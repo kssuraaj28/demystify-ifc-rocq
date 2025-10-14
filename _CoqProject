@@ -1,4 +1,8 @@
 -Q . NMIF
+# Version
+# The Rocq Prover, version 9.0.0
+# compiled with OCaml 5.2.1
+
 # How to run everything? 
 # rocq makefile -f _CoqProject *.v -o Makefile
-# coq_makefile -f _CoqProject *.v -o Makefile
+# Earlier, it was coq_makefile -f _CoqProject *.v -o Makefile
