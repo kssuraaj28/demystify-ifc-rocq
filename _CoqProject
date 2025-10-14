@@ -1,1 +1,4 @@
 -Q . NMIF
+# How to run everything? 
+# rocq makefile -f _CoqProject *.v -o Makefile
+# coq_makefile -f _CoqProject *.v -o Makefile

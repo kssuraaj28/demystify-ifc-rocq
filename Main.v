@@ -1,0 +1,1 @@
+Definition InitialCommit := 42.
