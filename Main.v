@@ -152,57 +152,18 @@ Section AttackSem.
     leak_strat : (PTStore * PUStore) -> list Value; 
     }.
 
+
+  (* 
+  This is one way to do this, 
+  and probably not the correct way to do it. 
+  We'd need a way to define composition of attack with program?
+  I think that this might be okay though...
+  *)
+  Inductive AttackedLanguageCommand : Set :=  
+  |  code (c : LanguageCommand ) 
+  |  atk (a : AttackSnippet ) 
+  . (* Could I coerce LanguageCommand into AttackedLanguageCommand*)
+
+  Definition AttackedProgram := list AttackedLanguageCommand.
+
 End AttackSem.
-
-
-(* TODO: There does seem to be some duplication here... I don't like this at all. *)
-Fail Module FourPointProg (attacklevel : nat). (* Hmm. You can only parameterize modules by 'module types'. Actually, you can use this Parameter thing *)
-
-  Inductive FourPoint := ST | PT | PU | SU.
-  Record VarName : Set := {
-    point : FourPoint ;
-    name : nat 
-  }.
-
-  Notation " p ~ id " := {| point := p ; name := id |} (at level 50).
-  Check ST~5.
-
-  Definition Value := nat. (* Maybe this really needs to be argument to a module *)
-  Definition Store := VarName -> Value.
-
-
-
-  (* This is really a basic block *)
-  Inductive LanguageCommand : Set :=
-    | assignment ( v : VarName ) ( f : Store -> Store)
-    | input ( v : VarName )
-    | output ( v : VarName )
-  .
-
-  (* An AdversaryAttack is a pair of functions.
-  - state transform : Store -> Store, but you don't read the secret variables and dont' corrupt the trusted variables
-  - leak transform : Store -> LeakedVals, but the you don't read the secret variables.
-
-  What is the right way to do this?
-  - We could require that it is any function but require a proof that of this property.
-  - We could syntactically construct something. How exactly will this work out?
-
-  *)
-  Record AdversaryAttack := 
-  {
-    state_trans: Store -> Store  ;
-    leak_info: Store -> list Value 
-  }. (* This is not exactly correct. *)
-
-
-  
-
-
-
-  (* Eventually we need to do something like forall adv, exists sim. You need to define a composition operation with these single attack programs. 
-  Q: Can this be a partial operation? Does it make sense to have a type system here?
-  *)
-
-
-
-End FourPointProg.
