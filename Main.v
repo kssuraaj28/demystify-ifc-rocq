@@ -1,10 +1,10 @@
 (* I would eventually like to have a module or a typeclass for lattices *)
 
-Module MasterLanguage.
 Inductive PartialOrderExample : Set :=
   | root
   | alice
   | bob
+  | chuck
   | any.
 
 
@@ -15,6 +15,8 @@ Inductive PartialOrderFlows : PartialOrderExample -> PartialOrderExample -> Prop
   | any_bot (e : _) : any ≼ e
   | refl (e : _) : e ≼ e
 where "x ≼ y" :=  (PartialOrderFlows x y).
+
+(* This is essentially the M3 lattice.. *)
 
 Section Examples.
   Hint Constructors PartialOrderFlows : core.
@@ -85,10 +87,77 @@ Notation " ! x  " := (output x) (at level 50).
 
 
 Definition LanguageProgram := list LanguageCommand. (* Only straightline code for now *)
-End MasterLanguage.
+
+
+(* I really feel like this should be 'Module'. Maybe I should ask Gary. *)
+Section AttackSem.
+  Variable attack_level : Label.
+  Notation attack_conf :=  (conf attack_level).
+  Notation attack_int :=  (int attack_level).
+
+  Section Aux.
+    Variable element_label : Label. 
+    Notation element_conf := (conf element_label).
+    Notation element_int := (int element_label).
+
+    (* TODO: Why can't I make this Notation? *)
+    Definition public := element_conf ≼ attack_conf. 
+    Definition secret := ~public. 
+
+    Definition untrusted := element_int ≼ attack_int.
+    Definition trusted := ~untrusted.
+
+
+    (* My naming convention is different for Prop and Set *)
+    Definition public_trusted   : Prop := public /\ trusted.
+    Definition secret_trusted   : Prop := secret /\ trusted.
+    Definition public_untrusted : Prop := public /\ untrusted.
+    Definition secret_untrusted : Prop := secret /\ untrusted.
+
+    (* I don't know why I do this *)
+    Print Section AttackSem.
+    Print Section Aux.
+  End Aux.
+
+
+
+  (* TODO: If I make this a definition and view it outside a section what happens? *)
+  (* This is a subset type. I hope that coq gods are friendly to me, as I am using a dependent type *)
+  (* 
+    Essentially, we restrict the domain of the store.
+  *)
+  Notation StoreView := (fun P => { x : VarName | P (lbl x) } -> Value).
+
+  (* TODO: What's the easiest way to test these close to where they are defined? 
+  I think I'd like to have a way where I can just instantiate a section variable with something, and I test this example 'model'
+  Maybe, I could use Modules and Parameters?
+  The idea would be to define a module M that takes in a parameter p.
+  Then you would use it as follows: m_example := M<4>
+  *)
+
+  Definition PTStore : Set := StoreView public_trusted.
+  Definition STStore : Set := StoreView secret_trusted.
+  Definition PUStore : Set := StoreView public_untrusted.
+  Definition SUStore : Set := StoreView secret_untrusted.
+
+  (* An attack is the following information *)
+  Record AttackSnippet : Set := {
+   (* How do the public untrusted values get transformed? *)
+    pu_trans_strat : (PTStore * PUStore) -> PUStore; 
+
+   (* How do the secret untrusted values get transformed? *)
+    su_trans_strat : (PTStore * STStore * PUStore * SUStore ) -> SUStore;
+
+   (* What information is the attacker learning for themselves? *)
+    leak_strat : (PTStore * PUStore) -> list Value; 
+    }.
+
+End AttackSem.
+
 
 (* TODO: There does seem to be some duplication here... I don't like this at all. *)
-Module FourPointProg.
+Fail Module FourPointProg (attacklevel : nat). (* Hmm. You can only parameterize modules by 'module types'. Actually, you can use this Parameter thing *)
+
   Inductive FourPoint := ST | PT | PU | SU.
   Record VarName : Set := {
     point : FourPoint ;
@@ -137,5 +206,3 @@ Module FourPointProg.
 
 
 End FourPointProg.
-
-
