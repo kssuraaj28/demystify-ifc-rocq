@@ -58,11 +58,14 @@ Record VarName :  Set := {
   name : nat
   }.
 
+(* TODO: Can we automatically generate equality check for this? *)
+
 Notation " l ~ id " := {| lbl := l ; name := id |} (at level 30).
 Check ⟨ root , alice ⟩ ~ 5 : VarName.
 
-(* This is our 'Value' set *)
-Definition Value := nat.
+(* This is our 'Value' set. This should be abstracted out *)
+Definition Value : Set := nat.
+Definition val_eqb : Value -> Value -> bool := Nat.eqb. (* TODO: Do we need this? *)
 
 Definition Store := VarName -> Value.
 Example s1 : Store := fun _ => 5. (* TODO: Module this? *)
@@ -76,7 +79,7 @@ Example s2 : Store := fun v =>
 
 (* The set of commands we have in our langauge *)
 Inductive LanguageCommand : Set :=
-  | assignment (v : VarName) (f : Store -> Store)  (* Mixing syntax and semantics like a pro *)
+  | assignment (v : VarName) (f : Store -> Value)  (* Mixing syntax and semantics like a pro *)
   | input (v : VarName)
   | output (v : VarName)
 .
@@ -90,8 +93,8 @@ Definition LanguageProgram := list LanguageCommand. (* Only straightline code fo
 
 
 (* I really feel like this should be 'Module'. Maybe I should ask Gary. *)
-Section AttackSem.
-  Variable attack_level : Label.
+Module AttackSem.
+  Parameter attack_level : Label.
   Notation attack_conf :=  (conf attack_level).
   Notation attack_int :=  (int attack_level).
 
@@ -115,7 +118,6 @@ Section AttackSem.
     Definition secret_untrusted : Prop := secret /\ untrusted.
 
     (* I don't know why I do this *)
-    Print Section AttackSem.
     Print Section Aux.
   End Aux.
 
@@ -152,18 +154,85 @@ Section AttackSem.
     leak_strat : (PTStore * PUStore) -> list Value; 
     }.
 
-
   (* 
   This is one way to do this, 
   and probably not the correct way to do it. 
   We'd need a way to define composition of attack with program?
   I think that this might be okay though...
   *)
+
   Inductive AttackedLanguageCommand : Set :=  
-  |  code (c : LanguageCommand ) 
-  |  atk (a : AttackSnippet ) 
+  |  code (c : LanguageCommand )
+  |  atk (a : AttackSnippet )
   . (* Could I coerce LanguageCommand into AttackedLanguageCommand*)
 
   Definition AttackedProgram := list AttackedLanguageCommand.
 
+  Module OperationalSemantics.
+    Inductive Event : Set := 
+      | input (v : Value)
+      | output (v : Value)
+      | epsilon 
+      | adv_leak (lv : list Value).
+
+
+
+    (* TODO: I need to define this later
+    Moreover, I feel like this should be something coq should be able to do automatically.
+    TODO: Is this naming convention okay?
+    *)
+    Axiom eqb_VarName : VarName -> VarName -> bool.
+    Definition update_store (s : Store) (idx : VarName) (v : Value) : Store :=  
+      fun idx' => 
+      if (eqb_VarName idx idx') then v
+      else s idx.
+
+    (* TODO: Test this *)
+
+
+
+    Inductive lang_cmd_eval : 
+      Store -> (* Input store *)
+      LanguageCommand ->  (* Command to run *)
+      Event ->  (* Resulting event *)
+      Store ->  (* Resulting store *)
+      Prop := 
+
+      | assignment_eval (store var comp_fn : _) : 
+          let new_val := comp_fn store in
+          let new_store := update_store store var new_val in
+          lang_cmd_eval store (var ← comp_fn) epsilon new_store
+
+      | input_eval (store var val : _) : 
+          let new_store := update_store store var val in
+          lang_cmd_eval store (? var) (input val) new_store
+
+      | output_eval (store var : _) : 
+          let val := store var in
+          lang_cmd_eval store (! var) (output val) store
+    .
+
+    (* Maybe we prove that this is deterministic? *)
+
+    Record Configuration := {
+      prog : AttackedProgram ;
+      store : Store
+      }.
+
+
+    (* Evaluate an attack on a store *)
+    Inductive TransitionRel : AttackedProgram -> Events -> AttackedProgram -> Prop := 
+    .
+
+
+
+
+  End OperationalSemantics.
+
+
 End AttackSem.
+
+(* This really should be module *)
+Section OperationalSemantics.
+
+End OperationalSemantics.
