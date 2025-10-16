@@ -18,7 +18,7 @@ where "x ≼ y" :=  (PartialOrderFlows x y).
 
 (* This is essentially the M3 lattice.. *)
 
-Section Examples.
+Section example.
   Hint Constructors PartialOrderFlows : core.
   Hint Extern 10 => match goal with [ H : _ ≼ _ |- _ ] => inversion H end : core.
 
@@ -31,7 +31,7 @@ Section Examples.
   Goal ~ bob ≼ alice. Proof. auto. Qed.
   Goal forall x, x ≼ x. Proof. auto. Qed.
   Goal forall x y z, x ≼ y -> y ≼ z -> x ≼ z. Proof. auto. Qed.
-End Examples.
+End example.
 
 
 (* TODO: Have a confidentiality partial order, and integrity partial order, etc. *)
@@ -98,7 +98,7 @@ Module AttackSem.
   Notation attack_conf :=  (conf attack_level).
   Notation attack_int :=  (int attack_level).
 
-  Section Aux.
+  Section aux.
     Variable element_label : Label. 
     Notation element_conf := (conf element_label).
     Notation element_int := (int element_label).
@@ -118,8 +118,8 @@ Module AttackSem.
     Definition secret_untrusted : Prop := secret /\ untrusted.
 
     (* I don't know why I do this *)
-    Print Section Aux.
-  End Aux.
+    Print Section aux.
+  End aux.
 
 
 
@@ -137,10 +137,13 @@ Module AttackSem.
   Then you would use it as follows: m_example := M<4>
   *)
 
+  (* There is some repitition here *)
   Definition PTStore : Set := StoreView public_trusted.
   Definition STStore : Set := StoreView secret_trusted.
   Definition PUStore : Set := StoreView public_untrusted.
   Definition SUStore : Set := StoreView secret_untrusted.
+
+
 
   (* An attack is the following information *)
   Record AttackSnippet : Set := {
@@ -153,6 +156,14 @@ Module AttackSem.
    (* What information is the attacker learning for themselves? *)
     leak_strat : (PTStore * PUStore) -> list Value; 
     }.
+  Notation "☠︎︎⟨ x |  y | z ⟩" := {| pu_trans_strat := x ; su_trans_strat := y ; leak_strat := z |}.
+
+  Section check.
+    Variable pu_tr : (PTStore * PUStore) -> PUStore. 
+    Variable su_tr : (PTStore * STStore * PUStore * SUStore ) -> SUStore.
+    Variable leak : (PTStore * PUStore) -> list Value.
+    Check ☠︎︎⟨ pu_tr | su_tr | leak⟩. (* I'm soo good *)
+  End check.
 
   (* 
   This is one way to do this, 
@@ -189,6 +200,18 @@ Module AttackSem.
 
     (* TODO: Test this *)
 
+    (* TODO: Define these *)
+    Axiom extract_PUStore : Store -> PUStore.
+    Axiom extract_PTStore : Store -> PTStore.
+    Axiom extract_STStore : Store -> STStore.
+    Axiom extract_SUStore : Store -> SUStore.
+
+    (*TODO: This is pretty bad. I should probably refactor this sooo good. *)
+    Axiom update_storepu : Store -> PUStore -> Store.
+    Axiom update_storept : Store -> PTStore -> Store.
+    Axiom update_storest : Store -> STStore -> Store.
+    Axiom update_storesu : Store -> SUStore -> Store.
+
 
 
     Inductive lang_cmd_eval : 
@@ -209,8 +232,7 @@ Module AttackSem.
 
       | output_eval (store var : _) : 
           let val := store var in
-          lang_cmd_eval store (! var) (output val) store
-    .
+          lang_cmd_eval store (! var) (output val) store.
 
 
     Inductive atk_snip_eval : 
@@ -219,7 +241,43 @@ Module AttackSem.
       list Value ->  (* Leaked data *)
       Store ->  (* Resulting store *)
       Prop := 
-      | dummy ( s a lv : _) : atk_snip_eval s a lv s.
+      | atk_eval (store pu_tr su_tr leak yaaa: _) : 
+          let ststore := extract_STStore store in
+          let pustore := extract_PUStore store in
+          let ptstore := extract_PTStore store in
+          let sustore := extract_SUStore store in
+
+          (* There is some type level something happening *)
+          let pustore' := pu_tr (ptstore, pustore) in
+          let sustore' := su_tr (ptstore, ststore,  pustore, sustore) in
+
+
+          let atk := (☠︎︎⟨ pu_tr | su_tr | leak ⟩) in
+
+          atk_snip_eval store atk yaaa store.
+
+    (* Is there is better way to write a variable and coq just infers its type without using this function syntax? *)
+    Check
+      fun (store pu_tr su_tr leak_fn : _) =>
+          let ststore := extract_STStore store in
+          let pustore := extract_PUStore store in
+          let ptstore := extract_PTStore store in
+          let sustore := extract_SUStore store in
+
+          let leak := leak_fn (ptstore, pustore)  in
+
+          (* There is some type level something happening *)
+          let pustore' := pu_tr (ptstore, pustore) in
+          let sustore' := su_tr (ptstore, ststore,  pustore, sustore) in
+
+          let store' := update_storepu (update_storesu store sustore') pustore' in
+
+          let atk := (☠︎︎⟨ pu_tr | su_tr | leak_fn ⟩) in
+          
+
+          atk_snip_eval store atk leak store.
+
+
 
 
     Record Configuration := {
