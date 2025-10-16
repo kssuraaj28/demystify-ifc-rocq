@@ -212,7 +212,15 @@ Module AttackSem.
           lang_cmd_eval store (! var) (output val) store
     .
 
-    (* Maybe we prove that this is deterministic? *)
+
+    Inductive atk_snip_eval : 
+      Store -> (* Input store *)
+      AttackSnippet ->  (* Command to run *)
+      list Value ->  (* Leaked data *)
+      Store ->  (* Resulting store *)
+      Prop := 
+      | dummy ( s a lv : _) : atk_snip_eval s a lv s.
+
 
     Record Configuration := {
       prog : AttackedProgram ;
