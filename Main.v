@@ -241,24 +241,7 @@ Module AttackSem.
       list Value ->  (* Leaked data *)
       Store ->  (* Resulting store *)
       Prop := 
-      | atk_eval (store pu_tr su_tr leak yaaa: _) : 
-          let ststore := extract_STStore store in
-          let pustore := extract_PUStore store in
-          let ptstore := extract_PTStore store in
-          let sustore := extract_SUStore store in
-
-          (* There is some type level something happening *)
-          let pustore' := pu_tr (ptstore, pustore) in
-          let sustore' := su_tr (ptstore, ststore,  pustore, sustore) in
-
-
-          let atk := (☠︎︎⟨ pu_tr | su_tr | leak ⟩) in
-
-          atk_snip_eval store atk yaaa store.
-
-    (* Is there is better way to write a variable and coq just infers its type without using this function syntax? *)
-    Check
-      fun (store pu_tr su_tr leak_fn : _) =>
+      | atk_eval (store pu_tr su_tr leak_fn : _) : 
           let ststore := extract_STStore store in
           let pustore := extract_PUStore store in
           let ptstore := extract_PTStore store in
@@ -274,7 +257,6 @@ Module AttackSem.
 
           let atk := (☠︎︎⟨ pu_tr | su_tr | leak_fn ⟩) in
           
-
           atk_snip_eval store atk leak store.
 
 
