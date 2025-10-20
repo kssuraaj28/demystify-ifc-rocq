@@ -103,23 +103,23 @@ Module AttackSem.
     Notation element_conf := (conf element_label).
     Notation element_int := (int element_label).
 
-    (* TODO: Why can't I make this Notation? *)
-    Definition public := element_conf ≼ attack_conf. 
-    Definition secret := ~public. 
+    Definition Public : Prop := element_conf ≼ attack_conf. 
+    Definition Secret : Prop := ~Public. 
 
-    Definition untrusted := element_int ≼ attack_int.
-    Definition trusted := ~untrusted.
+    Definition Untrusted : Prop := element_int ≼ attack_int.
+    Definition Trusted   : Prop := ~Untrusted.
 
 
-    (* My naming convention is different for Prop and Set *)
-    Definition public_trusted   : Prop := public /\ trusted.
-    Definition secret_trusted   : Prop := secret /\ trusted.
-    Definition public_untrusted : Prop := public /\ untrusted.
-    Definition secret_untrusted : Prop := secret /\ untrusted.
+    (* My naming convention is same for Prop and Set *)
+    Definition PublicTrusted   : Prop := Public /\ Trusted.
+    Definition SecretTrusted   : Prop := Secret /\ Trusted.
+    Definition PublicUntrusted : Prop := Public /\ Untrusted.
+    Definition SecretUntrusted : Prop := Secret /\ Untrusted.
 
     (* I don't know why I do this *)
     Print Section aux.
   End aux.
+
 
 
 
@@ -128,7 +128,10 @@ Module AttackSem.
   (* 
     Essentially, we restrict the domain of the store.
   *)
-  Notation StoreView := (fun P => { x : VarName | P (lbl x) } -> Value).
+  Definition StoreView (P : VarName -> Prop) : Set := 
+    { x : VarName | P x } -> Value.
+
+
 
   (* TODO: What's the easiest way to test these close to where they are defined? 
   I think I'd like to have a way where I can just instantiate a section variable with something, and I test this example 'model'
@@ -137,31 +140,33 @@ Module AttackSem.
   Then you would use it as follows: m_example := M<4>
   *)
 
-  (* There is some repitition here *)
-  Definition PTStore : Set := StoreView public_trusted.
-  Definition STStore : Set := StoreView secret_trusted.
-  Definition PUStore : Set := StoreView public_untrusted.
-  Definition SUStore : Set := StoreView secret_untrusted.
+  Notation LiftLblPred := (fun Pred => fun idx => Pred (lbl idx)).
 
 
+  Notation StoreViewAll := (StoreView (fun _ => True)). (* This is isomorphic to Store *)
+  Notation StoreViewP := (StoreView (LiftLblPred Public)). (* Watchout, for Notations are not type checked! *)
+  Notation StoreViewPU := (StoreView (LiftLblPred PublicUntrusted)).
+  Notation StoreViewSU := (StoreView (LiftLblPred SecretUntrusted)).
 
   (* An attack is the following information *)
   Record AttackSnippet : Set := {
    (* How do the public untrusted values get transformed? *)
-    pu_trans_strat : (PTStore * PUStore) -> PUStore; 
+    pu_trans_strat : StoreViewP -> StoreViewPU ; 
 
    (* How do the secret untrusted values get transformed? *)
-    su_trans_strat : (PTStore * STStore * PUStore * SUStore ) -> SUStore;
+    su_trans_strat : StoreViewAll -> StoreViewSU;
 
    (* What information is the attacker learning for themselves? *)
-    leak_strat : (PTStore * PUStore) -> list Value; 
+    leak_strat : StoreViewP -> list Value; 
     }.
+
   Notation "☠︎︎⟨ x |  y | z ⟩" := {| pu_trans_strat := x ; su_trans_strat := y ; leak_strat := z |}.
 
+
   Section check.
-    Variable pu_tr : (PTStore * PUStore) -> PUStore. 
-    Variable su_tr : (PTStore * STStore * PUStore * SUStore ) -> SUStore.
-    Variable leak : (PTStore * PUStore) -> list Value.
+    Variable pu_tr : StoreViewP -> StoreViewPU. 
+    Variable su_tr : StoreViewAll -> StoreViewSU.
+    Variable leak : StoreViewP -> list Value.
     Check ☠︎︎⟨ pu_tr | su_tr | leak⟩. (* I'm soo good *)
   End check.
 
@@ -173,8 +178,8 @@ Module AttackSem.
   *)
 
   Inductive AttackedLanguageCommand : Set :=  
-  |  code (c : LanguageCommand )
-  |  atk (a : AttackSnippet )
+  |  code (c : LanguageCommand)
+  |  atk (a : AttackSnippet)
   . (* Could I coerce LanguageCommand into AttackedLanguageCommand*)
 
   Definition AttackedProgram := list AttackedLanguageCommand.
@@ -186,20 +191,35 @@ Module AttackSem.
       | epsilon 
       | adv_leak (lv : list Value).
 
-
-
     (* TODO: I need to define this later
     Moreover, I feel like this should be something coq should be able to do automatically.
     TODO: Is this naming convention okay?
     *)
-    Axiom eqb_VarName : VarName -> VarName -> bool.
-    Definition update_store (s : Store) (idx : VarName) (v : Value) : Store :=  
-      fun idx' => 
-      if (eqb_VarName idx idx') then v
-      else s idx.
 
-    (* TODO: Test this *)
+    Definition extract_StoreView (s : Store) (Pred : VarName -> Prop) : StoreView Pred :=
+      fun c => 
+        match c with 
+          exist _ idx _ => (s idx)
+        end.
 
+    (* Algorithms are overrated. *)
+    Definition UpdatedStore (oldstore : Store) {P} (update : StoreView P) (newstore : Store) : Prop := 
+      forall (var : VarName), 
+        ~(P var) -> newstore var = oldstore var /\
+        forall (prf : P var), newstore var = update (exist _ var prf). 
+        (* TODO: Is there notation for exist? Also, could I use Ltac to define this?*)
+
+    (* Helper when the update is just for a single value. 
+       I am a little bit sad that this is not a function
+    *)
+    Definition UpdatedStoreVal (oldstore var val newstore : _) := 
+            let P := fun x => x = var in
+            let storeslice := fun (inp : { x : VarName | P x }) =>  val in
+            UpdatedStore oldstore storeslice newstore.
+
+
+
+        (*
     (* TODO: Define these *)
     Axiom extract_PUStore : Store -> PUStore.
     Axiom extract_PTStore : Store -> PTStore.
@@ -212,6 +232,7 @@ Module AttackSem.
     Axiom update_storest : Store -> STStore -> Store.
     Axiom update_storesu : Store -> SUStore -> Store.
 
+    *)
 
 
     Inductive lang_cmd_eval : 
@@ -221,13 +242,13 @@ Module AttackSem.
       Store ->  (* Resulting store *)
       Prop := 
 
-      | assignment_eval (store var comp_fn : _) : 
+      | assignment_eval (store new_store var comp_fn : _) : 
           let new_val := comp_fn store in
-          let new_store := update_store store var new_val in
+          UpdatedStoreVal store var new_val new_store ->
           lang_cmd_eval store (var ← comp_fn) epsilon new_store
 
-      | input_eval (store var val : _) : 
-          let new_store := update_store store var val in
+      | input_eval (store new_store var val : _) : 
+          UpdatedStoreVal store var val new_store ->
           lang_cmd_eval store (? var) (input val) new_store
 
       | output_eval (store var : _) : 
@@ -273,14 +294,6 @@ Module AttackSem.
     .
 
 
-
-
   End OperationalSemantics.
 
-
 End AttackSem.
-
-(* This really should be module *)
-Section OperationalSemantics.
-
-End OperationalSemantics.
