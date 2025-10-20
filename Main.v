@@ -1,4 +1,6 @@
 (* I would eventually like to have a module or a typeclass for lattices *)
+From Stdlib Require Import List.
+Import ListNotations.
 
 Inductive PartialOrderExample : Set :=
   | root
@@ -14,7 +16,9 @@ Inductive PartialOrderFlows : PartialOrderExample -> PartialOrderExample -> Prop
   | root_top (e : _) : e ≼ root
   | any_bot (e : _) : any ≼ e
   | refl (e : _) : e ≼ e
-where "x ≼ y" :=  (PartialOrderFlows x y).
+where "x ≼ y" :=  (PartialOrderFlows x y). 
+(* Watchout! When you do _, PartialOrderFlows is defined okay, but the notation is messed up! TODO *)
+
 
 (* This is essentially the M3 lattice.. *)
 
@@ -254,7 +258,7 @@ Module AttackSem.
     *)
 
 
-    Inductive lang_cmd_eval : 
+    Inductive LangCmdEval : 
       Store -> (* Input store *)
       LanguageCommand ->  (* Command to run *)
       Event ->  (* Resulting event *)
@@ -264,18 +268,18 @@ Module AttackSem.
       | assignment_eval (store new_store var comp_fn : _) : 
           let new_val := comp_fn store in
           UpdatedStoreVal store var new_val new_store ->
-          lang_cmd_eval store (var ← comp_fn) epsilon new_store
+          _ store (var ← comp_fn) epsilon new_store
 
       | input_eval (store new_store var val : _) : 
           UpdatedStoreVal store var val new_store ->
-          lang_cmd_eval store (? var) (input val) new_store
+          _ store (? var) (input val) new_store
 
       | output_eval (store var : _) : 
           let val := store var in
-          lang_cmd_eval store (! var) (output val) store.
+          _ store (! var) (output val) store.
 
-          
-    Inductive atk_snip_eval : 
+
+    Inductive AtkSnipEval : 
       Store -> (* Input store *)
       AttackSnippet ->  (* Command to run *)
       list Value ->  (* Leaked data *)
@@ -291,21 +295,32 @@ Module AttackSem.
           let leak := leak_fn pubstore in
 
           new_store = CombinedStoreView newpustore newsustore ->
-          atk_snip_eval store atk leak store.
-
-
+          _ store atk leak store.
 
     Record Configuration := {
-      prog : AttackedProgram ;
+      prog : AttackedProgram;
       store : Store
       }.
 
-
     (* Evaluate an attack on a store *)
-    Inductive TransitionRel : AttackedProgram -> Events -> AttackedProgram -> Prop := 
-    .
+    Inductive TransitionRel : 
+      Configuration ->  (*Starting state*)
+      Event ->  (* Event, if any *)
+      Configuration -> (* Resulting state *)
+      Prop := 
+      | atk_step (store store' atk_snip leak remaining : _) :
+          let cfg := ({| prog := (atk atk_snip) :: remaining ; store := store |}) in
+          let cfg' := ({| prog := remaining ; store := store' |}) in
+          AtkSnipEval store atk_snip leak  store' ->
+          TransitionRel cfg (adv_leak leak) cfg'
+
+      | prg_step  (store store' cmd event remaining : _) :
+          let cfg := ({| prog := (code cmd) :: remaining ; store := store |}) in
+          let cfg' := ({| prog := remaining ; store := store' |}) in
+          LangCmdEval store cmd event store' ->
+          TransitionRel cfg event cfg'.
+
 
 
   End OperationalSemantics.
-
 End AttackSem.
