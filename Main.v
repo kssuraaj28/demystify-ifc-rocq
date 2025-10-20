@@ -142,33 +142,31 @@ Module AttackSem.
 
   Notation LiftLblPred := (fun Pred => fun idx => Pred (lbl idx)).
 
-
-  Notation StoreViewAll := (StoreView (fun _ => True)). (* This is isomorphic to Store *)
-  Notation StoreViewP := (StoreView (LiftLblPred Public)). (* Watchout, for Notations are not type checked! *)
-  Notation StoreViewPU := (StoreView (LiftLblPred PublicUntrusted)).
-  Notation StoreViewSU := (StoreView (LiftLblPred SecretUntrusted)).
+  (* Watchout, for notations are not type checked *)
+  Notation AllVar := (fun _ => True).
+  Notation PubVar := (LiftLblPred Public).
+  Notation PUVar := (LiftLblPred PublicUntrusted).
+  Notation SUVar := (LiftLblPred SecretUntrusted).
 
   (* An attack is the following information *)
   Record AttackSnippet : Set := {
    (* How do the public untrusted values get transformed? *)
-    pu_trans_strat : StoreViewP -> StoreViewPU ; 
+    pu_trans_strat : (StoreView PubVar) -> (StoreView PUVar); 
 
    (* How do the secret untrusted values get transformed? *)
-    su_trans_strat : StoreViewAll -> StoreViewSU;
+    su_trans_strat : (StoreView AllVar) -> (StoreView SUVar);
 
    (* What information is the attacker learning for themselves? *)
-    leak_strat : StoreViewP -> list Value; 
+    leak_strat : (StoreView PubVar) -> list Value; 
     }.
 
   Notation "☠︎︎⟨ x |  y | z ⟩" := {| pu_trans_strat := x ; su_trans_strat := y ; leak_strat := z |}.
 
+  Check let pu_tr := _ in let su_tr := _ in  let leak := _ in
+      ☠︎︎⟨ pu_tr | su_tr | leak⟩. (* I'm soo good *)
 
-  Section check.
-    Variable pu_tr : StoreViewP -> StoreViewPU. 
-    Variable su_tr : StoreViewAll -> StoreViewSU.
-    Variable leak : StoreViewP -> list Value.
-    Check ☠︎︎⟨ pu_tr | su_tr | leak⟩. (* I'm soo good *)
-  End check.
+  Check fun pu_tr su_tr leak => (☠︎︎⟨ pu_tr | su_tr | leak⟩ : _). (* I'm soo good. Note how there is a difference between this and the previous one *)
+
 
   (* 
   This is one way to do this, 
@@ -192,17 +190,20 @@ Module AttackSem.
       | adv_leak (lv : list Value).
 
     (* TODO: I need to define this later
-    Moreover, I feel like this should be something coq should be able to do automatically.
     TODO: Is this naming convention okay?
     *)
 
-    Definition extract_StoreView (s : Store) (Pred : VarName -> Prop) : StoreView Pred :=
+    Definition extract_storeview (s : Store) (Pred : VarName -> Prop) : StoreView Pred :=
       fun c => 
         match c with 
           exist _ idx _ => (s idx)
         end.
 
-    (* Algorithms are overrated. *)
+
+    (* 
+    Algorithms are overrated. Here, this P is a predicate. 
+    This means that getting computational things might turn out to be bad 
+    *)
     Definition UpdatedStore (oldstore : Store) {P} (update : StoreView P) (newstore : Store) : Prop := 
       forall (var : VarName), 
         ~(P var) -> newstore var = oldstore var /\
@@ -213,9 +214,27 @@ Module AttackSem.
        I am a little bit sad that this is not a function
     *)
     Definition UpdatedStoreVal (oldstore var val newstore : _) := 
-            let P := fun x => x = var in
-            let storeslice := fun (inp : { x : VarName | P x }) =>  val in
-            UpdatedStore oldstore storeslice newstore.
+      let P := fun x => x = var in
+      let storeslice := fun (inp : { x : VarName | P x }) =>  val in
+      UpdatedStore oldstore storeslice newstore.
+
+
+    (* What does it mean to combine two store views*)
+    (* I also don't know whether this works. I would like to have an example to check. Moreover, I think that this is not deterministic*)
+    (* I wonder if an inductive definition is clearer *)
+    (* TODO: Can I use Ltac for this? *)
+    Definition CombinedStoreView {P1} {P2} (sv1 : StoreView P1) (sv2 : StoreView P2) (sres : StoreView (fun var => P1 var \/ P2 var)) : Prop :=
+      forall var, 
+        forall (prf : P1 var), 
+          let val := sv1 (exist _ var prf) in 
+          let resval := sres (exist _ var (or_introl prf)) in (* TODO: Why is it that I can (or_introl _ prf) also?*)
+          resval = val
+      \/
+        forall (prf : P2 var), 
+          let val := sv2 (exist _ var prf) in 
+          let resval := sres (exist _ var (or_intror prf)) in 
+          resval = val.
+
 
 
 
@@ -228,7 +247,7 @@ Module AttackSem.
 
     (*TODO: This is pretty bad. I should probably refactor this sooo good. *)
     Axiom update_storepu : Store -> PUStore -> Store.
-    Axiom update_storept : Store -> PTStore -> Store.
+    Axiom update_storept : Store -> PTStore -kZZ> Store.
     Axiom update_storest : Store -> STStore -> Store.
     Axiom update_storesu : Store -> SUStore -> Store.
 
@@ -255,31 +274,24 @@ Module AttackSem.
           let val := store var in
           lang_cmd_eval store (! var) (output val) store.
 
-
+          
     Inductive atk_snip_eval : 
       Store -> (* Input store *)
       AttackSnippet ->  (* Command to run *)
       list Value ->  (* Leaked data *)
       Store ->  (* Resulting store *)
       Prop := 
-      | atk_eval (store pu_tr su_tr leak_fn : _) : 
-          let ststore := extract_STStore store in
-          let pustore := extract_PUStore store in
-          let ptstore := extract_PTStore store in
-          let sustore := extract_SUStore store in
-
-          let leak := leak_fn (ptstore, pustore)  in
-
-          (* There is some type level something happening *)
-          let pustore' := pu_tr (ptstore, pustore) in
-          let sustore' := su_tr (ptstore, ststore,  pustore, sustore) in
-
-          let store' := update_storepu (update_storesu store sustore') pustore' in
+      | atk_eval (store new_store pu_tr su_tr leak_fn : _) : 
+          let pubstore := extract_storeview store PubVar in
+          let allstore := extract_storeview store AllVar in
 
           let atk := (☠︎︎⟨ pu_tr | su_tr | leak_fn ⟩) in
-          
-          atk_snip_eval store atk leak store.
+          let newpustore := pu_tr pubstore in 
+          let newsustore := su_tr allstore in
+          let leak := leak_fn pubstore in
 
+          new_store = CombinedStoreView newpustore newsustore ->
+          atk_snip_eval store atk leak store.
 
 
 
