@@ -241,23 +241,6 @@ Module AttackSem.
 
 
 
-
-        (*
-    (* TODO: Define these *)
-    Axiom extract_PUStore : Store -> PUStore.
-    Axiom extract_PTStore : Store -> PTStore.
-    Axiom extract_STStore : Store -> STStore.
-    Axiom extract_SUStore : Store -> SUStore.
-
-    (*TODO: This is pretty bad. I should probably refactor this sooo good. *)
-    Axiom update_storepu : Store -> PUStore -> Store.
-    Axiom update_storept : Store -> PTStore -kZZ> Store.
-    Axiom update_storest : Store -> STStore -> Store.
-    Axiom update_storesu : Store -> SUStore -> Store.
-
-    *)
-
-
     Inductive LangCmdEval : 
       Store -> (* Input store *)
       LanguageCommand ->  (* Command to run *)
@@ -321,6 +304,12 @@ Module AttackSem.
           TransitionRel cfg event cfg'.
 
 
+    (* I'd like to define what NMIF means semantically. 
+    - Single attack nmif. There are multiple choices here. 
+        The attacker that does not touch SU. The attacker that sets them to 0, etc.
+        Are all these definitions equivalent?
+    - Lifting this to multiple attacks. 
+    *)
 
   End OperationalSemantics.
 End AttackSem.
