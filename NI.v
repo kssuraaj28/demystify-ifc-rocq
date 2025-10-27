@@ -1,12 +1,6 @@
-(* The many different ways to define Noninterference *)
+(* In my math, these hold obviously *)
 From Stdlib Require Import Logic.FunctionalExtensionality.
-Definition Val := nat.
-
-Record State : Set := {trusted : Val ; untrusted : Val}.
-Notation "⟨ t | u ⟩" := {| trusted := t ; untrusted := u |} (at level 5). (* Can I do this without | *)
-
-Definition Computation : Set := State -> State.
-
+From Stdlib Require Import Logic.ClassicalFacts.
 
 Section constant.
   Context {A B : Type}.
@@ -15,38 +9,36 @@ Section constant.
   Notation A_has_element := (exists a : A, True). (* Note how we just 'transported' A to Prop. In some sense, this is just A. Is this impredicativity? *)
 
   Definition constant : Prop := forall a a', f a = f a'. 
-
   Definition constant' : Prop := exists b, forall a, f a = b. 
-  
-
-  (* Is there a function that satisified constant', but not constant? *)
-  Goal constant <-> constant'. 
-  Proof.
-    unfold constant; unfold constant'; intuition.
-    - admit. (* This does not hold actually.. *)
-    - firstorder; generalize (H a'); generalize (H a); intros; subst; auto. (* This is garbage *)
-  Abort.
-
 End constant.
 
-Definition example (x : Empty_set) : Empty_set :=  match x with end.
-
-Goal constant example. Proof. cbv; intuition. Qed.
+Definition example (x : Empty_set) : Empty_set :=  match x with end. 
+Goal constant example. Proof. cbv; intuition. Qed. 
 Goal ~ constant' example. Proof. cbv; inversion 1; intuition. Qed.
 
+
+
+(* The many different ways to define Noninterference *)
+Parameter SecretVal : Set.
+Parameter PublicVal : Set.
+
+Record State : Set := {secret : SecretVal ; public : PublicVal}.
+Notation "⟨ s | p ⟩" := {| secret := s ; public := p |} (at level 5). (* Can I do this without | *)
+
+Definition Computation : Set := State -> State.
 
 Section ni_defs.
   Variable f : Computation.
 
   (* When if f noninterfering? *)
   Definition ni_0 : Prop :=
-    forall t, forall u1 u2, 
-      let inp1 := ⟨ t | u1⟩ in
-      let inp2 := ⟨ t | u2 ⟩ in
-      trusted (f inp1) = trusted (f inp2).
+    forall p, forall s1 s2, 
+      let inp1 := ⟨ s1 | p⟩ in
+      let inp2 := ⟨ s2 | p ⟩ in
+      public (f inp1) = public (f inp2).
 
   Definition ni_1 : Prop :=
-    forall t, let f := (fun u => trusted (f ⟨ t | u ⟩)) in
+    forall p, let f := (fun s => public (f ⟨ s | p ⟩)) in
           constant f.
 
   Goal ni_1 <-> ni_0. Proof. firstorder. Qed. 
@@ -54,31 +46,46 @@ Section ni_defs.
   (* There is probably a version where we need to use exists *)
 
 
-  Goal forall {A} {B} (f1 f2 : A -> B) , f1 = f2 -> forall x, f1 x = f2 x.
+
+
+  (* 
+    This is a garbage definition!
+    It is essentially always true!
+  *)
+  Definition garbage (s : SecretVal) : Prop :=
+    exists pub_trans,
+      (* TODO: forall s used to be here before. Does that make a difference?*)
+      pub_trans = fun p => public (f ⟨ s | p ⟩).
+
+
+  Goal forall s, garbage s.
   Proof.
-    congruence.
-  Save temp.
+    eexists; reflexivity.
+  Qed.
 
+  (* Something using exists *)
+  Definition ni_2 : Prop := exists pub_trans, forall s, pub_trans = fun p => public (f ⟨ s | p ⟩).
 
-  Definition ni_2 : Prop :=
-    exists tr_trans,
-      forall u,
-      tr_trans = fun t => trusted (f ⟨ t | u ⟩).
+  Axiom temp : inhabited SecretVal \/ ~inhabited (SecretVal). (* This is nothing really special *)
 
   Goal ni_1 <->  ni_2.
   Proof.
-    split; red in *; intros; simpl in *; cycle 1.
-    - destruct H; subst f0; red; intros.
+    unfold ni_1; unfold ni_2; split; intros; cycle 1.
+    - red; intros. destruct H. 
       generalize (H a).
       generalize (H a').
+      clear H.
       intros; subst.
-      specialize (temp _ _ H1 t).
-      clear H1 H.
-      auto. (* What the hell.. This should be much easier *)
+      assert (forall A B (f1 f2 : A -> B) , f1 = f2 -> forall x, f1 x = f2 x); [ congruence | idtac ].
+      specialize (H _ _ _ _ H0 p).
+      auto. (* What the hell.. This should be much easier. This is a disgusting proof. *)
 
-    - exists (fun t => trusted (f ⟨ t | 0 ⟩)). (* The fact that there is a zero makes this a little sad *)
-      intros.
-      apply functional_extensionality.
-      firstorder.
+    - destruct temp as [[s] |  y].
+      --  exists (fun p => public (f ⟨ s | p ⟩)). (* This does make me a little sad. Is there a version with no axioms? *)
+          intros. 
+          apply functional_extensionality.
+          firstorder.
+      -- eexists (fun x => x). (* This seems arbitrary too... *)
+         intros; exfalso; auto.
   Qed.
 End ni_defs.
