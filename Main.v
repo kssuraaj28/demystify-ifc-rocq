@@ -33,6 +33,7 @@ Section example.
   Goal any ≼ bob. Proof. auto. Qed.
   Goal ~ alice ≼ bob. Proof. auto.  Qed.
   Goal ~ bob ≼ alice. Proof. auto. Qed.
+  Goal ~ chuck ≼ alice. Proof. auto. Qed.
   Goal forall x, x ≼ x. Proof. auto. Qed.
   Goal forall x y z, x ≼ y -> y ≼ z -> x ≼ z. Proof. auto. Qed.
 End example.
@@ -51,7 +52,7 @@ Definition IntPO :=  PartialOrderExample.
 
 Record Label : Set := { 
   conf : ConfPO ;
-  int : ConfPO
+  int : IntPO
   }.
 
 Notation " ⟨ l1 , l2 ⟩ " := {| conf := l1 ; int := l2 |}.
@@ -278,7 +279,7 @@ Module AttackSem.
           let leak := leak_fn pubstore in
 
           new_store = CombinedStoreView newpustore newsustore ->
-          _ store atk leak store.
+          _ store atk leak store. (* This should not be store!! *)
 
     Record Configuration := {
       prog : AttackedProgram;
