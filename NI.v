@@ -67,6 +67,7 @@ Section ni_defs.
     forall secret, (fun p => public  ( f ⟨ tested_secret | p ⟩)) =  (fun p => public  ( f ⟨ secret | p ⟩)).
 
 
+  
   Goal forall s, (ni_2 s <-> ni_1). (* (forall s, ni_2 s) also equal?  *)
   Proof.
     cbv; split; intros; simpl in *.
@@ -85,6 +86,7 @@ Section ni_defs.
       end; auto.
   Qed.
 
+  (* Can I prove this from previous? This seems a little stupid *)
   Goal (forall s, ni_2 s) <-> ni_1.
   Proof.
     cbv; split; intros; simpl in *.
