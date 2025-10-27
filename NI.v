@@ -86,9 +86,35 @@ Section ni_defs.
       end; auto.
   Qed.
 
-  (* Can I prove this from previous? This seems a little stupid *)
+
+  Goal forall ts, (ni_2 ts -> (forall s, ni_2 s)).
+  Proof.
+    (* Note how this really depends on the definition of ni_2 *)
+    unfold ni_2; simpl; intros.
+    (* This pattern can be a really cool tactic *)
+    generalize (H s).
+    generalize (H secret0).
+    clear H.
+    intros.
+    rewrite <- H.
+    rewrite <- H0.
+    auto.
+    (* Woah, we can actually even prove this with coq's garbage = *)
+  Qed.
+
+
+  (* The other direction is obvious *)
+  Goal forall (T : Type) (P : T -> Prop) x, ((forall x', P x') -> P x).
+  Proof.
+    firstorder.
+  Qed.
+
+  (* Can I prove this from previous? This seems a little stupid. I don't know whether I am proving something harder or easier. *)
   Goal (forall s, ni_2 s) <-> ni_1.
   Proof.
+    split.
+    - admit.
+    - intros. rewrite temp. auto.
     cbv; split; intros; simpl in *.
     - generalize (H a a'). 
       clear H.
