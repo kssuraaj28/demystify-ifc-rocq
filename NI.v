@@ -63,14 +63,51 @@ Section ni_defs.
     eexists; reflexivity.
   Qed.
 
+  Definition ni_2 (tested_secret : SecretVal) : Prop := 
+    forall secret, (fun p => public  ( f ⟨ tested_secret | p ⟩)) =  (fun p => public  ( f ⟨ secret | p ⟩)).
+
+
+  Goal forall s, (ni_2 s <-> ni_1). (* (forall s, ni_2 s) also equal?  *)
+  Proof.
+    cbv; split; intros; simpl in *.
+    - generalize (H a).
+      generalize (H a').
+      clear H.
+      intros.
+      rewrite  H in H0.
+      match goal with 
+        [ H : ?f = ?g |- _ ] => specialize (equal_f H); clear H; intros 
+      end; firstorder. (* This is kinda disgusting *)
+
+    - apply functional_extensionality; intros;
+      match goal with 
+        [H : forall a b c, _ , a: _ , b: _ , c: _ |- _] => specialize (H a b c)
+      end; auto.
+  Qed.
+
+  Goal (forall s, ni_2 s) <-> ni_1.
+  Proof.
+    cbv; split; intros; simpl in *.
+    - generalize (H a a'). 
+      clear H.
+      intros.
+      match goal with 
+        [ H : ?f = ?g |- _ ] => specialize (equal_f H); clear H; intros 
+      end; firstorder. (* This is kinda disgusting *)
+    - apply functional_extensionality;
+      firstorder.
+  Qed.
+
+
+
   (* Something using exists *)
-  Definition ni_2 : Prop := exists pub_trans, forall s, pub_trans = fun p => public (f ⟨ s | p ⟩).
+  Definition ni_3 : Prop := exists pub_trans, forall s, pub_trans = fun p => public (f ⟨ s | p ⟩).
 
   Axiom temp : inhabited SecretVal \/ ~inhabited (SecretVal). (* This is nothing really special *)
 
-  Goal ni_1 <->  ni_2.
+  Goal ni_1 <->  ni_3.
   Proof.
-    unfold ni_1; unfold ni_2; split; intros; cycle 1.
+    unfold ni_1; unfold ni_3; split; intros; cycle 1.
     - red; intros. destruct H. 
       generalize (H a).
       generalize (H a').
@@ -88,4 +125,7 @@ Section ni_defs.
       -- eexists (fun x => x). (* This seems arbitrary too... *)
          intros; exfalso; auto.
   Qed.
+
+
+
 End ni_defs.
