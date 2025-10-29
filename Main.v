@@ -155,20 +155,39 @@ Module AttackSem.
 
   (* TODO: Attacks need to have private memory  *)
 
-  (* An attack is the following information *)
-  Record AttackSnippet (AttackerMem : Set) : Set := {
-   (* How do the public untrusted values get transformed? *)
-    pu_trans_strat : AttackerMem -> (StoreView PubVar) -> (StoreView PUVar); 
+  Section attackermem.
+    Variable AttackerMem : Set.
+    (* An attack is the following information *)
+    Record AttackSnippet  : Set := {
+     (* How do the public untrusted values get transformed? *)
+      pu_trans_strat : AttackerMem -> (StoreView PubVar) -> (StoreView PUVar); 
 
-   (* What information is the attacker learning for themselves? *)
-    leak_strat : AttackerMem -> (StoreView PubVar) -> list Value; 
+     (* What information is the attacker learning for themselves? *)
+      leak_strat : AttackerMem -> (StoreView PubVar) -> list Value; 
 
-   (* How is the attacker memory changed? *)
-    mem_strat : AttackerMem -> (StoreView PubVar) -> AttackerMem; 
+     (* How is the attacker memory changed? *)
+      mem_strat : AttackerMem -> (StoreView PubVar) -> AttackerMem; 
 
-   (* How do the secret untrusted values get transformed? *)
-    su_trans_strat : AttackerMem -> (StoreView AllVar) -> (StoreView SUVar);
-    }.
+     (* How do the secret untrusted values get transformed? *)
+      su_trans_strat : AttackerMem -> (StoreView AllVar) -> (StoreView SUVar);
+      }.
+
+
+
+    (* 
+    This is one way to do this, 
+    and probably not the correct way to do it. 
+    We'd need a way to define composition of attack with program?
+    I think that this might be okay though...
+    *)
+
+    Inductive AttackedLanguageCommand : Set :=  
+    |  code (c : LanguageCommand)
+    |  atk (a : AttackSnippet)
+    . (* Could I coerce LanguageCommand into AttackedLanguageCommand*)
+
+    Definition AttackedProgram := list AttackedLanguageCommand.
+  End attackermem.
 
   Notation "☠︎︎⟨ x |  y | z ⟩" := {| pu_trans_strat := x ; su_trans_strat := y ; leak_strat := z |}.
 
@@ -176,21 +195,6 @@ Module AttackSem.
       ☠︎︎⟨ pu_tr | su_tr | leak⟩. (* I'm soo good *)
 
   Check fun pu_tr su_tr leak => (☠︎︎⟨ pu_tr | su_tr | leak⟩ : _). (* I'm soo good. Note how there is a difference between this and the previous one *)
-
-
-  (* 
-  This is one way to do this, 
-  and probably not the correct way to do it. 
-  We'd need a way to define composition of attack with program?
-  I think that this might be okay though...
-  *)
-
-  Inductive AttackedLanguageCommand : Set :=  
-  |  code (c : LanguageCommand)
-  |  atk (a : AttackSnippet)
-  . (* Could I coerce LanguageCommand into AttackedLanguageCommand*)
-
-  Definition AttackedProgram := list AttackedLanguageCommand.
 
   Module OperationalSemantics.
     Inductive Event : Set := 
@@ -268,25 +272,30 @@ Module AttackSem.
           _ store (! var) (output val) store.
 
 
-    Inductive AtkSnipEval : 
-      Store -> (* Input store *)
-      AttackSnippet ->  (* Command to run *)
-      list Value ->  (* Leaked data *)
-      Store ->  (* Resulting store *)
-      Prop := 
-      | atk_eval (store new_store combined_view (* Make it exists?*) pu_tr su_tr leak_fn : _) : 
-          let pubstore := extract_storeview store PubVar in
-          let allstore := extract_storeview store AllVar in
+    Section attackermem.
+      Variable AtkMem : Set.
 
-          let atk := (☠︎︎⟨ pu_tr | su_tr | leak_fn ⟩) in
-          let newpustore := pu_tr pubstore in 
-          let newsustore := su_tr allstore in
-          let leak := leak_fn pubstore in
+      Inductive AtkSnipEval : 
+        Store -> (* Input store *)
+        AtkMem -> (* Attacker memory*)
+        AttackSnippet (AtkMem) ->  (* Command to run *)
+        list Value ->  (* Leaked data *)
+        Store ->  (* Resulting store *)
+        AtkMem -> (* Attacker memory*)
+        Prop := 
+        | atk_eval (store new_store combined_view (* Make it exists?*) pu_tr su_tr leak_fn  : _) : 
+            let pubstore := extract_storeview store PubVar in
+            let allstore := extract_storeview store AllVar in
 
-          CombinedStoreView newpustore newsustore combined_view -> (* Maybe this combined view thing should really be exists *)
-          UpdatedStore store combined_view new_store -> (* Maybe this combined view thing should really be exists *)
+            let atk := (☠︎︎⟨ pu_tr | su_tr | leak_fn ⟩) in
+            let newpustore := pu_tr pubstore in 
+            let newsustore := su_tr allstore in
+            let leak := leak_fn pubstore in
 
-          _ store atk leak new_store. 
+            CombinedStoreView newpustore newsustore combined_view -> (* Maybe this combined view thing should really be exists *)
+            UpdatedStore store combined_view new_store -> (* Maybe this combined view thing should really be exists *)
+
+            _ store atk leak new_store. 
 
     Record Configuration := {
       prog : AttackedProgram;
