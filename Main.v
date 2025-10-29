@@ -153,6 +153,8 @@ Module AttackSem.
   Notation PUVar := (LiftLblPred PublicUntrusted).
   Notation SUVar := (LiftLblPred SecretUntrusted).
 
+  (* TODO: Attacks need to have private memory  *)
+
   (* An attack is the following information *)
   Record AttackSnippet : Set := {
    (* How do the public untrusted values get transformed? *)
