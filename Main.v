@@ -156,15 +156,18 @@ Module AttackSem.
   (* TODO: Attacks need to have private memory  *)
 
   (* An attack is the following information *)
-  Record AttackSnippet : Set := {
+  Record AttackSnippet (AttackerMem : Set) : Set := {
    (* How do the public untrusted values get transformed? *)
-    pu_trans_strat : (StoreView PubVar) -> (StoreView PUVar); 
-
-   (* How do the secret untrusted values get transformed? *)
-    su_trans_strat : (StoreView AllVar) -> (StoreView SUVar);
+    pu_trans_strat : AttackerMem -> (StoreView PubVar) -> (StoreView PUVar); 
 
    (* What information is the attacker learning for themselves? *)
-    leak_strat : (StoreView PubVar) -> list Value; 
+    leak_strat : AttackerMem -> (StoreView PubVar) -> list Value; 
+
+   (* How is the attacker memory changed? *)
+    mem_strat : AttackerMem -> (StoreView PubVar) -> AttackerMem; 
+
+   (* How do the secret untrusted values get transformed? *)
+    su_trans_strat : AttackerMem -> (StoreView AllVar) -> (StoreView SUVar);
     }.
 
   Notation "☠︎︎⟨ x |  y | z ⟩" := {| pu_trans_strat := x ; su_trans_strat := y ; leak_strat := z |}.
