@@ -269,7 +269,7 @@ Module AttackSem.
       list Value ->  (* Leaked data *)
       Store ->  (* Resulting store *)
       Prop := 
-      | atk_eval (store new_store pu_tr su_tr leak_fn : _) : 
+      | atk_eval (store new_store combined_view (* Make it exists?*) pu_tr su_tr leak_fn : _) : 
           let pubstore := extract_storeview store PubVar in
           let allstore := extract_storeview store AllVar in
 
@@ -278,8 +278,10 @@ Module AttackSem.
           let newsustore := su_tr allstore in
           let leak := leak_fn pubstore in
 
-          new_store = CombinedStoreView newpustore newsustore ->
-          _ store atk leak store. (* This should not be store!! *)
+          CombinedStoreView newpustore newsustore combined_view -> (* Maybe this combined view thing should really be exists *)
+          UpdatedStore store combined_view new_store -> (* Maybe this combined view thing should really be exists *)
+
+          _ store atk leak new_store. 
 
     Record Configuration := {
       prog : AttackedProgram;
