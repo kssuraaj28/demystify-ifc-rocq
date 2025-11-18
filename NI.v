@@ -1,15 +1,20 @@
-(* In my math, these hold obviously *)
-From Stdlib Require Import Logic.FunctionalExtensionality.
+(*
+In my math, these hold obviously 
+
 From Stdlib Require Import Logic.ClassicalFacts.
+
+*)
+From Stdlib Require Import Logic.FunctionalExtensionality.
+
+(* This is function composition *)
+Notation "x ;; y" := (fun i => y(x(i))) (at level 10).
 
 Section constant.
   Context {A B : Type}.
   Variable f : A -> B.
 
-  Notation A_has_element := (exists a : A, True). (* Note how we just 'transported' A to Prop. In some sense, this is just A. Is this impredicativity? *)
-
   Definition constant : Prop := forall a a', f a = f a'. 
-  Definition constant' : Prop := exists b, forall a, f a = b. 
+  Definition constant' : Prop := exists b, forall a, f a = b.  (* This really is an experiment that should not be visible outside other things *)
 End constant.
 
 Definition example (x : Empty_set) : Empty_set :=  match x with end. 
@@ -19,29 +24,103 @@ Goal ~ constant' example. Proof. cbv; inversion 1; intuition. Qed.
 
 
 (* The many different ways to define Noninterference *)
+(* First, we consider two nonempty sets. 
+TODO: Parameterize them later..
+*)
+
+(* TODO: Do we need these nonempty axioms? *)
 Parameter SecretVal : Set.
+Axiom SecretNonempty : inhabited SecretVal : Prop.
+
 Parameter PublicVal : Set.
+Axiom PublicNonempty : inhabited PublicVal : Prop.
 
 Record State : Set := {secret : SecretVal ; public : PublicVal}.
 Notation "⟨ s | p ⟩" := {| secret := s ; public := p |} (at level 5). (* Can I do this without | *)
 
 Definition Computation : Set := State -> State.
 
-Section ni_defs.
-  Variable f : Computation.
+(* Given a computation, you partially apply a value *)
+Definition fix_secret (comp : Computation) (secret : SecretVal) : PublicVal -> State := 
+  fun public => 
+    let inp := ⟨ secret | public ⟩ in
+    comp inp.
 
-  (* When if f noninterfering? *)
-  Definition ni_0 : Prop :=
-    forall p, forall s1 s2, 
-      let inp1 := ⟨ s1 | p⟩ in
-      let inp2 := ⟨ s2 | p ⟩ in
-      public (f inp1) = public (f inp2).
+Definition fix_public (comp : Computation) (public : PublicVal) : SecretVal -> State := 
+  fun secret => 
+    let inp := ⟨ secret | public ⟩ in
+    comp inp.
+
+Section ni_defs.
+  Variable comp : Computation.
+
+  (* The secrets do not affect the public part, for p_inp*)
+  Definition ni_for_p (pub_inp : _) :=
+    let p_comp := fix_public comp pub_inp in
+      constant (p_comp ;; public).
 
   Definition ni_1 : Prop :=
-    forall p, let f := (fun s => public (f ⟨ s | p ⟩)) in
-          constant f.
+    forall pub_inp, ni_for_p pub_inp.
 
-  Goal ni_1 <-> ni_0. Proof. firstorder. Qed. 
+  Definition ni_2 : Prop := 
+    forall s1 s2,
+      let s1_comp := fix_secret comp s1 in
+      let s2_comp := fix_secret comp s2 in
+      s1_comp ;; public = s2_comp ;; public.
+
+  (* This is a 'parameterized' definition. In some sense, it is a family of definitions *)
+  Definition ni_3 (tested_secret : SecretVal) : Prop := 
+    let ts_comp := fix_secret comp tested_secret in
+    forall secret,
+      let s_comp := fix_secret comp secret in
+      ts_comp ;; public = s_comp ;; public.
+
+
+  (* Maybe, this is the right use case for ltac2... *)
+
+  (* This is garbage *)
+  Ltac unfold_these := 
+    unfold ni_1 in *; intuition; 
+    unfold ni_2 in *; intuition;
+    unfold ni_3 in *; intuition;
+    unfold ni_for_p in *; intuition; 
+    unfold constant in *; intuition; (* This really needs to be refactored into a custom tactic. *)
+    unfold fix_secret in *; intuition;
+    unfold fix_public in *; intuition.
+
+  Goal ni_1 -> ni_2.
+  Proof.
+    unfold_these. (* Here, I think that I actually disagree a little bit with Adam Chlipala *)
+    auto using functional_extensionality.
+  Qed.
+
+  Goal ni_2 -> ni_1.
+  Proof.
+    unfold_these.
+    specialize H with (s1 := a) (s2 := a').  (* This is not a good tactic invocation*)
+    apply (equal_f H). (* This is garbage *)
+  Qed.
+ 
+
+
+  Section ni23.
+    Variable s : SecretVal.
+    Notation ni_3 := (ni_3 s).
+    Goal ni_3 -> ni_2.
+    Proof.
+      unfold_these.
+      generalize (H s1); generalize (H s2); clear H; intros.
+      rewrite <- H; rewrite <- H0; auto. (* This really needs to be automatic*)
+    Qed.
+
+    Goal ni_2 -> ni_3.
+    Proof.
+      unfold_these.
+    Qed.
+  End ni23.
+
+
+
   (* TODO: Is there a definition where we need to assume function existentionality? *)
   (* There is probably a version where we need to use exists *)
 
@@ -63,8 +142,6 @@ Section ni_defs.
     eexists; reflexivity.
   Qed.
 
-  Definition ni_2 (tested_secret : SecretVal) : Prop := 
-    forall secret, (fun p => public  ( f ⟨ tested_secret | p ⟩)) =  (fun p => public  ( f ⟨ secret | p ⟩)).
 
 
 
