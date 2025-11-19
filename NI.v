@@ -38,42 +38,43 @@ Axiom PublicNonempty : inhabited PublicVal : Prop.
 Record State : Set := {secret : SecretVal ; public : PublicVal}.
 Notation "⟨ s | p ⟩" := {| secret := s ; public := p |} (at level 5). (* Can I do this without | *)
 
+Definition set_secret (secret : SecretVal) : PublicVal -> State := 
+  fun public =>  ⟨ secret | public ⟩.
+
+Definition set_public (public : PublicVal) : SecretVal -> State := 
+  fun secret => ⟨ secret | public ⟩.
+
 Definition Computation : Set := State -> State.
-
-(* Given a computation, you partially apply a value *)
-Definition fix_secret (comp : Computation) (secret : SecretVal) : PublicVal -> State := 
-  fun public => 
-    let inp := ⟨ secret | public ⟩ in
-    comp inp.
-
-Definition fix_public (comp : Computation) (public : PublicVal) : SecretVal -> State := 
-  fun secret => 
-    let inp := ⟨ secret | public ⟩ in
-    comp inp.
 
 Section ni_defs.
   Variable comp : Computation.
 
-  (* The secrets do not affect the public part, for p_inp*)
   Definition ni_for_p (pub_inp : _) :=
-    let p_comp := fix_public comp pub_inp in
-      constant (p_comp ;; public).
+     constant ((set_public pub_inp ;; comp ;; public) : SecretVal -> PublicVal).
 
   Definition ni_1 : Prop :=
     forall pub_inp, ni_for_p pub_inp.
 
+  (* This is really the 'real' definition of NI... *)
   Definition ni_2 : Prop := 
     forall s1 s2,
-      let s1_comp := fix_secret comp s1 in
-      let s2_comp := fix_secret comp s2 in
-      s1_comp ;; public = s2_comp ;; public.
+      set_secret s1 ;; comp ;; public = set_secret s2 ;; comp ;; public.
+
+  Notation "f || g" := (fun i => ⟨ f i | g i ⟩). (* Parallel composition  *)
+
+  (* More like a 'UMP style' *)
+  Definition ni_3 : Prop :=
+    forall (A : Type) (sinp1 sinp2: A -> _) (pinp : A -> _), 
+        (sinp1 || pinp)  ;; comp ;; public = (sinp2 || pinp) ;; comp ;; public. (* TODO: Why can A not be declared implicit? *)
+
+
+
 
   (* This is a 'parameterized' definition. In some sense, it is a family of definitions *)
-  Definition ni_3 (tested_secret : SecretVal) : Prop := 
-    let ts_comp := fix_secret comp tested_secret in
+  Definition ni_4 (tested_secret : SecretVal) : Prop := 
     forall secret,
-      let s_comp := fix_secret comp secret in
-      ts_comp ;; public = s_comp ;; public.
+      set_secret tested_secret ;; comp ;; public = set_secret secret ;; comp ;; public.
+
 
 
   (* Maybe, this is the right use case for ltac2... *)
@@ -85,13 +86,28 @@ Section ni_defs.
     unfold ni_3 in *; intuition;
     unfold ni_for_p in *; intuition; 
     unfold constant in *; intuition; (* This really needs to be refactored into a custom tactic. *)
-    unfold fix_secret in *; intuition;
-    unfold fix_public in *; intuition.
+    unfold set_secret in *; intuition;
+    unfold set_secret in *; intuition.
+
+  Goal ni_3 -> ni_2.
+  Proof.
+    unfold_these.
+  Qed.
+
+  Goal ni_2 -> ni_3.
+  Proof.
+    unfold_these.
+    apply functional_extensionality.
+    intros.
+    specialize (H (sinp1 x) (sinp2 x)).
+    apply (equal_f H). (* This is kinda garbage.. *)
+  Qed.
 
   Goal ni_1 -> ni_2.
   Proof.
     unfold_these. (* Here, I think that I actually disagree a little bit with Adam Chlipala *)
-    auto using functional_extensionality.
+    apply functional_extensionality. (* I think that we actually need function extensionality, because the statement literally reduces to that *)
+    firstorder.
   Qed.
 
   Goal ni_2 -> ni_1.
@@ -102,14 +118,13 @@ Section ni_defs.
   Qed.
  
 
-
   Section ni23.
     Variable s : SecretVal.
     Notation ni_3 := (ni_3 s).
     Goal ni_3 -> ni_2.
     Proof.
       unfold_these.
-      generalize (H s1); generalize (H s2); clear H; intros.
+      generalize (H s1); generalize (H s2); clear H; intros. (*The same forall being quantified multiple ways *)
       rewrite <- H; rewrite <- H0; auto. (* This really needs to be automatic*)
     Qed.
 
@@ -119,12 +134,22 @@ Section ni_defs.
     Qed.
   End ni23.
 
+  (* What do I need to do? 
+  f ;; public = clean (f) ;; public?
+  The clean thing?
+  Compositon and clean thing..
+  Section composition and clean.
+
+  There is the input UMP.
+  There are also output UMPs.
 
 
-  (* TODO: Is there a definition where we need to assume function existentionality? *)
+  *)
+
+
+
+
   (* There is probably a version where we need to use exists *)
-
-
 
 
   (* 
@@ -134,79 +159,14 @@ Section ni_defs.
   Definition garbage (s : SecretVal) : Prop :=
     exists pub_trans,
       (* TODO: forall s used to be here before. Does that make a difference?*)
-      pub_trans = fun p => public (f ⟨ s | p ⟩).
+      pub_trans = fun p => public (comp ⟨ s | p ⟩).
 
 
-  Goal forall s, garbage s.
-  Proof.
-    eexists; reflexivity.
-  Qed.
+  Goal forall s, garbage s. Proof. eexists; reflexivity. Qed.
 
 
-
-
-  Theorem ni_12 : forall s, (ni_2 s <-> ni_1). (* (forall s, ni_2 s) also equal?  *)
-  Proof.
-    cbv; split; intros; simpl in *.
-    - generalize (H a).
-      generalize (H a').
-      clear H.
-      intros.
-      rewrite  H in H0.
-      match goal with 
-        [ H : ?f = ?g |- _ ] => specialize (equal_f H); clear H; intros 
-      end; firstorder. (* This is kinda disgusting *)
-
-    - apply functional_extensionality; intros;
-      match goal with 
-        [H : forall a b c, _ , a: _ , b: _ , c: _ |- _] => specialize (H a b c)
-      end; auto.
-  Qed.
-
-
-  Goal forall ts, (ni_2 ts -> (forall s, ni_2 s)).
-  Proof.
-    (* Note how this really depends on the definition of ni_2 *)
-    unfold ni_2; simpl; intros.
-    (* This pattern can be a really cool tactic *)
-    generalize (H s).
-    generalize (H secret0).
-    clear H.
-    intros.
-    rewrite <- H.
-    rewrite <- H0.
-    auto.
-    (* Woah, we can actually even prove this with coq's garbage = *)
-  Qed.
-
-
-  (* The other direction is obvious *)
-  Goal forall (T : Type) (P : T -> Prop) x, ((forall x', P x') -> P x).
-  Proof.
-    firstorder.
-  Qed.
-
-  (* Can I prove this from previous? This seems a little stupid. I don't know whether I am proving something harder or easier. *)
-  Goal (forall s, ni_2 s) <-> ni_1.
-  Proof.
-    split.
-    - admit.
-    - intros. rewrite temp. auto.
-    cbv; split; intros; simpl in *.
-    - generalize (H a a'). 
-      clear H.
-      intros.
-      match goal with 
-        [ H : ?f = ?g |- _ ] => specialize (equal_f H); clear H; intros 
-      end; firstorder. (* This is kinda disgusting *)
-    - apply functional_extensionality;
-      firstorder.
-  Qed.
-
-
-
-  (* Something using exists *)
-  Definition ni_3 : Prop := exists pub_trans, forall s, pub_trans = fun p => public (f ⟨ s | p ⟩).
+  (* Something using exists. Can there be anything else? *)
+  Definition ni_4 : Prop := exists pub_trans, forall s, pub_trans = fun p => public (comp ⟨ s | p ⟩).
 
   Axiom temp : inhabited SecretVal \/ ~inhabited (SecretVal). (* This is nothing really special *)
 
