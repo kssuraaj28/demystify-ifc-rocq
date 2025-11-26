@@ -69,7 +69,6 @@ Section ni_defs.
 
 
 
-
   (* This is a 'parameterized' definition. In some sense, it is a family of definitions *)
   Definition ni_4 (tested_secret : SecretVal) : Prop := 
     forall secret,
@@ -96,6 +95,15 @@ Section ni_defs.
 
   Goal ni_2 -> ni_3.
   Proof.
+    unfold_these.
+    apply functional_extensionality.
+    intros.
+    generalize (sinp1 x).
+    generalize (sinp2 x).
+    intuition.
+    specialize (H s s0).
+
+    Restart.
     unfold_these.
     apply functional_extensionality.
     intros.

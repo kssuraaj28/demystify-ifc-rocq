@@ -58,6 +58,7 @@ Record Label : Set := {
 Notation " ⟨ l1 , l2 ⟩ " := {| conf := l1 ; int := l2 |}.
 Check ⟨ root , alice ⟩ : Label.
 
+(* Actually, while this is a good model to start with, this should be abstracted out! *)
 Record VarName :  Set := {
   lbl : Label ;
   name : nat
