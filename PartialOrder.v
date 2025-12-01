@@ -59,6 +59,4 @@ Module  Examples.
     Qed.
   End M3.
 
-
-
 End Examples.
