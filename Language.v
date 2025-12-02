@@ -6,13 +6,13 @@ Set Implicit Arguments.
 
 (* I think that this is probably the better way? *)
 (* TODO: This should be typeclass eventually, I think *)
-Record POParams : Type := {
+Record PartOrderParam : Type := {
   conf_po : PartialOrder;
   int_po : PartialOrder;
  }.
 
 Section label. 
-  Variable (params : POParams).  (* This is my convention for abstraction. *)
+  Variable (params : PartOrderParam).  (* This is my convention for abstraction. *)
 
   Let conf_po := conf_po params.
   Let ConfCarrier := Carrier (data conf_po).
@@ -50,36 +50,45 @@ Record ValueParam : Type := {
   val_eq_dec : forall v v' : ValCarrier, {v = v'} + {v <> v'} ;
   }.
 
-Record VarName (p : POParams) : Type := {
-  VarCarrier : Type ;
-  var_lbl : VarCarrier -> Label p ;
-  var_eq_dec : forall v v' : VarCarrier, {v = v'} + {v <> v'} ;
-  }.
+
+Section varname.
+  Variable p : PartOrderParam.
+  Let Label := Label p. 
+  (* Maybe this is good enough, for now.
+  However, I think that once I become soo good, I can use typeclasses, 
+  and become a god
+  *)
+
+  Record VarParam : Type := {
+    VarCarrier : Type ;
+    var_lbl : VarCarrier -> Label ; (* Is it possible that this can be inferred using the typeclass mechanism?*)
+    var_eq_dec : forall v v' : VarCarrier, {v = v'} + {v <> v'} ;
+    }.
+End varname.
 
 
 
+Section store.
+  (* I really like my sections to be short. *)
+  Variables po   : PartOrderParam.
+  Let VarParam := VarParam po. (* This is what I want to do.. *)
 
-Section label. Variable (params : POParams).  (* This is my convention for abstraction. *)
+  Variables vals : ValueParam.
+  Variables vars : VarParam.
 
+  Let VarName := VarCarrier vars.
+  Let Value := VarCarrier vars.
 
+  Definition Store := VarParam -> Value.
 
-  Section varval.
-    (* You have a set of variables *)
-    Variables (VarName : Type)
-              (var_lbl : VarName -> Label)
-              (var_eq_dec : forall v v' : VarName, {v = v'} + {v <> v'}).
+  Section storeview.
+    Variable VarPred : VarName -> Prop. (* If you make this a bool, then you need to make a whole bunch of things decidable, which I am not going to do now.. *)
+    Let FilteredVars := {x : VarName | VarPred x}. (* Refinement type *)
+    Definition Storeview := FilteredVars -> Value.
+  End storeview.
 
-    (* You have a set of values *)
-    Variables (Value : Type)
-              (val_eq_dec : forall v v' : Value, {v = v'} + {v <> v'}).
+End store.
 
-
-    Definition Store := VarName -> Value.
-    Section storeview.
-      Variable VarPred : VarName -> Prop. (* If you make this a bool, then you need to make a whole bunch of things decidable, which I am not going to do now.. *)
-      Let FilteredVars := {x : VarName | VarPred x}. (* Refinement type *)
-      Definition Storeview := FilteredVars -> Value.
-    End storeview.
 
     Section example.
       Variable (natval : nat -> Value).
