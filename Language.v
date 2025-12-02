@@ -1,201 +1,209 @@
-(* I would eventually like to have a module or a typeclass for lattices *)
 From Stdlib Require Import List.
-Import ListNotations.
 
-Inductive PartialOrderExample : Set :=
-  | root
-  | alice
-  | bob
-  | chuck
-  | any.
+From NMIF Require Import PartialOrder.
 
+Set Implicit Arguments. 
 
-Reserved Notation "x ≼ y" (at level 20).
-(* I really need to have maybe a module or a typeclass *)
-Inductive PartialOrderFlows : PartialOrderExample -> PartialOrderExample -> Prop :=
-  | root_top (e : _) : e ≼ root
-  | any_bot (e : _) : any ≼ e
-  | refl (e : _) : e ≼ e
-where "x ≼ y" :=  (PartialOrderFlows x y). 
-(* Watchout! When you do _, PartialOrderFlows is defined okay, but the notation is messed up! TODO *)
+(* I think that this is probably the better way? *)
+(* TODO: This should be typeclass eventually, I think *)
+Record POParams : Type := {
+  conf_po : PartialOrder;
+  int_po : PartialOrder;
+ }.
 
+Section label. 
+  Variable (params : POParams).  (* This is my convention for abstraction. *)
 
-(* This is essentially the M3 lattice.. *)
+  Let conf_po := conf_po params.
+  Let ConfCarrier := Carrier (data conf_po).
+  Let ConfOrder := Ordering (data conf_po).
 
-Section example.
-  Hint Constructors PartialOrderFlows : core.
-  Hint Extern 10 => match goal with [ H : _ ≼ _ |- _ ] => inversion H end : core.
-
-  Goal root ≼ root. Proof. auto. Qed.
-  Goal any ≼ root. Proof. auto. Qed.
-  Goal alice ≼ root. Proof. auto. Qed.
-  Goal any ≼ bob. Proof. auto. Qed.
-  Goal any ≼ bob. Proof. auto. Qed.
-  Goal ~ alice ≼ bob. Proof. auto.  Qed.
-  Goal ~ bob ≼ alice. Proof. auto. Qed.
-  Goal ~ chuck ≼ alice. Proof. auto. Qed.
-  Goal forall x, x ≼ x. Proof. auto. Qed.
-  Goal forall x y z, x ≼ y -> y ≼ z -> x ≼ z. Proof. auto. Qed.
-End example.
+  Let int_po := int_po params.
+  Let IntCarrier := Carrier (data int_po).
+  Let IntOrder := Ordering (data int_po).
 
 
-(* TODO: Have a confidentiality partial order, and integrity partial order, etc. *)
-(* 
-In an ideal world. I would define the partial order 'interface' - A typeclass perhaps. 
-Then, everything else takes that thing as input. Perhaps the best idea is to
-start with bare dependent records, and feel the pain, before migrating to
-typeclasses
-*)
+  Notation "x '≼c' y" := (ConfOrder x y)(at level 70).
+  Check _ ≼c _. (* Is there a useful place where we'd want to have notations but the check will fail? *)
 
-Definition ConfPO :=  PartialOrderExample.
-Definition IntPO :=  PartialOrderExample.
+  Notation "x '≼i' y" := (IntOrder x y)(at level 70).
+  Check _ ≼i _.
 
-Record Label : Set := { 
-  conf : ConfPO ;
-  int : IntPO
+
+  Record Label : Type := { 
+    conf : ConfCarrier;
+    int : IntCarrier
+    }.
+
+  Notation " ⟨ l1 , l2 ⟩ " := {| conf := l1 ; int := l2 |}.
+
+  Section test.
+    Variables (root : ConfCarrier) (alice : IntCarrier).
+    Check ⟨ root , alice ⟩ : Label.
+  End test.
+End label.
+
+
+(* Again, I think that this should be typeclasses :). I really should learn how to do this typeclass magic. *)
+Record ValueParam : Type := {
+  ValCarrier : Type ;
+  val_eq_dec : forall v v' : ValCarrier, {v = v'} + {v <> v'} ;
   }.
 
-Notation " ⟨ l1 , l2 ⟩ " := {| conf := l1 ; int := l2 |}.
-Check ⟨ root , alice ⟩ : Label.
-
-(* Actually, while this is a good model to start with, this should be abstracted out! *)
-Record VarName :  Set := {
-  lbl : Label ;
-  name : nat
+Record VarName (p : POParams) : Type := {
+  VarCarrier : Type ;
+  var_lbl : VarCarrier -> Label p ;
+  var_eq_dec : forall v v' : VarCarrier, {v = v'} + {v <> v'} ;
   }.
 
-(* TODO: Can we automatically generate equality check for this? *)
-
-Notation " l ~ id " := {| lbl := l ; name := id |} (at level 30).
-Check ⟨ root , alice ⟩ ~ 5 : VarName.
-
-(* This is our 'Value' set. This should be abstracted out *)
-Definition Value : Set := nat.
-Definition val_eqb : Value -> Value -> bool := Nat.eqb. (* TODO: Do we need this? *)
-
-Definition Store := VarName -> Value.
-Example s1 : Store := fun _ => 5. (* TODO: Module this? *)
-Example s2 : Store := fun v => 
-  match v with 
-  | ⟨ root , root ⟩ ~ 0 => 0
-  | ⟨ root , root ⟩ ~ 1 => 1 
-  | ⟨ root , root ⟩ ~ _ => 4
-  |  _ => 42 
-  end. (* TODO: Module this? *)
-
-(* The set of commands we have in our langauge *)
-Inductive LanguageCommand : Set :=
-  | assignment (v : VarName) (f : Store -> Value)  (* Mixing syntax and semantics like a pro *)
-  | input (v : VarName)
-  | output (v : VarName)
-.
-
-Notation " x ← f " := (assignment x f) (at level 50).
-Notation " ? x  " := (input x) (at level 50).
-Notation " ! x  " := (output x) (at level 50).
 
 
-Definition LanguageProgram := list LanguageCommand. (* Only straightline code for now *)
+
+Section label. Variable (params : POParams).  (* This is my convention for abstraction. *)
 
 
-(* I really feel like this should be 'Module'. Maybe I should ask Gary. *)
+
+  Section varval.
+    (* You have a set of variables *)
+    Variables (VarName : Type)
+              (var_lbl : VarName -> Label)
+              (var_eq_dec : forall v v' : VarName, {v = v'} + {v <> v'}).
+
+    (* You have a set of values *)
+    Variables (Value : Type)
+              (val_eq_dec : forall v v' : Value, {v = v'} + {v <> v'}).
+
+
+    Definition Store := VarName -> Value.
+    Section storeview.
+      Variable VarPred : VarName -> Prop. (* If you make this a bool, then you need to make a whole bunch of things decidable, which I am not going to do now.. *)
+      Let FilteredVars := {x : VarName | VarPred x}. (* Refinement type *)
+      Definition Storeview := FilteredVars -> Value.
+    End storeview.
+
+    Section example.
+      Variable (natval : nat -> Value).
+      Coercion natval : nat >-> Value. 
+      (* TODO: Learn coertions correctly.. 
+      Is there a way to make this more concise?
+      That is, can we make the above thing in one line?
+      Can I do reversible / bidirectional coertions?
+      There was some limitation also, I think*)
+
+      Variable (v1 v2 v3 v4 : VarName).
+
+
+      Notation "v == v'" := (var_eq_dec v v')(at level 10).
+      Print Notation "_ == _".
+ 
+      Let ex1 : Store := fun _ => 5.
+      Let ex2 : Store := fun v => 
+        if v == v1 then 4 else 
+        if v == v2 then 97 else 
+        if v == v3 then 43 else 
+        if v == v4 then 0 else 
+        42.
+
+      Set Printing Coercions. Print ex2. Unset Printing Coercions.
+    End example.
+    Fail Print Notation "_ == _".
+
+
+    (* TODO: Have input vars, etc. *)
+
+    Inductive LanguageCommand : Type :=
+      | assignment (v : VarName) (f : Store -> Value)  (* Mixing syntax and semantics like a pro *)
+      | input (v : VarName)
+      | output (v : VarName).
+
+    (* These are locally defined notations. *)
+    Notation " x ← f " := (assignment x f) (at level 50).
+    Notation " ? x  " := (input x) (at level 50).
+    Notation " ! x  " := (output x) (at level 50).
+
+    Definition LanguageProgram := list LanguageCommand. (* Only straightline code for now *)
+
+    Section atk_sem.
+      Variable attack_level : Label.
+      Let attack_conf :=  (conf attack_level).
+      Let attack_int :=  (int attack_level).
+
+      Section defs.
+        Variable element_label : Label.  (* I feel like these could be typeclasses.. *)
+        Let element_conf := (conf element_label).
+        Let element_int := (int element_label).
+
+        Definition Public : Prop := element_conf ≼c attack_conf. 
+        Definition Secret : Prop := ~Public.  
+
+        Definition Untrusted : Prop := element_int ≼i attack_int.
+        Definition Trusted   : Prop := ~Untrusted.
+
+        Definition PublicTrusted   : Prop := Public /\ Trusted.
+        Definition SecretTrusted   : Prop := Secret /\ Trusted.
+        Definition PublicUntrusted : Prop := Public /\ Untrusted.
+        Definition SecretUntrusted : Prop := Secret /\ Untrusted.
+
+      End defs.
+
+      Definition FullStore := Storeview (fun _ => True).
+      (* Is it possible to make this x a Variable? *)
+      Definition PubStore := Storeview (fun x => Public (var_lbl x)).
+      Definition PUStore := Storeview (fun x => PublicTrusted (var_lbl x)).
+      Definition SUStore := Storeview (fun x => SecretUntrusted (var_lbl x)).
+
+
+      Section atk_code.
+        (* An attacker has memory. *)
+        Variable AttackerMem : Type.
+        Record AttackSnippet := {
+         (* How do the public untrusted values get transformed? *)
+          pu_trans_code : AttackerMem -> PubStore -> PUStore;
+
+         (* What information is the attacker learning for themselves? *)
+          leak_code : AttackerMem -> PubStore -> list Value; 
+
+         (* How is the attacker memory changed? *)
+          mem_code : AttackerMem -> PubStore -> AttackerMem; 
+
+         (* How do the secret untrusted values get transformed? *)
+          su_trans_code : AttackerMem -> FullStore -> SUStore;
+        }.
+
+        Inductive AttackedLanguageCommand : Type :=  
+        |  code (c : LanguageCommand)
+        |  atk (a : AttackSnippet)
+        . 
+        (* Could I coerce LanguageCommand into AttackedLanguageCommand
+          Coercion code : LanguageCommand >-> AttackedLanguageCommand.
+          This needs to be exported, and things..
+        *)
+
+        Definition AttackedProgram := list AttackedLanguageCommand.
+
+      End atk_code.
+    End atk_sem.
+  End varval. 
+End po_ctx.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Module AttackSem.
-  Parameter attack_level : Label.
-  Notation attack_conf :=  (conf attack_level).
-  Notation attack_int :=  (int attack_level).
-
-  Section aux.
-    Variable element_label : Label. 
-    Notation element_conf := (conf element_label).
-    Notation element_int := (int element_label).
-
-    Definition Public : Prop := element_conf ≼ attack_conf. 
-    Definition Secret : Prop := ~Public. 
-
-    Definition Untrusted : Prop := element_int ≼ attack_int.
-    Definition Trusted   : Prop := ~Untrusted.
-
-
-    (* My naming convention is same for Prop and Set *)
-    Definition PublicTrusted   : Prop := Public /\ Trusted.
-    Definition SecretTrusted   : Prop := Secret /\ Trusted.
-    Definition PublicUntrusted : Prop := Public /\ Untrusted.
-    Definition SecretUntrusted : Prop := Secret /\ Untrusted.
-
-    (* I don't know why I do this *)
-    Print Section aux.
-  End aux.
 
 
 
-
-  (* TODO: If I make this a definition and view it outside a section what happens? *)
-  (* This is a subset type. I hope that coq gods are friendly to me, as I am using a dependent type *)
-  (* 
-    Essentially, we restrict the domain of the store.
-  *)
-  Definition StoreView (P : VarName -> Prop) : Set := 
-    { x : VarName | P x } -> Value.
-
-
-
-  (* TODO: What's the easiest way to test these close to where they are defined? 
-  I think I'd like to have a way where I can just instantiate a section variable with something, and I test this example 'model'
-  Maybe, I could use Modules and Parameters?
-  The idea would be to define a module M that takes in a parameter p.
-  Then you would use it as follows: m_example := M<4>
-  *)
-
-  Notation LiftLblPred := (fun Pred => fun idx => Pred (lbl idx)).
-
-  (* Watchout, for notations are not type checked *)
-  Notation AllVar := (fun _ => True).
-  Notation PubVar := (LiftLblPred Public).
-  Notation PUVar := (LiftLblPred PublicUntrusted).
-  Notation SUVar := (LiftLblPred SecretUntrusted).
-
-  (* TODO: Attacks need to have private memory  *)
-
-  Section attackermem.
-    Variable AttackerMem : Set.
-    (* An attack is the following information *)
-    Record AttackSnippet  : Set := {
-     (* How do the public untrusted values get transformed? *)
-      pu_trans_strat : AttackerMem -> (StoreView PubVar) -> (StoreView PUVar); 
-
-     (* What information is the attacker learning for themselves? *)
-      leak_strat : AttackerMem -> (StoreView PubVar) -> list Value; 
-
-     (* How is the attacker memory changed? *)
-      mem_strat : AttackerMem -> (StoreView PubVar) -> AttackerMem; 
-
-     (* How do the secret untrusted values get transformed? *)
-      su_trans_strat : AttackerMem -> (StoreView AllVar) -> (StoreView SUVar);
-      }.
-
-
-
-    (* 
-    This is one way to do this, 
-    and probably not the correct way to do it. 
-    We'd need a way to define composition of attack with program?
-    I think that this might be okay though...
-    *)
-
-    Inductive AttackedLanguageCommand : Set :=  
-    |  code (c : LanguageCommand)
-    |  atk (a : AttackSnippet)
-    . (* Could I coerce LanguageCommand into AttackedLanguageCommand*)
-
-    Definition AttackedProgram := list AttackedLanguageCommand.
-  End attackermem.
-
-  Notation "☠︎︎⟨ x |  y | z ⟩" := {| pu_trans_strat := x ; su_trans_strat := y ; leak_strat := z |}.
-
-  Check let pu_tr := _ in let su_tr := _ in  let leak := _ in
-      ☠︎︎⟨ pu_tr | su_tr | leak⟩. (* I'm soo good *)
-
-  Check fun pu_tr su_tr leak => (☠︎︎⟨ pu_tr | su_tr | leak⟩ : _). (* I'm soo good. Note how there is a difference between this and the previous one *)
 
   Module OperationalSemantics.
     Inductive Event : Set := 
