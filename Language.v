@@ -12,7 +12,7 @@ Record PartOrderParam : Type := {
  }.
 
 Section label. 
-  Variable (params : PartOrderParam).  (* This is my convention for abstraction. *)
+  Context {params : PartOrderParam}.  (* This is my convention for abstraction. *)
 
   Let conf_po := conf_po params.
   Let ConfCarrier := Carrier (data conf_po).
@@ -86,36 +86,58 @@ Section store.
     Let FilteredVars := {x : VarName | VarPred x}. (* Refinement type *)
     Definition Storeview := FilteredVars -> Value.
   End storeview.
-
 End store.
 
 
-    Section example.
-      Variable (natval : nat -> Value).
-      Coercion natval : nat >-> Value. 
-      (* TODO: Learn coertions correctly.. 
-      Is there a way to make this more concise?
-      That is, can we make the above thing in one line?
-      Can I do reversible / bidirectional coertions?
-      There was some limitation also, I think*)
+Section example.
+  Variable admit : forall {T}, T. (* Wow, I'm soo good *)
 
-      Variable (v1 v2 v3 v4 : VarName).
+  Variable po : PartOrderParam.
+  Let VarParam := VarParam po.
+  Let ValueParam := ValueParam.
+
+  Definition vals : ValueParam := {|
+    ValCarrier := nat;
+    val_eq_dec := admit;
+ |}.
+
+  (* I was using Coercions before. But I think that this is better. *)
+  Definition vars : VarParam := {|
+    VarCarrier := nat;
+    var_lbl := admit;
+    var_eq_dec := PeanoNat.Nat.eq_dec;
+ |}.
+    
 
 
-      Notation "v == v'" := (var_eq_dec v v')(at level 10).
-      Print Notation "_ == _".
- 
-      Let ex1 : Store := fun _ => 5.
-      Let ex2 : Store := fun v => 
-        if v == v1 then 4 else 
-        if v == v2 then 97 else 
-        if v == v3 then 43 else 
-        if v == v4 then 0 else 
-        42.
+  Notation "v == v'" := (var_eq_dec vars v v')(at level 10).
+  Check _ == _.
 
-      Set Printing Coercions. Print ex2. Unset Printing Coercions.
-    End example.
-    Fail Print Notation "_ == _".
+  Print Notation "_ == _".
+
+  Let ex1 : Store := fun _ => 5.
+
+  Check fun v => 
+    if v == v1 then 4 else 
+    if v == v2 then 97 else 
+    if v == v3 then 43 else 
+    if v == v4 then 0 else 
+    42.
+  Let ex2 : Store := fun v => 
+    if v == v1 then 4 else 
+    if v == v2 then 97 else 
+    if v == v3 then 43 else 
+    if v == v4 then 0 else 
+    42.
+
+  Set Printing Coercions. Print ex2. Unset Printing Coercions.
+  End example.
+  Fail Print Notation "_ == _".
+
+End example.
+End store.
+
+
 
 
     (* TODO: Have input vars, etc. *)
