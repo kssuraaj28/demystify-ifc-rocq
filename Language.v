@@ -1,8 +1,11 @@
 From Stdlib Require Import List.
+From Stdlib Require Import Basics. (* TODO: How to go to this library file? *)
+
 
 From NMIF Require Import PartialOrder.
 
 Set Implicit Arguments. (* Are these maximally inserted? *)
+
 
 (* I think that this is probably the better way? *)
 Class PartOrderParam : Type := {
@@ -27,13 +30,13 @@ End label.
 
 (* Whenever I am defining a notation, I am happy to define a definition that corresponds to it... *)
 (* I don't know whether this is the right place to put this? Should I do export? TODO *)
-Notation "x '≼c' y" := (ConfOrder x y)(at level 70).
+#[local] Notation "x '≼c' y" := (ConfOrder x y)(at level 70).
 Check _ ≼c _. (* Is there a useful place where we'd want to have notations but the check will fail? *)
 
-Notation "x '≼i' y" := (IntOrder x y)(at level 70).
+#[local] Notation "x '≼i' y" := (IntOrder x y)(at level 70).
 Check _ ≼i _.
 
-Notation "⟨ l1 , l2 ⟩" := {| conf := l1 ; int := l2 |}.
+#[local] Notation "⟨ l1 , l2 ⟩" := {| conf := l1 ; int := l2 |}.
 
 Section test.
   Check ⟨ _ , _ ⟩.
@@ -43,13 +46,15 @@ Section test.
   Check ⟨ root , alice ⟩ : Label.
 End test.
 
-
-
 Class ValueParam : Type := {
   Value : Type ;
   val_eq_dec : forall v v' : Value, {v = v'} + {v <> v'} ;
   }.
 
+
+(* Is this a good name? *)
+Inductive VarKind : Type := inp_var | out_var | internal_var.
+Definition varkind_eq_dec : forall k k' : VarKind, {k = k'} + {k <> k'}. Proof.  decide equality. Defined.
 
 Section varname.
   Context {p : PartOrderParam}. (* TODO:  What happens when this is not an implicit parameter? What about `  *)
@@ -57,29 +62,55 @@ Section varname.
   Class VarParam : Type := {
     VarName : Type ;
     var_lbl : VarName -> Label ; 
-    var_eq_dec : forall v v' : VarName, {v = v'} + {v <> v'} ;
+    var_kind : VarName -> VarKind ; 
+    var_eq_dec : forall v v' : VarName, {v = v'} + {v <> v'} ; (* Do I need this actually? *)
     }.
+
 End varname.
 
+Section varsubset.
+  Context {p: PartOrderParam} {vars: VarParam}. 
+  Definition VarPred := VarName -> Prop.
+
+  Definition VarSubset (P : VarPred) := {v : VarName | P v}.
+End varsubset.
+
+
+Section var_kind_preds.
+  Context {p : PartOrderParam} {vars : VarParam}.
+
+  Variable (v : VarName).
+  Let v_kind := var_kind v.
+
+  Definition IsInpVar := v_kind = inp_var.
+
+  Definition IsOutVar := v_kind = out_var.
+
+  Definition IsInternalVar := v_kind = internal_var.
+End var_kind_preds.
+
+Section test.
+  Open Scope program_scope. (* Does this belong here? *)
+  Check not ∘ IsInpVar. (* In general, I'd like to be able to lift more.. Preshieve or some nonsense. *)
+End test.
 
 Section store.
-  Fail Context {vars : VarParam}.
   Context {p : PartOrderParam} {vars : VarParam} {vals : ValueParam}. (* Typeclasses just cook this.. *)
 
   Definition Store := VarName -> Value. 
 
   Section storeview.
-    Variable VarPred : VarName -> Prop. (* If you make this a bool, then you need to make a whole bunch of things decidable, which I am not going to do now.. *)
-    Let FilteredVars := {x : VarName | VarPred x}. (* Refinement type *)
+    Variable VarPred : VarName -> Prop.
+    Let FilteredVars := VarSubset VarPred.
     Definition Storeview := FilteredVars -> Value.
   End storeview.
-
 
   Definition extract_storeview (s : Store) (Pred : VarName -> Prop) : Storeview Pred :=
     fun c => 
       match c with 
         exist _ idx _ => (s idx)
       end.
+
 
   (* 
   Why can I not get the computation of this to not go through? 
@@ -104,7 +135,8 @@ Section store.
   *)
   Definition UpdatedStoreVal (oldstore var val newstore : _) := 
     let P := fun x => x = var in
-    let storeslice := fun (inp : { x : VarName | P x }) =>  val in
+    let storeslice := 
+      fun (inp : VarSubset P ) =>  val in
     UpdatedStore oldstore storeslice newstore.
 
     (* What does it mean to combine two store views*)
@@ -135,7 +167,8 @@ Section example.
   Instance vars : VarParam := {|
     VarName := nat;
     var_lbl := admit;
-    var_eq_dec := PeanoNat.Nat.eq_dec;
+    var_kind := admit;
+    var_eq_dec := admit;
  |}. Existing Instance vars.
 
   Let vals : ValueParam := {|
@@ -145,7 +178,7 @@ Section example.
 
   Compute Store.
 
-  Notation "v == v'" := (var_eq_dec v v')(at level 10).
+  Notation "v == v'" := (PeanoNat.Nat.eq v v')(at level 10).
   Check _ == _.
 
   Print Notation "_ == _".
@@ -161,20 +194,37 @@ Section example.
     | _ => 0
     end.
 
+  Compute ex2 5.
+  Compute ex2 4.
+
 End example.
 Fail Print Notation "_ == _".
+
 
 Section cmd.
   Context {p : PartOrderParam} {vars : VarParam} {vals : ValueParam}.
 
+  Open Scope program_scope.
+
+  (*  
+
+    You want some gap between output and the effect, so that you give attacker time to influence. This is a modeling hack. However, I think that it is okay
+(* The point is that  the attacker should be able to read and modify (if necessary) the output.  *)
+  *)
+
   Inductive LanguageCommand : Type :=
-    | assignment (v : VarName) (f : Store -> Value)  (* Mixing syntax and semantics like a pro *)
-    | input (v : VarName)
-    | output (v : VarName).
+    | input (v : VarSubset IsInpVar)
+    | assignment (v : VarSubset (not ∘ IsInpVar))  (comp_fn : (Storeview (not ∘ IsOutVar)) -> Value) 
+      (* Mixing syntax and semantics like a pro *) 
+    | output (v : VarSubset IsOutVar). 
+  (* There is some nice duality to this nonsense. *)
 
   Definition LanguageProgram := list LanguageCommand. (* Only straightline code for now *)
 
 End cmd.
+
+Fail Check _ ∘ _.
+
 
 (* TODO: What is the visibility of these notations.. 
 I would like these to be local to the current compilation unit (Library file), but it should be possible to import these to other modules eventually?
@@ -206,18 +256,25 @@ Section defs.
     Definition Untrusted : Prop := element_int ≼i attack_int.
     Definition Trusted   : Prop := ~Untrusted.
 
-    Definition PublicTrusted   : Prop := Public /\ Trusted.
+    (* Is there a CT way of doing whatever I just did. 
+    f : A -> B
+    f_lift : (X -> A) -> (X -> B)
+
+    f : (A x B) -> C
+    f_lift : ((X -> A) x (X -> B)) -> (X -> C))
+    *)
+    Definition PublicTrusted   : Prop := Public /\ Trusted. 
     Definition SecretTrusted   : Prop := Secret /\ Trusted.
     Definition PublicUntrusted : Prop := Public /\ Untrusted.
     Definition SecretUntrusted : Prop := Secret /\ Untrusted.
   End defs.
-
 End defs.
 
 Section pred_egs.
   Context {p : PartOrderParam} {v :VarParam} {atkprm : AtkLblParam}.
 
   Variable x : VarName.
+  (* TODO: Should these be Let. *)
   Definition AllPred := let _ := x in True.
   Definition PubPred := Public (var_lbl x).
   Definition PUPred := PublicTrusted (var_lbl x).
@@ -255,8 +312,6 @@ Section atk_code.
     leak_code : AttackerMem -> PubStore -> list Value; 
   }.
 
-  Print AttackSnippet.
-
   Inductive AttackedLanguageCommand : Type :=  
   |  code (c : LanguageCommand)
   |  atk (a : AttackSnippet). 
@@ -281,12 +336,16 @@ Section event. (* This should be a module eventually? *)
     | adv_leak (lv : list Value).
 End event.
 
+Search sig.
 
 Section langeval.
   Context {p : PartOrderParam} 
           {vars : VarParam} 
           {vals : ValueParam}.
 
+  Open Scope program_scope.
+
+  Check (extract_storeview _ (Pred := _)).
   Inductive LangCmdEval : 
     Store -> (* Input store *)
     LanguageCommand ->  (* Command to run *)
@@ -294,18 +353,21 @@ Section langeval.
     Store ->  (* Resulting store *)
     Prop := 
 
-    | assignment_eval (store new_store var comp_fn : _) : 
-        let new_val := comp_fn store in
+    | assignment_eval (store new_store var varprf comp_fn : _) : 
+        let var_w_prf := exist _ var varprf in
+        let new_val := comp_fn (extract_storeview store (Pred:= (not ∘ IsOutVar))) in (* I have no idea whether this works. Why can Rocq not infer Pred. TODO Later *)
         UpdatedStoreVal store var new_val new_store ->
-        _ store (var ← comp_fn) epsilon new_store
+        _ store (var_w_prf ← comp_fn) epsilon new_store
 
-    | input_eval (store new_store var val : _) : 
+    | input_eval (store new_store var varprf val : _) : 
+        let var_w_prf := exist IsInpVar var varprf in (* Is there a way to make this better? *)
         UpdatedStoreVal store var val new_store ->
-        _ store (? var) (inp_ev val) new_store
+        _ store (? var_w_prf) (inp_ev val) new_store
 
-    | output_eval (store var : _) : 
+    | output_eval (store var varprf : _) : 
+        let var_w_prf := exist IsOutVar var varprf in (* Is there a way to make this better? *)
         let val := store var in
-        _ store (! var) (out_ev val) store.
+        _ store (! var_w_prf) (out_ev val) store.
 End langeval.
 
 Section atkeval. 
@@ -319,7 +381,7 @@ Section atkeval.
   Inductive AtkSnipEval (atk_code : AttackSnippet) :
                 Store -> (* Input store *)
                 Store -> (* Output store *)     
-                AttackerMem -> (* Input attacker memory *)
+          
                 AttackerMem -> (* Output attacker memory *)
                 list Value -> (* Leaked information *)
                 Prop := 
