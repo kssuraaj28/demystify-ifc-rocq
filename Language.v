@@ -74,7 +74,6 @@ Section varsubset.
 End varsubset.
 
 
-(*
 Section var_kind_preds.
   Context {p : PartOrderParam} {vars : VarParam}.
 
@@ -90,9 +89,8 @@ End var_kind_preds.
 
 Section test.
   Open Scope program_scope. (* Does this belong here? *)
-  Check not ∘ IsInpVar. (* In general, I'd like to be able to lift more.. Preshieve or some nonsense. *)
+  Check not ∘ IsInpVar. (* In general, I'd like to be able to lift more.. For instance, I want to lift \/ *)
 End test.
-*)
 
 Section store.
   Context {p : PartOrderParam} {vars : VarParam} {vals : ValueParam}. (* Typeclasses just cook this.. *)
@@ -220,26 +218,34 @@ Fail Print Notation "_ == _".
 Section cmd.
   Context {p : PartOrderParam} {vars : VarParam} {vals : ValueParam}.
 
-  Open Scope program_scope.
+
+
+  Section var_subsets.
+    Open Scope program_scope.
+    (* This should go somewhere else. I don't know where though. *)
+    Definition InputVars := VarSubset (IsInpVar).
+    Definition OutputVars := VarSubset (IsInpVar).
+    Definition AssignableVars := VarSubset (not ∘ IsInpVar). (* When you are done w computation, you cannot assign to input variables *)
+    Definition AccessibleStore := Storeview (not ∘ IsOutVar). (* When you are doing computation, you don't read from output variables *)
+    Definition ComputeFn := AccessibleStore -> Value.
+  End var_subsets.
 
   (*  
-
     You want some gap between output and the effect, so that you give attacker time to influence. This is a modeling hack. However, I think that it is okay
 (* The point is that  the attacker should be able to read and modify (if necessary) the output.  *)
   *)
 
   Inductive LanguageCommand : Type :=
-    | input (v : VarSubset IsInpVar)
-    | assignment (v : VarSubset (not ∘ IsInpVar))  (comp_fn : (Storeview (not ∘ IsOutVar)) -> Value) 
+    | input (v : InputVars)
+    | assignment (v : AssignableVars) (comp_fn : ComputeFn)
       (* Mixing syntax and semantics like a pro *) 
-    | output (v : VarSubset IsOutVar). 
+    | output (v : OutputVars). 
   (* There is some nice duality to this nonsense. *)
 
   Definition LanguageProgram := list LanguageCommand. (* Only straightline code for now *)
 
 End cmd.
 
-Fail Check _ ∘ _.
 
 
 (* TODO: What is the visibility of these notations.. 
@@ -252,6 +258,7 @@ Maybe the right solution is to have this be in a module, but it can be used loca
 
 
 Section atklvl.
+
   Context {p : PartOrderParam}. 
   Class AtkLblParam := {attack_level : Label}. (* TODO: Is there an implicit coerction into this? *)
 End atklvl.
@@ -359,9 +366,8 @@ Section langeval.
           {vars : VarParam} 
           {vals : ValueParam}.
 
-  Open Scope program_scope.
 
-  Check (extract_storeview _ (Pred := _)).
+
   Inductive LangCmdEval : 
     Store -> (* Input store *)
     LanguageCommand ->  (* Command to run *)
@@ -369,21 +375,21 @@ Section langeval.
     Store ->  (* Resulting store *)
     Prop := 
 
-    | assignment_eval (store new_store var varprf comp_fn : _) : 
-        let var_w_prf := exist _ var varprf in
-        let new_val := comp_fn (extract_storeview store (Pred:= (not ∘ IsOutVar))) in (* I have no idea whether this works. Why can Rocq not infer Pred. TODO Later *)
-        UpdatedStoreVal store var new_val new_store ->
-        _ store (var_w_prf ← comp_fn) epsilon new_store
+    | assignment_eval (store new_store : Store) (dest : AssignableVars)  (comp_fn : ComputeFn) : 
+        let var := proj1_sig dest in
+        let new_val := comp_fn (extract_storeview store _) in
+        UpdatedStoreVal store new_store var new_val ->
+        _ store (dest ← comp_fn) epsilon new_store
 
-    | input_eval (store new_store var varprf val : _) : 
-        let var_w_prf := exist IsInpVar var varprf in (* Is there a way to make this better? *)
-        UpdatedStoreVal store var val new_store ->
-        _ store (? var_w_prf) (inp_ev val) new_store
+    | input_eval (store new_store : Store) (dest : InputVars) (val : Value) : 
+        let var := proj1_sig dest in
+        UpdatedStoreVal store new_store var val ->
+        _ store (? dest) (inp_ev val) new_store
 
-    | output_eval (store var varprf : _) : 
-        let var_w_prf := exist IsOutVar var varprf in (* Is there a way to make this better? *)
+    | output_eval (store : Store) (src : OutputVars):
+        let var := proj1_sig src in
         let val := store var in
-        _ store (! var_w_prf) (out_ev val) store.
+        _ store (! src) (out_ev val) store.
 End langeval.
 
 Section atkeval. 
