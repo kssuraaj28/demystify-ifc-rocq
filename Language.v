@@ -4,8 +4,6 @@ From Stdlib Require Import Basics. (* TODO: How to go to this library file? *)
 
 From NMIF Require Import PartialOrder.
 
-Set Implicit Arguments. (* Are these maximally inserted? *)
-
 
 (* I think that this is probably the better way? *)
 Class PartOrderParam : Type := {
@@ -76,6 +74,7 @@ Section varsubset.
 End varsubset.
 
 
+(*
 Section var_kind_preds.
   Context {p : PartOrderParam} {vars : VarParam}.
 
@@ -93,6 +92,7 @@ Section test.
   Open Scope program_scope. (* Does this belong here? *)
   Check not ∘ IsInpVar. (* In general, I'd like to be able to lift more.. Preshieve or some nonsense. *)
 End test.
+*)
 
 Section store.
   Context {p : PartOrderParam} {vars : VarParam} {vals : ValueParam}. (* Typeclasses just cook this.. *)
@@ -101,9 +101,15 @@ Section store.
 
   Section storeview.
     Variable VarPred : VarName -> Prop.
-    Let FilteredVars := VarSubset VarPred.
+    Let FilteredVars := 
+      VarSubset VarPred.
+      (*
+      {x : VarName | VarPred x}.
+      *)
+     
     Definition Storeview := FilteredVars -> Value.
   End storeview.
+
 
   Definition extract_storeview (s : Store) (Pred : VarName -> Prop) : Storeview Pred :=
     fun c => 
@@ -111,13 +117,17 @@ Section store.
         exist _ idx _ => (s idx)
       end.
 
+  About extract_storeview.
 
   (* 
   Why can I not get the computation of this to not go through? 
   If that were the case, we'd need to 'test' the input against the predicate,
   Not all predicates are computationally testable :)
   *)
-  Definition UpdatedStore (oldstore : Store) (P : _) (update : Storeview P) (newstore : Store) : Prop :=
+  (* I don't know what kind of implicit I should use.. 
+  For now, I'll just use maximally inserted implcits
+  *)
+  Definition UpdatedStore (oldstore : Store) {P} (update : Storeview P) (newstore : Store) : Prop :=
     forall (var : VarName), 
       ~(P var) -> newstore var = oldstore var /\
       forall (prf : P var), newstore var = update (exist _ var prf). 
@@ -133,11 +143,17 @@ Section store.
      Helper when the update is just for a single value. 
      I am a little bit sad that this is not a function.
   *)
-  Definition UpdatedStoreVal (oldstore var val newstore : _) := 
-    let P := fun x => x = var in
-    let storeslice := 
-      fun (inp : VarSubset P ) =>  val in
-    UpdatedStore oldstore storeslice newstore.
+  Section updatedstoreval.
+    Variables (oldstore newstore : Store)
+              (var : VarName)
+              (val : Value).
+
+    Let VarSelPred (v' : VarName) :=  v' = var.
+    Let storeslice : Storeview VarSelPred := fun inp => val.
+
+    Definition UpdatedStoreVal : Prop := UpdatedStore oldstore storeslice newstore.
+  End updatedstoreval.
+
 
     (* What does it mean to combine two store views*)
     (* I also don't know whether this works. I would like to have an example to check. Moreover, I think that this is not deterministic*)
