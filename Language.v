@@ -1,5 +1,7 @@
 From Stdlib Require Import List.
 From Stdlib Require Import Basics. 
+From Stdlib Require Import Logic.FunctionalExtensionality.
+From Stdlib Require Import Logic.Classical_Prop.
 
 
 From NMIF Require Import PartialOrder.
@@ -103,7 +105,7 @@ Section store.
   *)
   Definition UpdatedStore (oldstore : Store) {P} (update : Storeview P) (newstore : Store) : Prop :=
     forall (var : VarName), 
-      ~(P var) -> newstore var = oldstore var /\
+      (~(P var) -> newstore var = oldstore var) /\ (* Should this be \/ *)
       forall (prf : P var), newstore var = update (exist _ var prf). 
       (* Interestingly, if change prf to _, this is like 'clear'. I lose information. 
          This makes sense I guess..
@@ -112,16 +114,18 @@ Section store.
          The best proof would have that generated, and, I could just use `assumption`
        *)  
 
-  (*
-  (* I don't like this convention for Prop.. *)
-  Theorem DeterministicUpdatedStore : forall store {P} (update : Storeview P), forall store' store'',
+  Theorem updatedstore_deterministic : forall store {P} (update : Storeview P), forall store' store'',
     UpdatedStore store update store' ->
     UpdatedStore store update store'' ->
     store' = store''.
-  Proof. Admitted.
-
-  Check (_ : DeterministicUpdatedStore _ _ _ _ _ _ ).
-  *)
+  Proof. 
+    repeat (intuition; try match goal with
+           | [ H : _ , H' : _ |- _ ] =>  specialize (H H')
+           | [ |- _ = _] =>  apply functional_extensionality || congruence
+           | [ P : _, x : _ |- _ ] =>  destruct (classic (P x))  
+               (* This is a little bit garbage *)
+    end).
+  Qed.
 
 
   (* 
