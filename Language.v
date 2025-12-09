@@ -1,5 +1,5 @@
 From Stdlib Require Import List.
-From Stdlib Require Import Basics. (* TODO: How to go to this library file? *)
+From Stdlib Require Import Basics. 
 
 
 From NMIF Require Import PartialOrder.
@@ -15,10 +15,10 @@ Section label.
   Context {params : PartOrderParam}. 
 
   Definition ConfCarrier := Carrier (data conf_po).
-  Definition ConfOrder := Ordering (data conf_po).
+  Definition ConfOrder := Ordering (data conf_po). (* We will have notation for this *)
 
   Definition IntCarrier := Carrier (data int_po).
-  Definition IntOrder := Ordering (data int_po).
+  Definition IntOrder := Ordering (data int_po). (* We will have notation for this *)
 
   Record Label : Type := { 
     conf : ConfCarrier;
@@ -26,10 +26,9 @@ Section label.
     }.
 End label.
 
-(* Whenever I am defining a notation, I am happy to define a definition that corresponds to it... *)
-(* I don't know whether this is the right place to put this? Should I do export? TODO *)
+(* Should I export? *)
 #[local] Notation "x '≼c' y" := (ConfOrder x y)(at level 70).
-Check _ ≼c _. (* Is there a useful place where we'd want to have notations but the check will fail? *)
+Check _ ≼c _. 
 
 #[local] Notation "x '≼i' y" := (IntOrder x y)(at level 70).
 Check _ ≼i _.
@@ -50,9 +49,8 @@ Class ValueParam : Type := {
   }.
 
 
-(* Is this a good name? *)
-Inductive VarKind : Type := inp_var | out_var | internal_var.
-Definition varkind_eq_dec : forall k k' : VarKind, {k = k'} + {k <> k'}. Proof.  decide equality. Defined.
+Inductive VarCategory : Type := inp_var | out_var | internal_var. 
+Definition varcat_eq_dec : forall k k' : VarCategory, {k = k'} + {k <> k'}. Proof.  decide equality. Defined.
 
 Section varname.
   Context {p : PartOrderParam}. (* TODO:  What happens when this is not an implicit parameter? What about `  *)
@@ -60,7 +58,7 @@ Section varname.
   Class VarParam : Type := {
     VarName : Type ;
     var_lbl : VarName -> Label ; 
-    var_kind : VarName -> VarKind ; 
+    var_kind : VarName -> VarCategory ; 
     var_eq_dec : forall v v' : VarName, {v = v'} + {v <> v'} ; (* Do I need this actually? *)
     }.
 
@@ -68,29 +66,11 @@ End varname.
 
 Section varsubset.
   Context {p: PartOrderParam} {vars: VarParam}. 
-  Definition VarPred := VarName -> Prop.
 
+  Definition VarPred := VarName -> Prop.
   Definition VarSubset (P : VarPred) := {v : VarName | P v}.
 End varsubset.
 
-
-Section var_kind_preds.
-  Context {p : PartOrderParam} {vars : VarParam}.
-
-  Variable (v : VarName).
-  Let v_kind := var_kind v.
-
-  Definition IsInpVar := v_kind = inp_var.
-
-  Definition IsOutVar := v_kind = out_var.
-
-  Definition IsInternalVar := v_kind = internal_var.
-End var_kind_preds.
-
-Section test.
-  Open Scope program_scope. (* Does this belong here? *)
-  Check not ∘ IsInpVar. (* In general, I'd like to be able to lift more.. For instance, I want to lift \/ *)
-End test.
 
 Section store.
   Context {p : PartOrderParam} {vars : VarParam} {vals : ValueParam}. (* Typeclasses just cook this.. *)
@@ -99,11 +79,7 @@ Section store.
 
   Section storeview.
     Variable VarPred : VarName -> Prop.
-    Let FilteredVars := 
-      VarSubset VarPred.
-      (*
-      {x : VarName | VarPred x}.
-      *)
+    Let FilteredVars := VarSubset VarPred.
      
     Definition Storeview := FilteredVars -> Value.
   End storeview.
@@ -220,19 +196,24 @@ Section cmd.
 
 
 
-  Section var_subsets.
+  Section types.
+    Let IsInpVar : VarPred := fun v => var_kind v = inp_var.
+    Let IsOutVar : VarPred := fun v => var_kind v = out_var.
+    Let IsInternalVar : VarPred := fun v => var_kind v = internal_var.
+
     Open Scope program_scope.
-    (* This should go somewhere else. I don't know where though. *)
+
     Definition InputVars := VarSubset (IsInpVar).
     Definition OutputVars := VarSubset (IsInpVar).
     Definition AssignableVars := VarSubset (not ∘ IsInpVar). (* When you are done w computation, you cannot assign to input variables *)
     Definition AccessibleStore := Storeview (not ∘ IsOutVar). (* When you are doing computation, you don't read from output variables *)
     Definition ComputeFn := AccessibleStore -> Value.
-  End var_subsets.
+  End types.
+
 
   (*  
-    You want some gap between output and the effect, so that you give attacker time to influence. This is a modeling hack. However, I think that it is okay
-(* The point is that  the attacker should be able to read and modify (if necessary) the output.  *)
+    You want some gap between output and the effect, so that you give attacker
+    time to influence. This is a modeling hack, because I am so good.
   *)
 
   Inductive LanguageCommand : Type :=
@@ -243,22 +224,15 @@ Section cmd.
   (* There is some nice duality to this nonsense. *)
 
   Definition LanguageProgram := list LanguageCommand. (* Only straightline code for now *)
-
 End cmd.
 
 
-
-(* TODO: What is the visibility of these notations.. 
-I would like these to be local to the current compilation unit (Library file), but it should be possible to import these to other modules eventually?
-Maybe the right solution is to have this be in a module, but it can be used locally in the file. TODO: Test this...
-*)
 #[local] Notation " x ← f " := (assignment x f) (at level 50).
 #[local] Notation " ? x  " := (input x) (at level 50).
 #[local] Notation " ! x  " := (output x) (at level 50).
 
 
 Section atklvl.
-
   Context {p : PartOrderParam}. 
   Class AtkLblParam := {attack_level : Label}. (* TODO: Is there an implicit coerction into this? *)
 End atklvl.
@@ -293,21 +267,10 @@ Section defs.
   End defs.
 End defs.
 
-Section pred_egs.
-  Context {p : PartOrderParam} {v :VarParam} {atkprm : AtkLblParam}.
-
-  Variable x : VarName.
-  (* TODO: Should these be Let. *)
-  Definition AllPred := let _ := x in True.
-  Definition PubPred := Public (var_lbl x).
-  Definition PUPred := PublicTrusted (var_lbl x).
-  Definition SUPred := SecretUntrusted (var_lbl x).
-End pred_egs.
 
 (* Attackers have private memory. *)
 Class AtkMemParam : Type := {AttackerMem : Type}.
 
-(* TODO: Have input vars, etc. *)
 Section atk_code.
   Context {p : PartOrderParam} 
           {vars : VarParam} 
@@ -315,10 +278,15 @@ Section atk_code.
           {atkprm : AtkLblParam} 
           {atkmem : AtkMemParam}.
 
-  Let FullStore := Storeview AllPred.
-  Let PubStore := Storeview PubPred.
-  Let PUStore := Storeview PUPred.
-  Let SUStore := Storeview SUPred.
+  Let AllPred : VarPred := fun _ => True.
+  Let PubPred : VarPred := fun x => Public (var_lbl x).
+  Let PUPred : VarPred := fun x => PublicTrusted (var_lbl x).
+  Let SUPred : VarPred := fun x => SecretUntrusted (var_lbl x).
+
+  Definition FullStore := Storeview AllPred.
+  Definition PubStore := Storeview PubPred.
+  Definition PUStore := Storeview PUPred.
+  Definition SUStore := Storeview SUPred.
 
   (* Can I make this a class (temporarily)? TODO.. *)
   Record AttackSnippet := {
@@ -373,21 +341,35 @@ Section langeval.
     Store ->  (* Resulting store *)
     Prop := 
 
-    | assignment_eval (store new_store : Store) (dest : AssignableVars)  (comp_fn : ComputeFn) : 
+    (* For Inductive things where I will actually do -> I _, I will forall *)
+    | assignment_eval: 
+        forall (dest : AssignableVars),
         let var := proj1_sig dest in
-        let new_val := comp_fn (extract_storeview store _) in (* The type of comp_fn is enough *)
-        UpdatedStoreVal store new_store var new_val ->
-        _ store (dest ← comp_fn) epsilon new_store
 
-    | input_eval (store new_store : Store) (dest : InputVars) (val : Value) : 
+        forall (store : Store) (comp_fn : ComputeFn),
+        let new_val := comp_fn (extract_storeview store _) in (* The type of comp_fn is enough *)
+
+        forall (store' : Store),
+        UpdatedStoreVal store store' var new_val ->
+
+        _ store (dest ← comp_fn) epsilon store'
+
+    | input_eval: 
+        forall (dest : InputVars),
         let var := proj1_sig dest in
+
+        forall (store new_store : Store) (val : Value),
         UpdatedStoreVal store new_store var val ->
+
         _ store (? dest) (inp_ev val) new_store
 
-    | output_eval (store : Store) (src : OutputVars):
+    | output_eval:
+        forall (store : Store) (src : OutputVars),
         let var := proj1_sig src in
         let val := store var in
+
         _ store (! src) (out_ev val) store.
+
 End langeval.
 
 Section atkeval. 
@@ -404,18 +386,28 @@ Section atkeval.
                 AttackerMem -> (* Output attacker memory *)
                 list Value -> (* Leaked information *)
                 Prop := 
-      atk_snip_eval (store store' amem : _) : 
-          let allstore := extract_storeview store AllPred in
-          let pubstore := extract_storeview store PubPred in
 
-          (* Perhaps it is better to do match? *)
-          (* Maybe a co-let or something? *)
-          let sustore' := su_trans_code atk_code amem allstore in 
-          let pustore' := pu_trans_code atk_code amem pubstore in
-          let amem' := mem_code atk_code amem pubstore in 
-          let leak := leak_code atk_code amem pubstore in 
+      atk_snip_eval : 
+          forall (store store' : Store) (amem : AttackerMem),
+          (* TODO: Can I refactor this? Notation? *)
+          let sustore' := su_trans_code atk_code amem (extract_storeview store _) in 
+          let pustore' := pu_trans_code atk_code amem (extract_storeview store _) in
+          let amem' := mem_code atk_code amem (extract_storeview store _) in 
+          let leak := leak_code atk_code amem (extract_storeview store _) in 
+
+          forall supustore', 
+          CombinedStoreView sustore' pustore' supustore' ->
+          UpdatedStore store supustore' store' ->
+
           _ _ store store' amem amem' leak.
+
+  Print AtkSnipEval.
 End atkeval.
+
+(* I think that I might have to show that things are deterministic. 
+Assignment  
+Attacker execution 
+*)
 
 Section opsem.
   Context {p: PartOrderParam} 
@@ -436,17 +428,25 @@ Section opsem.
     Event ->          (* Event, if any *)
     Configuration ->  (* Resulting state *)
     Prop := 
-    | atk_step (atk_snip store store' amem amem' leak remaining : _) :
+    | atk_step: 
+        forall atk_snip remaining store amem,
         let cfg := ({| prog := (atk atk_snip) :: remaining ; store := store ; atk_mem := amem |}) in
-        let cfg' := ({| prog := remaining ; store := store' ; atk_mem := amem' |}) in
-        AtkSnipEval atk_snip store store' amem amem' leak ->
-        TransitionRel cfg (adv_leak leak) cfg'
 
-    | prg_step  (cmd store store' amem event remaining : _) :
+        forall store' amem' leak,
+        AtkSnipEval atk_snip store store' amem amem' leak ->
+        let cfg' := ({| prog := remaining ; store := store' ; atk_mem := amem' |}) in
+
+        _ cfg (adv_leak leak) cfg'
+
+    | prg_step:  
+        forall cmd remaining store amem,
         let cfg := ({| prog := (code cmd) :: remaining ; store := store ; atk_mem := amem |}) in
-        let cfg' := ({| prog := remaining ; store := store' ; atk_mem := amem |}) in
+
+        forall event store',
         LangCmdEval store cmd event store' ->
-        TransitionRel cfg event cfg'.
+        let cfg' := ({| prog := remaining ; store := store' ; atk_mem := amem |}) in
+
+        _ cfg event cfg'.
 
   (* I'd like to define what NMIF means semantically. 
   - Single attack nmif. There are multiple choices here. 
