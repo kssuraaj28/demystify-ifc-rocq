@@ -112,6 +112,17 @@ Section store.
          The best proof would have that generated, and, I could just use `assumption`
        *)  
 
+  (*
+  (* I don't like this convention for Prop.. *)
+  Theorem DeterministicUpdatedStore : forall store {P} (update : Storeview P), forall store' store'',
+    UpdatedStore store update store' ->
+    UpdatedStore store update store'' ->
+    store' = store''.
+  Proof. Admitted.
+
+  Check (_ : DeterministicUpdatedStore _ _ _ _ _ _ ).
+  *)
+
 
   (* 
      Helper when the update is just for a single value. 
@@ -249,21 +260,8 @@ Section defs.
 
     Definition Public : Prop := element_conf ≼c attack_conf. 
     Definition Secret : Prop := ~Public.  
-
     Definition Untrusted : Prop := element_int ≼i attack_int.
     Definition Trusted   : Prop := ~Untrusted.
-
-    (* Is there a CT way of doing whatever I just did. 
-    f : A -> B
-    f_lift : (X -> A) -> (X -> B)
-
-    f : (A x B) -> C
-    f_lift : ((X -> A) x (X -> B)) -> (X -> C))
-    *)
-    Definition PublicTrusted   : Prop := Public /\ Trusted. 
-    Definition SecretTrusted   : Prop := Secret /\ Trusted.
-    Definition PublicUntrusted : Prop := Public /\ Untrusted.
-    Definition SecretUntrusted : Prop := Secret /\ Untrusted.
   End defs.
 End defs.
 
@@ -278,10 +276,19 @@ Section atk_code.
           {atkprm : AtkLblParam} 
           {atkmem : AtkMemParam}.
 
-  Let AllPred : VarPred := fun _ => True.
-  Let PubPred : VarPred := fun x => Public (var_lbl x).
-  Let PUPred : VarPred := fun x => PublicTrusted (var_lbl x).
-  Let SUPred : VarPred := fun x => SecretUntrusted (var_lbl x).
+  Let AllPred : VarPred := fun _ => 
+    True.
+
+  Let PubPred : VarPred := fun x => 
+    Public (var_lbl x).
+
+  Let PUPred : VarPred := fun x => 
+    let x_lbl := var_lbl x in
+    Public x_lbl /\ Untrusted x_lbl.
+
+  Let SUPred : VarPred := fun x => 
+    let x_lbl := var_lbl x in
+    Secret x_lbl /\ Trusted x_lbl.
 
   Definition FullStore := Storeview AllPred.
   Definition PubStore := Storeview PubPred.
@@ -388,20 +395,22 @@ Section atkeval.
                 Prop := 
 
       atk_snip_eval : 
-          forall (store store' : Store) (amem : AttackerMem),
+          forall (store : Store) (amem : AttackerMem),
           (* TODO: Can I refactor this? Notation? *)
           let sustore' := su_trans_code atk_code amem (extract_storeview store _) in 
           let pustore' := pu_trans_code atk_code amem (extract_storeview store _) in
           let amem' := mem_code atk_code amem (extract_storeview store _) in 
           let leak := leak_code atk_code amem (extract_storeview store _) in 
 
-          forall supustore', 
+          forall (supustore' : _), 
           CombinedStoreView sustore' pustore' supustore' ->
+
+          forall (store' : _), (* Here, you might want to show that this is deterministic. *)
           UpdatedStore store supustore' store' ->
 
           _ _ store store' amem amem' leak.
 
-  Print AtkSnipEval.
+  Print atk_snip_eval.
 End atkeval.
 
 (* I think that I might have to show that things are deterministic. 
