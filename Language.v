@@ -366,8 +366,6 @@ Section langeval.
           {vars : VarParam} 
           {vals : ValueParam}.
 
-
-
   Inductive LangCmdEval : 
     Store -> (* Input store *)
     LanguageCommand ->  (* Command to run *)
@@ -377,7 +375,7 @@ Section langeval.
 
     | assignment_eval (store new_store : Store) (dest : AssignableVars)  (comp_fn : ComputeFn) : 
         let var := proj1_sig dest in
-        let new_val := comp_fn (extract_storeview store _) in
+        let new_val := comp_fn (extract_storeview store _) in (* The type of comp_fn is enough *)
         UpdatedStoreVal store new_store var new_val ->
         _ store (dest ← comp_fn) epsilon new_store
 
@@ -399,11 +397,10 @@ Section atkeval.
           {atkprm : AtkLblParam}
           {atkmem : AtkMemParam}.
 
-
   Inductive AtkSnipEval (atk_code : AttackSnippet) :
                 Store -> (* Input store *)
                 Store -> (* Output store *)     
-          
+                AttackerMem -> (* Input attacker memory *)
                 AttackerMem -> (* Output attacker memory *)
                 list Value -> (* Leaked information *)
                 Prop := 
