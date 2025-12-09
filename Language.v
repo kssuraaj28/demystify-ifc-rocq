@@ -29,21 +29,11 @@ Section label.
 End label.
 
 (* Should I export? *)
-#[local] Notation "x '≼c' y" := (ConfOrder x y)(at level 70).
-Check _ ≼c _. 
+#[local] Notation "x '≼c' y" := (ConfOrder x y)(at level 70). Check _ ≼c _. 
 
-#[local] Notation "x '≼i' y" := (IntOrder x y)(at level 70).
-Check _ ≼i _.
+#[local] Notation "x '≼i' y" := (IntOrder x y)(at level 70). Check _ ≼i _.
 
-#[local] Notation "⟨ l1 , l2 ⟩" := {| conf := l1 ; int := l2 |}.
-
-Section test.
-  Check ⟨ _ , _ ⟩.
-  Context {p : PartOrderParam}.
-  Check ⟨ _ , _ ⟩.
-  Variables (root : ConfCarrier) (alice : IntCarrier).
-  Check ⟨ root , alice ⟩ : Label.
-End test.
+#[local] Notation "⟨ l1 , l2 ⟩" := {| conf := l1 ; int := l2 |}. Check ⟨ _ , _ ⟩.
 
 Class ValueParam : Type := {
   Value : Type ;
@@ -119,11 +109,11 @@ Section store.
     UpdatedStore store update store'' ->
     store' = store''.
   Proof. 
-    repeat (intuition; try match goal with
+    repeat (intuition; match goal with
            | [ H : _ , H' : _ |- _ ] =>  specialize (H H')
            | [ |- _ = _] =>  apply functional_extensionality || congruence
            | [ P : _, x : _ |- _ ] =>  destruct (classic (P x))  
-               (* This is a little bit garbage *)
+               (* This is a little bit garbage. The order of branches matters *)
     end).
   Qed.
 
@@ -337,8 +327,6 @@ Section event. (* This should be a module eventually? *)
     | epsilon 
     | adv_leak (lv : list Value).
 End event.
-
-Search sig.
 
 Section langeval.
   Context {p : PartOrderParam} 
