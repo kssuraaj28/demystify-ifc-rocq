@@ -1,6 +1,5 @@
 From NMIF Require Import PartialOrder.
 
-
 (* I think that this is probably the better way? *)
 Class PartOrderParam : Type := {
   conf_po : PartialOrder;
@@ -52,11 +51,11 @@ Section varsubset.
 End varsubset.
 
 
-Module CommonNotations.
-(* Should I export? *)
-Notation "x '≼c' y" := (ConfOrder x y)(at level 70). Check _ ≼c _. 
+Module Notations.
+  (* Should I export? TODO: *)
+  Notation "x '≼c' y" := (ConfOrder x y)(at level 70). Check _ ≼c _. 
 
-Notation "x '≼i' y" := (IntOrder x y)(at level 70). Check _ ≼i _.
+  Notation "x '≼i' y" := (IntOrder x y)(at level 70). Check _ ≼i _.
 
-Notation "⟨ l1 , l2 ⟩" := {| conf := l1 ; int := l2 |}. Check ⟨ _ , _ ⟩.
-End CommonNotations.
+  Notation "⟨ l1 , l2 ⟩" := {| conf := l1 ; int := l2 |}. Check ⟨ _ , _ ⟩.
+End Notations.
