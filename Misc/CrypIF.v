@@ -97,10 +97,11 @@ Definition combined_sem (c : Combined) (s : State) : State. Proof. (* I wonder h
 Defined.
   
 
-Definition Prog := list Combined.
+Definition AtkProg := list Combined.
 Import ListNotations.
 
-Fixpoint prog_sem (p : Prog) : State -> State :=
+(* I wonder if I could do (s : State) *)
+Fixpoint prog_sem (p : AtkProg) : State -> State :=
   match p with
   | [] => 
       fun inp_state => inp_state
@@ -108,6 +109,13 @@ Fixpoint prog_sem (p : Prog) : State -> State :=
       fun inp_state => 
         prog_sem p' (combined_sem c inp_state)
   end.
+
+
+Definition prog_behavior (p : AtkProg) (st_inp : Value) : (Value * Value)  (* ST x PT *) :=
+  let inp_state := fun v => if var_eq_dec v st then st_inp else 0 in 
+  let end_state := prog_sem p inp_state in
+  (end_state st, end_state pt).
+
 
 Section test.
   Let s : State :=
@@ -120,7 +128,7 @@ Section test.
   Let c : Compute :=
     fun s => s st + s pt + s pu.
 
-  Let p : Prog := 
+  Let p : AtkProg := 
     [
     inl (pu ← c); 
     inl (st ← c); 
@@ -131,4 +139,14 @@ Section test.
   Compute s' pu.
   Compute s' pt.
   Compute s' st.
+
+  Compute prog_behavior p 10.
 End test.
+
+(* The next step will be to write an example *)
+Definition running_example : AtkProg
+    [
+    inl (pu ← c); 
+    inl (st ← c); 
+    inl (pt ← c)
+    ].
