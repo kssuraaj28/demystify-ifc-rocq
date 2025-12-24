@@ -48,12 +48,18 @@ Section test.
   Goal s' st = (s st). reflexivity. Qed.
 End test.
 
-Definition AtkSnip := Value -> Value -> Value. (* pt -> pu -> pu *)
+Record AtkSnip (*(AtkMem : Type)*) := {
+  pu_trans : Value -> Value -> Value (*  *)
+  }.
+
+Notation "☠︎︎ ⟨ f ⟩" := {|pu_trans := f|}.
+
+
 Section atksnip_sem.
   Variables (a: AtkSnip) (s : State).
 
   Definition atksnip_sem : State:=
-    let pu_v := a (s pt) (s pu) in
+    let pu_v := pu_trans a (s pt) (s pu) in
     fun v => 
       if var_eq_dec v pu then (* You could probably refactor this.. *)
         pu_v
@@ -71,7 +77,7 @@ Section test.
              end.
 
   Section zero.
-    Let zero_atk : AtkSnip := fun _ _ => 0.
+    Let zero_atk : AtkSnip := ☠︎︎ ⟨ fun _ _ => 0⟩.
 
     Let s' := atksnip_sem zero_atk s.
     Goal s' pu = 0. cbv. reflexivity. Qed.
@@ -80,7 +86,7 @@ Section test.
   End zero.
 
   Section sum.
-    Let sum_atk : AtkSnip := fun x y => x + y.
+    Let sum_atk : AtkSnip := ☠︎︎ ⟨ fun x y => x + y ⟩.
 
     Let s' := atksnip_sem sum_atk s.
     Goal s' pu = s pt + s pu. cbv. reflexivity. Qed.
@@ -89,14 +95,19 @@ Section test.
   End sum.
 End test.
 
-Definition Combined : Type := (Cmd + AtkSnip). 
+Inductive Combined : Type := 
+  | cmd (c : Cmd) 
+  | atk (a: AtkSnip).
+
+Coercion cmd : Cmd >-> Combined.
+Coercion atk : AtkSnip >-> Combined.
 (* 
-TODO: Can I make this work?
+TODO: Can I make this work? with Cmd + AtkSnip?
 Coercion inl : Cmd >-> Combined.
  *)
 
 
-Definition combined_sem (c : Combined) (s : State) : State. Proof. (* I wonder how things might look if I used case instead *)
+Definition combined_sem (c : Combined) (s : State) : State. Proof. (* I wonder how things might look if I used case instead TODO *)
   destruct c.
   - exact (cmd_sem c s).
   - exact (atksnip_sem a s).
@@ -134,11 +145,30 @@ Section test.
   Let c : Compute :=
     fun s => s st + s pt + s pu.
 
+  (* TODO: Forcing this, and not being able to infer seems a little bit sad *)
+  Check (pu ← _) : Combined. (* How can I print Coercions? *)
+(*
+pu ← _ : Combined
+     : Combined
+*)
+  Set Printing Coercions.
+  Check (pu ← _) : Combined. 
+(*
+cmd (pu ← ?comp) : Combined
+     : Combined
+*)
+  Unset Printing Coercions.
+  Check (pu ← _) : Combined. 
+(*
+pu ← ?comp : Combined
+     : Combined
+*)
+
   Let p : AtkProg := 
     [
-    inl (pu ← c);
-    inl (st ← c); 
-    inl (pt ← c)
+     (pu ← c) : Combined;  (* TODO: Is it possible to not keep writing this nonsense *)
+     (st ← c) : Combined; 
+     (pt ← c) : Combined
     ].
 
   Let s' := prog_sem p s.
@@ -154,27 +184,28 @@ End test.
 (* 
   I wish I could have syntax that is a little better. 
   TODO: Notation?
+  TODO: Should I force programs to alternate? Let me not. 
 *)
 Definition running_example : AtkProg := [
-    inr (fun _ _ => 10) ;             (* ☠︎︎ sets pu to 10 *)
-    inl (pt ← fun _ => 10) ;          (* pt ← 10 *)
-    inr (fun pt pu => pt + pu) ;      (* ☠︎︎ sets pu to sum of pu and pt*)
-    inl (pu ← fun s => s pt + 5);     (* pu ← pt + 5 *)
-    inr (fun _ pu => pu) ;            (* ☠︎︎ does nothing *)
-    inl (pt ← (fun s => s pu)) ;      (* pt ← pu  !!ENDORSE!! *)
-    inr (fun _ _ => 10);              (* Adversary sets pu to 10 *)
-    inl (pt ← (fun s => s pt + 1))    (* pt ← pt + 1 *)
+     ☠︎︎ ⟨fun _ _ => 10  ⟩        : Combined; (* ☠︎︎ sets pu to 10 *)
+     (pt ← fun _ => 10)         : Combined; (* pt ← 10 *)
+     ☠︎︎ ⟨fun pt pu => pt + pu  ⟩ : Combined; (* ☠︎︎ sets pu to 10 *)
+     (pu ← fun s => s pt + 5)   : Combined; (* pu ← pt + 5 *)
+     ☠︎︎ ⟨ (fun _ pu => pu)  ⟩    : Combined; (* ☠︎︎ does nothing *)
+     (pt ← (fun s => s pu))     : Combined; (* pt ← pu  !!ENDORSE!! *)
+     ☠︎︎ ⟨  (fun _ _ => 10)⟩      : Combined; (* Adversary sets pu to 10 *)
+     (pt ← (fun s => s pt + 1)) : Combined  (* pt ← pt + 1 *)
   ].
 
 Definition sim : AtkProg := [
-    inr (fun _ pu => pu) ;            (* ☠︎︎ noop *)
-    inl (pt ← fun _ => 10) ;          (* pt ← 10 *)
-    inr (fun _ pu => pu) ;            (* ☠︎︎ noop *)
-    inl (pu ← fun s => s pt + 5);     (* pu ← pt + 5 *)
-    inr (fun _ _ => 15) ;             (* ☠︎︎ ENDORSE plan value *)
-    inl (pt ← (fun s => s pu)) ;      (* pt ← pu  !!ENDORSE!! *)
-    inr (fun _ pu => pu) ;            (* ☠︎︎ noop *)
-    inl (pt ← (fun s => s pt + 1))    (* pt ← pt + 1 *)
+     ☠︎︎⟨ (fun _ pu => pu) ⟩       :Combined ;  (* ☠︎︎ noop *)
+     (pt ← fun _ => 10)          :Combined ;  (* pt ← 10 *)
+     ☠︎︎⟨(fun _ pu => pu) ⟩        :Combined ;  (* ☠︎︎ noop *)
+     (pu ← fun s => s pt + 5)    :Combined ;  (* pu ← pt + 5 *)
+     ☠︎︎⟨(fun _ _ => 15) ⟩         :Combined ;  (* ☠︎︎ ENDORSE plan value *)
+     (pt ← (fun s => s pu))      :Combined ;  (* pt ← pu  !!ENDORSE!! *)
+     ☠︎︎⟨(fun _ pu => pu) ⟩        :Combined ;  (* ☠︎︎ noop *)
+     (pt ← (fun s => s pt + 1))  :Combined    (* pt ← pt + 1 *)
   ].
 
 Definition beh_real := prog_behavior running_example.
