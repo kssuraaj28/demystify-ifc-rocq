@@ -48,23 +48,32 @@ Section test.
   Goal s' st = (s st). reflexivity. Qed.
 End test.
 
-Record AtkSnip (*(AtkMem : Type)*) := {
-  pu_trans : Value -> Value -> Value (*  *)
-  }.
+Class AtkMemParam := { AtkState : Type ; init_val : AtkState }.
 
-Notation "☠︎︎ ⟨ f ⟩" := {|pu_trans := f|}.
+Record AtkSnip {amem : AtkMemParam} := {
+  pu_trans : AtkState  -> Value (* pt *) -> Value (* pu *) -> Value (* pu *)  ;
+  mem_trans : AtkState -> Value (* pt *) -> Value (* pu *) -> AtkState 
+}.
 
+Notation "☠︎︎ ⟨ pu | mem ⟩" := {|pu_trans := pu ; mem_trans := mem |}.
 
 Section atksnip_sem.
-  Variables (a: AtkSnip) (s : State).
+  Context {amem : AtkMemParam}.
+  Definition CombState : Type := State * AtkState.
+  Variables (a: AtkSnip) (cfg : CombState).
 
-  Definition atksnip_sem : State:=
-    let pu_v := pu_trans a (s pt) (s pu) in
-    fun v => 
-      if var_eq_dec v pu then (* You could probably refactor this.. *)
-        pu_v
-      else
-        s v.
+
+  Definition atksnip_sem : CombState :=
+    let (s, s_atk) := cfg in
+    let pu_v := pu_trans a s_atk (s pt) (s pu) in
+    let s_atk' := mem_trans a s_atk (s pt) (s pu) in
+    let s' := fun v => 
+                if var_eq_dec v pu then (* You could probably refactor this.. *)
+                  pu_v
+                else
+                  s v in
+    (s', s_atk').
+
 End atksnip_sem.
 
 
@@ -77,25 +86,34 @@ Section test.
              end.
 
   Section zero.
-    Let zero_atk : AtkSnip := ☠︎︎ ⟨ fun _ _ => 0⟩.
+    Let amem : AtkMemParam := {| AtkState := unit ; init_val := tt |}.  Existing Instance amem.
+    Let zero_atk : AtkSnip := ☠︎︎ ⟨ fun _ _ _ => 0 | fun x _ _ => x⟩.
 
-    Let s' := atksnip_sem zero_atk s.
+    
+    Let res := atksnip_sem zero_atk s tt. (* Can I not do copattern? *)
+    Let s' := fst res.
+    Let atk' := snd res.
     Goal s' pu = 0. cbv. reflexivity. Qed.
     Goal s' pt = s pt. cbv. reflexivity. Qed.
     Goal s' st = s st. cbv. reflexivity. Qed. (* We could have theorem that says this for all atk *)
+    Goal atk' = tt. cbv. reflexivity. Qed. 
   End zero.
 
   Section sum.
-    Let sum_atk : AtkSnip := ☠︎︎ ⟨ fun x y => x + y ⟩.
+    Let amem : AtkMemParam := {| AtkState := nat ; init_val := 67 |}.  Existing Instance amem.
+    Let sum_atk : AtkSnip := ☠︎︎ ⟨ fun m x y => m + x + y | fun x _ _ => x + 1⟩.
 
-    Let s' := atksnip_sem sum_atk s.
-    Goal s' pu = s pt + s pu. cbv. reflexivity. Qed.
+    Let res := atksnip_sem sum_atk s 42. (* Can I not do copattern? *)
+    Let s' := fst res. Let atk' := snd res.
+
+    Goal s' pu = (42 + 3 + 58). cbv. reflexivity. Qed.
     Goal s' pt = s pt. cbv. reflexivity. Qed.
     Goal s' st = s st. cbv. reflexivity. Qed. (* We could have theorem that says this for all atk *)
+    Goal atk' = (42 + 1). cbv. reflexivity. Qed. (* We could have theorem that says this for all atk *)
   End sum.
 End test.
 
-Inductive Combined : Type := 
+Inductive Combined {amem : AtkMemParam} : Type := 
   | cmd (c : Cmd) 
   | atk (a: AtkSnip).
 
@@ -107,9 +125,22 @@ Coercion inl : Cmd >-> Combined.
  *)
 
 
-Definition combined_sem (c : Combined) (s : State) : State. Proof. (* I wonder how things might look if I used case instead TODO *)
+Section comb.
+  Context {amem : AtkMemParam}.
+  Variables (c : Combined) (cfg : CombState).
+
+  Check (
+    let (st, ast) := cfg in
+      match c with 
+        | cmd c => (st , ast)
+        | atk a => (st , ast)
+        end) : CombState.
+
+
+  Definition combined_sem : CombState.
+Proof. (* I wonder how things might look if I used case instead TODO *)
   destruct c.
-  - exact (cmd_sem c s).
+  - refine (cmd_sem _ _ _).
   - exact (atksnip_sem a s).
 Defined.
   
