@@ -5,6 +5,8 @@ Let us start with a very simple program. Then we try to see how
 From Stdlib Require Import List.
 From Stdlib Require Import Logic.FunctionalExtensionality.
 
+Import ListNotations.
+
 Inductive Vars := st | pt | pu.
 Definition var_eq_dec : forall (v v' : Vars), {v = v'} + {v <> v'}. Proof. decide equality. Defined.
 
@@ -138,27 +140,37 @@ Section comb.
         (cmd_sem c st , ast)
     | atk a => atksnip_sem a cfg
     end.
-  
-
-Definition AtkProg := list Combined.
-Import ListNotations.
-
-(* I wonder if I could do (s : State) *)
-Fixpoint prog_sem (p : AtkProg) : State -> State :=
-  match p with
-  | [] => 
-      fun inp_state => inp_state
-  | c :: p' => 
-      fun inp_state => 
-        prog_sem p' (combined_sem c inp_state)
-  end.
+End comb.
 
 
-Definition prog_behavior (p : AtkProg) (st_inp : Value) : (Value * Value)  (* ST x PT *) :=
-  let inp_state := fun v => if var_eq_dec v st then st_inp else 0 in 
-  let end_state := prog_sem p inp_state in
-  (end_state st, end_state pt).
+Section prog.
+  Context {amem : AtkMemParam}.
+  Definition AtkProg := list Combined.
 
+  (* I wonder if I could do (s : State) *)
+  Fixpoint prog_sem (p : AtkProg) : CombState -> CombState :=
+    match p with
+    | [] => 
+        fun inp_state => inp_state
+    | c :: p' => 
+        fun inp_state => 
+          prog_sem p' (combined_sem c inp_state)
+    end.
+
+  Section prog_behavior.
+    Variables (p : AtkProg) (st_inp : Value). 
+
+    Let inp_state := fun v => if var_eq_dec v st then st_inp else 0.
+    Let inp_atk_state := init_val.
+    Let inp_cfg := (inp_state, inp_atk_state).
+    Let out_cfg := prog_sem p inp_cfg.
+
+  (* This init_val is kind of garbage *)
+    Definition prog_behavior : (Value * Value)  (* ST x PT *) := 
+      let (end_state, _) := out_cfg in
+      (end_state st, end_state pt).
+  End prog_behavior.
+End prog.
 
 Section test.
   Let s : State :=
@@ -190,17 +202,14 @@ pu ← ?comp : Combined
      : Combined
 *)
 
+  Context {amem : AtkMemParam}.
+  
   Let p : AtkProg := 
     [
      (pu ← c) : Combined;  (* TODO: Is it possible to not keep writing this nonsense *)
      (st ← c) : Combined; 
      (pt ← c) : Combined
     ].
-
-  Let s' := prog_sem p s.
-  Compute s' pu.
-  Compute s' pt.
-  Compute s' st.
 
   Compute prog_behavior p 10.
 End test.
@@ -212,37 +221,39 @@ End test.
   TODO: Notation?
   TODO: Should I force programs to alternate? Let me not. 
 *)
-Definition running_example : AtkProg := [
-     ☠︎︎ ⟨fun _ _ => 10  ⟩        :Combined; (* ☠︎︎ sets pu to 10 *)
-     (pt ← fun _ => 10)         :Combined; (* pt ← 10 *)
-     ☠︎︎ ⟨fun pt pu => pt + pu  ⟩ :Combined; (* ☠︎︎ sets pu to 10 *)
-     (pu ← fun s => s pt + 5)   :Combined; (* pu ← pt + 5 *)
-     ☠︎︎ ⟨ (fun _ pu => pu)  ⟩    :Combined; (* ☠︎︎ does nothing *)
-     (pt ← (fun s => s pu))     :Combined; (* pt ← pu  !!ENDORSE!! *)
-     ☠︎︎ ⟨  (fun _ _ => 10)⟩      :Combined; (* Adversary sets pu to 10 *)
-     (pt ← (fun s => s pt + 1)) :Combined  (* pt ← pt + 1 *)
-  ].
+Section run_ex.
+  Context {amem : AtkMemParam}.
+  Definition running_example : AtkProg := [
+       ☠︎︎ ⟨fun _ _ _ => 10 | fun s _ _ => s ⟩        :Combined; (* ☠︎︎ sets pu to 10 *)
+       (pt ← fun _ => 10)         :Combined; (* pt ← 10 *)
+       ☠︎︎ ⟨fun _ pt pu => pt + pu | fun s _ _ => s ⟩ :Combined; (* ☠︎︎ sets pu to 10 *)
+       (pu ← fun s => s pt + 5)   :Combined; (* pu ← pt + 5 *)
+       ☠︎︎ ⟨ (fun _ pt pu => pu)  | fun s _ _ => s⟩    :Combined; (* ☠︎︎ does nothing *)
+       (pt ← (fun s => s pu))     :Combined; (* pt ← pu  !!ENDORSE!! *)
+       ☠︎︎ ⟨  (fun _ _ _ => 10)| fun s _ _ => s⟩      :Combined; (* Adversary sets pu to 10 *)
+       (pt ← (fun s => s pt + 1)) :Combined  (* pt ← pt + 1 *)
+    ].
 
-Set Printing Coercions.
-Print running_example.
-Unset Printing Coercions.
+  Set Printing Coercions.
+  Print running_example.
+  Unset Printing Coercions.
 
-Definition sim : AtkProg := [
-     ☠︎︎⟨ (fun _ pu => pu) ⟩       :Combined; (* ☠︎︎ noop *)
-     (pt ← fun _ => 10)          :Combined; (* pt ← 10 *)
-     ☠︎︎⟨(fun _ pu => pu) ⟩        :Combined; (* ☠︎︎ noop *)
-     (pu ← fun s => s pt + 5)    :Combined; (* pu ← pt + 5 *)
-     ☠︎︎⟨(fun _ _ => 15) ⟩         :Combined; (* ☠︎︎ ENDORSE plan value *)
-     (pt ← (fun s => s pu))      :Combined; (* pt ← pu  !!ENDORSE!! *)
-     ☠︎︎⟨(fun _ pu => pu) ⟩        :Combined; (* ☠︎︎ noop *)
-     (pt ← (fun s => s pt + 1))  :Combined  (* pt ← pt + 1 *)
-  ].
+  Definition sim : AtkProg := [
+       ☠︎︎⟨ (fun _ _ pu => pu) | fun s _ _ => s⟩       :Combined; (* ☠︎︎ noop *)
+       (pt ← fun _ => 10)          :Combined; (* pt ← 10 *)
+       ☠︎︎⟨(fun _ _ pu => pu) | fun s _ _ => s⟩        :Combined; (* ☠︎︎ noop *)
+       (pu ← fun s => s pt + 5)    :Combined; (* pu ← pt + 5 *)
+       ☠︎︎⟨(fun _ _ _ => 15) | fun s _ _ => s⟩         :Combined; (* ☠︎︎ ENDORSE plan value *)
+       (pt ← (fun s => s pu))      :Combined; (* pt ← pu  !!ENDORSE!! *)
+       ☠︎︎⟨(fun _ _ pu => pu) | fun s _ _ => s⟩        :Combined; (* ☠︎︎ noop *)
+       (pt ← (fun s => s pt + 1))  :Combined  (* pt ← pt + 1 *)
+    ].
 
-Definition beh_real := prog_behavior running_example.
-Definition beh_ideal := prog_behavior sim.
+  Definition beh_real := prog_behavior running_example.
+  Definition beh_ideal := prog_behavior sim.
 
-(* This is what we want to do *)
-Goal beh_real = beh_ideal. (* This is what we want to do *) (* We don't even use functional_extensionaltiy here! *)
-Proof.
-  reflexivity.
-Qed.
+  (* This is what we want to do *)
+  Goal beh_real = beh_ideal. (* This is what we want to do *) (* We don't even use functional_extensionaltiy here! *)
+  Proof.
+    cbv. reflexivity.
+  Qed.
