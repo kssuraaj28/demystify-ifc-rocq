@@ -90,7 +90,7 @@ Section test.
     Let zero_atk : AtkSnip := ☠︎︎ ⟨ fun _ _ _ => 0 | fun x _ _ => x⟩.
 
     
-    Let res := atksnip_sem zero_atk s tt. (* Can I not do copattern? *)
+    Let res := atksnip_sem zero_atk (s, tt). (* Can I not do copattern? *)
     Let s' := fst res.
     Let atk' := snd res.
     Goal s' pu = 0. cbv. reflexivity. Qed.
@@ -103,7 +103,7 @@ Section test.
     Let amem : AtkMemParam := {| AtkState := nat ; init_val := 67 |}.  Existing Instance amem.
     Let sum_atk : AtkSnip := ☠︎︎ ⟨ fun m x y => m + x + y | fun x _ _ => x + 1⟩.
 
-    Let res := atksnip_sem sum_atk s 42. (* Can I not do copattern? *)
+    Let res := atksnip_sem sum_atk (s, 42). (* Can I not do copattern? *)
     Let s' := fst res. Let atk' := snd res.
 
     Goal s' pu = (42 + 3 + 58). cbv. reflexivity. Qed.
@@ -129,20 +129,15 @@ Section comb.
   Context {amem : AtkMemParam}.
   Variables (c : Combined) (cfg : CombState).
 
-  Check (
-    let (st, ast) := cfg in
-      match c with 
-        | cmd c => (st , ast)
-        | atk a => (st , ast)
-        end) : CombState.
 
 
-  Definition combined_sem : CombState.
-Proof. (* I wonder how things might look if I used case instead TODO *)
-  destruct c.
-  - refine (cmd_sem _ _ _).
-  - exact (atksnip_sem a s).
-Defined.
+  Definition combined_sem : CombState :=
+    match c with 
+    | cmd c => 
+        let (st, ast) := cfg in
+        (cmd_sem c st , ast)
+    | atk a => atksnip_sem a cfg
+    end.
   
 
 Definition AtkProg := list Combined.
