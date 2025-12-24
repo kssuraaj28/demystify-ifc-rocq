@@ -187,25 +187,29 @@ End test.
   TODO: Should I force programs to alternate? Let me not. 
 *)
 Definition running_example : AtkProg := [
-     ☠︎︎ ⟨fun _ _ => 10  ⟩        : Combined; (* ☠︎︎ sets pu to 10 *)
-     (pt ← fun _ => 10)         : Combined; (* pt ← 10 *)
-     ☠︎︎ ⟨fun pt pu => pt + pu  ⟩ : Combined; (* ☠︎︎ sets pu to 10 *)
-     (pu ← fun s => s pt + 5)   : Combined; (* pu ← pt + 5 *)
-     ☠︎︎ ⟨ (fun _ pu => pu)  ⟩    : Combined; (* ☠︎︎ does nothing *)
-     (pt ← (fun s => s pu))     : Combined; (* pt ← pu  !!ENDORSE!! *)
-     ☠︎︎ ⟨  (fun _ _ => 10)⟩      : Combined; (* Adversary sets pu to 10 *)
-     (pt ← (fun s => s pt + 1)) : Combined  (* pt ← pt + 1 *)
+     ☠︎︎ ⟨fun _ _ => 10  ⟩        :Combined; (* ☠︎︎ sets pu to 10 *)
+     (pt ← fun _ => 10)         :Combined; (* pt ← 10 *)
+     ☠︎︎ ⟨fun pt pu => pt + pu  ⟩ :Combined; (* ☠︎︎ sets pu to 10 *)
+     (pu ← fun s => s pt + 5)   :Combined; (* pu ← pt + 5 *)
+     ☠︎︎ ⟨ (fun _ pu => pu)  ⟩    :Combined; (* ☠︎︎ does nothing *)
+     (pt ← (fun s => s pu))     :Combined; (* pt ← pu  !!ENDORSE!! *)
+     ☠︎︎ ⟨  (fun _ _ => 10)⟩      :Combined; (* Adversary sets pu to 10 *)
+     (pt ← (fun s => s pt + 1)) :Combined  (* pt ← pt + 1 *)
   ].
 
+Set Printing Coercions.
+Print running_example.
+Unset Printing Coercions.
+
 Definition sim : AtkProg := [
-     ☠︎︎⟨ (fun _ pu => pu) ⟩       :Combined ;  (* ☠︎︎ noop *)
-     (pt ← fun _ => 10)          :Combined ;  (* pt ← 10 *)
-     ☠︎︎⟨(fun _ pu => pu) ⟩        :Combined ;  (* ☠︎︎ noop *)
-     (pu ← fun s => s pt + 5)    :Combined ;  (* pu ← pt + 5 *)
-     ☠︎︎⟨(fun _ _ => 15) ⟩         :Combined ;  (* ☠︎︎ ENDORSE plan value *)
-     (pt ← (fun s => s pu))      :Combined ;  (* pt ← pu  !!ENDORSE!! *)
-     ☠︎︎⟨(fun _ pu => pu) ⟩        :Combined ;  (* ☠︎︎ noop *)
-     (pt ← (fun s => s pt + 1))  :Combined    (* pt ← pt + 1 *)
+     ☠︎︎⟨ (fun _ pu => pu) ⟩       :Combined; (* ☠︎︎ noop *)
+     (pt ← fun _ => 10)          :Combined; (* pt ← 10 *)
+     ☠︎︎⟨(fun _ pu => pu) ⟩        :Combined; (* ☠︎︎ noop *)
+     (pu ← fun s => s pt + 5)    :Combined; (* pu ← pt + 5 *)
+     ☠︎︎⟨(fun _ _ => 15) ⟩         :Combined; (* ☠︎︎ ENDORSE plan value *)
+     (pt ← (fun s => s pu))      :Combined; (* pt ← pu  !!ENDORSE!! *)
+     ☠︎︎⟨(fun _ pu => pu) ⟩        :Combined; (* ☠︎︎ noop *)
+     (pt ← (fun s => s pt + 1))  :Combined  (* pt ← pt + 1 *)
   ].
 
 Definition beh_real := prog_behavior running_example.
