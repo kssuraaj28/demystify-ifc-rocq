@@ -341,6 +341,9 @@ Section run_ex.
 
   (* Now, what should my proof compiler target be? *)
 
-  (* TODO: An example with isolation *)
+  (* TODO: An example with isolation. 
+     The attacker should be able to write to pu vars though.. 
+  *)
+
   (* TODO: An example with declassification *)
   (* TODO: An example with both *)
