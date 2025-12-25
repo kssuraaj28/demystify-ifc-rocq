@@ -266,8 +266,7 @@ Section run_ex.
        (pt ← (fun s => s pt + 1))                                                   :Combined  (* pt ← pt + 1 *)
     ].
 
-  Definition beh_real := prog_behavior real_atkprg.
-  Compute beh_real.
+  Compute prog_behavior real_atkprg.
 (*
 = fun st_inp : Value => (st_inp, 16, [4; 5; 6; 9])
      : Value -> Value * Value * LeakVal
@@ -290,17 +289,58 @@ Section run_ex.
 
        (pt ← (fun s => s pt + 1))                                                    :Combined  (* pt ← pt + 1 *)
        ].
+  Compute  prog_behavior ideal_atkprg1.
 
+  (* This is what we want to do *)
+  Goal prog_behavior real_atkprg = prog_behavior ideal_atkprg1. (* This is what we want to do *) (* We don't even use functional_extensionaltiy here! *)
+  Proof.
+    cbv. reflexivity.
+  Qed.
 
-  Definition beh_ideal := prog_behavior ideal_atkprg1.
-  Compute beh_ideal.
+  Definition ideal_atkprg2 : AtkProg := [
+       ☠︎︎ ⟨fun _ _ pu => pu | fun s _ _ => s | fun _ _ _ => [4; 5; 6; 9]⟩             :Combined; (* ☠︎︎ leaks everything first *)
+
+       (pt ← fun _ => 10)                                                            :Combined; (* pt ← 10 *)
+       (pu ← fun s => s pt + 5)                                                      :Combined; (* pu ← pt + 5 *)
+
+       ☠︎︎ ⟨fun _ _ pu => 15 | fun s _ _ => s | fun _ _ _ => []⟩                       :Combined; (* ☠︎︎ endorses 15, a value. There is no compute, or anything *)
+
+       (pt ← (fun s => s pu))                                                        :Combined; (* pt ← pu  !!ENDORSE!! *)
+       (pt ← (fun s => s pt + 1))                                                    :Combined  (* pt ← pt + 1 *)
+       ].
+
+  Compute  prog_behavior ideal_atkprg2.
 (*
 = fun st_inp : Value => (st_inp, 16, [4; 5; 6; 9])
      : Value -> Value * Value * LeakVal
 *)
 
-  (* This is what we want to do *)
-  Goal beh_real = beh_ideal. (* This is what we want to do *) (* We don't even use functional_extensionaltiy here! *)
+  Goal prog_behavior real_atkprg = prog_behavior ideal_atkprg2. (* This is what we want to do *) (* We don't even use functional_extensionaltiy here! *)
   Proof.
     cbv. reflexivity.
   Qed.
+
+
+  Definition ideal_atkprg3 : AtkProg := [
+
+       (pt ← fun _ => 10)                                                            :Combined; (* pt ← 10 *)
+       (pu ← fun s => s pt + 5)                                                      :Combined; (* pu ← pt + 5 *)
+
+       ☠︎︎ ⟨fun _ _ pu => 15 | fun s _ _ => s | fun _ _ _ => []⟩                       :Combined; (* ☠︎︎ endorses 15, a value. There is no compute, or anything *)
+
+       (pt ← (fun s => s pu))                                                        :Combined; (* pt ← pu  !!ENDORSE!! *)
+       (pt ← (fun s => s pt + 1))                                                    :Combined; (* pt ← pt + 1 *)
+
+       ☠︎︎ ⟨fun _ _ pu => pu | fun s _ _ => s | fun _ _ _ => [4; 5; 6; 9]⟩             :Combined  (* ☠︎︎ leaks everything last  *)
+       ].
+
+  Goal prog_behavior real_atkprg = prog_behavior ideal_atkprg3. (* This is what we want to do *) (* We don't even use functional_extensionaltiy here! *)
+  Proof.
+    cbv. reflexivity.
+  Qed.
+
+  (* Now, what should my proof compiler target be? *)
+
+  (* TODO: An example with isolation *)
+  (* TODO: An example with declassification *)
+  (* TODO: An example with both *)
