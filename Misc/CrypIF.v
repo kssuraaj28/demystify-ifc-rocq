@@ -240,110 +240,283 @@ pu ← ?comp : Combined
 End test.
 
 (* The next step will be to write an example *)
+Module  IntEx.
+  (* 
+    I wish I could have syntax that is a little better. 
+    TODO: Notation?
+    TODO: Should I force programs to alternate? Let me not. 
+  *)
+  Section run_ex.
+    Context {amem : AtkMemParam}.
+    Definition real_atkprg : AtkProg := [
+         ☠︎︎ ⟨fun _ _ _ => 10 | fun s _ _ => s | fun s _ _ => [4 ] ⟩                    :Combined; (* ☠︎︎ sets pu to 10 *)
 
-(* 
-  I wish I could have syntax that is a little better. 
-  TODO: Notation?
-  TODO: Should I force programs to alternate? Let me not. 
-*)
-Section run_ex.
-  Context {amem : AtkMemParam}.
-  Definition real_atkprg : AtkProg := [
-       ☠︎︎ ⟨fun _ _ _ => 10 | fun s _ _ => s | fun s _ _ => [4 ] ⟩                    :Combined; (* ☠︎︎ sets pu to 10 *)
+         (pt ← fun _ => 10)                                                           :Combined; (* pt ← 10 *)
 
-       (pt ← fun _ => 10)                                                           :Combined; (* pt ← 10 *)
+         ☠︎︎ ⟨fun _ pt pu => pt + pu | fun s _ _ => s | fun s _ _ => [5] ⟩              :Combined; (* ☠︎︎ sets pu to 10 *)
 
-       ☠︎︎ ⟨fun _ pt pu => pt + pu | fun s _ _ => s | fun s _ _ => [5] ⟩              :Combined; (* ☠︎︎ sets pu to 10 *)
+         (pu ← fun s => s pt + 5)                                                     :Combined; (* pu ← pt + 5 *)
 
-       (pu ← fun s => s pt + 5)                                                     :Combined; (* pu ← pt + 5 *)
+         ☠︎︎ ⟨ (fun _ pt pu => pu)  | fun s _ _ => s | fun s _ _ => [6] ⟩               :Combined; (* ☠︎︎ does nothing *)
 
-       ☠︎︎ ⟨ (fun _ pt pu => pu)  | fun s _ _ => s | fun s _ _ => [6] ⟩               :Combined; (* ☠︎︎ does nothing *)
+         (pt ← (fun s => s pu))                                                       :Combined; (* pt ← pu  !!ENDORSE!! *)
 
-       (pt ← (fun s => s pu))                                                       :Combined; (* pt ← pu  !!ENDORSE!! *)
+         ☠︎︎ ⟨  (fun _ _ _ => 10)| fun s _ _ => s | fun s _ _ => [9] ⟩                  :Combined; (* Adversary sets pu to 10 *)
 
-       ☠︎︎ ⟨  (fun _ _ _ => 10)| fun s _ _ => s | fun s _ _ => [9] ⟩                  :Combined; (* Adversary sets pu to 10 *)
+         (pt ← (fun s => s pt + 1))                                                   :Combined  (* pt ← pt + 1 *)
+      ].
 
-       (pt ← (fun s => s pt + 1))                                                   :Combined  (* pt ← pt + 1 *)
-    ].
-
-  Compute prog_behavior real_atkprg.
-(*
-= fun st_inp : Value => (st_inp, 16, [4; 5; 6; 9])
-     : Value -> Value * Value * LeakVal
-*)
-
-  Definition ideal_atkprg1 : AtkProg := [
-       ☠︎︎ ⟨fun _ _ pu => pu | fun s _ _ => s | fun _ _ _ => [4; 5; 6; 9]⟩             :Combined; (* ☠︎︎ leaks everything first *)
-
-       (pt ← fun _ => 10)                                                            :Combined; (* pt ← 10 *)
-
-       ☠︎︎ ⟨fun _ _ pu => pu | fun s _ _ => s | fun _ _ _ => []⟩                       :Combined; (* ☠︎︎ noop *)
-
-       (pu ← fun s => s pt + 5)                                                      :Combined; (* pu ← pt + 5 *)
-
-       ☠︎︎ ⟨fun _ _ pu => 15 | fun s _ _ => s | fun _ _ _ => []⟩                       :Combined; (* ☠︎︎ endorses 15, a value. There is no compute, or anything *)
-
-       (pt ← (fun s => s pu))                                                        :Combined; (* pt ← pu  !!ENDORSE!! *)
-
-       ☠︎︎ ⟨fun _ _ pu => pu | fun s _ _ => s | fun _ _ _ => []⟩                       :Combined; (* ☠︎︎ noop 10 *)
-
-       (pt ← (fun s => s pt + 1))                                                    :Combined  (* pt ← pt + 1 *)
-       ].
-  Compute  prog_behavior ideal_atkprg1.
-
-  (* This is what we want to do *)
-  Goal prog_behavior real_atkprg = prog_behavior ideal_atkprg1. (* This is what we want to do *) (* We don't even use functional_extensionaltiy here! *)
-  Proof.
-    cbv. reflexivity.
-  Qed.
-
-  Definition ideal_atkprg2 : AtkProg := [
-       ☠︎︎ ⟨fun _ _ pu => pu | fun s _ _ => s | fun _ _ _ => [4; 5; 6; 9]⟩             :Combined; (* ☠︎︎ leaks everything first *)
-
-       (pt ← fun _ => 10)                                                            :Combined; (* pt ← 10 *)
-       (pu ← fun s => s pt + 5)                                                      :Combined; (* pu ← pt + 5 *)
-
-       ☠︎︎ ⟨fun _ _ pu => 15 | fun s _ _ => s | fun _ _ _ => []⟩                       :Combined; (* ☠︎︎ endorses 15, a value. There is no compute, or anything *)
-
-       (pt ← (fun s => s pu))                                                        :Combined; (* pt ← pu  !!ENDORSE!! *)
-       (pt ← (fun s => s pt + 1))                                                    :Combined  (* pt ← pt + 1 *)
-       ].
-
-  Compute  prog_behavior ideal_atkprg2.
-(*
-= fun st_inp : Value => (st_inp, 16, [4; 5; 6; 9])
-     : Value -> Value * Value * LeakVal
-*)
-
-  Goal prog_behavior real_atkprg = prog_behavior ideal_atkprg2. (* This is what we want to do *) (* We don't even use functional_extensionaltiy here! *)
-  Proof.
-    cbv. reflexivity.
-  Qed.
-
-
-  Definition ideal_atkprg3 : AtkProg := [
-
-       (pt ← fun _ => 10)                                                            :Combined; (* pt ← 10 *)
-       (pu ← fun s => s pt + 5)                                                      :Combined; (* pu ← pt + 5 *)
-
-       ☠︎︎ ⟨fun _ _ pu => 15 | fun s _ _ => s | fun _ _ _ => []⟩                       :Combined; (* ☠︎︎ endorses 15, a value. There is no compute, or anything *)
-
-       (pt ← (fun s => s pu))                                                        :Combined; (* pt ← pu  !!ENDORSE!! *)
-       (pt ← (fun s => s pt + 1))                                                    :Combined; (* pt ← pt + 1 *)
-
-       ☠︎︎ ⟨fun _ _ pu => pu | fun s _ _ => s | fun _ _ _ => [4; 5; 6; 9]⟩             :Combined  (* ☠︎︎ leaks everything last  *)
-       ].
-
-  Goal prog_behavior real_atkprg = prog_behavior ideal_atkprg3. (* This is what we want to do *) (* We don't even use functional_extensionaltiy here! *)
-  Proof.
-    cbv. reflexivity.
-  Qed.
-
-  (* Now, what should my proof compiler target be? *)
-
-  (* TODO: An example with isolation. 
-     The attacker should be able to write to pu vars though.. 
+    Compute prog_behavior real_atkprg.
+  (*
+  = fun st_inp : Value => (st_inp, 16, [4; 5; 6; 9])
+       : Value -> Value * Value * LeakVal
   *)
 
-  (* TODO: An example with declassification *)
-  (* TODO: An example with both *)
+    Definition ideal_atkprg1 : AtkProg := [
+         ☠︎︎ ⟨fun _ _ pu => pu | fun s _ _ => s | fun _ _ _ => [4; 5; 6; 9]⟩             :Combined; (* ☠︎︎ leaks everything first *)
+
+         (pt ← fun _ => 10)                                                            :Combined; (* pt ← 10 *)
+
+         ☠︎︎ ⟨fun _ _ pu => pu | fun s _ _ => s | fun _ _ _ => []⟩                       :Combined; (* ☠︎︎ noop *)
+
+         (pu ← fun s => s pt + 5)                                                      :Combined; (* pu ← pt + 5 *)
+
+         ☠︎︎ ⟨fun _ _ pu => 15 | fun s _ _ => s | fun _ _ _ => []⟩                       :Combined; (* ☠︎︎ endorses 15, a value. There is no compute, or anything *)
+
+         (pt ← (fun s => s pu))                                                        :Combined; (* pt ← pu  !!ENDORSE!! *)
+
+         ☠︎︎ ⟨fun _ _ pu => pu | fun s _ _ => s | fun _ _ _ => []⟩                       :Combined; (* ☠︎︎ noop 10 *)
+
+         (pt ← (fun s => s pt + 1))                                                    :Combined  (* pt ← pt + 1 *)
+         ].
+    Compute  prog_behavior ideal_atkprg1.
+
+    (* This is what we want to do *)
+    Goal prog_behavior real_atkprg = prog_behavior ideal_atkprg1. (* This is what we want to do *) (* We don't even use functional_extensionaltiy here! *)
+    Proof.
+      cbv. reflexivity.
+    Qed.
+
+    Definition ideal_atkprg2 : AtkProg := [
+         ☠︎︎ ⟨fun _ _ pu => pu | fun s _ _ => s | fun _ _ _ => [4; 5; 6; 9]⟩             :Combined; (* ☠︎︎ leaks everything first *)
+
+         (pt ← fun _ => 10)                                                            :Combined; (* pt ← 10 *)
+         (pu ← fun s => s pt + 5)                                                      :Combined; (* pu ← pt + 5 *)
+
+         ☠︎︎ ⟨fun _ _ pu => 15 | fun s _ _ => s | fun _ _ _ => []⟩                       :Combined; (* ☠︎︎ endorses 15, a value. There is no compute, or anything *)
+
+         (pt ← (fun s => s pu))                                                        :Combined; (* pt ← pu  !!ENDORSE!! *)
+         (pt ← (fun s => s pt + 1))                                                    :Combined  (* pt ← pt + 1 *)
+         ].
+
+    Compute  prog_behavior ideal_atkprg2.
+  (*
+  = fun st_inp : Value => (st_inp, 16, [4; 5; 6; 9])
+       : Value -> Value * Value * LeakVal
+  *)
+
+    Goal prog_behavior real_atkprg = prog_behavior ideal_atkprg2. (* This is what we want to do *) (* We don't even use functional_extensionaltiy here! *)
+    Proof.
+      cbv. reflexivity.
+    Qed.
+
+
+    Definition ideal_atkprg3 : AtkProg := [
+
+         (pt ← fun _ => 10)                                                            :Combined; (* pt ← 10 *)
+         (pu ← fun s => s pt + 5)                                                      :Combined; (* pu ← pt + 5 *)
+
+         ☠︎︎ ⟨fun _ _ pu => 15 | fun s _ _ => s | fun _ _ _ => []⟩                       :Combined; (* ☠︎︎ endorses 15, a value. There is no compute, or anything *)
+
+         (pt ← (fun s => s pu))                                                        :Combined; (* pt ← pu  !!ENDORSE!! *)
+         (pt ← (fun s => s pt + 1))                                                    :Combined; (* pt ← pt + 1 *)
+
+         ☠︎︎ ⟨fun _ _ pu => pu | fun s _ _ => s | fun _ _ _ => [4; 5; 6; 9]⟩             :Combined  (* ☠︎︎ leaks everything last  *)
+         ].
+
+    Goal prog_behavior real_atkprg = prog_behavior ideal_atkprg3. (* This is what we want to do *) (* We don't even use functional_extensionaltiy here! *)
+    Proof.
+      cbv. reflexivity.
+    Qed.
+End run_ex.
+End IntEx.
+
+Module NIex. Section ctx.
+    Let amem : AtkMemParam := {| AtkState := unit ; init_val := tt |}.  Existing Instance amem.
+    Definition real_atkprg : AtkProg := [
+
+        ☠︎︎ ⟨fun s pt pu => 10 | fun _ _ _ => tt | fun s pt pu => [pt ; pu] ⟩            :Combined;  
+
+         (pt ← fun _ => 10)                                                            :Combined; 
+
+         ☠︎︎ ⟨fun s pt pu => pt + 5 + pu| fun _ _ _ => tt | fun s pt pu => [pt ; pu] ⟩   :Combined;
+
+         (st ← fun s => (s st + s pt) * 29)                                            :Combined;
+
+         ☠︎︎ ⟨fun s pt pu => pt + 5 + pu| fun _ _ _ => tt | fun s pt pu => [pt ; pu] ⟩   :Combined;
+
+         (pu ← fun s => s pu * s pt)                                                   :Combined; (* pt ← 10 *)
+
+         ☠︎︎ ⟨fun s pt pu => pt + 5 + pu| fun _ _ _ => tt | fun s pt pu => [pt ; pu] ⟩   :Combined
+      ].
+
+    Eval compute in prog_behavior real_atkprg.
+
+    (* TODO: I would like to have a way to not*)
+    Definition ideal_atkprg : AtkProg := [
+
+         (pt ← fun _ => 10)                                                                                 :Combined; 
+
+         (st ← fun s => (s st + s pt) * 29)                                                                 :Combined;
+
+         (pu ← fun s => s pu * s pt)                                                                        :Combined; (* pt ← 10 *)
+
+         ☠︎︎ ⟨fun _ _ pu => pu | fun _ _ _ => tt | fun _ _ _ => [0; 0; 10; 10; 10; 25; 10; 400] ⟩             :Combined
+      ].
+
+     (* Notice how the ideal attacker just comes in at the end to leak the values.
+        If we defined equivalence where pu values also matter, 
+        then we should let the ideal attacker set those also, which compilcates the ideal world a little bit
+
+     *)
+    Eval compute in prog_behavior ideal_atkprg.
+    Goal prog_behavior real_atkprg = prog_behavior ideal_atkprg. (* This is what we want to do *) (* We don't even use functional_extensionaltiy here! *)
+    Proof.
+      cbv. reflexivity.
+    Qed.
+
+End ctx. End NIex.
+
+Set Printing Implicit.
+Check NIex.real_atkprg.
+Unset Printing Implicit.
+
+(* TODO: An example with declassification *)
+Module Declass. 
+  Section real. (* Can I use the same section for real and ideal? *)
+    Let amem : AtkMemParam := {| AtkState := unit ; init_val := tt |}.  Existing Instance amem.
+
+    Definition real_atkprg : AtkProg := [
+         ☠︎︎ ⟨fun _ _ pu => pu | fun _ _ _ => tt | fun _ pt pu => [pt ; pu] ⟩             
+             :Combined ;
+
+         (st ← fun s => if s st then 0 else 1)
+           :Combined;  (* check if st is 0 *)
+
+         ☠︎︎ ⟨fun _ _ pu => pu | fun _ _ _ => tt | fun _ pt pu => [pt ; pu] ⟩             
+             :Combined ;
+
+         (pt ← fun s => s st )
+           :Combined;  (* DECLASSIFICATION!! *)
+
+         ☠︎︎ ⟨fun _ _ pu => pu | fun _ _ _ => tt | fun _ pt pu => [pt ; pu] ⟩             
+             :Combined ;
+
+         (pt ← fun s => 0)
+           :Combined;  (* Some other random code *)
+
+         ☠︎︎ ⟨fun _ _ pu => pu | fun _ _ _ => tt | fun _ pt pu => [pt ; pu] ⟩             
+             :Combined ;
+
+         (st ← fun s => 1 - s st)
+           :Combined ; (* Some other random code *)
+
+         ☠︎︎ ⟨fun _ _ pu => pu | fun _ _ _ => tt | fun _ pt pu => [pt ; pu] ⟩             
+             :Combined 
+      ].
+  End real.
+  Eval compute in prog_behavior real_atkprg.
+
+  Section ideal. (* Can I use the same section for real and ideal? *)
+    Let amem : AtkMemParam := {| AtkState := nat ; init_val := 0 |}.  Existing Instance amem.
+
+    Definition ideal_atkprg : AtkProg := [
+         (st ← fun s => if s st then 0 else 1)
+           :Combined;  (* check if st is 0 *)
+
+         (pt ← fun s => s st )
+           :Combined;  (* DECLASSIFICATION!! *)
+
+         (* Note how these we have attacker right after the declassification point, and reads the declassified value *)
+         (* Unfortunately, the present model is not good enough to force this. This is a 'trust me bro'*)
+         ☠︎︎ ⟨fun _ _ pu => pu | fun _ pt _ => pt | fun _ pt pu => [] ⟩ 
+             :Combined ;
+
+         (pt ← fun s => 0)
+           :Combined;  (* Some other random code *)
+
+         (st ← fun s => 1 - s st)
+           :Combined ; (* Some other random code *)
+
+         ☠︎︎ ⟨fun _ _ pu => pu | fun s _ _ => s | fun s _ _ => [0 ; 0 ; 0; 0; s ; 0 ; 0 ; 0 ;0 ;0] ⟩ (*TODO: Why can't I use  if s ... here?  *)
+             :Combined 
+      ].
+  End ideal.
+  Goal prog_behavior ideal_atkprg = prog_behavior real_atkprg. Proof.
+    simpl.
+    reflexivity.
+  Qed.
+End Declass.
+
+Module Both.
+
+  Section real.
+    Let amem : AtkMemParam := {| AtkState := unit ; init_val := tt |}.  Existing Instance amem.
+
+    Definition real_atkprg : AtkProg := [
+         ☠︎︎ ⟨fun _ _ _ => 1 | fun _ _ _ => tt | fun _ pt pu => [pt ; pu] ⟩             
+             :Combined ; (* Attacker sets pu to 1*)
+
+         (pt ← fun s => s pu) 
+           :Combined;  (* ENDORSEMENT! *)
+
+         ☠︎︎ ⟨fun _ pt pu =>  pu + pt | fun _ _ _ => tt | fun _ _ _ => [3 ; 1] ⟩             
+             :Combined ; (* Attacker does random crap *)
+
+         (pt ← fun s => s pt * s st ) (* Reverse this later *)
+           :Combined ; (* DECLASSIFICATION! *)
+
+         ☠︎︎ ⟨fun _ _ _ => 1 | fun _ _ _ => tt | fun _ pt pu => [pt ; pu] ⟩             
+             :Combined  (* Attacker does random crap *)
+      ].
+  End real.
+  Compute prog_behavior real_atkprg.
+
+  Section ideal.
+    Let amem : AtkMemParam := {| AtkState := nat ; init_val := 0 |}.  Existing Instance amem.
+
+    Definition ideal_atkprg : AtkProg := [
+         ☠︎︎ ⟨fun _ _ _ => 1 | fun s _ _ => s | fun _ _ _ => [] ⟩
+             :Combined ; (* Setting the endorsement *)
+ 
+         (pt ← fun s => s pu) 
+           :Combined;  (* ENDORSEMENT! *)
+
+         (pt ← fun s => s pt * s st ) (* Reverse this later *)
+           :Combined ; (* DECLASSIFICATION! *)
+
+         ☠︎︎ ⟨fun _ _ pu => pu | fun _ pt _ => pt | fun _ _ _ => [] ⟩
+           :Combined ; (* Learning the declassification *)
+
+         ☠︎︎ ⟨fun _ _ pu => pu | fun s _ _ => s | fun s _ _ => [0 ; 0 ; 3; 1 ; s ; 2] ⟩
+           :Combined  (* Simulating the real learnt information *)
+      ].
+  End ideal.
+
+  Goal prog_behavior real_atkprg = prog_behavior ideal_atkprg.
+  Proof.
+    cbv.
+    reflexivity.
+  Qed.
+
+End Both.
+
+(* Now, what should my proof compiler target be? 
+
+There are so many directions it looks like I can take.
+- I can make the attackers do exactly one thing. Then, to simulate simulataneous model, we do one by one
+- I could do this in both the real and ideal situations
+- In order to give the proof compiler, I have to think about writing down declassify and endorse.
+  Can I write the compiler assuming this? (I feel like I might have to pass in 0 or something somewhere...) 
+
+*)
