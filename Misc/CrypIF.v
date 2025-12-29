@@ -357,6 +357,7 @@ pu ← ?comp : Combined
     ]); abstract exact admit.
     Defined.
 
+
   Compute prog_behavior p 10.
 End test.
 
@@ -369,25 +370,34 @@ Module  IntEx.
   *)
   Section run_ex.
     Context {amem : AtkMemParam}.
-    Definition real_atkprg : AtkProg := [
-         ☠︎︎ ⟨fun _ _ _ => 10 | fun s _ _ => s | fun s _ _ => [4 ] ⟩                    :Combined; (* ☠︎︎ sets pu to 10 *)
+    Definition real_atkprg : AtkProg. Proof. unshelve refine ([ (* TODO: Why do I have to do this unshelve? *)
+         ☠︎︎ ⟨fun _ _ _ => 10 | fun s _ _ => s | fun s _ _ => [4 ] ⟩
+         :Combined; (* ☠︎︎ sets pu to 10 *)
 
-         (pt ← fun _ => 10)                                                           :Combined; (* pt ← 10 *)
+         (pt ← {| code := fun _ => 10 ; cmp_lbl := pt |})
+         :Combined; (* pt ← 10 *)
 
-         ☠︎︎ ⟨fun _ pt pu => pt + pu | fun s _ _ => s | fun s _ _ => [5] ⟩              :Combined; (* ☠︎︎ sets pu to 10 *)
+         ☠︎︎ ⟨fun _ pt pu => pt + pu | fun s _ _ => s | fun s _ _ => [5] ⟩
+         :Combined; (* ☠︎︎ sets pu to 10 *)
 
-         (pu ← fun s => s pt + 5)                                                     :Combined; (* pu ← pt + 5 *)
+         (pu ← {| code := fun s => s pt + 5 ; cmp_lbl := pt |})
+         :Combined; (* pu ← pt + 5 *)
 
-         ☠︎︎ ⟨ (fun _ pt pu => pu)  | fun s _ _ => s | fun s _ _ => [6] ⟩               :Combined; (* ☠︎︎ does nothing *)
+         ☠︎︎ ⟨ (fun _ pt pu => pu)  | fun s _ _ => s | fun s _ _ => [6] ⟩               
+         :Combined; (* ☠︎︎ does nothing *)
 
-         (pt ← (fun s => s pu))                                                       :Combined; (* pt ← pu  !!ENDORSE!! *)
+         (pt ← {| code := fun s => s pu ; cmp_lbl := pu |})
+         :Combined; (* pt ← pu  !!ENDORSE!! *) (* I don't like the fact that there is not endorse happening *)
 
-         ☠︎︎ ⟨  (fun _ _ _ => 10)| fun s _ _ => s | fun s _ _ => [9] ⟩                  :Combined; (* Adversary sets pu to 10 *)
+         ☠︎︎ ⟨  (fun _ _ _ => 10)| fun s _ _ => s | fun s _ _ => [9] ⟩                  
+         :Combined; (* Adversary sets pu to 10 *)
 
-         (pt ← (fun s => s pt + 1))                                                   :Combined  (* pt ← pt + 1 *)
-      ].
+         (pt ← {| code := fun s => s pt + 1 ; cmp_lbl := pt |})
+         :Combined  (* pt ← pt + 1 *)
+      ]); abstract (congruence || discriminate).
+    Defined.
 
-    Compute prog_behavior real_atkprg.
+    Compute prog_behavior real_atkprg. (* See how there is no dependent type nonsense here at all! *)
   (*
   = fun st_inp : Value => (st_inp, 16, [4; 5; 6; 9])
        : Value -> Value * Value * LeakVal
