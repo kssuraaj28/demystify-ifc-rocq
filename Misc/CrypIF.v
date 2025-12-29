@@ -14,7 +14,9 @@ Definition Value := nat.
 Definition State :=  Vars -> Value.
 
 
-Record ComputeData := { code : State -> Value ; cmp_lbl : Vars }. 
+Record ComputeData := { code : State -> Value ; cmp_lbl : Vars }. (* TODO: Maybe `code` should be a Coercion too *)
+
+
 Definition WellFormedCompute (c : ComputeData) : Prop :=
   let (code, lbl) := c in 
   match lbl with 
@@ -106,37 +108,49 @@ Section test.
 
 End test.
 (* I hope that the refinement types gods don't come for me *)
-Definition Compute := {x : ComputeData | WellFormedCompute x}. 
+Definition Compute := {x : ComputeData | WellFormedCompute x}.  (* TODO: Can I coerce  *)
+Definition compute_data (c: Compute) : ComputeData := proj1_sig c.
+Coercion compute_data : Compute >-> ComputeData.
 
 
-Record Cmd := {dest : Vars; comp : Compute}.
-Notation "v ← c" := {| dest := v ; comp := c |} (at level 20).
-
-Inductive CmdKind := ni | endorse | declassify.
-
-Definition cmd_kind (cmd : Cmd) : CmdKind :=
-  let dest_lvl := dest cmd in
-  let src_lvl := cmp_lbl (proj1_sig (comp cmd)) in
-  match dest_lvl, src_lvl with 
-  | _, _ => ni
-  end.
-
-  let (dest, compute) := c in 
-  let (compute, _) := compute in  (* I wish I could do this copattern thing *)
-  ni.
+Record CmdData := {dest : Vars; comp : Compute}. 
 
 
-Definition cmd_sem (c: Cmd) (s: State) : State := 
+
+Definition cmd_sem (c: CmdData) (s: State) : State := 
   fun var => 
     let (dest, comp) := c in (* TODO: What did I just do? *)
-    let new_val := comp s in 
+    let new_val := code comp s in (* There is some Coercion happening *)
     let old_val := s var in 
     if var_eq_dec var dest then 
       new_val
     else
       old_val.
 
+(* There are illegal commands also.. *)
+Inductive CmdKind := ni | endorse | declassify | illegal.
+
+Definition cmd_kind (cmd : CmdData) : CmdKind :=
+  let src_lvl := cmp_lbl (proj1_sig (comp cmd)) in
+  let dest_lvl := dest cmd in
+  match src_lvl, dest_lvl with 
+  | pt, _ | st, st | pu, pu  => ni
+  | pu, pt => endorse
+  | st, pt => declassify
+  | _, _ => illegal (* st pu and pu st *)
+  end.
+
+Definition Cmd := { c : CmdData | cmd_kind c <> illegal }. (* Dependent gods please save me *)
+Definition cmd_to_data (c : Cmd) : CmdData := proj1_sig  c.
+Coercion cmd_to_data : Cmd >-> CmdData.
+
+Notation "v ← c" := ((exist _ {| dest := v ; comp := exist _ c _ |} _) : Cmd) (at level 20).
+Check _ ← _ : Cmd.
+(* This : Cmd helps force coercion. Otherwise, what we have below will not work*)
+Check cmd_sem (_ ← _) _. 
+
 Section test.
+  Variable admit : forall {T}, T.
   Let s : State :=
     fun v => match v with
              | st => 67
@@ -144,11 +158,12 @@ Section test.
              | pu => 58
              end.
 
-  Let c : Compute :=
-    fun s => s st + s pt + s pu.
+  Let c : ComputeData :=
+    {| code := fun s => s st + s pt + s pu ; cmp_lbl :=  admit |}. (* Actually, this Compute is illegal lmao *)
 
+  Let s' : State. Proof. unshelve refine (cmd_sem (pu ← c) s); abstract exact admit. Defined. 
+  (* Is there a shortcut for this?  Program fixpoint, for example?*)
 
-  Let s' := cmd_sem (pu ← c) s. 
   Goal s' pu = (s pu + s pt + s st). reflexivity. Qed.
   Goal s' pt = (s pt). reflexivity. Qed.
   Goal s' st = (s st). reflexivity. Qed.
@@ -302,6 +317,7 @@ Section prog.
 End prog.
 
 Section test.
+  Variable admit : forall {T}, T.
   Let s : State :=
     fun v => match v with
              | st => 67
@@ -309,11 +325,10 @@ Section test.
              | pu => 58
              end.
 
-  Let c : Compute :=
-    fun s => s st + s pt + s pu.
+  Let c := {| code :=  fun s => s st + s pt + s pu ; cmp_lbl := admit |} . (* TODO: I didn't like writing this at all *)
 
   (* TODO: Forcing this, and not being able to infer seems a little bit sad *)
-  Check (pu ← _) : Combined. (* How can I print Coercions? *)
+  Check ((pu ← _) : Cmd) : Combined. (* How can I print Coercions? *)
 (*
 pu ← _ : Combined
      : Combined
@@ -333,12 +348,14 @@ pu ← ?comp : Combined
 
   Context {amem : AtkMemParam}.
   
-  Let p : AtkProg := 
+  Let p : AtkProg. Proof.
+    unshelve refine (
     [
      (pu ← c) : Combined;  (* TODO: Is it possible to not keep writing this nonsense *)
      (st ← c) : Combined; 
      (pt ← c) : Combined
-    ].
+    ]); abstract exact admit.
+    Defined.
 
   Compute prog_behavior p 10.
 End test.
