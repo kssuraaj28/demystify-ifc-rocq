@@ -14,26 +14,117 @@ Definition Value := nat.
 Definition State :=  Vars -> Value.
 
 
-Record Compute := { code : State -> Value ; cmp_lbl : Vars }. 
-Definition WellFormedCompute (c : Compute) : Prop :=
+Record ComputeData := { code : State -> Value ; cmp_lbl : Vars }. 
+Definition WellFormedCompute (c : ComputeData) : Prop :=
   let (code, lbl) := c in 
   match lbl with 
-  | st 
-  | pt
-  | pu => True 
-  end.
+  | pt => forall s s', 
+      s pt = s' pt -> (* I should probably just use NI, which means I need to define this correctly *)
+      code s = code s'
 
-Record Compute := { code : State -> Value ; cmp_lbl : Vars }. 
-(* TODO: Define the prediates *)
-Definition Compute := State -> Value.
+  | st => forall s s', 
+      s pt = s' pt -> (* st can depend on pt and st *)
+      s st = s' st ->
+      code s = code s' 
 
-(* TODO: Define the prediates *)
-Definition Compute := State -> Value.
+  | pu => forall s s',
+      s pt = s' pt ->  (* pu can depend on pu and pt *)
+      s pu = s' pu ->
+      code s = code s' 
+  end. (* I could refactor. Or I could use NI. Or I could use lattice flow. For now, I don't care *)
 
-(* TODO: Just define confidentiality equivalence for now.. *)
+
+Section test.
+  (* This should go somewhere else *)
+  Ltac print_goal :=
+    match goal with
+    | |- ?G => idtac "Current Goal is:" G
+    end.
+
+  (* Can I automatcially generate counterexamples? *)
+  Ltac counterexample s1 s2:=
+      repeat (
+        intuition; 
+        match goal with
+        | [ H : WellFormedCompute _ |- _ ] => specialize (H s1 s2) 
+        | [|- _] => discriminate
+        end).
+
+  Section pt_good.
+    Let c :=  {| code := fun s => s pt; cmp_lbl := pt |}.
+    Goal WellFormedCompute c. 
+    Proof. 
+      congruence.
+    Qed.
+  End pt_good.
+
+  Section pt_bad.
+    Let c :=  {| code := fun s => s pt + s st; cmp_lbl := pt |}.
+    Goal ~ WellFormedCompute c. 
+    Proof. 
+      counterexample 
+      (fun x => match x with st => 1 | _ => 0 end) 
+      (fun x => match x with st => 2 | _ => 0 end).
+    Qed.
+  End pt_bad.
+
+  Section st_good.
+    Let c :=  {| code := fun s => s st + s pt; cmp_lbl := st |}.
+    Goal WellFormedCompute c. 
+    Proof. 
+      congruence.
+    Qed.
+  End st_good.
+
+  Section st_bad.
+    Let c :=  {| code := fun s => s pu + s st; cmp_lbl := pt |}.
+    Goal ~ WellFormedCompute c. 
+    Proof. 
+      counterexample 
+      (fun x => match x with pu => 1 | _ => 0 end) (* TODO: What happens when you tacvalue  ltac: *)
+      (fun x => match x with pu => 2 | _ => 0 end).
+    Qed.
+  End st_bad.
+
+  Section pu_good.
+    Let c :=  {| code := fun s => s pt * s pu + 102; cmp_lbl := pu |}.
+    Goal WellFormedCompute c. 
+    Proof. 
+      congruence.
+    Qed.
+  End pu_good.
+
+  Section pu_bad.
+    Let c :=  {| code := fun s => s st + s pt; cmp_lbl := pu |}.
+    Goal ~ WellFormedCompute c. 
+    Proof. 
+      counterexample 
+      (fun x => match x with st => 1 | _ => 0 end) 
+      (fun x => match x with st => 2 | _ => 0 end).
+    Qed.
+  End pu_bad.
+
+End test.
+(* I hope that the refinement types gods don't come for me *)
+Definition Compute := {x : ComputeData | WellFormedCompute x}. 
+
 
 Record Cmd := {dest : Vars; comp : Compute}.
 Notation "v ← c" := {| dest := v ; comp := c |} (at level 20).
+
+Inductive CmdKind := ni | endorse | declassify.
+
+Definition cmd_kind (cmd : Cmd) : CmdKind :=
+  let dest_lvl := dest cmd in
+  let src_lvl := cmp_lbl (proj1_sig (comp cmd)) in
+  match dest_lvl, src_lvl with 
+  | _, _ => ni
+  end.
+
+  let (dest, compute) := c in 
+  let (compute, _) := compute in  (* I wish I could do this copattern thing *)
+  ni.
+
 
 Definition cmd_sem (c: Cmd) (s: State) : State := 
   fun var => 
