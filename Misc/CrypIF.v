@@ -14,6 +14,19 @@ Definition Value := nat.
 Definition State :=  Vars -> Value.
 
 
+Record Compute := { code : State -> Value ; cmp_lbl : Vars }. 
+Definition WellFormedCompute (c : Compute) : Prop :=
+  let (code, lbl) := c in 
+  match lbl with 
+  | st 
+  | pt
+  | pu => True 
+  end.
+
+Record Compute := { code : State -> Value ; cmp_lbl : Vars }. 
+(* TODO: Define the prediates *)
+Definition Compute := State -> Value.
+
 (* TODO: Define the prediates *)
 Definition Compute := State -> Value.
 
