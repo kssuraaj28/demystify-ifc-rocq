@@ -762,7 +762,7 @@ Section proof_compiler.
      exact (leak tt 0 sim_pu). (* TODO: Eventually, this 0 should not exist. You should be able to have working pu memory with you at all times *)
     Defined.
 
-  Record Accumulator : Type := { partial_prog : AtkProg ; su_sim : Value ; partial_leak : LeakVal }. (* TODO Let or definition? *)
+  Record Accumulator : Type := { partial_prog : AtkProg ; pu_sim : Value ; partial_leak : LeakVal }. (* TODO Let or definition? *)
   (* I think that PU should eventually be Value -> Value (That is, a function of PT) *)
 
   Fixpoint proof_compiler_loop (inp_ap : AtkProg): Accumulator -> Accumulator. Proof.
@@ -792,9 +792,18 @@ Section proof_compiler.
          [SU]: { exact (atksnip_compile_pusim atk su_sofar). }
         }
      }
+    Guarded.
   Defined.
 
-  Fixpoint proof_compiler_loop (inp_ap : AtkProg): Accumulator -> Accumulator. Proof.
+  Definition proof_compiler (inp_ap : AtkProg) : AtkProg. Proof.
+    (* TODO: Is pu_sim actually set to 0? *)
+    pose (initial_acc := {| partial_prog := []; pu_sim := 0; partial_leak := []|}).
+    destruct (proof_compiler_loop inp_ap initial_acc) as [prefinal_prog  _  final_leak].
+    pose (final_snip := (☠︎︎ ⟨fun _ _ pu => pu | fun _ _ _ => tt | fun _ _ _ => final_leak ⟩): Combined).
+    exact (prefinal_prog ++ [final_snip]).
+  Defined.
+
+  Compute prog_behavior (proof_compiler NIex.real_atkprg). (* So, there is an error *)
 End proof_compiler.
 
 
