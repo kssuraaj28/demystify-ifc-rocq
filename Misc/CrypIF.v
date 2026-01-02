@@ -354,7 +354,8 @@ pu ← ?comp : Combined
      (pu ← c) : Combined;  (* TODO: Is it possible to not keep writing this nonsense *)
      (st ← c) : Combined; 
      (pt ← c) : Combined
-    ]); abstract exact admit.
+    ]). 
+    all:(abstract exact admit).
     Defined.
 
 
@@ -400,7 +401,8 @@ Module  IntEx.
 
          (pt ← {| code := fun s => s pt + 1 ; cmp_lbl := pt |})
          :Combined  (* pt ← pt + 1 *)
-      ]); dominate_example.
+      ]). 
+      all:(dominate_example).
     Defined.
     (* TODO: Am I using my other  coercions? *)
 
@@ -435,7 +437,8 @@ Module  IntEx.
 
          (pt ← {| code := fun s => s pt + 1 ; cmp_lbl := pt |})
          :Combined  (* pt ← pt + 1 *)
-         ]); dominate_example.
+         ]). 
+         all:(dominate_example).
      Defined.
     Compute  prog_behavior ideal_atkprg1.
 
@@ -607,7 +610,8 @@ Module Declass.
 
          ☠︎︎ ⟨fun _ _ pu => pu | fun _ _ _ => tt | fun _ pt pu => [pt ; pu] ⟩             
              :Combined 
-      ]); dominate_example.
+      ]). 
+      all:(dominate_example).
    Defined.
 
   End real.
@@ -636,7 +640,8 @@ Module Declass.
 
          ☠︎︎ ⟨fun _ _ pu => pu | fun s _ _ => s | fun s _ _ => [0 ; 0 ; 0; 0; s ; 0 ; 0 ; 0 ;0 ;0] ⟩ (*TODO: Why can't I use  if s ... here?  *)
              :Combined 
-      ]); dominate_example.
+      ]). 
+      all:(dominate_example).
      Defined.
 
   End ideal.
@@ -703,7 +708,112 @@ Module Both.
 
 End Both.
 
-(* Now, what should my proof compiler target be? 
+(* The proof compiler *)
+(* This takes in an input which is an attacked program, and returns an attacked program as well *)
+
+Section proof_compiler.
+  (* I don't care about things for now *)
+  Let amem : AtkMemParam := {| AtkState := unit ; init_val := tt |}.  Existing Instance amem.
+
+  (* This should really go somewhere else *)
+  Ltac name_gl name := refine ?[name]. (* for convenience *)
+
+  #[local] Set Printing Goal Names. (* Test Printing Goal Names at the end of section will return false *)
+  Definition cmd_compile_pusim (c : Cmd) (sim_pu : Value) : Value(* new sim_pu *). Proof.
+     destruct c as [cmd ?]. (* The question mark is important *)
+     destruct (cmd_kind cmd); [name_gl NI | name_gl END | name_gl DECL | name_gl ILL]. 
+
+    [ILL]: { abstract contradiction. }
+
+    (* TODO: Is there a way I can select multiple goals? Something like [NI], [END]*)
+    [END]: { exact 123. } (* This is a temp fix*)
+
+    [DECL]: { exact 69. } (* This is a temp fix*)
+
+    [NI]: {
+      (* you can also use as *) (* I use compute_data coercion here *)
+       pose (code := code (comp cmd)). 
+       destruct (dest cmd); [name_gl ST | name_gl PT | name_gl PU].
+
+       [ST]: {  exact sim_pu. } (* If a command *)
+       [PT]: {  exact sim_pu. }
+       [PU]: { 
+        (* I wonder if I could incrementally build this using an evar *)
+        (* 
+         assert State as new_state; [destruct 1; [name_gl ST | name_gl PT | name_gl PU] |].
+        I just get new_state : State. This seems okay, but there seems to me an Implicit generalization
+         *)
+          
+        pose (new_state := (fun var =>  match var with pu => sim_pu | _ => 67 end) : State). 
+        pose (new_val := code new_state).
+        exact new_val.
+      }
+    }
+  Defined.
+
+  Definition atksnip_compile_pusim (atk : AtkSnip) (sim_pu : Value) : Value. Proof.
+     destruct atk as [pu_trans _ _].
+     pose (new_pu := pu_trans tt 0 sim_pu). (* TODO: Eventually, this 0 should not exist. You should be able to have working pu memory with you at all times *)
+     exact new_pu.
+    Defined.
+
+  Definition atksnip_compile_leaksim (atk : AtkSnip) (sim_pu : Value) : LeakVal. Proof.
+     destruct atk as [_ _ leak].
+     exact (leak tt 0 sim_pu). (* TODO: Eventually, this 0 should not exist. You should be able to have working pu memory with you at all times *)
+    Defined.
+
+  Record Accumulator : Type := { partial_prog : AtkProg ; su_sim : Value ; partial_leak : LeakVal }. (* TODO Let or definition? *)
+  (* I think that PU should eventually be Value -> Value (That is, a function of PT) *)
+
+  Fixpoint proof_compiler_loop (inp_ap : AtkProg): Accumulator -> Accumulator. Proof.
+     destruct inp_ap as [| cmdatk inp_ap']; [name_gl EMPTY | name_gl NONEMPTY].
+
+    [EMPTY]: {  exact (fun x => x). } (* Just return the accumulator *)
+
+    [NONEMPTY]: { 
+       intros [partial_prog su_sofar partial_leak]. (* How do I use assertions? *)
+       unshelve evar (final_state : Accumulator); [| exact (proof_compiler_loop inp_ap' final_state)].
+
+       destruct cmdatk as [cmd | atk]; [name_gl CMD | name_gl ATK].
+
+       [CMD]: {
+         repeat split; [name_gl PROG | name_gl SU | name_gl LEAK].
+
+         [PROG]: { exact (partial_prog ++ [ cmd : Combined ]). } (* Don't do anything to commands *)
+         [LEAK]: { exact (partial_leak). }
+         [SU]: { exact (cmd_compile_pusim cmd su_sofar). }
+        }
+
+       [ATK]: {
+         repeat split; [name_gl PROG | name_gl SU | name_gl LEAK].
+
+         [PROG]: { exact partial_prog. } (* The attack gets erased. However, when we start thinking about downgrades, this should not be the case *)
+         [LEAK]: { exact (atksnip_compile_leaksim atk su_sofar). }
+         [SU]: { exact (atksnip_compile_pusim atk su_sofar). }
+        }
+     }
+  Defined.
+
+  Fixpoint proof_compiler_loop (inp_ap : AtkProg): Accumulator -> Accumulator. Proof.
+End proof_compiler.
+
+
+(* TODO: Check NI examples. Then see if I can prove that  *)
+
+
+
+
+
+
+
+
+  Goal forall p, prog_behavior p = prog_behavior (proof_compiler p). Proof.
+    reflexivity. 
+  Qed.
+
+
+
+(*  
 
 There are so many directions it looks like I can take.
 - I can make the attackers do exactly one thing. Then, to simulate simulataneous model, we do one by one
