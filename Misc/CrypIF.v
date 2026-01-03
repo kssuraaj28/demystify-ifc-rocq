@@ -805,10 +805,27 @@ Section proof_compiler.
   Defined.
 
   Print NIex.real_atkprg.
+  Goal False.
+  pose (proof_compiler NIex.real_atkprg). (* So, there is an error *)
+  red in a.
+  clear a.
+  pose (proof_compiler_loop NIex.real_atkprg). (* So, there is an error *)
+  simpl in a.
+  Abort.
 
+  (* 
+          (((partial_leak ++ [0; pu_sim]) ++ [0; 10]) ++ [0; 15]) ++
+          [0; 1340]
+ *)
 
   Compute prog_behavior (NIex.real_atkprg). (* So, there is an error *)
+(*
+      [0; 0; 10; 10; 10; 25; 10; 400])
+*)
   Compute prog_behavior (proof_compiler NIex.real_atkprg). (* So, there is an error *)
+(*
+      [0; 0; 0; 10; 0; 15; 0; 1340])
+*)
 End proof_compiler.
 
 
