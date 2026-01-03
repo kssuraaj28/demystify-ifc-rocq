@@ -539,7 +539,7 @@ Module NIex. Section ctx.
 
        ☠︎︎ ⟨fun s pt pu => pt + 5 + pu| fun _ _ _ => tt | fun s pt pu => [pt ; pu] ⟩   
        :Combined
-      ]); abstract (congruence || discriminate). 
+      ]). all: (abstract (congruence || discriminate)). 
     Defined.
 
     Print real_atkprg.
@@ -559,7 +559,7 @@ Module NIex. Section ctx.
 
          ☠︎︎ ⟨fun _ _ pu => pu | fun _ _ _ => tt | fun _ _ _ => [0; 0; 10; 10; 10; 25; 10; 400] ⟩             
              :Combined
-      ]); abstract ( congruence || discriminate).
+      ]). all: (abstract ( congruence || discriminate)).
    Defined.
 
      (* Notice how the ideal attacker just comes in at the end to leak the values.
@@ -821,7 +821,25 @@ Section proof_compiler.
     exact (prefinal_prog ++ [final_snip]).
   Defined.
 
-  Print NIex.real_atkprg.
+    Let example_atk : AtkProg. Proof. unshelve refine ([
+
+       ☠︎︎ ⟨fun s pt pu => pt + 5 + pu| fun _ _ _ => tt | fun s pt pu => [] ⟩
+       :Combined;
+
+       (pu ← {|  code := fun s => s pu * s pt ;  cmp_lbl := pu |})
+       :Combined; 
+
+       ☠︎︎ ⟨fun s pt pu => pt + 5 + pu| fun _ _ _ => tt | fun s pt pu => [pu] ⟩
+       :Combined
+      ]). all: (abstract (congruence || discriminate)). 
+    Defined.
+
+  Compute prog_behavior (example_atk).
+(*
+      [0; 0; 10; 10; 10; 25; 10; 400])
+*)
+  Compute prog_behavior (proof_compiler example_atk). (* There is another bug *)
+
   Goal False.
   pose (proof_compiler NIex.real_atkprg). (* So, there is an error *)
   red in a.
@@ -835,11 +853,11 @@ Section proof_compiler.
           [0; 1340]
  *)
 
-  Compute prog_behavior (NIex.real_atkprg). (* So, there is an error *)
+  Compute prog_behavior (NIex.real_atkprg).
 (*
       [0; 0; 10; 10; 10; 25; 10; 400])
 *)
-  Compute prog_behavior (proof_compiler NIex.real_atkprg). (* So, there is an error *)
+  Compute prog_behavior (proof_compiler NIex.real_atkprg). (* There is another bug *)
 (*
       [0; 0; 0; 10; 0; 15; 0; 1340])
 *)
