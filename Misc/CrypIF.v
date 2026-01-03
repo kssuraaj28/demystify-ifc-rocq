@@ -743,7 +743,7 @@ Section proof_compiler.
          Then things could be pairs, where there will be an 'effective function'.
          I'm not entirely sure what the right way to proceed is
        *)
-       pose (dummy_newst := (fun var =>  match var with pu => old_pu | pt => old_pu | st => 69 end) : State). 
+       pose (dummy_newst := (fun var =>  match var with pu => old_pu | pt => old_pt | st => 69 end) : State). 
 
        destruct (dest cmd); [name_gl ST | name_gl PT | name_gl PU].
 
@@ -789,7 +789,8 @@ Section proof_compiler.
        destruct cmdatk as [cmd | atk]; [name_gl CMD | name_gl ATK].
 
        [CMD]: {
-         destruct (cmd_simulate cmd pt_sim_old pu_sim_old) as [pt_sim_new pu_sim_new].
+         destruct (cmd_simulate cmd pt_sim_old pu_sim_old) as [pt_sim_new pu_sim_new]. 
+         Show Proof.
          repeat split; [ name_gl PROG | name_gl PT | name_gl PU | name_gl LEAK].
 
          [PROG]: { exact (partial_prog ++ [ cmd : Combined ]). } (* Trusted code gets compiled as such *)
@@ -821,100 +822,14 @@ Section proof_compiler.
     exact (prefinal_prog ++ [final_snip]).
   Defined.
 
-    Let example_atk : AtkProg. Proof. 
-      pose (a := ☠︎︎ ⟨fun s _ _ => 3| fun _ _ _ => tt | fun s pt pu => [] ⟩
-       :Combined).
-
-      unshelve evar (c : Combined); [  refine ((pu ← {|  code := fun s => s pt ;  cmp_lbl := pu |}) : Combined); shelve | ].
-
-      pose (a' := ☠︎︎ ⟨fun _ _ _ => 0| fun _ _ _ => tt | fun _ _ pu => [pu] ⟩ :Combined).
-
-      exact [a ; c ; a'].
-
-      Unshelve. (* Is this the right pattern? *)
-      all: (abstract (congruence || discriminate)). 
-    Defined.
-
-  Goal False.
-    pose (proof_compiler_loop example_atk
-      {| partial_prog := []; pt_sim := 0; pu_sim := 0; partial_leak := [] |}).
-    cbv delta [proof_compiler_loop] in a.
-    cbv zeta in example_atk.
-    subst example_atk.
-
-    Ltac t a := repeat (cbv beta in a || cbv zeta in a || cbv match in a || cbv delta [atksnip_sim  cmd_simulate] in a).
-    t a.
-    cbv fix in a.
-    t a.
-    cbv fix in a.
-    t a.
-    cbv fix in a.
-    t a.
-    repeat cbv fix in a.
-    cbv fix in a.
-    cbv fix in a.
-    hnf in a.
-
-    cbv head in a.
-
-    cbv fix in a; t a.
-    cbv fix in a; t a.
-    cbv fix in a; t a.
-    t a.
-    cbv fix in a.
-
-    t a.
-    red in a.
-    cbv fix in a.
-
-    t a.
-    t a.
-    t a.
-    t a.
-    t a.
-    t a.
-    t a.
-    t a.
-    cbv iota in a.
-    t a.
-    cbv iota in a.
-    t a.
-    progress cbn beta in a.
-    progress cbn zeta in a.
-    progress cbn iota in a.
-    progress lazy iota in a.
-    progress lazy beta in a.
-    progress lazy iota in a.
-    progress lazy beta in a.
-    progress cbn iota in a.
-
-    match goal with 
-    | [ a := (fix proof_compiler_loop inp_ap := _ )(_)(_) |- _ ] => idtac
-    end.
-    match 
-  (* Can I dominate this nonsense? *)
-    cbv beta in a; cbv iota in a.
-    cbv beta in a; cbv iota in a.
-    cbv beta in a; cbv iota in a.
-    cbv beta in a; cbv iota in a.
-
-    cbv beta in a.
-
-
-
-
-    pose (proof_compiler example_atk).
-    unfold proof_compiler in a.
-
-  Compute  snd (@prog_sem amem example_atk (fun v : Vars => 0, tt, [])).
-
-  Compute   snd (@prog_sem amem (proof_compiler example_atk) (fun v : Vars => 0,tt, [])).
-
-  Compute prog_behavior (example_atk).
-  Compute prog_behavior (proof_compiler example_atk). (* There is another bug *)
-
 End proof_compiler.
 
+   Goal prog_behavior NIex.real_atkprg = prog_behavior (proof_compiler NIex.real_atkprg). Proof.
+     reflexivity.
+   Qed.
+
+
+  
 
 (* TODO: Check NI examples. Then see if I can prove that  *)
 
