@@ -542,6 +542,7 @@ Module NIex. Section ctx.
       ]); abstract (congruence || discriminate). 
     Defined.
 
+    Print real_atkprg.
     Eval compute in prog_behavior real_atkprg.
 
     (* TODO: I would like to have a way to not*)
@@ -788,7 +789,7 @@ Section proof_compiler.
          repeat split; [name_gl PROG | name_gl SU | name_gl LEAK].
 
          [PROG]: { exact partial_prog. } (* The attack gets erased. However, when we start thinking about downgrades, this should not be the case *)
-         [LEAK]: { exact (atksnip_compile_leaksim atk su_sofar). }
+         [LEAK]: { exact (partial_leak ++ atksnip_compile_leaksim atk su_sofar). }
          [SU]: { exact (atksnip_compile_pusim atk su_sofar). }
         }
      }
@@ -803,15 +804,15 @@ Section proof_compiler.
     exact (prefinal_prog ++ [final_snip]).
   Defined.
 
+  Print NIex.real_atkprg.
+
+
+  Compute prog_behavior (NIex.real_atkprg). (* So, there is an error *)
   Compute prog_behavior (proof_compiler NIex.real_atkprg). (* So, there is an error *)
 End proof_compiler.
 
 
 (* TODO: Check NI examples. Then see if I can prove that  *)
-
-
-
-
 
 
 
