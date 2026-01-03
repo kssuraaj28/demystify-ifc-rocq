@@ -834,10 +834,119 @@ Section proof_compiler.
       ]). all: (abstract (congruence || discriminate)). 
     Defined.
 
+  Compute   snd (@prog_sem amem example_atk (fun v : Vars => 0, tt, [])).
+
+  Compute   snd (@prog_sem amem (proof_compiler example_atk) (fun v : Vars => 0,tt, [])).
+
+  Goal False.
+   pose(snd (@prog_sem amem example_atk (fun v : Vars => 0, tt, []))) as dut.
+    match goal with 
+    | [ example_atk := ([?a ; ?b ; ?c])  |- _ ] => remember a; remember b; remember c
+    end.
+  cbn in dut.
+  remember (@combined_sem amem c (fun _ : Vars => 0, tt)).
+  subst c.
+  simpl in Heqp.
+  Abort.
+
+  Goal False.
+   pose (proof_compiler_loop example_atk
+      {| partial_prog := []; pt_sim := 0; pu_sim := 0; partial_leak := [] |}).
+    match goal with 
+    | [ example_atk := ([?a ; ?b ; ?c])  |- _ ] => remember a; remember b; remember c
+    end.
+  subst example_atk.
+  cbv delta [proof_compiler_loop] in a.
+  simpl in a.
+
+  cbv iota in a.
+
+
+  simpl in example_atk'.
+
+
+  post 
+
+    (* TODO: What is the right way to single step computations 
+    It should be possible that I can 'zoom in' to a computation
+    It is possible that I want to hide things that should not be unfolded, etc.
+    
+
+
+    *)
+
+  Goal False.
+    assert (st_inp : Value) ; [admit |].
+    pose  (@prog_sem amem example_atk
+          (fun v : Vars => if var_eq_dec v st then st_inp else 0,
+           @init_val amem, [])).
+
+    Ltac ez p := cbv beta in p || cbv zeta in p || cbv iota in p. (* I wish I could define these 'closures' or whatever *)
+    ez p.
+    cbv delta [prog_sem] in p.
+    ez p.
+    remember (☠︎︎ ⟨ fun (_ : @AtkState amem) (pt pu : Value) => pt + 5 + pu
+   | fun (_ : @AtkState amem) (_ _ : Value) => tt
+   | fun (_ : @AtkState amem) (_ _ : Value) => [] ⟩).
+
+   remember(pu ← {| code := fun s : State => s pu * s pt; cmp_lbl := pu |}).
+   remember (☠︎︎ ⟨ fun (_ : @AtkState amem) (pt pu : Value) => pt + 5 + pu
+   | fun (_ : @AtkState amem) (_ _ : Value) => tt
+   | fun (_ : @AtkState amem) (_ pu : Value) => [pu] ⟩).
+
+
+    cbv delta [example_atk] in p. (* How can I use at here? *)
+    clear example_atk.
+
+    repeat ez p.
+
+    remember(@combined_sem amem a
+        (fun v : Vars => if var_eq_dec v st then st_inp else 0,
+         @init_val amem) ) eqn: E.  
+
+    unfold  combined_sem in E.
+    subst a.
+    unfold  atksnip_sem in E.
+    simpl in E.
+    subst p0.
+    simpl in E.
+
+
+      remember (let (cst0, lk0) := @combined_sem amem c cst in
+      let (cst', lk_extra) := @combined_sem amem a0 cst0 in
+      (cst', lk0 ++ lk_extra)). in
+
+
+    simpl.
+    unfold combined_sem in p.
+    cbv delta [atksnip_sem] in p.
+    unfold atksnip_sem in p at 1.
+
+    ez p.
+    ez p.
+
+  clear example_atk.
+  cbv zeta in p.
+  cbv iota in p.
+
+  cbv delta [prog_behavior].
+  cbv beta.
+  cbv zeta.
+  cbv beta.
+
+  cbv delta.
+  Ltac step := lazy beta || lazy iota || lazy delta||  lazy zeta || fail.
+  step.
+  step.
+  step.
+  step.
+  step.
+  step.
+  red.
+  lazy.
+  Abort.
+
   Compute prog_behavior (example_atk).
-(*
-      [0; 0; 10; 10; 10; 25; 10; 400])
-*)
   Compute prog_behavior (proof_compiler example_atk). (* There is another bug *)
 
   Goal False.
