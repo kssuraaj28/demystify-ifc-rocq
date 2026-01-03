@@ -3,9 +3,15 @@ Let us start with a very simple program. Then we try to see how
 *)
 
 From Stdlib Require Import List.
+From Stdlib Require Import String.
 From Stdlib Require Import Logic.FunctionalExtensionality.
 
+From ReductionEffect Require Import PrintingEffect.
+
 Import ListNotations.
+
+Ltac print_in_gallina x := 
+  let t := fresh in pose (print x) as t; clear t.
 
 Inductive Vars := st | pt | pu.
 Definition var_eq_dec : forall (v v' : Vars), {v = v'} + {v <> v'}. Proof. decide equality. Defined.
@@ -818,11 +824,25 @@ Section proof_compiler.
     (* TODO: Are pt, pu_sim actually set to 0? *)
     pose (initial_acc := {| partial_prog := []; pt_sim := 0 ; pu_sim := 0; partial_leak := []|}).
     destruct (proof_compiler_loop inp_ap initial_acc) as [prefinal_prog  _  _ final_leak].
+
+
+    print_in_gallina("Prefin"%string).
+
+    print_in_gallina(prefinal_prog).
+
     pose (final_snip := (☠︎︎ ⟨fun _ _ pu => pu | fun _ _ _ => tt | fun _ _ _ => final_leak ⟩): Combined).
+
+    print_in_gallina("Final Snip"%string).
+    print_in_gallina(final_snip).
+    let v := type of final_snip in 
+    print_in_gallina(v).
+
     exact (prefinal_prog ++ [final_snip]).
   Defined.
 
 End proof_compiler.
+
+  Eval cbv in (proof_compiler NIex.real_atkprg).
 
    Goal prog_behavior NIex.real_atkprg = prog_behavior (proof_compiler NIex.real_atkprg). Proof.
      reflexivity.
