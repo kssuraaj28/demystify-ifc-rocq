@@ -720,24 +720,38 @@ Section proof_compiler.
   Ltac name_gl name := refine ?[name]. (* for convenience *)
 
   #[local] Set Printing Goal Names. (* Test Printing Goal Names at the end of section will return false *)
-  Definition cmd_compile_pusim (c : Cmd) (sim_pu : Value) : Value(* new sim_pu *). Proof.
-     destruct c as [cmd ?]. (* The question mark is important *)
+
+  Definition cmd_simulate (c : Cmd) (old_pt : Value) (old_pu : Value) : Value(* new_pt*) * Value (* new_pu) *). Proof.
+     destruct c as [cmd ?]. (* Don't use _ instead of ? *)
      destruct (cmd_kind cmd); [name_gl NI | name_gl END | name_gl DECL | name_gl ILL]. 
 
-    [ILL]: { abstract contradiction. }
+    [ILL]: { abstract contradiction. } (* We don't care about these *)
 
     (* TODO: Is there a way I can select multiple goals? Something like [NI], [END]*)
-    [END]: { exact 123. } (* This is a temp fix*)
+    [END]: { exact (123, 59). } (* This is a temp fix*)
 
-    [DECL]: { exact 69. } (* This is a temp fix*)
+    [DECL]: { exact (69, 30). } (* This is a temp fix*)
 
     [NI]: {
       (* you can also use as *) (* I use compute_data coercion here *)
        pose (code := code (comp cmd)). 
+
+       (* 
+         The interface the program gives you is a function.
+         Unfortunately, This means that you'll have to construct a state with some useless values
+         We could also syntactically force functions to look a certain way
+         Then things could be pairs, where there will be an 'effective function'.
+         I'm not entirely sure what the right way to proceed is
+       *)
+       pose (dummy_newst := (fun var =>  match var with pu => old_pu | pt => old_pu | st => 69 end) : State). 
+
        destruct (dest cmd); [name_gl ST | name_gl PT | name_gl PU].
 
-       [ST]: {  exact sim_pu. } (* If a command *)
-       [PT]: {  exact sim_pu. }
+       [ST]: {  exact (old_pt,old_pu). } (* If the assignment is to ST *)
+       [PT]: {  
+         pose (new_pt := code dummy_newst).
+         exact (new_pt, old_pu).
+        }
        [PU]: { 
         (* I wonder if I could incrementally build this using an evar *)
         (* 
@@ -745,61 +759,64 @@ Section proof_compiler.
         I just get new_state : State. This seems okay, but there seems to me an Implicit generalization
          *)
           
-        pose (new_state := (fun var =>  match var with pu => sim_pu | _ => 67 end) : State). 
-        pose (new_val := code new_state).
-        exact new_val.
+        pose (new_pu := code dummy_newst).
+        exact (old_pt, new_pu).
       }
     }
   Defined.
 
-  Definition atksnip_compile_pusim (atk : AtkSnip) (sim_pu : Value) : Value. Proof.
-     destruct atk as [pu_trans _ _].
-     pose (new_pu := pu_trans tt 0 sim_pu). (* TODO: Eventually, this 0 should not exist. You should be able to have working pu memory with you at all times *)
-     exact new_pu.
+  Definition atksnip_sim (atk : AtkSnip) (existing_pt : Value) (existing_pu : Value) : 
+            (Value (* pu *) *  LeakVal). Proof.
+     destruct atk as [pu_trans _ leak].
+     pose (new_pu := pu_trans tt existing_pt existing_pu). (* TODO: tt is stupid *)
+     pose (leaked := leak tt existing_pt existing_pu). 
+     exact (new_pu, leaked).
     Defined.
 
-  Definition atksnip_compile_leaksim (atk : AtkSnip) (sim_pu : Value) : LeakVal. Proof.
-     destruct atk as [_ _ leak].
-     exact (leak tt 0 sim_pu). (* TODO: Eventually, this 0 should not exist. You should be able to have working pu memory with you at all times *)
-    Defined.
-
-  Record Accumulator : Type := { partial_prog : AtkProg ; pu_sim : Value ; partial_leak : LeakVal }. (* TODO Let or definition? *)
-  (* I think that PU should eventually be Value -> Value (That is, a function of PT) *)
+  Record Accumulator : Type := { partial_prog : AtkProg ; pt_sim : Value; pu_sim : Value ; partial_leak : LeakVal }. (* TODO Let or definition? *)
+  (* I think that these sims should eventually be Value -> Value, because they might depend on runtime secrets *) 
+  (* 'Last declassified secret' should probably be what the memory should be*)
 
   Fixpoint proof_compiler_loop (inp_ap : AtkProg): Accumulator -> Accumulator. Proof.
-     destruct inp_ap as [| cmdatk inp_ap']; [name_gl EMPTY | name_gl NONEMPTY].
+    destruct inp_ap as [| cmdatk inp_ap']; [name_gl EMPTY | name_gl NONEMPTY].
 
     [EMPTY]: {  exact (fun x => x). } (* Just return the accumulator *)
 
     [NONEMPTY]: { 
-       intros [partial_prog su_sofar partial_leak]. (* How do I use assertions? *)
-       unshelve evar (final_state : Accumulator); [| exact (proof_compiler_loop inp_ap' final_state)].
+       intros [partial_prog pt_sim_old pu_sim_old partial_leak]. (* How do I use assertions? *)
+       unshelve evar (final_state : Accumulator); [| exact (proof_compiler_loop inp_ap' final_state)]. 
 
        destruct cmdatk as [cmd | atk]; [name_gl CMD | name_gl ATK].
 
        [CMD]: {
-         repeat split; [name_gl PROG | name_gl SU | name_gl LEAK].
+         destruct (cmd_simulate cmd pt_sim_old pu_sim_old) as [pt_sim_new pu_sim_new].
+         repeat split; [ name_gl PROG | name_gl PT | name_gl PU | name_gl LEAK].
 
-         [PROG]: { exact (partial_prog ++ [ cmd : Combined ]). } (* Don't do anything to commands *)
-         [LEAK]: { exact (partial_leak). }
-         [SU]: { exact (cmd_compile_pusim cmd su_sofar). }
+         [PROG]: { exact (partial_prog ++ [ cmd : Combined ]). } (* Trusted code gets compiled as such *)
+         [LEAK]: { exact (partial_leak). } (* No need to simulate any leaks when you have this *)
+         [PT]: { exact (pt_sim_new). } (* No need to simulate any leaks when you have this *)
+         [PU]: { exact (pu_sim_new). }
         }
 
        [ATK]: {
-         repeat split; [name_gl PROG | name_gl SU | name_gl LEAK].
+         destruct (atksnip_sim atk pt_sim_old pu_sim_old) as [pu_sim_new extra_leak].
+         pose (partial_leak_new := partial_leak ++ extra_leak).
+
+         repeat split; [name_gl PROG | name_gl PT | name_gl PU | name_gl LEAK].
 
          [PROG]: { exact partial_prog. } (* The attack gets erased. However, when we start thinking about downgrades, this should not be the case *)
-         [LEAK]: { exact (partial_leak ++ atksnip_compile_leaksim atk su_sofar). }
-         [SU]: { exact (atksnip_compile_pusim atk su_sofar). }
+         [LEAK]: { exact partial_leak_new.  }
+         [PU]: { exact pu_sim_new.  }
+         [PT]: { exact pt_sim_old. }
         }
      }
     Guarded.
   Defined.
 
   Definition proof_compiler (inp_ap : AtkProg) : AtkProg. Proof.
-    (* TODO: Is pu_sim actually set to 0? *)
-    pose (initial_acc := {| partial_prog := []; pu_sim := 0; partial_leak := []|}).
-    destruct (proof_compiler_loop inp_ap initial_acc) as [prefinal_prog  _  final_leak].
+    (* TODO: Are pt, pu_sim actually set to 0? *)
+    pose (initial_acc := {| partial_prog := []; pt_sim := 0 ; pu_sim := 0; partial_leak := []|}).
+    destruct (proof_compiler_loop inp_ap initial_acc) as [prefinal_prog  _  _ final_leak].
     pose (final_snip := (☠︎︎ ⟨fun _ _ pu => pu | fun _ _ _ => tt | fun _ _ _ => final_leak ⟩): Combined).
     exact (prefinal_prog ++ [final_snip]).
   Defined.
