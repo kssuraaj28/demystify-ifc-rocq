@@ -2,6 +2,7 @@
 Let us start with a very simple program. Then we try to see how
 *)
 
+
 From Stdlib Require Import List.
 From Stdlib Require Import String.
 From Stdlib Require Import Logic.FunctionalExtensionality.
@@ -13,6 +14,7 @@ Import ListNotations.
 Ltac print_in_gallina x := 
   let t := fresh in pose (print x) as t; clear t.
 
+Ltac name_gl name := refine ?[name]. (* for convenience *)
 Inductive Vars := st | pt | pu.
 Definition var_eq_dec : forall (v v' : Vars), {v = v'} + {v <> v'}. Proof. decide equality. Defined.
 
@@ -454,10 +456,6 @@ Module  IntEx.
       cbv. reflexivity.
     Qed.
 
-    
-    Definition my_nat : nat := 5.
-
-    Definition my_prf : True := I. (* True is a type that has one element called I *)
 
     Definition ideal_atkprg2 : AtkProg. Proof. unshelve refine ([
          ☠︎︎ ⟨fun _ _ pu => pu | fun s _ _ => s | fun _ _ _ => [4; 5; 6; 9]⟩             
@@ -723,7 +721,6 @@ Section proof_compiler.
   Let amem : AtkMemParam := {| AtkState := unit ; init_val := tt |}.  Existing Instance amem.
 
   (* This should really go somewhere else *)
-  Ltac name_gl name := refine ?[name]. (* for convenience *)
 
   #[local] Set Printing Goal Names. (* Test Printing Goal Names at the end of section will return false *)
 
@@ -796,7 +793,6 @@ Section proof_compiler.
 
        [CMD]: {
          destruct (cmd_simulate cmd pt_sim_old pu_sim_old) as [pt_sim_new pu_sim_new]. 
-         Show Proof.
          repeat split; [ name_gl PROG | name_gl PT | name_gl PU | name_gl LEAK].
 
          [PROG]: { exact (partial_prog ++ [ cmd : Combined ]). } (* Trusted code gets compiled as such *)
@@ -820,27 +816,33 @@ Section proof_compiler.
     Guarded.
   Defined.
 
+  Definition leak_only_atk (l : LeakVal) : AtkSnip :=
+     (☠︎︎ ⟨fun _ _ pu => pu | fun _ _ _ => tt | fun _ _ _ => l ⟩).
+
+  Lemma leak_only_atk_beh : 
+        forall prog extra_leak,
+          let atk := leak_only_atk extra_leak in
+          let b1 := prog_behavior (prog ++ [atk : Combined]) in
+          let b2 inp := 
+              let (comb_state, leak) := prog_behavior prog inp  in
+              (comb_state, leak ++ extra_leak) in
+          b1 = b2. 
+  Proof. 
+    cbv zeta.
+  Admitted.
+
   Definition proof_compiler (inp_ap : AtkProg) : AtkProg. Proof.
     (* TODO: Are pt, pu_sim actually set to 0? *)
     pose (initial_acc := {| partial_prog := []; pt_sim := 0 ; pu_sim := 0; partial_leak := []|}).
     destruct (proof_compiler_loop inp_ap initial_acc) as [prefinal_prog  _  _ final_leak].
 
+    pose (final_snip := (leak_only_atk final_leak): Combined).
 
-    print_in_gallina("Prefin"%string).
-
-    print_in_gallina(prefinal_prog).
-
-    pose (final_snip := (☠︎︎ ⟨fun _ _ pu => pu | fun _ _ _ => tt | fun _ _ _ => final_leak ⟩): Combined).
-
-    print_in_gallina("Final Snip"%string).
-    print_in_gallina(final_snip).
     let v := type of final_snip in 
-    print_in_gallina(v).
 
     exact (prefinal_prog ++ [final_snip]).
   Defined.
 
-End proof_compiler.
 
   Eval cbv in (proof_compiler NIex.real_atkprg).
 
@@ -850,15 +852,78 @@ End proof_compiler.
 
 
   
+  
+Check prog_sem.
 
-(* TODO: Check NI examples. Then see if I can prove that  *)
+Print proof_compiler.
+
+(* I wonder whether we can just do the proof_compiler part first? *)
+
+
+Lemma correct'': forall  p,
+                   let acc := {| partial_prog := []; pt_sim := 0; pu_sim := 0; partial_leak := [] |} in
+                   let (partial_prog, pt_sim, pu_sim, partial_leak) := proof_compiler_loop p acc in
+                   let orig_beh := prog_behavior p in
+                   let comp_beh inp :=
+                       let (comb_state, leak) := (prog_behavior partial_prog) inp in
+                       (comb_state, leak ++ partial_leak) in
+                    orig_beh = comp_beh. 
+
+        Admitted.
+
+Ltac t := match goal with 
+  | [  |- context [proof_compiler_loop ?p ?a] ] => destruct (proof_compiler_loop p a)
+  end.
+
+(* t *)
+
+
+Lemma correct' : forall p,
+  let acc := {| partial_prog := []; pt_sim := 0; pu_sim := 0; partial_leak := [] |} in
+  let (partial_prog,pt_sim, pu_sim, partial_leak) := proof_compiler_loop p acc in
+
+  let comp_beh :=
+    prog_behavior (partial_prog ++
+        [☠︎︎ ⟨ fun _ _ pu => pu
+         | fun _ _ _  => tt
+         | fun _ _ _ =>
+           partial_leak 
+         ⟩ : Combined]) in
+
+  let orig_beh := prog_behavior p in
+
+  orig_beh = comp_beh. 
+Proof.
+    intros p.
+    specialize (correct'' p) as H; cbv zeta in H.
+    simpl.
+    t.
+    rewrite H; clear H.
+    specialize (leak_only_atk_beh) as H; cbv zeta in H.
+    rewrite <- H.
+    reflexivity.
+Qed. (* I want to automate this proof *)
 
 
 
+Section correct.
+  Hint Extern 10 => simpl : core.
+  Hint Extern 10 => t : core.
 
-  Goal forall p, prog_behavior p = prog_behavior (proof_compiler p). Proof.
-    reflexivity. 
+  Theorem correct: forall p, prog_behavior p = prog_behavior (proof_compiler p). Proof.
+    (* Here, I think what's happening is the lack of definitional equality for record *)
+    intros p; specialize (correct' p);
+    unfold proof_compiler;
+    auto.
   Qed.
+
+End correct.
+
+
+End proof_compiler.
+
+
+
 
 
 
