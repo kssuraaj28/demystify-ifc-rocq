@@ -11,6 +11,22 @@ From ReductionEffect Require Import PrintingEffect.
 
 Import ListNotations.
 
+
+Ltac pose_cbv name inp :=
+    let t :=  inp in
+    let t := eval cbv in t in
+    pose (name := t).
+
+Ltac pose_no_let name t:=
+  match goal with |- ?g =>
+    let to_simpl_evar := open_constr:(?[name] :> t) in
+    unshelve  (* Looks like the location of this unshelve matters also! *)
+    let proof := open_constr:(let name := to_simpl_evar in _ :> g) in
+    let proof := eval cbv in proof in
+    exact proof
+  end.
+
+
 Ltac print_in_gallina x := 
   let t := fresh in pose (print x) as t; clear t.
 
@@ -20,6 +36,28 @@ Definition var_eq_dec : forall (v v' : Vars), {v = v'} + {v <> v'}. Proof. decid
 
 Definition Value := nat.
 Definition State :=  Vars -> Value.
+
+Definition state_to_triple (s : State) := (s st, s pt, s pu).
+Definition triple_to_state (s : Value * Value * Value) : State. Proof.
+  destruct s as [[st pt] pu].
+  destruct 1; [name_gl ST | name_gl PT | name_gl PU].
+  [ST]: { exact st. }
+  [PT]: { exact pt. }
+  [PU]: { exact pu. }
+  Defined.
+
+Lemma state_eq1 : forall s, s = state_to_triple (triple_to_state s). 
+Proof. intuition. Qed.
+
+Lemma state_eq2 : forall s, s = triple_to_state (state_to_triple s). 
+Proof. 
+  repeat match goal with 
+    | [  |- _ ] => intuition || apply functional_extensionality
+    | [ x : Vars |- _ ] => destruct x
+    end.
+Qed.
+
+
 
 
 Record ComputeData := { code : State -> Value ; cmp_lbl : Vars }. (* TODO: Maybe `code` should be a Coercion too *)
@@ -307,6 +345,7 @@ Section prog.
   Section prog_behavior.
     Variables (p : AtkProg) (st_inp : Value). 
 
+    (* This is important brother *)
     Let inp_state := fun v => if var_eq_dec v st then st_inp else 0.
     Let inp_atk_state := init_val.
     Notation inp_cfg := ((inp_state, inp_atk_state), []). (* This does not type check otherwise. *)
@@ -323,6 +362,7 @@ Section prog.
 
   End prog_behavior.
 End prog.
+Check prog_behavior.
 
 Section test.
   Variable admit : forall {T}, T.
@@ -814,7 +854,10 @@ Section proof_compiler.
         }
      }
     Guarded.
+
   Defined.
+  Print proof_compiler_loop.
+
 
   Definition leak_only_atk (l : LeakVal) : AtkSnip :=
      (☠︎︎ ⟨fun _ _ pu => pu | fun _ _ _ => tt | fun _ _ _ => l ⟩).
@@ -831,6 +874,10 @@ Section proof_compiler.
     cbv zeta.
   Admitted.
 
+
+
+
+
   Definition proof_compiler (inp_ap : AtkProg) : AtkProg. Proof.
     (* TODO: Are pt, pu_sim actually set to 0? *)
     pose (initial_acc := {| partial_prog := []; pt_sim := 0 ; pu_sim := 0; partial_leak := []|}).
@@ -844,36 +891,161 @@ Section proof_compiler.
   Defined.
 
 
-  Eval cbv in (proof_compiler NIex.real_atkprg).
-
-   Goal prog_behavior NIex.real_atkprg = prog_behavior (proof_compiler NIex.real_atkprg). Proof.
-     reflexivity.
-   Qed.
 
 
-  
-  
-Check prog_sem.
-
-Print proof_compiler.
 
 (* I wonder whether we can just do the proof_compiler part first? *)
-
-
-Lemma correct'': forall  p,
-                   let acc := {| partial_prog := []; pt_sim := 0; pu_sim := 0; partial_leak := [] |} in
-                   let (partial_prog, pt_sim, pu_sim, partial_leak) := proof_compiler_loop p acc in
-                   let orig_beh := prog_behavior p in
-                   let comp_beh inp :=
-                       let (comb_state, leak) := (prog_behavior partial_prog) inp in
-                       (comb_state, leak ++ partial_leak) in
-                    orig_beh = comp_beh. 
-
-        Admitted.
-
 Ltac t := match goal with 
   | [  |- context [proof_compiler_loop ?p ?a] ] => destruct (proof_compiler_loop p a)
   end.
+
+
+Print Accumulator.
+
+Definition CorrectPred (p pp : AtkProg) (stin ptin puin : Value) (leakin : LeakVal) : Prop. Proof.
+  pose_no_let statement Prop.
+  [statement] : {
+
+    pose (acc := Build_Accumulator pp ptin puin leakin).
+
+    pose_cbv inp_state (triple_to_state (stin,ptin, puin)).
+
+    destruct (proof_compiler_loop p acc) as  [compile_prog compile_pt compile_pu compile_leak].
+
+    destruct (prog_sem compile_prog (inp_state, tt, leakin)) as [[comp_outst _] lk1]. (* tt *)
+
+    destruct (prog_sem (pp ++ p) (inp_state, tt, leakin)) as [[noncomp_outst _] lk2]. (* tt *)
+
+    destruct (state_to_triple comp_outst) as [[stout1 ptout1] _]. 
+    (* I think that you don't need to know the value of this compiled output *)
+
+    destruct (state_to_triple noncomp_outst) as [[stout2 ptout2] puout2].
+
+    refine (_ /\ _); [exact (stout1 = stout2 ) |].
+    refine (_ /\ _); [exact (ptout1 = ptout2) |].
+    refine (_ /\ _); [exact (ptout1 = compile_pt) |]. (* Why do you need this? I'm just adding stuff*)
+
+    refine (_ /\ _); [exact (compile_pu = puout2) |].
+
+    refine (_ /\ _); [exact (leakin = lk1 \/ False) |]. 
+    exact (compile_leak = lk2 \/ False). (* I have no idea whether this will work.. *)
+    }
+
+  let t := eval cbv delta [statement] beta zeta in statement in 
+  exact t.
+Defined.
+
+
+(*
+Definition CorrectPred (p pp stin ptin puin leakin : _) :=
+    let acc := Build_Accumulator pp ptin puin leakin in
+
+    let (compile_prog, _, _, partial_leak) :=  proof_compiler_loop p acc in
+
+    let inp_state := fun v => match v with st => stin | pt => ptin | pu => puin end in
+
+    (* Is this true though? 
+    For one, we don't really
+    *)
+    prog_sem compile_prog (inp_state, tt , partial_leak) = 
+    prog_sem (pp ++ p) (inp_state, tt, partial_leak).
+  Print CorrectPred.
+  *)
+
+Section t.
+  Let p := NIex.real_atkprg.
+  Let pp := Both.real_atkprg.
+  Let stin := 10.
+  Let ptin := 19.
+  Let puin := 5.
+  Let leakin := [1 ; 10].
+
+  Goal CorrectPred p pp stin ptin puin leakin. Proof.
+  Fail fail ; repeat match goal with 
+    | [ a := _ |- _ ] => subst a
+    end.
+
+    cbv.
+    repeat match goal with 
+    | [  |- _ /\ _ ] => split
+    end; try easy.
+
+    split.
+    repeat try f_equal.
+    - apply functional_extensionality.
+      destruct x.
+      -- (* st *) reflexivity.
+      -- (* pt *) reflexivity.
+      -- (* pu *)
+      admit.
+    match goal with 
+    | [  |- (_,_,_) = (_,_,_) ] => f_equal
+    end.
+
+  cbv.
+  apply functional_extensionality.
+  cbv.
+  simpl.
+
+QuickChick Correct'.
+
+
+
+
+Lemma correct''' : Correct'.
+
+). Show Proof.
+
+
+
+  let comp_beh inp :=
+    let (comb_state, leak) :=
+      let inp_state v := if var_eq_dec v st then inp else 0 in
+      let inp_atk_state := init_val in
+      let out := prog_sem compile_prog (inp_state, inp_atk_state, []) in
+      (fst out, snd out ++ partial_leak)
+      let out_cfg := fst out in
+      let out_lk := snd out in
+      let out_pt := @fst State (@AtkState amem) out_cfg pt in
+      let out_st := @fst State (@AtkState amem) out_cfg st in
+      (out_st, out_pt, out_lk) in
+    (comb_state, leak ++ partial_leak) in
+
+  comp_beh =
+  (let orig_beh :=
+     fun st_inp : Value =>
+     let inp_state := fun v : Vars => if var_eq_dec v st then st_inp else 0 in
+     let inp_atk_state := @init_val amem in
+     let out := @prog_sem amem p (inp_state, inp_atk_state, []) in
+     let out_cfg := @fst (@CombState amem) LeakVal out in
+     let out_lk := @snd (@CombState amem) LeakVal out in
+     let out_pt := @fst State (@AtkState amem) out_cfg pt in
+     let out_st := @fst State (@AtkState amem) out_cfg st in
+     (out_st, out_pt, out_lk) in
+   orig_beh).
+Proof.
+  cbv delta [prog_behavior] beta.
+
+  Admitted.
+
+Lemma correct'': forall  p,
+
+                   let acc := {| partial_prog := []; pt_sim := 0; pu_sim := 0; partial_leak := [] |} in
+                   let (compile_prog, pt_sim, pu_sim, partial_leak) := proof_compiler_loop p acc in
+                   let comp_beh inp :=
+                       let (comb_state, leak) := (prog_behavior compile_prog) inp in
+                       (comb_state, leak ++ partial_leak) in
+                    comp_beh =
+                  
+                   let orig_beh := prog_behavior p in
+                    orig_beh.
+
+Proof.
+  firstorder using correct'''.
+  (* Use correct''' *)
+
+Admitted.
+
 
 (* t *)
 
@@ -898,7 +1070,7 @@ Proof.
     specialize (correct'' p) as H; cbv zeta in H.
     simpl.
     t.
-    rewrite H; clear H.
+    rewrite <- H; clear H. (* I hate this rewriting direction *)
     specialize (leak_only_atk_beh) as H; cbv zeta in H.
     rewrite <- H.
     reflexivity.
