@@ -4,7 +4,6 @@ Let us start with a very simple program. Then we try to see how
 
 
 From Stdlib Require Import List.
-From Stdlib Require Import String.
 From Stdlib Require Import Logic.FunctionalExtensionality.
 
 From ReductionEffect Require Import PrintingEffect.
@@ -12,6 +11,10 @@ From ReductionEffect Require Import PrintingEffect.
 Import ListNotations.
 
 
+Ltac idtac_cbv exp :=
+    let x := exp in
+    let x := eval cbv in x in
+    idtac x.
 Ltac pose_cbv name inp :=
     let t :=  inp in
     let t := eval cbv in t in
@@ -423,9 +426,10 @@ Module  IntEx.
   *)
   Section run_ex.
     Context {amem : AtkMemParam}.
-    Definition real_atkprg : AtkProg. Proof. unshelve refine ([ (* TODO: Why do I have to do this unshelve? *) 
-      (* Moreover, refine is a tactic that takes in incomplete gallina terms. Can I build a custom tactic that does that? *)
 
+    Program Definition real_atkprg : AtkProg :=
+      (* Moreover, refine is a tactic that takes in incomplete gallina terms. Can I build a custom tactic that does that? *)
+      [
          ☠︎︎ ⟨fun _ _ _ => 10 | fun s _ _ => s | fun s _ _ => [4 ] ⟩
          :Combined; (* ☠︎︎ sets pu to 10 *)
 
@@ -449,11 +453,9 @@ Module  IntEx.
 
          (pt ← {| code := fun s => s pt + 1 ; cmp_lbl := pt |})
          :Combined  (* pt ← pt + 1 *)
-      ]). 
-      all:(dominate_example).
-    Defined.
-    (* TODO: Am I using my other  coercions? *)
+      ].  (* What. How did these obligations get solved automatically.. *)
 
+    Print real_atkprg.
 
     Compute prog_behavior real_atkprg. (* See how there is no dependent type nonsense here at all! *)
   (*
@@ -817,6 +819,11 @@ Section proof_compiler.
     Defined.
 
   Record Accumulator : Type := { partial_prog : AtkProg ; pt_sim : Value; pu_sim : Value ; partial_leak : LeakVal }. (* TODO Let or definition? *)
+
+  Print Accumulator.
+  Print partial_prog.
+
+  Eval cbv in partial_prog _.
   (* I think that these sims should eventually be Value -> Value, because they might depend on runtime secrets *) 
   (* 'Last declassified secret' should probably be what the memory should be*)
 
@@ -899,71 +906,206 @@ Ltac t := match goal with
   | [  |- context [proof_compiler_loop ?p ?a] ] => destruct (proof_compiler_loop p a)
   end.
 
-
 Print Accumulator.
 
-Definition CorrectPred (p pp : AtkProg) (stin ptin puin : Value) (leakin : LeakVal) : Prop. Proof.
-  pose_no_let statement Prop.
-  [statement] : {
 
-    pose (acc := Build_Accumulator pp ptin puin leakin).
+Section pred.
 
-    pose_cbv inp_state (triple_to_state (stin,ptin, puin)).
-
-    destruct (proof_compiler_loop p acc) as  [compile_prog compile_pt compile_pu compile_leak].
-
-    destruct (prog_sem compile_prog (inp_state, tt, leakin)) as [[comp_outst _] lk1]. (* tt *)
-
-    destruct (prog_sem (pp ++ p) (inp_state, tt, leakin)) as [[noncomp_outst _] lk2]. (* tt *)
-
-    destruct (state_to_triple comp_outst) as [[stout1 ptout1] _]. 
-    (* I think that you don't need to know the value of this compiled output *)
-
-    destruct (state_to_triple noncomp_outst) as [[stout2 ptout2] puout2].
-
-    refine (_ /\ _); [exact (stout1 = stout2 ) |].
-    refine (_ /\ _); [exact (ptout1 = ptout2) |].
-    refine (_ /\ _); [exact (ptout1 = compile_pt) |]. (* Why do you need this? I'm just adding stuff*)
-
-    refine (_ /\ _); [exact (compile_pu = puout2) |].
-
-    refine (_ /\ _); [exact (leakin = lk1 \/ False) |]. 
-    exact (compile_leak = lk2 \/ False). (* I have no idea whether this will work.. *)
-    }
-
-  let t := eval cbv delta [statement] beta zeta in statement in 
-  exact t.
-Defined.
+  Variables (p pp : AtkProg) (stin ptin puin : Value) (acc_leakin : LeakVal).
 
 
-(*
-Definition CorrectPred (p pp stin ptin puin leakin : _) :=
-    let acc := Build_Accumulator pp ptin puin leakin in
+  Let CorrectPred' : Prop.  Proof. (* 
+  Building this term using ltac is really the right choice... Destruct is a life saver
+  The only thing that I don't like is a bunch of these anonymous functions.
+  I'm hoping that I learn techniques that help there
 
-    let (compile_prog, _, _, partial_leak) :=  proof_compiler_loop p acc in
-
-    let inp_state := fun v => match v with st => stin | pt => ptin | pu => puin end in
-
-    (* Is this true though? 
-    For one, we don't really
-    *)
-    prog_sem compile_prog (inp_state, tt , partial_leak) = 
-    prog_sem (pp ++ p) (inp_state, tt, partial_leak).
-  Print CorrectPred.
   *)
+
+      pose_cbv inp_state (triple_to_state (stin,ptin, puin)).
+
+        (* I don't like this [] *)
+
+      destruct (prog_sem (pp) (inp_state, tt, [] )) as [[pp_outst _] pplk]. (* tt *) (* I think that it is worth having the leakin lemma thing as a separate thing.. *)
+
+      pose (acc := Build_Accumulator pp (pp_outst pt) (pp_outst pu) pplk). 
+      (* It looks like here is where the loop invariant comes into the picture!!! 
+      I could probably prove that this holds for every step... 
+      How would this generalize when there is no more NI?
+      *) 
+
+      (* I'm scared because we don't quantify over all accumulator inputs *)
+      destruct (proof_compiler_loop p acc) as [compile_prog compile_pt compile_pu compile_leak]. (* The fact that we quantify over all inputs to proof_compiler is good*)
+
+
+      destruct (prog_sem compile_prog (inp_state, tt, [] )) as [[comp_outst _] lk1]. (* tt *)
+
+      (* Why is it that you need to make this []? 
+      prog_sem is essentially going to just add whatever you give as input to the beginning, stupidly.
+      The compiled program is going to be
+
+      *)
+
+      destruct (prog_sem (pp ++ p) (inp_state, tt, [] )) as [[noncomp_outst _] lk2]. (* tt *) (* I think that it is worth having the leakin lemma thing as a separate thing.. *)
+
+      destruct (state_to_triple comp_outst) as [[stout1 ptout1] _]. (* We don't care about pu_out1 *) 
+
+      (* I think that you don't need to know the value of this compiled output *)
+
+      destruct (state_to_triple noncomp_outst) as [[stout2 ptout2] puout2].
+
+      refine (_ /\ _); [exact (forall x, prog_behavior (pp ++ p) = x ) |].
+      refine (_ /\ _); [exact (forall x, prog_behavior (compile_prog ) = x ) |].
+      refine (_ /\ _); [exact (forall x, compile_prog = x ) |].
+      refine (_ /\ _); [exact (stout1 = stout2 ) |].
+      refine (_ /\ _); [exact (ptout1 = ptout2) |].
+      refine (_ /\ _); [exact (ptout1 = compile_pt) |]. (* Why do you need this? I'm just adding stuff*)
+
+      (* TODO: I want to see how things might be better *)
+      refine (_ /\ _); [exact (compile_pu = puout2) |]. 
+      refine (_ /\ _); [exact (lk1 ++ compile_leak = lk2 ++ acc_leakin) |].
+      refine (_ /\ _); [exact (lk1 = [] ) |].
+      refine (_ /\ _); [exact (lk2 = [] ) |].
+      refine (_ /\ _); [exact (compile_leak = [] ) |].
+      refine (_ /\ _); [exact (acc_leakin = [] ) |].
+      exact True.
+  Defined.
+
+Check (4 :> nat).
+Check (4 : nat). (* This makes a difference! *)
+
+
+
+  Definition CorrectPred : Prop := Eval cbv delta [state_to_triple CorrectPred'] beta zeta iota in CorrectPred'.
+  (* This is another style *)
+
+End pred.
+Print CorrectPred.
+
+
+Set Printing All.
+Goal forall (p : nat*nat) (q : nat), False. Proof.
+    intros.
+    pose ((let (m, n) := (p :> nat * nat) in 
+        (fun _ : nat => True)
+        ) (q :> nat)) as XX. 
+    let t := eval cbv delta [XX] in XX in
+    match t with
+    | 
+    (match ?m  with 
+        pair _ _ => (fun _ => ?a)
+
+
+    end _) 
+
+
+    => idtac a
+    end.
+
+
+
+Eval cbv in (
+       (
+        let (m, n) := (_ :> nat * nat) in 
+        (fun _ : nat => True)
+        ) (_ :> nat)). 
+Unset Printing All.
+
+Check (
+       let (mn, o) := (_ :> nat * nat * nat) in
+       (
+        let (m, n) := mn in 
+        fun _ : nat => True
+        ) (o : _)). 
+
+(* This state_to_triple thing matters. *)
+(* o1 *) Eval cbv beta zeta iota  in (  
+(* o2 *) (*Check ( *)
+
+       let (p1, v2) := state_to_triple _ in
+       (
+            let (_, _) := p1 in 
+            fun _ : Value => True
+        ) v2). 
+
+(* o1 *) Eval cbv beta zeta iota  in (  
+(* o2 *) (*Check ( *)
+
+       let (p1, v2) := state_to_triple _ in
+       (
+            fun _ : Value => 
+            let (_, _) := p1 in 
+            True
+        ) v2). 
+
+Print CorrectPred.
 
 Section t.
   Let p := NIex.real_atkprg.
-  Let pp := Both.real_atkprg.
+  Let pp : AtkProg := NIex.real_atkprg.
   Let stin := 10.
   Let ptin := 19.
   Let puin := 5.
-  Let leakin := [1 ; 10].
+  Let leakin1 : LeakVal := [89; 98; 29].
+  Let leakin2 : LeakVal := [].
 
-  Goal CorrectPred p pp stin ptin puin leakin. Proof.
-  Fail fail ; repeat match goal with 
+  Compute prog_behavior (p ++ pp).
+
+  Goal CorrectPred p pp stin ptin puin leakin1 . Proof.
+    red.
+  repeat match goal with 
     | [ a := _ |- _ ] => subst a
     end.
+    red.
+
+    repeat split.
+
+    - match goal with 
+    |  |- forall x, ?t = _ => set t as asdf 
+    end. admit.
+    - 
+
+
+
+    only 1: match goal with 
+    |  |- forall x, ?t = _ => set t as cp
+    end.
+    let i := constr:(4) in
+        idtac_cbv (nth_error p i);
+        idtac_cbv (nth_error cp i).
+
+    idtac_cbv (prog_sem cp (inp_state, tt, [] )).
+    idtac_cbv (nth_error cp 1).
+    idtac_cbv (length( pp)).
+    idtac_cbv (length( cp)).
+
+
+
+    easy.
+
+    idtac_cbv (length( p)).
+    idtac_cbv (length( pp)).
+
+    cbv delta [CorrectPred] beta.
+    repeat   match goal with 
+      | [ x := _ |- _ ] => subst x
+      end.
+    set (proof_compiler_loop _  _).
+    simpl in a.
+
+    idtac_cbv (length(partial_prog a)).
+
+    let x := constr:(length(partial_prog a)) in
+    let x := eval cbv delta [partial_prog a] beta iota   in x in
+    let x := eval cbv in x in
+    idtac x.
+    cbv.
+    remember x as hah.
+    simpl in hah.
+    match x with 
+      _ => idtac x
+    end.
+
+    cbv in a.
 
     cbv.
     repeat match goal with 
