@@ -19,10 +19,9 @@ Class AdvMemParam := {AdvMem : Type}. (* Maybe specify initial value also.. *)
 Class AdvLeakParam := {LeakVals : Type}.  (* The type of messages that the adversary leaks *)
 
 Section advsnips.
-  Context `{ValPrm} `{AdvMemParam} `{AdvLeakParam}. (* I wonder whether some sus thing can happen when I have duplication.. TODO *)
+  Context `{ValPrm} `{AdvMemParam} `{AdvLeakParam}. (* TODO: Maybe this is too smart for its own good *)
 
-  (* I think that this eventually has to have memory updates as well *)
-  Definition AdvExfiltrator := Vals -> AdvMem -> LeakVals. 
+  Definition AdvExfiltrator := Vals -> AdvMem -> (LeakVals * AdvMem).  
   Definition AdvCorruptor := Vals -> AdvMem -> Vals. 
 End advsnips.
 
