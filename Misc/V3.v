@@ -1,17 +1,30 @@
 From Stdlib Require Import List ssreflect.
+(* ssreflect for gallina extensions *)
+From QuickChick Require Import Decidability. 
+(* QuickCheck decidable equality classes are so good *)
 
 Import ListNotations.
-Class VarPrm := {Vars : Type}.
+(* I'm just going to bundle stuff for now. The context is getting quite large otherwise.
+*)
+Class VarPrm := {Vars : Type ; vars_deceq :: Dec_Eq Vars}. 
 Class ValPrm := {Vals : Type}.
 
+(* An adversary level is given by specifying which variables can be controlled  *)
+Class AdvLvlParam `{VarPrm} := { is_untrusted : Vars -> bool ; is_public : Vars -> bool }.
 
-Section Adv.
-  Context `{VarPrm} `{ValPrm}.
-  Definition LeakVal := nat. (* This should be a parameter as well. *)
+
+(* When you instantiate an adversary, you also give it memory *)
+Class AdvMemParam := {AdvMem : Type}. (* Maybe specify initial value also.. *)
+
+Class AdvLeakParam := {LeakVals : Type}.  (* The type of messages that the adversary leaks *)
+
+Section advsnips.
+  Context `{ValPrm} `{AdvMemParam} `{AdvLeakParam}. (* I wonder whether some sus thing can happen when I have duplication.. TODO *)
+
   (* I think that this eventually has to have memory updates as well *)
-  Definition AdvExfiltrator := Vals -> LeakVal. 
-  Definition AdvCorruptor := Vals -> Vals. 
-End Adv.
+  Definition AdvExfiltrator := Vals -> AdvMem -> LeakVals. 
+  Definition AdvCorruptor := Vals -> AdvMem -> Vals. 
+End advsnips.
 
 Section syntax.
   Context `{VarPrm} `{ValPrm}.
@@ -68,7 +81,7 @@ Section syntax.
   Goal forall c : Cmd, c = c. elim => c; reflexivity. Qed. 
 End syntax.
 
-Section cfg.
+Section store.
   Context `{VarPrm} `{ValPrm}.
 
   Definition Store := Vars -> Vals.
@@ -77,45 +90,28 @@ Section cfg.
   Definition get_store (s : Store) (v : Vars) : Vals := s v.
 
   Definition update_store (s : Store) (v : Vars) (vl : Vals) : Store := 
-    fun v' => if Nat.eqb v v' is true then vl else s v'.
-
-  (* A 'state' is the program state + the pending program / continuation  *)
-  Record Cfg := mk_cfg {store : Store; cont : Prog}. 
-End cfg.
+    fun v' => if (v = v')? is true then vl else s v'.
+End store.
 
 
 Section cfg.
-  (* Context `{VarPrm} `{ValPrm}. *)
-
-  Definition Store := Vars -> Vals.
-
-  (* This seems like it should be in a module *)
-  Definition get_store (s : Store) (v : Vars) : Vals := s v.
-
-  Definition update_store (s : Store) (v : Vars) (vl : Vals) : Store := 
-    fun v' => if Nat.eqb v v' is true then vl else s v'.
+  Context `{VarPrm} `{ValPrm}.
 
   (* A 'state' is the program state + the pending program / continuation  *)
   Record Cfg := mk_cfg {store : Store; cont : Prog}. 
 End cfg.
 
-(* How should we expose adversary things? 
-What are the options?
-- Record in cfg
-  - Quite easy.
-  - Hmm. Now, I am not very sure
-  - Maybe don't do list and see where we might get stuck?
-  - We may need to prove a theorem that says that this always grows.
-- Make the step thing have this. 
-  - The advantage here is that you will only append.
-  - I guess we might have to quotient some things out.
-
-*)
 Section semantics.
-  (*Context `{VarPrm} `{ValPrm}. *)
+  Context `{VarPrm} `{ValPrm}.
 
   Definition exp_eval (e : ValExp) (store : Store) : Vals :=
-    let: mk_vl_exp v1 _ v2 _ comp := e in
+    let: mk_vl_exp v1 v2 v1_adv v2_adv comp := e in
+    let: v1val := get_store store v1 in
+    let: v2val := get_store store v2 in
+    comp v1val v2val.
+
+  Definition assign_eval (e : ValExp) (store : Store) : Vals :=
+    let: mk_vl_exp v1 v2 v1_adv v2_adv comp := e in
     let: v1val := get_store store v1 in
     let: v2val := get_store store v2 in
     comp v1val v2val.
