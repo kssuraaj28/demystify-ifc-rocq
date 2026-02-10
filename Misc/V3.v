@@ -27,10 +27,15 @@ Section syntax.
     Another thing we could to is to have an alternative where the adversary gets to supply an alternative function.
     Here, when either variable is untrusted, the adversary function gets activated
   *)
-  Record Expression := mk_exp {
+  Record ValExp := mk_vl_exp {
                         v1: Vars; v1_adv: Vals -> Vals; 
                         v2: Vars; v2_adv: Vals -> Vals; 
                         comp : Vals -> Vals -> Vals
+                       }.
+
+  Record BoolExp := mk_bl_exp {
+                        v: Vars;
+                        test : Vals -> bool
                        }.
 
   Notation Prog' Cmd := (list Cmd).
@@ -38,9 +43,9 @@ Section syntax.
 
   Unset Elimination Schemes. 
   Inductive Cmd :=
-    | assign (x: Vars) (e: Expression) (adv : AdvReader) : Cmd 
-    | cond (cond_var: Vars) (b1 b2: Prog' Cmd) : Cmd
-    | while (cond_var: Vars) (body: Prog' Cmd) : Cmd. 
+    | assign (adv : AdvReader) (x: Vars) (e: ValExp)
+    | cond (cond_var: Vars) (b1 b2: Prog' Cmd)
+    | while (cond_var: Vars) (body: Prog' Cmd). 
   Set Elimination Schemes.
 
   Definition Prog := Prog' Cmd.
@@ -107,8 +112,8 @@ What are the options?
 Section semantics.
   (*Context `{VarPrm} `{ValPrm}. *)
 
-  Definition exp_eval (e : Expression) (store : Store) : Vals :=
-    let: mk_exp v1 _ v2 _ comp := e in
+  Definition exp_eval (e : ValExp) (store : Store) : Vals :=
+    let: mk_vl_exp v1 _ v2 _ comp := e in
     let: v1val := get_store store v1 in
     let: v2val := get_store store v2 in
     comp v1val v2val.
@@ -118,7 +123,7 @@ Section semantics.
     if prog isn't (cmd :: prog') then (cfg, None) else  (* prog is skip *)
 
     match cmd with 
-    | assign var exp adv  =>  
+    | assign adv var exp =>  
         let: val := (exp_eval exp store) in
         let: leak := adv val in
         let: cont := prog' in
