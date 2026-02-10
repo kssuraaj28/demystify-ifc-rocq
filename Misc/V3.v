@@ -1,86 +1,88 @@
 From Stdlib Require Import List ssreflect.
 
 Import ListNotations.
-(* Making this into param fails. Why? TODO *)
-(* 
 Class VarPrm := {Vars : Type}.
- *)
-Definition Vars := nat.
-Definition Vals := nat.
-(* 
 Class ValPrm := {Vals : Type}.
- *)
 
 
 Section Adv.
+  Context `{VarPrm} `{ValPrm}.
   Definition LeakVal := nat. (* This should be a parameter as well. *)
   (* I think that this eventually has to have memory updates as well *)
-  Definition AdvReader := Vals -> LeakVal. 
+  Definition AdvExfiltrator := Vals -> LeakVal. 
+  Definition AdvCorruptor := Vals -> Vals. 
 End Adv.
 
 Section syntax.
-  (*   Context `{VarPrm} `{ValPrm}. *)
-  (* v1 ∘ v2. Some binary operation *)
+  Context `{VarPrm} `{ValPrm}.
 
   (* 
+    v1 ∘ v2. Some binary operation 
     If either variable is controlled by the adversary, then that strat will be applied.
     Another thing we could to is to have an alternative where the adversary gets to supply an alternative function.
     Here, when either variable is untrusted, the adversary function gets activated
   *)
-  Record ValExp := mk_vl_exp {
-                        v1: Vars; v1_adv: Vals -> Vals; 
-                        v2: Vars; v2_adv: Vals -> Vals; 
-                        comp : Vals -> Vals -> Vals
-                       }.
+  Inductive ValExp :=
+    mk_vl_exp (v1 v2: Vars) (v1_adv v2_adv : AdvCorruptor) (comp : Vals -> Vals -> Vals).
 
-  Record BoolExp := mk_bl_exp {
-                        v: Vars;
-                        test : Vals -> bool
-                       }.
+  Inductive BoolExp := 
+    mk_bl_exp (v: Vars) (v_adv : AdvCorruptor) (test : Vals -> bool).
 
-  Notation Prog' Cmd := (list Cmd).
+  Inductive AssignDest := 
+    mk_ass_dest (v: Vars) (v_adv : AdvExfiltrator).
 
 
-  Unset Elimination Schemes. 
-  Inductive Cmd :=
-    | assign (adv : AdvReader) (x: Vars) (e: ValExp)
-    | cond (cond_var: Vars) (b1 b2: Prog' Cmd)
-    | while (cond_var: Vars) (body: Prog' Cmd). 
-  Set Elimination Schemes.
+  Section cmd.
+    Notation Prog' Cmd := (list Cmd).
+    Unset Elimination Schemes. 
+    Inductive Cmd :=
+      | assign (d : AssignDest) (exp : ValExp)
+      | cond (cond_var: BoolExp) (b1 b2: Prog' Cmd)
+      | while (cond_var: BoolExp) (body: Prog' Cmd). 
+    Set Elimination Schemes.
+    Definition Prog := Prog' Cmd.
+  End cmd.
 
-  Definition Prog := Prog' Cmd.
-  (* TODO: I need to define the induction principle *)
+  Section cmd_ind.
+    Variable P : Cmd -> Prop.
+    Generalizable All Variables.
 
+    Hypothesis assign : `(P (assign d exp)).
+
+    Hypothesis cond : `(Forall P b1 ->
+                        Forall P b2 ->
+                        P (cond cond_var b1 b2)).
+
+    Hypothesis while : `(Forall P body ->
+                          P (while cond_var body)).
+
+    Ltac done ::= auto.
+    Ltac t appl :=  intros; apply appl; match goal with |- Forall P ?b => induction b end.
+
+    (* I don't know whether I'm using the right ssreflect thing *)
+    Fixpoint Cmd_ind : forall c, P c. Proof.
+      case => c; by [t assign || t cond || t while].
+    Qed.
+  End cmd_ind.
+  (* It is a little weird that a very syntactic  *_ind approach is used. *)
+  Goal forall c : Cmd, c = c. elim => c; reflexivity. Qed. 
 End syntax.
 
-Goal forall c : Cmd, c = c.  Fail induction c. Abort.
+Section cfg.
+  Context `{VarPrm} `{ValPrm}.
 
-Section ind.
-  Variable P : Cmd -> Prop.
-  Generalizable All Variables.
+  Definition Store := Vars -> Vals.
 
-  Hypothesis assign : `(P (assign var exp adv)).
+  (* This seems like it should be in a module *)
+  Definition get_store (s : Store) (v : Vars) : Vals := s v.
 
-  Hypothesis cond : `(Forall P b1 ->
-                      Forall P b2 ->
-                      P (cond cond_var b1 b2)).
+  Definition update_store (s : Store) (v : Vars) (vl : Vals) : Store := 
+    fun v' => if Nat.eqb v v' is true then vl else s v'.
 
-  Hypothesis while : `(Forall P body ->
-                        P (while cond_var body)).
+  (* A 'state' is the program state + the pending program / continuation  *)
+  Record Cfg := mk_cfg {store : Store; cont : Prog}. 
+End cfg.
 
-  Ltac done ::= auto.
-  Ltac t appl :=  intros; apply appl; match goal with |- Forall P ?b => induction b end.
-
-  (* I don't know whether I'm using the right ssreflect thing *)
-  Fixpoint Cmd_ind : forall c, P c. Proof.
-    case => c; by [t assign || t cond || t while].
-  Qed.
-End ind.
-
-Check Cmd_ind.
-
-(* It is a little weird that a very syntactic  *_ind approach is used. *)
-Goal forall c : Cmd, c = c. elim => c; reflexivity. Qed. 
 
 Section cfg.
   (* Context `{VarPrm} `{ValPrm}. *)
@@ -144,10 +146,9 @@ Section semantics.
 
 
 (* 
-  - Here is the simplest strategy I think.
-  - The attacker attaches strats to everything.
-  - This only gets enabled when the variable can be controlled.
-
+  My dream is the following:
+  - Typeclasses
+  - Assign store eval
 
   Attacker memory.
   Labels.
