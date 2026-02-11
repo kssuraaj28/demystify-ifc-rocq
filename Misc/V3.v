@@ -9,8 +9,8 @@ Import ListNotations.
 Class VarPrm := {Vars : Type ; vars_deceq :: Dec_Eq Vars}. 
 Class ValPrm := {Vals : Type}.
 
-(* An adversary level is given by specifying which variables can be controlled  *)
-Class AdvLvlParam `{VarPrm} := { is_untrusted : Vars -> bool ; is_public : Vars -> bool }.
+(* Changing this to () does make a difference! *)
+Class AdvLvlParam `{!VarPrm} := { is_untrusted : Vars -> bool ; is_public : Vars -> bool }.
 
 
 (* When you instantiate an adversary, you also give it memory *)
@@ -19,14 +19,25 @@ Class AdvMemParam := {AdvMem : Type}. (* Maybe specify initial value also.. *)
 Class AdvLeakParam := {LeakVals : Type}.  (* The type of messages that the adversary leaks *)
 
 Section advsnips.
-  Context `{ValPrm} `{AdvMemParam} `{AdvLeakParam}. (* TODO: Maybe this is too smart for its own good *)
+  Context `{!ValPrm, !AdvMemParam, !AdvLeakParam}. 
 
-  Definition AdvExfiltrator := Vals -> AdvMem -> (LeakVals * AdvMem).  
+  (* When you write to an adversary readable variable, the adversary can exfiltrate the value *)
+  Definition AdvExfiltrator := Vals -> AdvMem -> (LeakVals * AdvMem).
+
+  (* 
+    When you read from  an adversary writable variable, the adversary can corrupt the value 
+    The adversary can maul
+  *)
   Definition AdvCorruptor := Vals -> AdvMem -> Vals. 
 End advsnips.
 
 Section syntax.
-  Context `{VarPrm} `{ValPrm}.
+  (* I wonder whether all of this should be packaged into a single thing? I could do "SyntaxParams" *)
+  Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
+
+  Inductive VarSrc := mk_vr_src (v: Vars) (adv : AdvCorruptor).
+  Inductive VarDst := mk_vr_dest (v: Vars) (adv : AdvExfiltrator).
+
 
   (* 
     v1 ∘ v2. Some binary operation 
@@ -34,24 +45,15 @@ Section syntax.
     Another thing we could to is to have an alternative where the adversary gets to supply an alternative function.
     Here, when either variable is untrusted, the adversary function gets activated
   *)
-  Inductive ValExp :=
-    mk_vl_exp (v1 v2: Vars) (v1_adv v2_adv : AdvCorruptor) (comp : Vals -> Vals -> Vals).
-
-  Inductive BoolExp := 
-    mk_bl_exp (v: Vars) (v_adv : AdvCorruptor) (test : Vals -> bool).
-
-  Inductive AssignDest := 
-    mk_ass_dest (v: Vars) (v_adv : AdvExfiltrator).
-
+  Inductive ValExp := mk_vl_exp (v1 v2: VarSrc) (comp : Vals -> Vals -> Vals).
+  Inductive BoolExp :=  mk_bl_exp (v: VarSrc) (test : Vals -> bool).
 
   Section cmd.
     Notation Prog' Cmd := (list Cmd).
-    Unset Elimination Schemes. 
-    Inductive Cmd :=
-      | assign (d : AssignDest) (exp : ValExp)
+    Unset Elimination Schemes. Inductive Cmd :=
+      | assign (d : VarDst) (exp : ValExp)
       | cond (cond_var: BoolExp) (b1 b2: Prog' Cmd)
-      | while (cond_var: BoolExp) (body: Prog' Cmd). 
-    Set Elimination Schemes.
+      | while (cond_var: BoolExp) (body: Prog' Cmd).  Set Elimination Schemes.
     Definition Prog := Prog' Cmd.
   End cmd.
 
@@ -81,61 +83,88 @@ Section syntax.
 End syntax.
 
 Section store.
-  Context `{VarPrm} `{ValPrm}.
+  Context `{!VarPrm, !ValPrm}.
 
   Definition Store := Vars -> Vals.
-
-  (* This seems like it should be in a module *)
-  Definition get_store (s : Store) (v : Vars) : Vals := s v.
-
-  Definition update_store (s : Store) (v : Vars) (vl : Vals) : Store := 
-    fun v' => if (v = v')? is true then vl else s v'.
+  Definition get_from_store (st : Store) (v : Vars) : Vals := st v.
+  Definition update_to_store (st : Store) (v : Vars) (vl : Vals) : Store := 
+    fun v' => if (v = v')? is true then vl else st v'.  (* The double colon in vars_deceq is needed here. *)
 End store.
+
+Section store_access.
+  Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam, !AdvLvlParam}.
+
+
+  (* 
+    You check whether the variable is controlled by the attacker. 
+    If the variable is controlled by the attacker, then the adversary strat is active
+    I'm making a very important choice here. 
+    We can strengthen or weaken the adversary later here.
+  *)
+
+  Definition store_access_read (st : Store) (vs : VarSrc) (amem : AdvMem) : Vals := 
+    let: mk_vr_src v adv := vs in 
+    let: orig_val := get_from_store st v in
+    if (is_untrusted v) is false then orig_val else
+    adv orig_val amem.
+
+  Definition store_access_update 
+          (s : Store) (vd : VarDst) (vl : Vals) (amem : AdvMem) : 
+          Store * AdvMem * option LeakVals := 
+    let: mk_vr_dest v adv := vd in 
+    let: s' := update_to_store s v vl in
+    if (is_public v) is false then (s',amem, None) else 
+    let: (lk, amem') := adv vl amem in
+    (s',amem', Some lk).
+End store_access.
 
 
 Section cfg.
-  Context `{VarPrm} `{ValPrm}.
+  Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
 
-  (* A 'state' is the program state + the pending program / continuation  *)
-  Record Cfg := mk_cfg {store : Store; cont : Prog}. 
+  (* What is 'state'? *)
+  Inductive Cfg := mk_cfg (store : Store) (amem: AdvMem) (cont : Prog).
 End cfg.
 
 Section semantics.
-  Context `{VarPrm} `{ValPrm}.
+  Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam, !AdvLvlParam}.
 
-  Definition exp_eval (e : ValExp) (store : Store) : Vals :=
-    let: mk_vl_exp v1 v2 v1_adv v2_adv comp := e in
-    let: v1val := get_store store v1 in
-    let: v2val := get_store store v2 in
-    comp v1val v2val.
+  Definition val_exp_eval (e : ValExp) (store : Store) (amem : AdvMem) : Vals :=
+    let: mk_vl_exp vs1 vs2 comp := e in
+    let: get_val := fun vs => store_access_read store vs amem in 
+    let: val1 := get_val vs1 in
+    let: val2 := get_val vs2 in
+    comp val1 val2.
 
-  Definition assign_eval (e : ValExp) (store : Store) : Vals :=
-    let: mk_vl_exp v1 v2 v1_adv v2_adv comp := e in
-    let: v1val := get_store store v1 in
-    let: v2val := get_store store v2 in
-    comp v1val v2val.
 
-  Definition step (cfg : Cfg) : Cfg * option LeakVal :=
-    let: mk_cfg store prog := cfg in
+  Definition bool_exp_eval (be : BoolExp) (store : Store) (amem : AdvMem) : bool :=
+    let: mk_bl_exp vs test := be in
+    let: val := store_access_read store vs amem in 
+    test val.
+
+  (* Maybe this can be factored out.. *)
+  Definition step (cfg : Cfg) : Cfg * option LeakVals :=
+    let: mk_cfg store amem prog := cfg in
     if prog isn't (cmd :: prog') then (cfg, None) else  (* prog is skip *)
 
     match cmd with 
-    | assign adv var exp =>  
-        let: val := (exp_eval exp store) in
-        let: leak := adv val in
+    | assign vd exp =>  
         let: cont := prog' in
-        let: cfg := mk_cfg (update_store store var val) cont in
-        (cfg, Some(leak))
+        let: val := (val_exp_eval exp store amem) in
+        let: (store', amem', optlk) := store_access_update store vd val amem in
+        (mk_cfg store' amem' prog', optlk)
 
-    | cond v b1 b2 =>  (* I really need to think of the right way to treat equality.. *)
-        let: branch := if (Nat.eqb v 0) is true then b1 else b2 in
+    | cond exp b1 b2 =>
+        let: test := (bool_exp_eval exp store amem) in
+        let: branch := if test is true then b1 else b2 in
         let: cont := (branch ++ prog') in
-        let: cfg := mk_cfg store cont in
+        let: cfg := mk_cfg store amem cont in
         (cfg, None)
 
-    | while v while_bdy  =>  
-       let: cont := if (Nat.eqb v 0) is true then prog' else (while_bdy ++ prog) in
-       let: cfg := mk_cfg store cont in
+    | while exp while_bdy  =>  
+       let: test := (bool_exp_eval exp store amem) in
+       let: cont := if test is false then prog' else (while_bdy ++ prog) in
+       let: cfg := mk_cfg store amem cont in
        (cfg, None)
     end.
 
