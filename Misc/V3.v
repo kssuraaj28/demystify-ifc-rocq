@@ -1,7 +1,8 @@
-From Stdlib Require Import List ssreflect.
-(* ssreflect for gallina extensions *)
+From Stdlib Require Import (*Arith*) List ssreflect.
 From QuickChick Require Import Decidability. 
 (* QuickCheck decidable equality classes are so good *)
+(* ssreflect for gallina extensions *)
+(* Arith for iter_nat *)
 
 Import ListNotations.
 (* I'm just going to bundle stuff for now. The context is getting quite large otherwise.
@@ -14,7 +15,7 @@ Class AdvLvlParam `{!VarPrm} := { is_untrusted : Vars -> bool ; is_public : Vars
 
 
 (* When you instantiate an adversary, you also give it memory *)
-Class AdvMemParam := {AdvMem : Type}. (* Maybe specify initial value also.. *)
+Class AdvMemParam := {AdvMem : Type; adv_init : AdvMem}.
 
 Class AdvLeakParam := {LeakVals : Type}.  (* The type of messages that the adversary leaks *)
 
@@ -101,7 +102,7 @@ Section semantics.
      If it works, I think it's good.
   *)
   Inductive Event :=
-    | assignment (optupd: option (Vars * Vals)) (optlk : option LeakVals) (* We don't care about updates to untrusted variables *)
+    | assignment (optupd: option (Vars * Vals)) (optlk : option LeakVals) 
     | if_choice(choice : bool)
     | while_choice (choice : bool)
     | terminate.
@@ -146,7 +147,6 @@ Section semantics.
 
 
 
-  (* Maybe this can be factored out.. *)
   Definition step (cfg : Cfg) : Cfg * Event:=
     let: mk_cfg store amem prog := cfg in
     if prog isn't (cmd :: prog') then (cfg, terminate) else  (* prog is skip *)
@@ -172,16 +172,40 @@ Section semantics.
        (cfg, while_choice test)
     end.
 
+  (* Maybe define this with iter nat *)
+  Fixpoint multi_step (cfg : Cfg) (n : nat) : Cfg * Event := 
+    if n isn't S n' then step cfg else 
+    let: (cfg, _) := multi_step cfg n' in
+    step cfg.
 
-(* 
-  What is the correct next step?
-  - Define what NMIF is. 
-  - I need to define what an observation is..
-    -- initial and final state? Then I need to talk about nontermination and all that bs
-    -- Writes to trusted channels? What about reads then?
-  - Maybe I skirt things about observations, and show the stongest proof lemma I can show..
-    -- This will be my strat.
-  - First, I would have to put restriction on adversary (cannot maul) -- This will be the definition of what it means for a system to satisfy nmif.
-  - Then, I will have to incorporate IFC on it.
-*)
+  Print multi_step.
+
+  (* 
+    What does behavior of program mean? 
+  *)
+  Definition Behavior := Store -> nat -> Event.
+
+  (* I think that it is possible to use iter_nat to make this so much simpler *)
+  (* 
+    TODO: I feel like this says nothing about the initial state.  
+    Perhaps that is okay?
+    I feel like the right way to have solved this would have been
+    Parameter Behavior and parameter prog_behavior..
+
+    This is wrong anyway. We're letting the environment choose all input values.
+    The adversary needs a way to learn what the inputs are.
+    - There are a few other ways to get this done, I think...
+ *)
+  Definition prog_behavior (p : Prog) : Behavior := 
+    fun store_init step_cnt =>
+      let: init_cfg := mk_cfg store_init adv_init p in
+      let: multi_step := 
+        fix multi_step cfg n {struct n} :=
+            if n isn't S n' then step cfg else 
+            let: (cfg, _) := multi_step cfg n' in
+            step cfg
+      in 
+      let: (_, ret) := multi_step init_cfg step_cnt in
+      ret.
 End semantics.
+
