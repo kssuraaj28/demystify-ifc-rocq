@@ -91,10 +91,20 @@ Section store.
     fun v' => if (v = v')? is true then vl else st v'.  (* The double colon in vars_deceq is needed here. *)
 End store.
 
-Section store_access.
+Section semantics.
   Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam, !AdvLvlParam}.
 
+  (* What is 'state'? *)
+  Inductive Cfg := mk_cfg (store : Store) (amem: AdvMem) (cont : Prog).
 
+  (* Our definition is super lockstep. 
+     If it works, I think it's good.
+  *)
+  Inductive Event :=
+    | assignment (optupd: option (Vars * Vals)) (optlk : option LeakVals) (* We don't care about updates to untrusted variables *)
+    | if_choice(choice : bool)
+    | while_choice (choice : bool)
+    | terminate.
   (* 
     You check whether the variable is controlled by the attacker. 
     If the variable is controlled by the attacker, then the adversary strat is active
@@ -102,36 +112,15 @@ Section store_access.
     We can strengthen or weaken the adversary later here.
   *)
 
-  Definition store_access_read (st : Store) (vs : VarSrc) (amem : AdvMem) : Vals := 
+  Definition store_read_w_adv (st : Store) (vs : VarSrc) (amem : AdvMem) : Vals := 
     let: mk_vr_src v adv := vs in 
     let: orig_val := get_from_store st v in
     if (is_untrusted v) is false then orig_val else
     adv orig_val amem.
 
-  Definition store_access_update 
-          (s : Store) (vd : VarDst) (vl : Vals) (amem : AdvMem) : 
-          Store * AdvMem * option LeakVals := 
-    let: mk_vr_dest v adv := vd in 
-    let: s' := update_to_store s v vl in
-    if (is_public v) is false then (s',amem, None) else 
-    let: (lk, amem') := adv vl amem in
-    (s',amem', Some lk).
-End store_access.
-
-
-Section cfg.
-  Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
-
-  (* What is 'state'? *)
-  Inductive Cfg := mk_cfg (store : Store) (amem: AdvMem) (cont : Prog).
-End cfg.
-
-Section semantics.
-  Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam, !AdvLvlParam}.
-
   Definition val_exp_eval (e : ValExp) (store : Store) (amem : AdvMem) : Vals :=
     let: mk_vl_exp vs1 vs2 comp := e in
-    let: get_val := fun vs => store_access_read store vs amem in 
+    let: get_val := fun vs => store_read_w_adv store vs amem in 
     let: val1 := get_val vs1 in
     let: val2 := get_val vs2 in
     comp val1 val2.
@@ -139,44 +128,60 @@ Section semantics.
 
   Definition bool_exp_eval (be : BoolExp) (store : Store) (amem : AdvMem) : bool :=
     let: mk_bl_exp vs test := be in
-    let: val := store_access_read store vs amem in 
+    let: val := store_read_w_adv store vs amem in 
     test val.
 
+
+  Definition store_update_w_adv
+          (s : Store) (vd : VarDst) (vl : Vals) (amem : AdvMem) : 
+          Store * AdvMem * Event :=
+    let: mk_vr_dest v adv := vd in 
+    let: s' := update_to_store s v vl in
+    let: (lk, amem') := (adv vl amem) in
+    (* We leak only when the variable is public *)
+    let: optlk := if (is_public v) is false then None else Some lk in 
+    (* Only trusted updates are part of our trace *)
+    let: optupd := if (is_untrusted v) is true then None else Some (v,vl) in
+    (s',amem', assignment optupd optlk).
+
+
+
   (* Maybe this can be factored out.. *)
-  Definition step (cfg : Cfg) : Cfg * option LeakVals :=
+  Definition step (cfg : Cfg) : Cfg * Event:=
     let: mk_cfg store amem prog := cfg in
-    if prog isn't (cmd :: prog') then (cfg, None) else  (* prog is skip *)
+    if prog isn't (cmd :: prog') then (cfg, terminate) else  (* prog is skip *)
 
     match cmd with 
     | assign vd exp =>  
         let: cont := prog' in
         let: val := (val_exp_eval exp store amem) in
-        let: (store', amem', optlk) := store_access_update store vd val amem in
-        (mk_cfg store' amem' prog', optlk)
+        let: (store', amem', event) := store_update_w_adv store vd val amem in
+        (mk_cfg store' amem' prog', event)
 
     | cond exp b1 b2 =>
         let: test := (bool_exp_eval exp store amem) in
         let: branch := if test is true then b1 else b2 in
         let: cont := (branch ++ prog') in
         let: cfg := mk_cfg store amem cont in
-        (cfg, None)
+        (cfg, if_choice test)
 
     | while exp while_bdy  =>  
        let: test := (bool_exp_eval exp store amem) in
        let: cont := if test is false then prog' else (while_bdy ++ prog) in
        let: cfg := mk_cfg store amem cont in
-       (cfg, None)
+       (cfg, while_choice test)
     end.
 
 
 (* 
-  My dream is the following:
-  - Typeclasses
-  - Assign store eval
-
-  Attacker memory.
-  Labels.
-  Should I think about what the right way to define a trace is?
-  Technically, we need to be defining system equivalence.
+  What is the correct next step?
+  - Define what NMIF is. 
+  - I need to define what an observation is..
+    -- initial and final state? Then I need to talk about nontermination and all that bs
+    -- Writes to trusted channels? What about reads then?
+  - Maybe I skirt things about observations, and show the stongest proof lemma I can show..
+    -- This will be my strat.
+  - First, I would have to put restriction on adversary (cannot maul) -- This will be the definition of what it means for a system to satisfy nmif.
+  - Then, I will have to incorporate IFC on it.
 *)
 End semantics.
