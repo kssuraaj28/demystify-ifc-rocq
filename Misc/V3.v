@@ -208,4 +208,3 @@ Section semantics.
       let: (_, ret) := multi_step init_cfg step_cnt in
       ret.
 End semantics.
-
