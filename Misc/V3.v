@@ -1,4 +1,4 @@
-From Stdlib Require Import (*Arith*) List ssreflect.
+From Stdlib Require Import (*Arith*) List String ssreflect.
 From QuickChick Require Import Decidability. 
 (* QuickCheck decidable equality classes are so good *)
 (* ssreflect for gallina extensions *)
@@ -48,15 +48,19 @@ End var_atk.
    This should be a helper defined somewhere else. 
    There should be a string accessor
 *)
-Class _SrcVarTC := SrcVar : Type. 
-Class _DstVarTC := DstVar : Type.
+Class CfgVar (T : Type) (id : string) := cfg_val : T.
+Arguments cfg_val : clear implicits. Arguments cfg_val {_} id {_}.
+(* Print Implicit cfg_val. *)
+
 
 Section meta_syntax.
   (* I wonder whether all of this should be packaged into a single thing? I could do "SyntaxParams" *)
   Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
 
-  Context `(!_SrcVarTC, !_DstVarTC).
+  Context `(!CfgVar Type "src", !CfgVar Type "dst").
 
+  Notation SrcVar := (cfg_val "src"). (* TODO: I have no idea how this works/ why. I think this is because of some eauto thing. *)
+  Notation DstVar := (cfg_val "dst").
 
   (* 
     v1 ∘ v2. Some binary operation 
@@ -114,8 +118,8 @@ Section syntax.
   Ltac constr_prog := let t := eval unfold ProgMeta in (ProgMeta _ _) in exact t.
 
   Section clean.
-    Hint Extern 0 _SrcVarTC => exact Vars : typeclass_instances.
-    Hint Extern 0 _DstVarTC => exact Vars : typeclass_instances.
+    Hint Extern 0 (CfgVar Type "src") => exact Vars : typeclass_instances.
+    Hint Extern 0 (CfgVar Type "dst") => exact Vars : typeclass_instances.
 
     Definition CleanValExp := ltac:(constr_valexp).
     Definition CleanBoolExp := ltac:(constr_boolexp).
@@ -124,8 +128,8 @@ Section syntax.
   End clean.
 
   Section atk.
-    Hint Extern 0 _SrcVarTC => exact AtkVarSrc : typeclass_instances.
-    Hint Extern 0 _DstVarTC => exact AtkVarDst : typeclass_instances.
+    Hint Extern 0 (CfgVar Type "src") => exact AtkVarSrc : typeclass_instances.
+    Hint Extern 0 (CfgVar Type "dst") => exact AtkVarDst : typeclass_instances.
 
     Definition AtkValExp := ltac:(constr_valexp).
     Definition AtkBoolExp := ltac:(constr_boolexp).
@@ -171,11 +175,12 @@ Section store.
     fun v' => if (v = v')? is true then vl else st v'.  (* The double colon in vars_deceq is needed here. *)
 End store.
 
+(* We only give semantics to attacked programs *)
 Section semantics.
   Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam, !AdvLvlParam}.
 
   (* What is 'state'? *)
-  Inductive Cfg := mk_cfg (store : Store) (amem: AdvMem) (cont : Prog).
+  Inductive Cfg := mk_cfg (store : Store) (amem: AdvMem) (cont : AtkProg).
 
   (* Our definition is super lockstep. 
      If it works, I think it's good.
@@ -185,6 +190,7 @@ Section semantics.
     | if_choice(choice : bool)
     | while_choice (choice : bool)
     | terminate.
+
   (* 
     You check whether the variable is controlled by the attacker. 
     If the variable is controlled by the attacker, then the adversary strat is active
