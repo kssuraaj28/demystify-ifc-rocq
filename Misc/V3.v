@@ -9,41 +9,6 @@ Import ListNotations.
 *)
 Class VarPrm := {Vars : Type ; vars_deceq :: Dec_Eq Vars}. 
 Class ValPrm := {Vals : Type}.
-
-(* Changing this to () does make a difference! *)
-Class AdvLvlParam `{!VarPrm} := { is_untrusted : Vars -> bool ; is_public : Vars -> bool }.
-
-
-(* When you instantiate an adversary, you also give it memory *)
-Class AdvMemParam := {AdvMem : Type; adv_init : AdvMem}.
-
-Class AdvLeakParam := {LeakVals : Type}.  (* The type of messages that the adversary leaks *)
-
-Section advsnips.
-  Context `{!ValPrm, !AdvMemParam, !AdvLeakParam}. 
-
-  (* When you write to an adversary readable variable, the adversary can exfiltrate the value *)
-  Definition AdvExfiltrator := Vals -> AdvMem -> (LeakVals * AdvMem).
-
-  (* 
-    When you read from  an adversary writable variable, the adversary can corrupt the value 
-    The adversary can maul
-  *)
-  Definition AdvCorruptor := Vals -> AdvMem -> Vals. 
-End advsnips.
-
-
-
-Section var_atk.
-  Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
-  
-  Inductive AtkVarSrc := mk_vr_src (v: Vars) (adv : AdvCorruptor).
-  Definition erase_var_src '(mk_vr_src v _) := v. (* I don't even think that this is an ssreflect extension *)
-
-  Inductive AtkVarDst := mk_vr_dest (v: Vars) (adv : AdvExfiltrator).
-  Definition erase_var_dst '(mk_vr_dest v _) := v.
-End var_atk.
-
 (* 
    This should be a helper defined somewhere else. 
    There should be a string accessor
@@ -55,7 +20,7 @@ Arguments cfg_val : clear implicits. Arguments cfg_val {_} id {_}.
 
 Section meta_syntax.
   (* I wonder whether all of this should be packaged into a single thing? I could do "SyntaxParams" *)
-  Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
+  Context `{!VarPrm, !ValPrm}.
 
   Context `(!CfgVar Type "src", !CfgVar Type "dst").
 
@@ -104,6 +69,29 @@ Section meta_syntax.
   Goal forall c : CmdMeta, c = c. elim => c; reflexivity. Qed. 
 End meta_syntax.
 
+(* Changing this to () does make a difference! *)
+Class AdvLvlParam `{!VarPrm} := { is_untrusted : Vars -> bool ; is_public : Vars -> bool }.
+
+
+(* When you instantiate an adversary, you also give it memory *)
+Class AdvMemParam := {AdvMem : Type; adv_init : AdvMem}.
+
+Class AdvLeakParam := {LeakVals : Type}.  (* The type of messages that the adversary leaks *)
+
+Section advsnips.
+  Context `{!ValPrm, !AdvMemParam, !AdvLeakParam}. 
+
+  (* When you write to an adversary readable variable, the adversary can exfiltrate the value *)
+  Definition AdvExfiltrator := Vals -> AdvMem -> (LeakVals * AdvMem).
+
+  (* 
+    When you read from  an adversary writable variable, the adversary can corrupt the value 
+    The adversary can maul
+  *)
+  Definition AdvCorruptor := Vals -> AdvMem -> Vals. 
+End advsnips.
+
+
 Section syntax.
   Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
 
@@ -118,8 +106,11 @@ Section syntax.
   Ltac constr_prog := let t := eval unfold ProgMeta in (ProgMeta _ _) in exact t.
 
   Section clean.
-    Hint Extern 0 (CfgVar Type "src") => exact Vars : typeclass_instances.
-    Hint Extern 0 (CfgVar Type "dst") => exact Vars : typeclass_instances.
+    Definition CleanVarSrc := Vars.
+    Definition CleanVarDst := Vars.
+
+    Hint Extern 0 (CfgVar Type "src") => exact CleanVarSrc : typeclass_instances.
+    Hint Extern 0 (CfgVar Type "dst") => exact CleanVarDst : typeclass_instances.
 
     Definition CleanValExp := ltac:(constr_valexp).
     Definition CleanBoolExp := ltac:(constr_boolexp).
@@ -128,6 +119,9 @@ Section syntax.
   End clean.
 
   Section atk.
+    Definition AtkVarSrc := (Vars * AdvCorruptor)%type.
+    Definition AtkVarDst := (Vars * AdvExfiltrator)%type.
+
     Hint Extern 0 (CfgVar Type "src") => exact AtkVarSrc : typeclass_instances.
     Hint Extern 0 (CfgVar Type "dst") => exact AtkVarDst : typeclass_instances.
 
@@ -141,6 +135,12 @@ End syntax.
 
 Section syntax_erase.
   Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
+
+  Definition erase_var_src (va : AtkVarSrc) : CleanVarSrc := 
+    let: (v,_) := va in v. 
+
+  Definition erase_var_dst (va : AtkVarDst) : CleanVarDst := 
+    let: (v,_) := va in v. 
 
   Definition erase_val_exp (exp : AtkValExp) : CleanValExp :=
     let: (mk_vl_exp v1 v2 comp) := exp in (* Weird pattern matching.. *)
@@ -198,13 +198,13 @@ Section semantics.
     We can strengthen or weaken the adversary later here.
   *)
 
-  Definition store_read_w_adv (st : Store) (vs : VarSrc) (amem : AdvMem) : Vals := 
-    let: mk_vr_src v adv := vs in 
+  Definition store_read_w_adv (st : Store) (vs : AtkVarSrc) (amem : AdvMem) : Vals := 
+    let: (v, adv) := vs in 
     let: orig_val := get_from_store st v in
     if (is_untrusted v) is false then orig_val else
     adv orig_val amem.
 
-  Definition val_exp_eval (e : ValExp) (store : Store) (amem : AdvMem) : Vals :=
+  Definition val_exp_eval (e : AtkValExp) (store : Store) (amem : AdvMem) : Vals :=
     let: mk_vl_exp vs1 vs2 comp := e in
     let: get_val := fun vs => store_read_w_adv store vs amem in 
     let: val1 := get_val vs1 in
@@ -212,7 +212,7 @@ Section semantics.
     comp val1 val2.
 
 
-  Definition bool_exp_eval (be : BoolExp) (store : Store) (amem : AdvMem) : bool :=
+  Definition bool_exp_eval (be : AtkBoolExp) (store : Store) (amem : AdvMem) : bool :=
     let: mk_bl_exp vs test := be in
     let: val := store_read_w_adv store vs amem in 
     test val.
