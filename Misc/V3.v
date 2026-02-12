@@ -138,11 +138,27 @@ End syntax.
 Section syntax_erase.
   Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
 
-  Parameter erase_val_exp : AtkValExp -> CleanValExp.
-  Parameter erase_bool_exp : AtkValExp -> CleanValExp.
-  Parameter erase_cmd : AtkCmd -> CleanCmd.
-  Parameter erase_prog : AtkProg -> CleanProg.
+  Definition erase_val_exp (exp : AtkValExp) : CleanValExp :=
+    let: (mk_vl_exp v1 v2 comp) := exp in (* Weird pattern matching.. *)
+    mk_vl_exp _ (erase_var_src v1) (erase_var_src v2) comp.
 
+  Definition erase_bool_exp (exp : AtkBoolExp) : CleanBoolExp :=
+    let: (mk_bl_exp v test) := exp in 
+    mk_bl_exp _ (erase_var_src v) test.
+
+
+  (* If map is opaque, I think that this would fail. *)
+  (* The termination checker cannot handle mutual recursion. Weird.*)
+  Notation erase_prog' p erase_cmd  := (map erase_cmd p).
+
+  Fixpoint erase_cmd (a_cmd : AtkCmd) : CleanCmd :=
+    match a_cmd with
+    | assign v exp => assign _ _ (erase_var_dst v) (erase_val_exp exp)
+    | cond test b1 b2 =>  cond _ _ (erase_bool_exp test) (erase_prog' b1 erase_cmd ) (erase_prog' b1 erase_cmd)
+    | while test p => while _ _ (erase_bool_exp test) (erase_prog' p erase_cmd)
+    end.
+  
+  Definition erase_prog p := erase_prog' p erase_cmd.
 End syntax_erase.
 
 
