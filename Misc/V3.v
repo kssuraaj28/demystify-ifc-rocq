@@ -32,34 +32,51 @@ Section advsnips.
   Definition AdvCorruptor := Vals -> AdvMem -> Vals. 
 End advsnips.
 
-Section syntax.
+
+
+Section var_atk.
+  Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
+  
+  Inductive AtkVarSrc := mk_vr_src (v: Vars) (adv : AdvCorruptor).
+  Definition erase_var_src '(mk_vr_src v _) := v. (* I don't even think that this is an ssreflect extension *)
+
+  Inductive AtkVarDst := mk_vr_dest (v: Vars) (adv : AdvExfiltrator).
+  Definition erase_var_dst '(mk_vr_dest v _) := v.
+End var_atk.
+
+(* 
+   This should be a helper defined somewhere else. 
+   There should be a string accessor
+*)
+Class _SrcVarTC := SrcVar : Type. 
+Class _DstVarTC := DstVar : Type.
+
+Section meta_syntax.
   (* I wonder whether all of this should be packaged into a single thing? I could do "SyntaxParams" *)
   Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
 
-  Inductive VarSrc := mk_vr_src (v: Vars) (adv : AdvCorruptor).
-  Inductive VarDst := mk_vr_dest (v: Vars) (adv : AdvExfiltrator).
+  Context `(!_SrcVarTC, !_DstVarTC).
 
 
   (* 
     v1 ∘ v2. Some binary operation 
-    If either variable is controlled by the adversary, then that strat will be applied.
-    Another thing we could to is to have an alternative where the adversary gets to supply an alternative function.
-    Here, when either variable is untrusted, the adversary function gets activated
   *)
-  Inductive ValExp := mk_vl_exp (v1 v2: VarSrc) (comp : Vals -> Vals -> Vals).
-  Inductive BoolExp :=  mk_bl_exp (v: VarSrc) (test : Vals -> bool).
+  Inductive ValExpMeta := mk_vl_exp (v1 v2: SrcVar) (comp : Vals -> Vals -> Vals).
+  Inductive BoolExpMeta :=  mk_bl_exp (v: SrcVar) (test : Vals -> bool).
 
   Section cmd.
-    Notation Prog' Cmd := (list Cmd).
-    Unset Elimination Schemes. Inductive Cmd :=
-      | assign (d : VarDst) (exp : ValExp)
-      | cond (cond_var: BoolExp) (b1 b2: Prog' Cmd)
-      | while (cond_var: BoolExp) (body: Prog' Cmd).  Set Elimination Schemes.
-    Definition Prog := Prog' Cmd.
+    Notation ProgMeta' CmdMeta := (list CmdMeta).
+
+    Unset Elimination Schemes. Inductive CmdMeta :=
+      | assign (d : DstVar) (exp : ValExpMeta)
+      | cond (cond_var: BoolExpMeta) (b1 b2: ProgMeta' CmdMeta)
+      | while (cond_var: BoolExpMeta) (body: ProgMeta' CmdMeta).  Set Elimination Schemes.
+
+    Definition ProgMeta := ProgMeta' CmdMeta.
   End cmd.
 
   Section cmd_ind.
-    Variable P : Cmd -> Prop.
+    Variable P : CmdMeta -> Prop.
     Generalizable All Variables.
 
     Hypothesis assign : `(P (assign d exp)).
@@ -71,17 +88,63 @@ Section syntax.
     Hypothesis while : `(Forall P body ->
                           P (while cond_var body)).
 
-    Ltac done ::= auto.
-    Ltac t appl :=  intros; apply appl; match goal with |- Forall P ?b => induction b end.
+    Ltac t appl :=  intros; apply appl; match goal with |- Forall P ?b => elim: b; auto end.
 
     (* I don't know whether I'm using the right ssreflect thing *)
-    Fixpoint Cmd_ind : forall c, P c. Proof.
-      case => c; by [t assign || t cond || t while].
+    Fixpoint CmdMeta_ind : forall c, P c. Proof.
+      case => c; (t assign || t cond || t while).
     Qed.
+
   End cmd_ind.
   (* It is a little weird that a very syntactic  *_ind approach is used. *)
-  Goal forall c : Cmd, c = c. elim => c; reflexivity. Qed. 
+  Goal forall c : CmdMeta, c = c. elim => c; reflexivity. Qed. 
+End meta_syntax.
+
+Section syntax.
+  Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
+
+  (* I don't like this _. 
+    There are a few options, none of which I found fully good
+    - refine
+    - notations
+  *)
+  Ltac constr_valexp := exact (ValExpMeta _). 
+  Ltac constr_boolexp := exact (BoolExpMeta _).
+  Ltac constr_cmd := exact (CmdMeta _ _).
+  Ltac constr_prog := let t := eval unfold ProgMeta in (ProgMeta _ _) in exact t.
+
+  Section clean.
+    Hint Extern 0 _SrcVarTC => exact Vars : typeclass_instances.
+    Hint Extern 0 _DstVarTC => exact Vars : typeclass_instances.
+
+    Definition CleanValExp := ltac:(constr_valexp).
+    Definition CleanBoolExp := ltac:(constr_boolexp).
+    Definition CleanCmd := ltac:(constr_cmd).
+    Definition CleanProg := ltac:(constr_prog).
+  End clean.
+
+  Section atk.
+    Hint Extern 0 _SrcVarTC => exact AtkVarSrc : typeclass_instances.
+    Hint Extern 0 _DstVarTC => exact AtkVarDst : typeclass_instances.
+
+    Definition AtkValExp := ltac:(constr_valexp).
+    Definition AtkBoolExp := ltac:(constr_boolexp).
+    Definition AtkCmd := ltac:(constr_cmd).
+    Definition AtkProg := ltac:(constr_prog).
+  End atk.
+
 End syntax.
+
+Section syntax_erase.
+  Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
+
+  Parameter erase_val_exp : AtkValExp -> CleanValExp.
+  Parameter erase_bool_exp : AtkValExp -> CleanValExp.
+  Parameter erase_cmd : AtkCmd -> CleanCmd.
+  Parameter erase_prog : AtkProg -> CleanProg.
+
+End syntax_erase.
+
 
 Section store.
   Context `{!VarPrm, !ValPrm}.
@@ -183,8 +246,10 @@ Section semantics.
   (* 
     What does behavior of program mean? 
   *)
+  Parameter Behavior : Type.
+  Parameter prog_behavior : Behavior -> Type.
+  (* 
   Definition Behavior := Store -> nat -> Event.
-
   (* I think that it is possible to use iter_nat to make this so much simpler *)
   (* 
     TODO: I feel like this says nothing about the initial state.  
@@ -207,4 +272,7 @@ Section semantics.
       in 
       let: (_, ret) := multi_step init_cfg step_cnt in
       ret.
+
+ *)
 End semantics.
+(* Now, you need to  *)
