@@ -219,9 +219,9 @@ Section semantics.
 
 
   Definition store_update_w_adv
-          (s : Store) (vd : VarDst) (vl : Vals) (amem : AdvMem) : 
+          (s : Store) (vd : AtkVarDst) (vl : Vals) (amem : AdvMem) : 
           Store * AdvMem * Event :=
-    let: mk_vr_dest v adv := vd in 
+    let: (v, adv) := vd in 
     let: s' := update_to_store s v vl in
     let: (lk, amem') := (adv vl amem) in
     (* We leak only when the variable is public *)
