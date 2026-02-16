@@ -87,31 +87,32 @@ Module MetaSyntax.
     Let DstVar1 : CfgVar Type "dst" := (@cfg_val Type "dst1" _). 
     Let SrcVar2 : CfgVar Type "src" := (@cfg_val Type "src2" _). 
     Let DstVar2 : CfgVar Type "dst" := (@cfg_val Type "dst2" _). 
-    Ltac erase_let cons :=
+    Ltac unfold_clean cons :=
       let t := constr:(ltac:(cons)) in 
-      let t := eval cbv delta [SrcVar1 DstVar1 SrcVar2 DstVar2] in t in
+      let t := eval cbv delta [SrcVar1 DstVar1 SrcVar2 DstVar2 cfg_val] in t in
       exact t.
 
     (* We need to force typeclass resolution *)
     Existing Instance SrcVar1. Existing Instance DstVar1.
-    Let ValExp1 := ltac:(erase_let constr_valexp).
-    Let BoolExp1 := ltac:(erase_let constr_boolexp).
-    Let Cmd1 := ltac:(erase_let constr_cmd).
-    Let Prog1 := ltac:(erase_let constr_prog).
+    Let ValExp1 := ltac:(unfold_clean constr_valexp).
+    Let BoolExp1 := ltac:(unfold_clean constr_boolexp).
+    Let Cmd1 := ltac:(unfold_clean constr_cmd).
+    Let Prog1 := ltac:(unfold_clean constr_prog).
     Remove Hints DstVar1 SrcVar1 : typeclass_instances.   (* TODO: Add HL *)
 
 
     Existing Instance SrcVar2. Existing Instance DstVar2.
-    Let ValExp2 := ltac:(erase_let constr_valexp).
-    Let BoolExp2 := ltac:(erase_let constr_boolexp).
-    Let Cmd2 := ltac:(erase_let constr_cmd).
-    Let Prog2 := ltac:(erase_let constr_prog).
+    Let ValExp2 := ltac:(unfold_clean constr_valexp).
+    Let BoolExp2 := ltac:(unfold_clean constr_boolexp).
+    Let Cmd2 := ltac:(unfold_clean constr_cmd).
+    Let Prog2 := ltac:(unfold_clean constr_prog).
     Remove Hints DstVar2 SrcVar2 : typeclass_instances.   (* TODO: Add HL *)
 
-    Ltac erase_let cons ::=
+    Ltac unfold_clean cons ::=
       let t := eval cbv delta [
         SrcVar1 DstVar1 ValExp1 BoolExp1 Cmd1 Prog1
         SrcVar2 DstVar2 ValExp2 BoolExp2 Cmd2 Prog2
+        cfg_val
         ] in cons in
       exact t.
 
@@ -119,23 +120,23 @@ Module MetaSyntax.
       I don't like that these take in parameters?
     *)
     Definition SrcTrans := (
-      ltac:(erase_let SrcVar1) -> 
-      ltac:(erase_let SrcVar2)).
+      ltac:(unfold_clean SrcVar1) -> 
+      ltac:(unfold_clean SrcVar2)).
 
     Definition DstTrans := (
-      ltac:(erase_let DstVar1) -> 
-      ltac:(erase_let DstVar2)).
+      ltac:(unfold_clean DstVar1) -> 
+      ltac:(unfold_clean DstVar2)).
 
     Context `(!CfgVar SrcTrans "src_trans", !CfgVar DstTrans "dst_trans").
 
     Notation src_trans := (cfg_val "src_trans"). Check ltac:(exact src_trans).
     Notation dst_trans := (cfg_val "dst_trans"). Check ltac:(exact dst_trans).
 
-    Definition val_exp_trans (exp : ltac:(erase_let ValExp1)) : ltac:(erase_let ValExp2) :=
+    Definition val_exp_trans (exp : ltac:(unfold_clean ValExp1)) : ltac:(unfold_clean ValExp2) :=
       let: (mk_vl_exp v1 v2 comp) := exp in (* Weird pattern matching.. *)
       mk_vl_exp _ (src_trans v1) (src_trans v2) comp.
 
-    Definition bool_exp_trans (exp : ltac:(erase_let BoolExp1)) : ltac:(erase_let BoolExp2) :=
+    Definition bool_exp_trans (exp : ltac:(unfold_clean BoolExp1)) : ltac:(unfold_clean BoolExp2) :=
       let: (mk_bl_exp v test) := exp in 
       mk_bl_exp _ (src_trans v) test.
 
@@ -143,7 +144,7 @@ Module MetaSyntax.
     (* The termination checker cannot handle mutual recursion. Weird.*)
     Notation prog_trans' p cmd_trans  := (map cmd_trans p).
 
-    Fixpoint cmd_trans (a_cmd : ltac:(erase_let Cmd1)) : ltac:(erase_let Cmd2) :=
+    Fixpoint cmd_trans (a_cmd : ltac:(unfold_clean Cmd1)) : ltac:(unfold_clean Cmd2) :=
       match a_cmd with
       | assign v exp => assign _ _ (dst_trans v) (val_exp_trans exp)
       | cond test b1 b2 =>  cond _ _ (bool_exp_trans test) (prog_trans' b1 cmd_trans ) (prog_trans' b1 cmd_trans)
@@ -221,8 +222,8 @@ Module AtkSyntax.
   Section syntax_erase.
     Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
 
-    Hint Extern 0 (CfgVar Type "src1") => exact VarSrc : typeclass_instances.
-    Hint Extern 0 (CfgVar Type "dst1") => exact VarDst : typeclass_instances.
+    Hint Extern 0 (CfgVar Type "src1") => exact AtkSyntax.VarSrc : typeclass_instances.
+    Hint Extern 0 (CfgVar Type "dst1") => exact AtkSyntax.VarDst : typeclass_instances.
 
     Hint Extern 0 (CfgVar Type "src2") => exact CleanSyntax.VarSrc : typeclass_instances.
     Hint Extern 0 (CfgVar Type "dst2") => exact CleanSyntax.VarDst : typeclass_instances.
@@ -370,8 +371,58 @@ Section semantics.
 End semantics.
 (* Define NMIF? *)
 
+Module NMIF.
+  Section nmif_syntax.
+    Import MetaSyntax AtkSyntax.
+    Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam, !AdvLvlParam}.
+    Definition NonmaulingCorruptor := AtkSyntax.AdvMem -> Vals. 
+
+    Instance VarSrc : CfgVar Type "src" := (Vars * NonmaulingCorruptor)%type.
+    Instance VarDst : CfgVar Type "dst" := AtkSyntax.VarDst.
+
+    Definition ValExp := ltac:(constr_valexp).
+    Definition BoolExp := ltac:(constr_boolexp).
+    Definition Cmd := ltac:(constr_cmd).
+    Definition Prog := ltac:(constr_prog).
+  End nmif_syntax.
+
+  Section nmif_to_atk.
+    Import MetaSyntax.
+    Context `{!VarPrm, !ValPrm, !AtkSyntax.AdvMemParam, !AtkSyntax.AdvLeakParam}.
+
+    Hint Extern 0 (CfgVar Type "src1") => exact NMIF.VarSrc : typeclass_instances.
+    Hint Extern 0 (CfgVar Type "dst1") => exact NMIF.VarDst : typeclass_instances.
+
+    Hint Extern 0 (CfgVar Type "src2") => exact AtkSyntax.VarSrc : typeclass_instances.
+    Hint Extern 0 (CfgVar Type "dst2") => exact AtkSyntax.VarDst : typeclass_instances.
+
+    (* I hope this is correct *)
+    Instance interpret_var_src : CfgVar SrcTrans "src_trans" :=
+      fun vs => let: (v, c) := vs in (v, fun _ i => c i). 
+
+    Instance interpret_var_dst : CfgVar DstTrans "dst_trans" :=
+      fun vd => vd.
+
+    Definition interpret_val_exp := ltac:(constr_val_exp_trans).
+    Definition interpret_bool_exp := ltac:(constr_bool_exp_trans).
+    Definition interpret_cmd := ltac:(constr_cmd_trans).
+    Definition interpret_prog := ltac:(constr_prog_trans). (* I wonder whether I can make this a coercion easily *)
+  End nmif_to_atk.
+End NMIF.
+
+(* TODO: Memories need not be the same *)
+Section sim_security.
+  Variable (IdealSyntax : Type) (interpretation : IdealSyntax -> AtkSyntax.Prog).
+
+  Definition SatsNMIF (p : CleanProg) : Prop :=
+    forall rap, exists iap, erase_prog rap = p /\ erase_prog iap = p -> 
+    AtkNMIFOkay iap /\
+    prog_behavior iap = prog_behavior rap.
+
+End sim_security.
+
 Section nmif.
-  Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam, !AdvLvlParam}.
+  Context `{}.
 
   (* I will do magic trick now. After this you should be convinced.  *)
   Definition CorruptorNMIFOkay (ac:  AdvCorruptor) : Prop :=
