@@ -30,9 +30,7 @@ Module MetaSyntax.
     Notation SrcVar := (cfg_val "src"). 
     Notation DstVar := (cfg_val "dst").
 
-    (* 
-      v1 ∘ v2. Some binary operation 
-    *)
+    (* v1 ∘ v2. Some binary operation *)
     Inductive ValExpMeta := mk_vl_exp (v1 v2: SrcVar) (comp : Vals -> Vals -> Vals).
     Inductive BoolExpMeta :=  mk_bl_exp (v: SrcVar) (test : Vals -> bool).
 
@@ -117,7 +115,9 @@ Module MetaSyntax.
         ] in cons in
       exact t.
 
-    (* All of this should be above... *)
+    (* Ideally, we would define all of these above.
+      I don't like that these take in parameters?
+    *)
     Definition SrcTrans := (
       ltac:(erase_let SrcVar1) -> 
       ltac:(erase_let SrcVar2)).
@@ -149,21 +149,24 @@ Module MetaSyntax.
       | cond test b1 b2 =>  cond _ _ (bool_exp_trans test) (prog_trans' b1 cmd_trans ) (prog_trans' b1 cmd_trans)
       | while test p => while _ _ (bool_exp_trans test) (prog_trans' p cmd_trans)
       end.
-    
     Definition prog_trans p := prog_trans' p cmd_trans.
   End syntax_transform.
 
-  Ltac constr_val_exp_trans := exact (val_exp_trans _ _ _). 
-  Ltac constr_bool_exp_trans := exact (bool_exp_trans _ _ _). 
-  Ltac constr_cmd_trans := exact (cmd_trans _ _ _ _ _ _). 
-  Ltac constr_prog_trans := exact (prog_trans _ _ _ _ _ _). 
+  Arguments SrcTrans {_} {_}.
+  Arguments DstTrans {_} {_}.
+
+  (* This can be refactored *)
+  Ltac constr_val_exp_trans := exact (val_exp_trans _ _ _).
+  Ltac constr_bool_exp_trans := exact (bool_exp_trans _ _ _).
+  Ltac constr_cmd_trans := exact (cmd_trans _ _ _ _ _ _).
+  Ltac constr_prog_trans := exact (prog_trans _ _ _ _ _ _).
 
   Section test.
     Context `{!VarPrm, !ValPrm}.
     Context `(!CfgVar Type "src1", !CfgVar Type "dst1").
     Context `(!CfgVar Type "src2", !CfgVar Type "dst2").
-    Context `(!CfgVar (SrcTrans _ _) "src_trans").
-    Context `(!CfgVar (DstTrans _ _) "dst_trans").
+    Context `(!CfgVar SrcTrans "src_trans").
+    Context `(!CfgVar DstTrans "dst_trans").
     Check ltac:(constr_val_exp_trans).
     Check ltac:(constr_bool_exp_trans).
     Check ltac:(constr_cmd_trans).
@@ -189,10 +192,7 @@ Module CleanSyntax.
   End clean_syntax.
 End CleanSyntax.
 
-
 Module AtkSyntax.
-  Class AdvLvlParam `{!VarPrm} := { is_untrusted : Vars -> bool ; is_public : Vars -> bool }.
-
   (* The type of messages that the adversary leaks *)
   Class AdvLeakParam := {LeakVals : Type}. 
 
@@ -217,44 +217,28 @@ Module AtkSyntax.
     Definition Cmd := ltac:(constr_cmd).
     Definition Prog := ltac:(constr_prog).
   End atksyntax.
-End AtkSyntax.
-
-(* 
-  I feel like this can be abstracted out also.. 
-  The point is that you just need to define
-  src and dst erasers
-*)
-Section syntax_erase.
-  Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
-
-  Definition erase_var_src (va : AtkVarSrc) : CleanVarSrc := 
-    let: (v,_) := va in v. 
-
-  Definition erase_var_dst (va : AtkVarDst) : CleanVarDst := 
-    let: (v,_) := va in v. 
-
-  Definition erase_val_exp (exp : AtkValExp) : CleanValExp :=
-    let: (mk_vl_exp v1 v2 comp) := exp in (* Weird pattern matching.. *)
-    mk_vl_exp _ (erase_var_src v1) (erase_var_src v2) comp.
-
-  Definition erase_bool_exp (exp : AtkBoolExp) : CleanBoolExp :=
-    let: (mk_bl_exp v test) := exp in 
-    mk_bl_exp _ (erase_var_src v) test.
-
-
-  (* If map is opaque, I think that this would fail. *)
-  (* The termination checker cannot handle mutual recursion. Weird.*)
-  Notation erase_prog' p erase_cmd  := (map erase_cmd p).
-
-  Fixpoint erase_cmd (a_cmd : AtkCmd) : CleanCmd :=
-    match a_cmd with
-    | assign v exp => assign _ _ (erase_var_dst v) (erase_val_exp exp)
-    | cond test b1 b2 =>  cond _ _ (erase_bool_exp test) (erase_prog' b1 erase_cmd ) (erase_prog' b1 erase_cmd)
-    | while test p => while _ _ (erase_bool_exp test) (erase_prog' p erase_cmd)
-    end.
   
-  Definition erase_prog p := erase_prog' p erase_cmd.
-End syntax_erase.
+  Section syntax_erase.
+    Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
+
+    Hint Extern 0 (CfgVar Type "src1") => exact VarSrc : typeclass_instances.
+    Hint Extern 0 (CfgVar Type "dst1") => exact VarDst : typeclass_instances.
+
+    Hint Extern 0 (CfgVar Type "src2") => exact CleanSyntax.VarSrc : typeclass_instances.
+    Hint Extern 0 (CfgVar Type "dst2") => exact CleanSyntax.VarDst : typeclass_instances.
+
+    Instance erase_var_src : CfgVar SrcTrans "src_trans" :=
+      fun vs => let: (v, _) := vs in v.
+
+    Instance erase_var_dst : CfgVar DstTrans "dst_trans" :=
+      fun vd => let: (v, _) := vd in v.
+
+    Definition erase_val_exp := ltac:(constr_val_exp_trans).
+    Definition erase_bool_exp := ltac:(constr_bool_exp_trans).
+    Definition erase_cmd := ltac:(constr_cmd_trans).
+    Definition erase_prog := ltac:(constr_prog_trans).
+  End syntax_erase.
+End AtkSyntax.
 
 
 Section store.
@@ -267,11 +251,14 @@ Section store.
 End store.
 
 (* We only give semantics to attacked programs *)
+Class AdvLvlParam `{!VarPrm} := {is_untrusted : Vars -> bool ; is_public : Vars -> bool }.
 Section semantics.
+  Import MetaSyntax.
+  Import AtkSyntax.
   Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam, !AdvLvlParam}.
 
   (* What is 'state'? *)
-  Inductive Cfg := mk_cfg (store : Store) (amem: AdvMem) (cont : AtkProg).
+  Inductive Cfg := mk_cfg (store : Store) (amem: AdvMem) (cont : Prog).
 
   (* Our definition is super lockstep. 
      If it works, I think it's good.
@@ -289,13 +276,13 @@ Section semantics.
     We can strengthen or weaken the adversary later here.
   *)
 
-  Definition store_read_w_adv (st : Store) (vs : AtkVarSrc) (amem : AdvMem) : Vals := 
+  Definition store_read_w_adv (st : Store) (vs : VarSrc) (amem : AdvMem) : Vals := 
     let: (v, adv) := vs in 
     let: orig_val := get_from_store st v in
     if (is_untrusted v) is false then orig_val else
     adv orig_val amem.
 
-  Definition val_exp_eval (e : AtkValExp) (store : Store) (amem : AdvMem) : Vals :=
+  Definition val_exp_eval (e : ValExp) (store : Store) (amem : AdvMem) : Vals :=
     let: mk_vl_exp vs1 vs2 comp := e in
     let: get_val := fun vs => store_read_w_adv store vs amem in 
     let: val1 := get_val vs1 in
@@ -303,14 +290,14 @@ Section semantics.
     comp val1 val2.
 
 
-  Definition bool_exp_eval (be : AtkBoolExp) (store : Store) (amem : AdvMem) : bool :=
+  Definition bool_exp_eval (be : BoolExp) (store : Store) (amem : AdvMem) : bool :=
     let: mk_bl_exp vs test := be in
     let: val := store_read_w_adv store vs amem in 
     test val.
 
 
   Definition store_update_w_adv
-          (s : Store) (vd : AtkVarDst) (vl : Vals) (amem : AdvMem) : 
+          (s : Store) (vd : VarDst) (vl : Vals) (amem : AdvMem) : 
           Store * AdvMem * Event :=
     let: (v, adv) := vd in 
     let: s' := update_to_store s v vl in
@@ -353,7 +340,7 @@ Section semantics.
     What does behavior of program mean? 
   *)
   Parameter Behavior : Type.
-  Parameter prog_behavior : AtkProg -> Behavior.
+  Parameter prog_behavior : Prog -> Behavior.
   (* 
   Definition Behavior := Store -> nat -> Event.
   (* I think that it is possible to use iter_nat to make this so much simpler *)
