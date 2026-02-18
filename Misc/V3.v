@@ -202,7 +202,7 @@ Module AtkSyntax.
 
   Import MetaSyntax.
   Section atksyntax.
-    Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
+    Context `{!VarPrm, !ValPrm, !AdvLeakParam, !AdvMemParam}.
 
     (* When you write to an adversary readable variable, the adversary can exfiltrate the value *)
     Definition AdvExfiltrator := Vals -> AdvMem -> (LeakVals * AdvMem).
@@ -218,6 +218,7 @@ Module AtkSyntax.
     Definition Cmd := ltac:(constr_cmd).
     Definition Prog := ltac:(constr_prog).
   End atksyntax.
+
   
   Section syntax_erase.
     Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
@@ -239,6 +240,14 @@ Module AtkSyntax.
     Definition erase_cmd := ltac:(constr_cmd_trans).
     Definition erase_prog := ltac:(constr_prog_trans).
   End syntax_erase.
+
+  (* You get to customize your memory actually*)
+  Section customize_mem.
+    Context `{!VarPrm, !ValPrm, !AdvLeakParam}.
+
+    Definition AtkwMem := {_ : AdvMemParam & Prog}.
+    (* Import SigTNotations. Check (_ ; _). *)
+  End customize_mem.
 End AtkSyntax.
 
 
@@ -373,7 +382,7 @@ End semantics.
 
 Module NMIF.
   Section nmif_syntax.
-    Import MetaSyntax AtkSyntax.
+    Import MetaSyntax AtkSyntax. (* This should not be imported TODO *)
     Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam, !AdvLvlParam}.
     Definition NonmaulingCorruptor := AtkSyntax.AdvMem -> Vals. 
 
@@ -410,31 +419,23 @@ Module NMIF.
   End nmif_to_atk.
 End NMIF.
 
-(* TODO: Memories need not be the same *)
-Section sim_security.
-  Variable (IdealSyntax : Type) (interpretation : IdealSyntax -> AtkSyntax.Prog).
 
-  Definition SatsNMIF (p : CleanProg) : Prop :=
-    forall rap, exists iap, erase_prog rap = p /\ erase_prog iap = p -> 
-    AtkNMIFOkay iap /\
-    prog_behavior iap = prog_behavior rap.
+Section sim_security.
+  Import AtkSyntax (AtkwMem,AdvMemParam, AdvLeakParam, erase_prog).
+  Notation CleanProg := CleanSyntax.Prog.
+
+  Context `{!VarPrm, !ValPrm, !AdvLeakParam}.
+
+  Import SigTNotations.
+
+  (* This is some typeclass magic *)
+  Definition atk_sim_sec (p : CleanProg) := 
+    forall ra : AtkwMem, let: (_ ; ra) := ra in erase_prog ra = p ->
+    exists ia : AtkwMem, let: (_ ; ia) := ia in erase_prog ia = p /\
+    prog_behavior ra = prog_behavior ia. 
+
 
 End sim_security.
-
-Section nmif.
-  Context `{}.
-
-  (* I will do magic trick now. After this you should be convinced.  *)
-  Definition CorruptorNMIFOkay (ac:  AdvCorruptor) : Prop :=
-    forall mem v1 v2, 
-      ac v1 mem = ac v2 mem.
-
-  Parameter AtkNMIFOkay:  AtkProg -> Prop.
-  Definition SatsNMIF (p : CleanProg) : Prop :=
-    forall rap, exists iap, erase_prog rap = p /\ erase_prog iap = p -> 
-    AtkNMIFOkay iap /\
-    prog_behavior iap = prog_behavior rap.
-
-End nmif.
-(* It should be a predicate on clean programs *)
-
+(* 
+  The goal here is to define a predicate on Clean programs. 
+*)
