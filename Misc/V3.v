@@ -23,22 +23,23 @@ Module MetaSyntax.
     Context `{!VarPrm, !ValPrm}.
 
     (* If I make this implicit it becomes a little hard to debug *)
-    Context `(!CfgVar Type "src", !CfgVar Type "dst").
+    Context `{!CfgVar Type "src", !CfgVar Type "dst"}.
 
   (* TODO: I have no idea how this works/ why. I think this is because of some eauto thing.
      To be more specific, I don't know why cfg_val does not infer the right thing. *)
-    Notation SrcVar := (cfg_val "src"). 
-    Notation DstVar := (cfg_val "dst").
+    (* TODO: SrcVar needn't be notation anymore. Check *)
+    Definition SrcVarMeta := (cfg_val "src").
+    Definition DstVarMeta := (cfg_val "dst").
 
     (* v1 ∘ v2. Some binary operation *)
-    Inductive ValExpMeta := mk_vl_exp (v1 v2: SrcVar) (comp : Vals -> Vals -> Vals).
-    Inductive BoolExpMeta :=  mk_bl_exp (v: SrcVar) (test : Vals -> bool).
+    Inductive ValExpMeta := mk_vl_exp (v1 v2: SrcVarMeta) (comp : Vals -> Vals -> Vals).
+    Inductive BoolExpMeta :=  mk_bl_exp (v: SrcVarMeta) (test : Vals -> bool).
 
     Section cmd.
       Notation ProgMeta' CmdMeta := (list CmdMeta).
 
       Unset Elimination Schemes. Inductive CmdMeta :=
-        | assign (d : DstVar) (exp : ValExpMeta)
+        | assign (d : DstVarMeta) (exp : ValExpMeta)
         | cond (cond_var: BoolExpMeta) (b1 b2: ProgMeta' CmdMeta)
         | while (cond_var: BoolExpMeta) (body: ProgMeta' CmdMeta).  Set Elimination Schemes.
 
@@ -70,42 +71,74 @@ Module MetaSyntax.
     Goal forall c : CmdMeta, c = c. elim => c; reflexivity. Qed. 
   End meta_syntax.
 
-  Ltac constr_valexp := exact (ValExpMeta _). 
-  Ltac constr_boolexp := exact (BoolExpMeta _).
-  Ltac constr_cmd := exact (CmdMeta _ _).
-  Ltac constr_prog := let t := eval unfold ProgMeta in (ProgMeta _ _) in exact t.
+  Section syntax_pred.
+    Context `{!VarPrm, !ValPrm}.
+    (* Maybe I should be more uniform. I do use this a lot.. *)
+    Context `{!CfgVar Type "src", !CfgVar Type "dst"}. 
+    Context `{!CfgVar (SrcVarMeta -> Prop) "srcpred", !CfgVar (DstVarMeta -> Prop) "dstpred"}. 
+
+    Notation SrcPred := (cfg_val "srcpred"). Check ltac:(exact SrcPred).
+    Notation DstPred := (cfg_val "dstpred"). Check ltac:(exact DstPred).
+
+    Definition ValExpPred (exp: ValExpMeta): Prop :=
+      let: mk_vl_exp vs1 vs2 _ := exp in
+      SrcPred vs1 /\ SrcPred vs2.
+
+    Definition BoolExpPred (exp: BoolExpMeta):  Prop :=
+      let: mk_bl_exp vs test := exp in
+      SrcPred vs.
+
+    Notation ProgPred' CmdPred prog :=  
+      (fold_left (fun rest cmd => rest /\ CmdPred cmd) prog True).
+
+    Fixpoint CmdPred (cmd: CmdMeta) : Prop :=
+      match cmd with
+      | assign vd exp => DstPred vd /\ ValExpPred exp
+      | cond exp b1 b2 => 
+          BoolExpPred exp /\ 
+          ProgPred' CmdPred b1 /\
+          ProgPred' CmdPred b2
+      | while exp while_bdy  => 
+          BoolExpPred exp /\ 
+          ProgPred' CmdPred while_bdy
+      end.
+
+    Definition ProgPred prog := ProgPred' CmdPred prog.
+  End syntax_pred.
 
   (* Here, we give helper functions to transform syntax *)
   Section syntax_transform.
     Context `{!VarPrm, !ValPrm}.
 
-    Context `(!CfgVar Type "src1", !CfgVar Type "dst1").
-    Context `(!CfgVar Type "src2", !CfgVar Type "dst2").
+    Context `{!CfgVar Type "src1", !CfgVar Type "dst1"}.
+    Context `{!CfgVar Type "src2", !CfgVar Type "dst2"}.
 
-    (* I don't know why I had to do @ *)
+    (* I don't know why I had to do @. TODO *)
     Let SrcVar1 : CfgVar Type "src" := (@cfg_val Type "src1" _). 
     Let DstVar1 : CfgVar Type "dst" := (@cfg_val Type "dst1" _). 
     Let SrcVar2 : CfgVar Type "src" := (@cfg_val Type "src2" _). 
     Let DstVar2 : CfgVar Type "dst" := (@cfg_val Type "dst2" _). 
+
     Ltac unfold_clean cons :=
-      let t := constr:(ltac:(cons)) in 
+      let t := constr:(cons) in 
       let t := eval cbv delta [SrcVar1 DstVar1 SrcVar2 DstVar2 cfg_val] in t in
+      let t := eval hnf in t in (* TODO: Is this needed? *)
       exact t.
 
     (* We need to force typeclass resolution *)
     Existing Instance SrcVar1. Existing Instance DstVar1.
-    Let ValExp1 := ltac:(unfold_clean constr_valexp).
-    Let BoolExp1 := ltac:(unfold_clean constr_boolexp).
-    Let Cmd1 := ltac:(unfold_clean constr_cmd).
-    Let Prog1 := ltac:(unfold_clean constr_prog).
+    Let ValExp1 := ltac:(unfold_clean ValExpMeta).
+    Let BoolExp1 := ltac:(unfold_clean BoolExpMeta).
+    Let Cmd1 := ltac:(unfold_clean CmdMeta).
+    Let Prog1 := ltac:(unfold_clean ProgMeta).
     Remove Hints DstVar1 SrcVar1 : typeclass_instances.   (* TODO: Add HL *)
 
 
     Existing Instance SrcVar2. Existing Instance DstVar2.
-    Let ValExp2 := ltac:(unfold_clean constr_valexp).
-    Let BoolExp2 := ltac:(unfold_clean constr_boolexp).
-    Let Cmd2 := ltac:(unfold_clean constr_cmd).
-    Let Prog2 := ltac:(unfold_clean constr_prog).
+    Let ValExp2 := ltac:(unfold_clean ValExpMeta).
+    Let BoolExp2 := ltac:(unfold_clean BoolExpMeta).
+    Let Cmd2 := ltac:(unfold_clean CmdMeta).
+    Let Prog2 := ltac:(unfold_clean ProgMeta).
     Remove Hints DstVar2 SrcVar2 : typeclass_instances.   (* TODO: Add HL *)
 
     Ltac unfold_clean cons ::=
@@ -127,18 +160,18 @@ Module MetaSyntax.
       ltac:(unfold_clean DstVar1) -> 
       ltac:(unfold_clean DstVar2)).
 
-    Context `(!CfgVar SrcTrans "src_trans", !CfgVar DstTrans "dst_trans").
+    Context `{!CfgVar SrcTrans "src_trans", !CfgVar DstTrans "dst_trans"}.
 
     Notation src_trans := (cfg_val "src_trans"). Check ltac:(exact src_trans).
     Notation dst_trans := (cfg_val "dst_trans"). Check ltac:(exact dst_trans).
 
     Definition val_exp_trans (exp : ltac:(unfold_clean ValExp1)) : ltac:(unfold_clean ValExp2) :=
-      let: (mk_vl_exp v1 v2 comp) := exp in (* Weird pattern matching.. *)
-      mk_vl_exp _ (src_trans v1) (src_trans v2) comp.
+      let: (mk_vl_exp v1 v2 comp) := exp in 
+      mk_vl_exp (src_trans v1) (src_trans v2) comp.
 
     Definition bool_exp_trans (exp : ltac:(unfold_clean BoolExp1)) : ltac:(unfold_clean BoolExp2) :=
       let: (mk_bl_exp v test) := exp in 
-      mk_bl_exp _ (src_trans v) test.
+      mk_bl_exp (src_trans v) test.
 
     (* If map is opaque, I think that this would fail. *)
     (* The termination checker cannot handle mutual recursion. Weird.*)
@@ -146,33 +179,12 @@ Module MetaSyntax.
 
     Fixpoint cmd_trans (a_cmd : ltac:(unfold_clean Cmd1)) : ltac:(unfold_clean Cmd2) :=
       match a_cmd with
-      | assign v exp => assign _ _ (dst_trans v) (val_exp_trans exp)
-      | cond test b1 b2 =>  cond _ _ (bool_exp_trans test) (prog_trans' b1 cmd_trans ) (prog_trans' b1 cmd_trans)
-      | while test p => while _ _ (bool_exp_trans test) (prog_trans' p cmd_trans)
+      | assign v exp => assign (dst_trans v) (val_exp_trans exp)
+      | cond test b1 b2 =>  cond (bool_exp_trans test) (prog_trans' b1 cmd_trans ) (prog_trans' b1 cmd_trans)
+      | while test p => while (bool_exp_trans test) (prog_trans' p cmd_trans)
       end.
     Definition prog_trans p := prog_trans' p cmd_trans.
   End syntax_transform.
-
-  Arguments SrcTrans {_} {_}.
-  Arguments DstTrans {_} {_}.
-
-  (* This can be refactored *)
-  Ltac constr_val_exp_trans := exact (val_exp_trans _ _ _).
-  Ltac constr_bool_exp_trans := exact (bool_exp_trans _ _ _).
-  Ltac constr_cmd_trans := exact (cmd_trans _ _ _ _ _ _).
-  Ltac constr_prog_trans := exact (prog_trans _ _ _ _ _ _).
-
-  Section test.
-    Context `{!VarPrm, !ValPrm}.
-    Context `(!CfgVar Type "src1", !CfgVar Type "dst1").
-    Context `(!CfgVar Type "src2", !CfgVar Type "dst2").
-    Context `(!CfgVar SrcTrans "src_trans").
-    Context `(!CfgVar DstTrans "dst_trans").
-    Check ltac:(constr_val_exp_trans).
-    Check ltac:(constr_bool_exp_trans).
-    Check ltac:(constr_cmd_trans).
-    Check ltac:(constr_prog_trans).
-  End test.
 
 End MetaSyntax.
 
@@ -184,12 +196,11 @@ Module CleanSyntax.
     Instance VarDst : CfgVar Type "dst" := Vars.
 
 
-    Definition ValExp := ltac:(constr_valexp).
-    Definition BoolExp := ltac:(constr_boolexp).
-    Definition Cmd := ltac:(constr_cmd).
-    Definition Prog := ltac:(constr_prog).
-    (* Eval hnf in CleanProg. *)
-    (* Eval red  in CleanProg.  *)
+    Set Printing Implicit.
+    Definition ValExp := Eval hnf in ValExpMeta.
+    Definition BoolExp := Eval hnf in BoolExpMeta.
+    Definition Cmd := Eval hnf in CmdMeta.
+    Definition Prog := Eval hnf in ProgMeta.
   End clean_syntax.
 End CleanSyntax.
 
@@ -218,6 +229,7 @@ Module AtkSyntax.
     Definition Cmd := ltac:(constr_cmd).
     Definition Prog := ltac:(constr_prog).
   End atksyntax.
+  Arguments Prog _ _ _ amemprm : rename.
 
   
   Section syntax_erase.
@@ -241,13 +253,6 @@ Module AtkSyntax.
     Definition erase_prog := ltac:(constr_prog_trans).
   End syntax_erase.
 
-  (* You get to customize your memory actually*)
-  Section customize_mem.
-    Context `{!VarPrm, !ValPrm, !AdvLeakParam}.
-
-    Definition AtkwMem := {_ : AdvMemParam & Prog}.
-    (* Import SigTNotations. Check (_ ; _). *)
-  End customize_mem.
 End AtkSyntax.
 
 
@@ -421,16 +426,63 @@ End NMIF.
 
 
 Section sim_security.
-  Import AtkSyntax (AtkwMem,AdvMemParam, AdvLeakParam, erase_prog).
+  Import MetaSyntax AtkSyntax.
+  Context `{!VarPrm, !ValPrm, !AdvLeakParam, !AdvMemParam}.
+
+  Variable IdealCorruptorPred : AdvCorruptor -> Prop.
+  Variable IdealExfiltratorPred : AdvExfiltrator -> Prop.
+
+  Definition VarSrcPred (vs : VarSrc): Prop := 
+    let (_, cor) := vs in IdealCorruptorPred cor.
+
+  Definition VarDstPred (vd : VarDst): Prop := 
+    let (_, exf) := vd in IdealExfiltratorPred exf.
+
+  Definition ValExpPred (exp: ValExp): Prop :=
+    let: mk_vl_exp vs1 vs2 _ := exp in
+    VarSrcPred vs1 /\ VarSrcPred vs2.
+
+  Definition BoolExpPred (exp: BoolExp):  Prop :=
+    let: mk_bl_exp vs test := exp in
+    VarSrcPred vs.
+
+  Definition CmdPred: Cmd -> Prop.
+  Definition ProgPred: Prog -> Prop.
+
+
+  Print VarSrc.
+
+
+  Definition IdealCorruptor := {x| IdealCorruptorPred x}.
+  Definition IdealExfiltrator := {x| IdealExfiltratorPred x}.
+
+End sim_security.
+
+End sim_security.
+  (* You need a type and an interpretation as an AdvCorruptor *)
+  (* You need a type and an interpretation as an AdvInfiltrator *)
+  (* You could also have a predicate on AdvCorruptors.. *)
+  Import AtkSyntax (AdvMemParam, AdvLeakParam, erase_prog).
   Notation CleanProg := CleanSyntax.Prog.
+  Notation AtkProg := AtkSyntax.Prog.
 
   Context `{!VarPrm, !ValPrm, !AdvLeakParam}.
 
-  Import SigTNotations.
+  Notation ExpMemProgType := (AdvMemParam -> Type).
+  Variable  (IdealSyntax : ExpMemProgType).
 
-  (* This is some typeclass magic *)
+  Notation ExpMemAtkProg mem := (AtkProg (amemprm := mem)).
+  Check (fun i => ExpMemAtkProg i) : ExpMemProgType.
+
   Definition atk_sim_sec (p : CleanProg) := 
-    forall ra : AtkwMem, let: (_ ; ra) := ra in erase_prog ra = p ->
+    forall rm (rp : ExpMemAtkProg rm),  erase_prog rp = p ->
+    exists im (ip : AtkProg (amemprm:=im)),  erase_prog ip = p /\
+    True.
+
+
+  ExpMemAtkProg
+     : AdvMemParam -> Type
+    let: (_ ; ra) := ra in erase_prog ra = p ->
     exists ia : AtkwMem, let: (_ ; ia) := ia in erase_prog ia = p /\
     prog_behavior ra = prog_behavior ia. 
 
