@@ -162,16 +162,23 @@ Module MetaSyntax.
 
     Context `{!CfgVar SrcTrans "src_trans", !CfgVar DstTrans "dst_trans"}.
 
-    Notation src_trans := (cfg_val "src_trans"). Check ltac:(exact src_trans).
-    Notation dst_trans := (cfg_val "dst_trans"). Check ltac:(exact dst_trans).
+    Ltac src_trans := 
+      let t := constr:(cfg_val "src_trans") in
+      let t := eval hnf in t in
+      exact t.
+
+    Ltac dst_trans := 
+      let t := constr:(cfg_val "dst_trans") in
+      let t := eval hnf in t in
+      exact t.
 
     Definition val_exp_trans (exp : ltac:(unfold_clean ValExp1)) : ltac:(unfold_clean ValExp2) :=
       let: (mk_vl_exp v1 v2 comp) := exp in 
-      mk_vl_exp (src_trans v1) (src_trans v2) comp.
+      mk_vl_exp (ltac:(src_trans) v1) (ltac:(src_trans) v2) comp.
 
     Definition bool_exp_trans (exp : ltac:(unfold_clean BoolExp1)) : ltac:(unfold_clean BoolExp2) :=
       let: (mk_bl_exp v test) := exp in 
-      mk_bl_exp (src_trans v) test.
+      mk_bl_exp (ltac:(src_trans) v) test.
 
     (* If map is opaque, I think that this would fail. *)
     (* The termination checker cannot handle mutual recursion. Weird.*)
@@ -179,7 +186,7 @@ Module MetaSyntax.
 
     Fixpoint cmd_trans (a_cmd : ltac:(unfold_clean Cmd1)) : ltac:(unfold_clean Cmd2) :=
       match a_cmd with
-      | assign v exp => assign (dst_trans v) (val_exp_trans exp)
+      | assign v exp => assign (ltac:(dst_trans) v) (val_exp_trans exp)
       | cond test b1 b2 =>  cond (bool_exp_trans test) (prog_trans' b1 cmd_trans ) (prog_trans' b1 cmd_trans)
       | while test p => while (bool_exp_trans test) (prog_trans' p cmd_trans)
       end.
@@ -224,14 +231,12 @@ Module AtkSyntax.
     Instance VarSrc : CfgVar Type "src" := (Vars * AdvCorruptor)%type.
     Instance VarDst : CfgVar Type "dst" := (Vars * AdvExfiltrator)%type.
 
-    Definition ValExp := ltac:(constr_valexp).
-    Definition BoolExp := ltac:(constr_boolexp).
-    Definition Cmd := ltac:(constr_cmd).
-    Definition Prog := ltac:(constr_prog).
+    Definition ValExp := Eval hnf in ValExpMeta.
+    Definition BoolExp := Eval hnf in BoolExpMeta.
+    Definition Cmd := Eval hnf in CmdMeta.
+    Definition Prog := Eval hnf in ProgMeta.
   End atksyntax.
-  Arguments Prog _ _ _ amemprm : rename.
 
-  
   Section syntax_erase.
     Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
 
@@ -247,10 +252,11 @@ Module AtkSyntax.
     Instance erase_var_dst : CfgVar DstTrans "dst_trans" :=
       fun vd => let: (v, _) := vd in v.
 
-    Definition erase_val_exp := ltac:(constr_val_exp_trans).
-    Definition erase_bool_exp := ltac:(constr_bool_exp_trans).
-    Definition erase_cmd := ltac:(constr_cmd_trans).
-    Definition erase_prog := ltac:(constr_prog_trans).
+    (* TODO: Refactor and think *)
+    Definition erase_val_exp := Eval hnf in val_exp_trans.
+    Definition erase_bool_exp := Eval hnf in bool_exp_trans.
+    Definition erase_cmd := Eval hnf in cmd_trans.
+    Definition erase_prog := Eval hnf in prog_trans.
   End syntax_erase.
 
 End AtkSyntax.
