@@ -420,20 +420,16 @@ Section sim_security.
   Context `{!VarPrm, !ValPrm, !AdvLeakParam}.
 
   (* What went up must come down *)
-  Variable CorruptorPred : forall {memprm: AdvMemParam},  AdvCorruptor -> Prop.
-  Variable ExfiltratorPred : forall {memprm: AdvMemParam}, AdvExfiltrator -> Prop.
+  Variable CorruptorPred : forall `{!AdvMemParam},  AdvCorruptor -> Prop.
+  Variable ExfiltratorPred : forall `{!AdvMemParam}, AdvExfiltrator -> Prop.
 
-  (* 
-     This is what we want.. 
-     This is a little bit stupid..
-  *)
-  Definition AtkProgPred {memprm: AdvMemParam} :=
-    AtkSyntax.CorruptorRestricted CorruptorPred ExfiltratorPred.
+  (* The point here must be to define ProgPred : AdvMemParam -> Prog -> Prop *)
 
+  (* Define this predicate sooner.. *)
   Definition atk_sim_sec (p : CleanProg) := 
     forall (rm: AdvMemParam) (rp : AtkProg),  erase_prog rp = p ->
     exists (im: AdvMemParam) (ip : AtkProg),  erase_prog ip = p /\
-    AtkProgPred ip /\
+    AtkSyntax.CorruptorRestricted CorruptorPred ExfiltratorPred ip /\
     prog_behavior rp = prog_behavior ip.
 End sim_security.
 
