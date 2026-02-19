@@ -4,8 +4,7 @@ From QuickChick Require Import Decidability.
 (* ssreflect for gallina extensions *)
 (* Arith for iter_nat *)
 
-(* I'm just going to bundle stuff for now. The context is getting quite large otherwise.
-*)
+(* Don't have this stupid ltac nonsense. TODO*)
 Class VarPrm := {Vars : Type ; vars_deceq :: Dec_Eq Vars}. 
 Class ValPrm := {Vals : Type}.
 (* 
@@ -15,15 +14,13 @@ Class ValPrm := {Vals : Type}.
 
 
 Module MetaSyntax.
-  (* I use 'ArgPrm' when it will be in Context only once *)
-  Class SrcArgPrm := SrcVarMeta : Type.
-  Class DstArgPrm := DstVarMeta : Type.
+  Class SrcDstVarPrm := {SrcVarMeta : Type ; DstVarMeta : Type}.
+
+  (* TODO: There needs to be a good eval thing *)
   Section meta_syntax.
-    (* I wonder whether all of this should be packaged into a single thing? I could do "SyntaxParams" *)
     Context `{!VarPrm, !ValPrm}.
 
-    (* If I make this implicit it becomes a little hard to debug *)
-    Context `{!SrcArgPrm, !DstArgPrm}.
+    Context `{!SrcDstVarPrm}.
 
     (* v1 ∘ v2. Some binary operation *)
     Inductive ValExpMeta := mk_vl_exp (v1 v2: SrcVarMeta) (comp : Vals -> Vals -> Vals).
@@ -65,19 +62,20 @@ Module MetaSyntax.
     Goal forall c : CmdMeta, c = c. elim => c; reflexivity. Qed. 
   End meta_syntax.
 
+  Section prm.
+    Context `{!SrcDstVarPrm}.
+    Class SrcDstPredPrm := {SrcPred : (SrcVarMeta -> Prop); DstPred : (DstVarMeta -> Prop)}.
+  End prm.
+
   Section syntax_pred.
     Context `{!VarPrm, !ValPrm}.
-    (* Maybe I should be more uniform. I do use this a lot.. *)
-    Context `{!CfgVar Type "src", !CfgVar Type "dst"}. 
-    Context `{!CfgVar (SrcVarMeta -> Prop) "srcpred", !CfgVar (DstVarMeta -> Prop) "dstpred"}. 
 
-    (* TODO: Make this ltac *)
-    Notation SrcPred := (cfg_val "srcpred"). Check ltac:(exact SrcPred).
-    Notation DstPred := (cfg_val "dstpred"). Check ltac:(exact DstPred).
+    Context `{!SrcDstVarPrm,!SrcDstPredPrm}.
 
-    Definition ValExpPred (exp: ValExpMeta): Prop :=
+    Definition ValExpPred (exp: ValExpMeta): Prop := 
       let: mk_vl_exp vs1 vs2 _ := exp in
       SrcPred vs1 /\ SrcPred vs2.
+
 
     Definition BoolExpPred (exp: BoolExpMeta):  Prop :=
       let: mk_bl_exp vs test := exp in
@@ -86,7 +84,7 @@ Module MetaSyntax.
     Notation ProgPred' CmdPred prog :=  
       (fold_left (fun rest cmd => rest /\ CmdPred cmd) prog True).
 
-    Fixpoint CmdPred (cmd: CmdMeta) : Prop :=
+    Fixpoint CmdPred (cmd: CmdMeta) : Prop := 
       match cmd with
       | assign vd exp => DstPred vd /\ ValExpPred exp
       | cond exp b1 b2 => 
@@ -101,79 +99,63 @@ Module MetaSyntax.
     Definition ProgPred prog := ProgPred' CmdPred prog.
   End syntax_pred.
 
-  (* Here, we give helper functions to transform syntax *)
+  (* Bundling is a little bit sad. *)
+  Class SynTransPrm := {
+    Lang1: SrcDstVarPrm; 
+    Lang2: SrcDstVarPrm;
+    src_trans: @SrcVarMeta Lang1 -> @SrcVarMeta Lang2;
+    dst_trans: @DstVarMeta Lang1 -> @DstVarMeta Lang2
+  }.
+
+  Ltac syntransprm_clean cons := 
+    let t := eval red in cons in
+    let t := eval cbv fix in t in
+    let t := eval unfold 
+      Lang1, 
+      Lang2,
+      src_trans,
+      dst_trans in t in 
+    let t := eval hnf in t in
+    exact t. (* I wonder whether this can be make automatic *)
+
+
   Section syntax_transform.
     Context `{!VarPrm, !ValPrm}.
+    Context `{!SynTransPrm}.
 
-    Context `{!CfgVar Type "src1", !CfgVar Type "dst1"}.
-    Context `{!CfgVar Type "src2", !CfgVar Type "dst2"}.
+    (* Don't double colon!! *)
+    Fail Check ltac:(exact(_ : SrcDstVarPrm)). 
 
-    (* I don't know why I had to do @. TODO *)
-    Let SrcVar1 : CfgVar Type "src" := (@cfg_val Type "src1" _). 
-    Let DstVar1 : CfgVar Type "dst" := (@cfg_val Type "dst1" _). 
-    Let SrcVar2 : CfgVar Type "src" := (@cfg_val Type "src2" _). 
-    Let DstVar2 : CfgVar Type "dst" := (@cfg_val Type "dst2" _). 
+    Existing Instance Lang1. Check ltac:(exact(_ : SrcDstVarPrm)). 
+      Let ValExp1 := ValExpMeta.
+      Let BoolExp1 := BoolExpMeta.
+      Let Cmd1 := CmdMeta.
+      Let Prog1 := ProgMeta.
+    Remove Hints Lang1: typeclass_instances. Fail Check ltac:(exact(_ : SrcDstVarPrm)). 
 
+
+    Existing Instance Lang2. Check ltac:(exact(_ : SrcDstVarPrm)). 
+      Let ValExp2 := ValExpMeta.
+      Let BoolExp2 := BoolExpMeta.
+      Let Cmd2 := CmdMeta.
+      Let Prog2 := ProgMeta.
+    Remove Hints Lang2: typeclass_instances. Fail Check ltac:(exact(_ : SrcDstVarPrm)). 
+
+    (* Maybe make this cleaner? *)
     Ltac unfold_clean cons :=
-      let t := constr:(cons) in 
-      let t := eval cbv delta [SrcVar1 DstVar1 SrcVar2 DstVar2 cfg_val] in t in
-      let t := eval hnf in t in (* TODO: Is this needed? *)
-      exact t.
-
-    (* We need to force typeclass resolution *)
-    Existing Instance SrcVar1. Existing Instance DstVar1.
-    Let ValExp1 := ltac:(unfold_clean ValExpMeta).
-    Let BoolExp1 := ltac:(unfold_clean BoolExpMeta).
-    Let Cmd1 := ltac:(unfold_clean CmdMeta).
-    Let Prog1 := ltac:(unfold_clean ProgMeta).
-    Remove Hints DstVar1 SrcVar1 : typeclass_instances.   (* TODO: Add HL *)
-
-
-    Existing Instance SrcVar2. Existing Instance DstVar2.
-    Let ValExp2 := ltac:(unfold_clean ValExpMeta).
-    Let BoolExp2 := ltac:(unfold_clean BoolExpMeta).
-    Let Cmd2 := ltac:(unfold_clean CmdMeta).
-    Let Prog2 := ltac:(unfold_clean ProgMeta).
-    Remove Hints DstVar2 SrcVar2 : typeclass_instances.   (* TODO: Add HL *)
-
-    Ltac unfold_clean cons ::=
       let t := eval cbv delta [
-        SrcVar1 DstVar1 ValExp1 BoolExp1 Cmd1 Prog1
-        SrcVar2 DstVar2 ValExp2 BoolExp2 Cmd2 Prog2
-        cfg_val
+        ValExp1 BoolExp1 Cmd1 Prog1
+        ValExp2 BoolExp2 Cmd2 Prog2
         ] in cons in
-      exact t.
-
-    (* Ideally, we would define all of these above.
-      I don't like that these take in parameters?
-    *)
-    Definition SrcTrans := (
-      ltac:(unfold_clean SrcVar1) -> 
-      ltac:(unfold_clean SrcVar2)).
-
-    Definition DstTrans := (
-      ltac:(unfold_clean DstVar1) -> 
-      ltac:(unfold_clean DstVar2)).
-
-    Context `{!CfgVar SrcTrans "src_trans", !CfgVar DstTrans "dst_trans"}.
-
-    Ltac src_trans := 
-      let t := constr:(cfg_val "src_trans") in
-      let t := eval hnf in t in
-      exact t.
-
-    Ltac dst_trans := 
-      let t := constr:(cfg_val "dst_trans") in
-      let t := eval hnf in t in
       exact t.
 
     Definition val_exp_trans (exp : ltac:(unfold_clean ValExp1)) : ltac:(unfold_clean ValExp2) :=
       let: (mk_vl_exp v1 v2 comp) := exp in 
-      mk_vl_exp (ltac:(src_trans) v1) (ltac:(src_trans) v2) comp.
+      mk_vl_exp (src_trans v1) (src_trans v2) comp.
 
     Definition bool_exp_trans (exp : ltac:(unfold_clean BoolExp1)) : ltac:(unfold_clean BoolExp2) :=
       let: (mk_bl_exp v test) := exp in 
-      mk_bl_exp (ltac:(src_trans) v) test.
+      mk_bl_exp (src_trans v) test.
 
     (* If map is opaque, I think that this would fail. *)
     (* The termination checker cannot handle mutual recursion. Weird.*)
@@ -181,34 +163,37 @@ Module MetaSyntax.
 
     Fixpoint cmd_trans (a_cmd : ltac:(unfold_clean Cmd1)) : ltac:(unfold_clean Cmd2) :=
       match a_cmd with
-      | assign v exp => assign (ltac:(dst_trans) v) (val_exp_trans exp)
+      | assign v exp => assign (dst_trans v) (val_exp_trans exp)
       | cond test b1 b2 =>  cond (bool_exp_trans test) (prog_trans' b1 cmd_trans ) (prog_trans' b1 cmd_trans)
       | while test p => while (bool_exp_trans test) (prog_trans' p cmd_trans)
       end.
     Definition prog_trans p := prog_trans' p cmd_trans.
   End syntax_transform.
 
-End MetaSyntax.
+End MetaSyntax. 
 
 Module CleanSyntax.
   Import MetaSyntax.
   Section clean_syntax.
     Context `{!VarPrm, !ValPrm}.
-    Instance VarSrc : CfgVar Type "src" := Vars.
-    Instance VarDst : CfgVar Type "dst" := Vars.
 
+    Definition VarSrc := Vars.
+    Definition VarDst := Vars.
 
-    Set Printing Implicit.
-    Definition ValExp := Eval hnf in ValExpMeta.
-    Definition BoolExp := Eval hnf in BoolExpMeta.
-    Definition Cmd := Eval hnf in CmdMeta.
-    Definition Prog := Eval hnf in ProgMeta.
+    Hint Extern 0 SrcDstVarPrm => 
+      (exact {|SrcVarMeta := VarSrc; DstVarMeta := VarDst|}) : typeclass_instances.
+
+    Definition ValExp := ValExpMeta.
+    Definition BoolExp := BoolExpMeta.
+    Definition Cmd := CmdMeta.
+    Definition Prog := ProgMeta.
   End clean_syntax.
 End CleanSyntax.
 
 Module AtkSyntax.
-  (* The type of messages that the adversary leaks *)
-  Class AdvLeakParam := {LeakVals : Type}. 
+  (* The type of messages that the adversary leaks.
+  I made this a operational typeclass for some reason... *)
+  Class AdvLeakParam := LeakVals : Type. 
 
   (* When you instantiate an adversary, you also give it memory *)
   Class AdvMemParam := {AdvMem : Type; adv_init : AdvMem}.
@@ -223,54 +208,54 @@ Module AtkSyntax.
     (* When you read from  an adversary writable variable, the adversary can maul *)
     Definition AdvCorruptor := Vals -> AdvMem -> Vals. 
 
-    Instance VarSrc : CfgVar Type "src" := (Vars * AdvCorruptor)%type.
-    Instance VarDst : CfgVar Type "dst" := (Vars * AdvExfiltrator)%type.
+    Definition VarSrc := (Vars * AdvCorruptor)%type.
+    Definition VarDst := (Vars * AdvExfiltrator)%type.
 
-    Definition ValExp := Eval hnf in ValExpMeta.
-    Definition BoolExp := Eval hnf in BoolExpMeta.
-    Definition Cmd := Eval hnf in CmdMeta.
-    Definition Prog := Eval hnf in ProgMeta.
+    Hint Extern 0 SrcDstVarPrm => 
+      (exact {|SrcVarMeta := VarSrc; DstVarMeta := VarDst|}) : typeclass_instances.
+
+    Definition ValExp := ValExpMeta.
+    Definition BoolExp := BoolExpMeta.
+    Definition Cmd := CmdMeta.
+    Definition Prog := ProgMeta.
   End atksyntax.
 
   Section syntax_erase.
     Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam}.
 
-    Hint Extern 0 (CfgVar Type "src1") => exact AtkSyntax.VarSrc : typeclass_instances.
-    Hint Extern 0 (CfgVar Type "dst1") => exact AtkSyntax.VarDst : typeclass_instances.
+    Notation AtkSrc := AtkSyntax.VarSrc.
+    Notation AtkDst := AtkSyntax.VarDst.
 
-    Hint Extern 0 (CfgVar Type "src2") => exact CleanSyntax.VarSrc : typeclass_instances.
-    Hint Extern 0 (CfgVar Type "dst2") => exact CleanSyntax.VarDst : typeclass_instances.
+    Notation CleanSrc := CleanSyntax.VarSrc.
+    Notation CleanDst := CleanSyntax.VarDst.
 
-    Instance erase_var_src : CfgVar SrcTrans "src_trans" :=
-      fun vs => let: (v, _) := vs in v.
+    Definition erase_var_src (vs : AtkSrc) : CleanSrc := 
+      let: (v, _) := vs in v.
+    Definition erase_var_dst (vd : AtkDst) : CleanDst := 
+      let: (v, _) := vd in v.
 
-    Instance erase_var_dst : CfgVar DstTrans "dst_trans" :=
-      fun vd => let: (v, _) := vd in v.
+    Notation L1 := 
+      {|SrcVarMeta := AtkSrc; DstVarMeta := AtkDst |}.
+    Check ltac:(exact L1).
 
-    (* TODO: Refactor and think *)
-    Definition erase_val_exp := Eval hnf in val_exp_trans.
-    Definition erase_bool_exp := Eval hnf in bool_exp_trans.
-    Definition erase_cmd := Eval hnf in cmd_trans.
-    Definition erase_prog := Eval hnf in prog_trans.
+    Notation L2 := 
+      {|SrcVarMeta := CleanSrc; DstVarMeta := CleanDst |}.
+    Check ltac:(exact L2).
+
+    Hint Extern 0 SynTransPrm => (exact {|
+      Lang1 := L1;
+      Lang2 := L2;
+      src_trans := erase_var_src;
+      dst_trans := erase_var_dst;
+    |}) : typeclass_instances.
+    Check ltac:(exact(_ : SynTransPrm)).
+
+    (* Is this even useful? *)
+    Definition erase_val_exp := ltac:(syntransprm_clean val_exp_trans).
+    Definition erase_bool_exp := ltac:(syntransprm_clean bool_exp_trans).
+    Definition erase_cmd := ltac:(syntransprm_clean cmd_trans).
+    Definition erase_prog := ltac:(syntransprm_clean prog_trans).
   End syntax_erase.
-
-  Section atk_pred.
-    Context `{!VarPrm, !ValPrm, !AdvLeakParam, !AdvMemParam}.
-
-    Existing Instance VarSrc. Check ltac:(exact VarSrc).
-    Existing Instance VarDst. Check ltac:(exact VarSrc). 
-
-    Variable CorruptorPred : AdvCorruptor -> Prop.
-    Variable ExfiltratorPred : AdvExfiltrator -> Prop.
-
-    Instance VarSrcPred : CfgVar (SrcVarMeta -> Prop) "srcpred" :=
-      fun vs => let (_, cor) := vs in CorruptorPred cor.
-
-    Instance VarDstPred : CfgVar (DstVarMeta -> Prop) "dstpred" :=
-      fun vd => let (_, exf) := vd in ExfiltratorPred exf.
-
-    Definition CorruptorRestricted := Eval hnf in ProgPred.
-  End atk_pred.
 End AtkSyntax.
 
 
@@ -407,73 +392,89 @@ Section sim_security.
   (* You need a type and an interpretation as an AdvCorruptor *)
   (* You need a type and an interpretation as an AdvInfiltrator *)
   (* You could also have a predicate on AdvCorruptors.. *)
+  Import MetaSyntax.
   Import AtkSyntax (AdvMemParam, AdvLeakParam, AdvCorruptor, AdvExfiltrator, erase_prog).
   Notation CleanProg := CleanSyntax.Prog.
   Notation AtkProg := AtkSyntax.Prog.
+  Notation AtkVarSrc := AtkSyntax.VarSrc.
+  Notation AtkVarDst := AtkSyntax.VarDst.
+
 
   Context `{!VarPrm, !ValPrm, !AdvLeakParam}.
 
+  Hint Extern 0 SrcDstVarPrm => 
+    (exact {|SrcVarMeta := AtkVarSrc; DstVarMeta := AtkVarDst|}) : typeclass_instances.
+  Check ltac:(exact SrcDstVarPrm).
+
   (* What went up must come down *)
-  Variable CorruptorPred : forall `{!AdvMemParam},  AdvCorruptor -> Prop.
-  Variable ExfiltratorPred : forall `{!AdvMemParam}, AdvExfiltrator -> Prop.
+  Variable IdealCorruptor : forall `{!AdvMemParam},  AdvCorruptor -> Prop.
+  Variable IdealExfiltrator : forall `{!AdvMemParam}, AdvExfiltrator -> Prop.
 
-  (* The point here must be to define ProgPred : AdvMemParam -> Prog -> Prop *)
+  Section lift.
+    Context `{!AdvMemParam}.
+    Definition IdealSrcVar (vs : AtkVarSrc) : Prop :=
+      let: (_, cor) := vs in IdealCorruptor cor.
 
-  (* Define this predicate sooner.. *)
-  Definition atk_sim_sec (p : CleanProg) := 
-    forall (rm: AdvMemParam) (rp : AtkProg),  erase_prog rp = p ->
-    exists (im: AdvMemParam) (ip : AtkProg),  erase_prog ip = p /\
-    AtkSyntax.CorruptorRestricted CorruptorPred ExfiltratorPred ip /\
+    Definition IdealDstVar (vd : AtkVarDst) : Prop :=
+      let: (_, exf) := vd in IdealExfiltrator exf.
+
+    Hint Extern 0 SrcDstPredPrm => exact ({|
+        SrcPred := IdealSrcVar;
+        DstPred := IdealDstVar;
+    |}) : typeclass_instances.
+
+    (* This namespacing thing is stupid. TODO *)
+    Definition IdealProg := MetaSyntax.ProgPred.
+  End lift.
+
+
+  Let ExpMemAtkProg: AdvMemParam -> _ := @AtkProg _ _ _.
+  Definition atk_sim_sec (p : CleanProg) := Eval unfold ExpMemAtkProg in
+    forall rm (rp : ExpMemAtkProg rm),  erase_prog rp = p ->
+    exists im (ip : ExpMemAtkProg im),  erase_prog ip = p /\
+    IdealProg ip /\
     prog_behavior rp = prog_behavior ip.
 End sim_security.
 
-(* The idea is that you give two predicates, *)
-(* Define NMIF? *)
+Section nmif.
+  Import MetaSyntax.
+  Import AtkSyntax (AdvMemParam, AdvLeakParam, AdvCorruptor, AdvExfiltrator, erase_prog).
+  Context `{!VarPrm, !ValPrm,!AdvLeakParam}. (* TODO: Param vs Prm *)
 
-Module NMIF.
-  Section nmif_syntax.
-    Import MetaSyntax AtkSyntax. (* This should not be imported TODO *)
-    Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam, !AdvLvlParam}.
-    Fail.
-    Definition NonmaulingCorruptor := AtkSyntax.AdvMem -> Vals. 
+  Notation AtkVarSrc := AtkSyntax.VarSrc.
+  Notation AtkVarDst := AtkSyntax.VarDst.
 
-    Instance VarSrc : CfgVar Type "src" := (Vars * NonmaulingCorruptor)%type.
-    Instance VarDst : CfgVar Type "dst" := AtkSyntax.VarDst.
+  Hint Extern 0 SrcDstVarPrm => 
+    (exact {|SrcVarMeta := AtkVarSrc; DstVarMeta := AtkVarDst|}) : typeclass_instances.
 
-    Definition ValExp := Eval hnf in ValExpMeta.
-    Definition BoolExp := Eval hnf in BoolExpMeta.
-    Eval red in BoolExp.
-      ltac:(constr_boolexp).
-    Definition Cmd := ltac:(constr_cmd).
-    Definition Prog := ltac:(constr_prog).
-  End nmif_syntax.
+  Definition NmifCorruptor `{!AdvMemParam} (corr : AdvCorruptor) : Prop := 
+    forall mem v1 v2, corr v1 mem = corr v2 mem.
 
-  Section nmif_to_atk.
-    Import MetaSyntax.
-    Context `{!VarPrm, !ValPrm, !AtkSyntax.AdvMemParam, !AtkSyntax.AdvLeakParam}.
+  (* TODO: What happens when you make the variable thing have explicit param? 
+  I think that there should be no change? *)
+  Definition NmifSecurity := atk_sim_sec (fun _ => NmifCorruptor) (fun _ _ => True).
+End nmif.
 
-    Hint Extern 0 (CfgVar Type "src1") => exact NMIF.VarSrc : typeclass_instances.
-    Hint Extern 0 (CfgVar Type "dst1") => exact NMIF.VarDst : typeclass_instances.
+Section ni.
+  Import MetaSyntax.
+  Import AtkSyntax (AdvMemParam, AdvLeakParam, AdvCorruptor, AdvExfiltrator, erase_prog).
+  Context `{!VarPrm, !ValPrm,!AdvLeakParam}. (* TODO: Param vs Prm *)
 
-    Hint Extern 0 (CfgVar Type "src2") => exact AtkSyntax.VarSrc : typeclass_instances.
-    Hint Extern 0 (CfgVar Type "dst2") => exact AtkSyntax.VarDst : typeclass_instances.
+  Notation AtkVarSrc := AtkSyntax.VarSrc.
+  Notation AtkVarDst := AtkSyntax.VarDst.
 
-    (* I hope this is correct *)
-    Instance interpret_var_src : CfgVar SrcTrans "src_trans" :=
-      fun vs => let: (v, c) := vs in (v, fun _ i => c i). 
+  Hint Extern 0 SrcDstVarPrm => 
+    (exact {|SrcVarMeta := AtkVarSrc; DstVarMeta := AtkVarDst|}) : typeclass_instances.
 
-    Instance interpret_var_dst : CfgVar DstTrans "dst_trans" :=
-      fun vd => vd.
+  (* Noop *)
+  Definition NICorruptor `{!AdvMemParam} (corr : AdvCorruptor) : Prop := 
+    forall mem v, corr v mem = v.
 
-    Definition interpret_val_exp := ltac:(constr_val_exp_trans).
-    Definition interpret_bool_exp := ltac:(constr_bool_exp_trans).
-    Definition interpret_cmd := ltac:(constr_cmd_trans).
-    Definition interpret_prog := ltac:(constr_prog_trans). (* I wonder whether I can make this a coercion easily *)
-  End nmif_to_atk.
-End NMIF.
+  Definition NIExfiltrator `{!AdvMemParam} (exf : AdvExfiltrator) : Prop :=
+    forall v1 v2 amem,
+      exf v1 amem = exf v2 amem.
 
-
-
-(* 
-  The goal here is to define a predicate on Clean programs. 
-*)
+  (* TODO: What happens when you make the variable thing have explicit param? 
+  I think that there should be no change? *)
+  Definition NISecurity := atk_sim_sec (fun _ => NICorruptor) (fun _ => NIExfiltrator).
+End ni.
