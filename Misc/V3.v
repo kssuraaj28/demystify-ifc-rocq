@@ -77,6 +77,7 @@ Module MetaSyntax.
     Context `{!CfgVar Type "src", !CfgVar Type "dst"}. 
     Context `{!CfgVar (SrcVarMeta -> Prop) "srcpred", !CfgVar (DstVarMeta -> Prop) "dstpred"}. 
 
+    (* TODO: Make this ltac *)
     Notation SrcPred := (cfg_val "srcpred"). Check ltac:(exact SrcPred).
     Notation DstPred := (cfg_val "dstpred"). Check ltac:(exact DstPred).
 
@@ -259,6 +260,23 @@ Module AtkSyntax.
     Definition erase_prog := Eval hnf in prog_trans.
   End syntax_erase.
 
+  Section atk_pred.
+    Context `{!VarPrm, !ValPrm, !AdvLeakParam, !AdvMemParam}.
+
+    Existing Instance VarSrc. Check ltac:(exact VarSrc).
+    Existing Instance VarDst. Check ltac:(exact VarSrc). 
+
+    Variable CorruptorPred : AdvCorruptor -> Prop.
+    Variable ExfiltratorPred : AdvExfiltrator -> Prop.
+
+    Instance VarSrcPred : CfgVar (SrcVarMeta -> Prop) "srcpred" :=
+      fun vs => let (_, cor) := vs in CorruptorPred cor.
+
+    Instance VarDstPred : CfgVar (DstVarMeta -> Prop) "dstpred" :=
+      fun vd => let (_, exf) := vd in ExfiltratorPred exf.
+
+    Definition CorruptorRestricted := Eval hnf in ProgPred.
+  End atk_pred.
 End AtkSyntax.
 
 
@@ -389,19 +407,53 @@ Section semantics.
 
  *)
 End semantics.
+
+
+Section sim_security.
+  (* You need a type and an interpretation as an AdvCorruptor *)
+  (* You need a type and an interpretation as an AdvInfiltrator *)
+  (* You could also have a predicate on AdvCorruptors.. *)
+  Import AtkSyntax (AdvMemParam, AdvLeakParam, AdvCorruptor, AdvExfiltrator, erase_prog).
+  Notation CleanProg := CleanSyntax.Prog.
+  Notation AtkProg := AtkSyntax.Prog.
+
+  Context `{!VarPrm, !ValPrm, !AdvLeakParam}.
+
+  (* What went up must come down *)
+  Variable CorruptorPred : forall {memprm: AdvMemParam},  AdvCorruptor -> Prop.
+  Variable ExfiltratorPred : forall {memprm: AdvMemParam}, AdvExfiltrator -> Prop.
+
+  (* 
+     This is what we want.. 
+     This is a little bit stupid..
+  *)
+  Definition AtkProgPred {memprm: AdvMemParam} :=
+    AtkSyntax.CorruptorRestricted CorruptorPred ExfiltratorPred.
+
+  Definition atk_sim_sec (p : CleanProg) := 
+    forall (rm: AdvMemParam) (rp : AtkProg),  erase_prog rp = p ->
+    exists (im: AdvMemParam) (ip : AtkProg),  erase_prog ip = p /\
+    AtkProgPred ip /\
+    prog_behavior rp = prog_behavior ip.
+End sim_security.
+
+(* The idea is that you give two predicates, *)
 (* Define NMIF? *)
 
 Module NMIF.
   Section nmif_syntax.
     Import MetaSyntax AtkSyntax. (* This should not be imported TODO *)
     Context `{!VarPrm, !ValPrm, !AdvMemParam, !AdvLeakParam, !AdvLvlParam}.
+    Fail.
     Definition NonmaulingCorruptor := AtkSyntax.AdvMem -> Vals. 
 
     Instance VarSrc : CfgVar Type "src" := (Vars * NonmaulingCorruptor)%type.
     Instance VarDst : CfgVar Type "dst" := AtkSyntax.VarDst.
 
-    Definition ValExp := ltac:(constr_valexp).
-    Definition BoolExp := ltac:(constr_boolexp).
+    Definition ValExp := Eval hnf in ValExpMeta.
+    Definition BoolExp := Eval hnf in BoolExpMeta.
+    Eval red in BoolExp.
+      ltac:(constr_boolexp).
     Definition Cmd := ltac:(constr_cmd).
     Definition Prog := ltac:(constr_prog).
   End nmif_syntax.
@@ -431,69 +483,7 @@ Module NMIF.
 End NMIF.
 
 
-Section sim_security.
-  Import MetaSyntax AtkSyntax.
-  Context `{!VarPrm, !ValPrm, !AdvLeakParam, !AdvMemParam}.
 
-  Variable IdealCorruptorPred : AdvCorruptor -> Prop.
-  Variable IdealExfiltratorPred : AdvExfiltrator -> Prop.
-
-  Definition VarSrcPred (vs : VarSrc): Prop := 
-    let (_, cor) := vs in IdealCorruptorPred cor.
-
-  Definition VarDstPred (vd : VarDst): Prop := 
-    let (_, exf) := vd in IdealExfiltratorPred exf.
-
-  Definition ValExpPred (exp: ValExp): Prop :=
-    let: mk_vl_exp vs1 vs2 _ := exp in
-    VarSrcPred vs1 /\ VarSrcPred vs2.
-
-  Definition BoolExpPred (exp: BoolExp):  Prop :=
-    let: mk_bl_exp vs test := exp in
-    VarSrcPred vs.
-
-  Definition CmdPred: Cmd -> Prop.
-  Definition ProgPred: Prog -> Prop.
-
-
-  Print VarSrc.
-
-
-  Definition IdealCorruptor := {x| IdealCorruptorPred x}.
-  Definition IdealExfiltrator := {x| IdealExfiltratorPred x}.
-
-End sim_security.
-
-End sim_security.
-  (* You need a type and an interpretation as an AdvCorruptor *)
-  (* You need a type and an interpretation as an AdvInfiltrator *)
-  (* You could also have a predicate on AdvCorruptors.. *)
-  Import AtkSyntax (AdvMemParam, AdvLeakParam, erase_prog).
-  Notation CleanProg := CleanSyntax.Prog.
-  Notation AtkProg := AtkSyntax.Prog.
-
-  Context `{!VarPrm, !ValPrm, !AdvLeakParam}.
-
-  Notation ExpMemProgType := (AdvMemParam -> Type).
-  Variable  (IdealSyntax : ExpMemProgType).
-
-  Notation ExpMemAtkProg mem := (AtkProg (amemprm := mem)).
-  Check (fun i => ExpMemAtkProg i) : ExpMemProgType.
-
-  Definition atk_sim_sec (p : CleanProg) := 
-    forall rm (rp : ExpMemAtkProg rm),  erase_prog rp = p ->
-    exists im (ip : AtkProg (amemprm:=im)),  erase_prog ip = p /\
-    True.
-
-
-  ExpMemAtkProg
-     : AdvMemParam -> Type
-    let: (_ ; ra) := ra in erase_prog ra = p ->
-    exists ia : AtkwMem, let: (_ ; ia) := ia in erase_prog ia = p /\
-    prog_behavior ra = prog_behavior ia. 
-
-
-End sim_security.
 (* 
   The goal here is to define a predicate on Clean programs. 
 *)
