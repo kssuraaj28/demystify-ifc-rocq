@@ -438,7 +438,7 @@ End sim_security.
 
 Section nmif.
   Import MetaSyntax.
-  Import AtkSyntax (AdvMemParam, AdvLeakParam, AdvCorruptor, AdvExfiltrator, erase_prog).
+  Import AtkSyntax (AdvMemParam, AdvLeakParam, AdvCorruptor, AdvExfiltrator).
   Context `{!VarPrm, !ValPrm,!AdvLeakParam}. (* TODO: Param vs Prm *)
 
   Notation AtkVarSrc := AtkSyntax.VarSrc.
@@ -457,7 +457,7 @@ End nmif.
 
 Section ni.
   Import MetaSyntax.
-  Import AtkSyntax (AdvMemParam, AdvLeakParam, AdvCorruptor, AdvExfiltrator, erase_prog).
+  Import AtkSyntax (AdvMemParam, AdvLeakParam, AdvCorruptor, AdvExfiltrator).
   Context `{!VarPrm, !ValPrm,!AdvLeakParam}. (* TODO: Param vs Prm *)
 
   Notation AtkVarSrc := AtkSyntax.VarSrc.
@@ -478,3 +478,23 @@ Section ni.
   I think that there should be no change? *)
   Definition NISecurity := atk_sim_sec (fun _ => NICorruptor) (fun _ => NIExfiltrator).
 End ni.
+
+Section rd.
+  Import MetaSyntax.
+  Import AtkSyntax (AdvMemParam, AdvLeakParam, AdvCorruptor, AdvExfiltrator).
+  Context `{!VarPrm, !ValPrm,!AdvLeakParam}. (* TODO: Param vs Prm *)
+
+  Notation AtkVarSrc := AtkSyntax.VarSrc.
+  Notation AtkVarDst := AtkSyntax.VarDst.
+
+  Hint Extern 0 SrcDstVarPrm => 
+    (exact {|SrcVarMeta := AtkVarSrc; DstVarMeta := AtkVarDst|}) : typeclass_instances.
+
+  (* Passive *)
+  Definition RDCorruptor `{!AdvMemParam} (corr : AdvCorruptor) : Prop := 
+    forall mem v, corr v mem = v.
+
+  (* TODO: What happens when you make the variable thing have explicit param? 
+  I think that there should be no change? *)
+  Definition RDSecurity := atk_sim_sec (fun _ => RDCorruptor) (fun _ _ => True).
+End rd.
