@@ -12,24 +12,18 @@ Class ValPrm := {Vals : Type}.
    This should be a helper defined somewhere else. 
    There should be a string accessor
 *)
-Class CfgVar (T : Type) (id : string) := cfg_val : T.
-Arguments cfg_val : clear implicits. Arguments cfg_val {_} id {_}.
-(* Print Implicit cfg_val. *)
 
 
 Module MetaSyntax.
+  (* I use 'ArgPrm' when it will be in Context only once *)
+  Class SrcArgPrm := SrcVarMeta : Type.
+  Class DstArgPrm := DstVarMeta : Type.
   Section meta_syntax.
     (* I wonder whether all of this should be packaged into a single thing? I could do "SyntaxParams" *)
     Context `{!VarPrm, !ValPrm}.
 
     (* If I make this implicit it becomes a little hard to debug *)
-    Context `{!CfgVar Type "src", !CfgVar Type "dst"}.
-
-  (* TODO: I have no idea how this works/ why. I think this is because of some eauto thing.
-     To be more specific, I don't know why cfg_val does not infer the right thing. *)
-    (* TODO: SrcVar needn't be notation anymore. Check *)
-    Definition SrcVarMeta := (cfg_val "src").
-    Definition DstVarMeta := (cfg_val "dst").
+    Context `{!SrcArgPrm, !DstArgPrm}.
 
     (* v1 ∘ v2. Some binary operation *)
     Inductive ValExpMeta := mk_vl_exp (v1 v2: SrcVarMeta) (comp : Vals -> Vals -> Vals).
