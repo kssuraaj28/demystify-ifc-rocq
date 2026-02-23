@@ -107,20 +107,6 @@ Module MetaSyntax.
     dst_trans: @DstVarMeta Lang1 -> @DstVarMeta Lang2
   }.
 
-  (*
-  Ltac syntransprm_clean cons := 
-    let t := eval red in cons in
-    let t := eval cbv fix in t in
-    let t := eval unfold 
-      Lang1, 
-      Lang2,
-      src_trans,
-      dst_trans in t in 
-    let t := eval hnf in t in
-    exact t. (* I wonder whether this can be make automatic *)
-    *)
-
-
   Section syntax_transform.
     Context `{!VarPrm, !ValPrm}.
     Context `{!SynTransPrm}.
@@ -231,16 +217,9 @@ Module AtkSyntax.
     (* When you read from  an adversary writable variable, the adversary can maul *)
     Definition AdvCorruptor := Vals -> AdvMem -> Vals. 
 
-    Print sumbool.
-    Locate "+".
-    Search (Type -> Type -> Type).
-
-    Locate "~~".
-    Check negb.
-
     (* 
-      Is this good? There is some repetition here...
-      Is this a standard pattern?
+       Maybe think about other ways? I use computation here.. 
+       Maybe the equations plugin helps..
     *)
     Notation SrcAttachment v :=
       (if (is_untrusted v) is true then AdvCorruptor else unit).
@@ -303,8 +282,6 @@ Module AtkSyntax.
   End syntax_erase.
 End AtkSyntax.
 
-Fail Check 1.
-
 Section store.
   Context `{!VarPrm, !ValPrm}.
 
@@ -338,11 +315,31 @@ Section semantics.
     We can strengthen or weaken the adversary later here.
   *)
 
-  Definition store_read_w_adv (st : Store) (vs : VarSrc) (amem : AdvMem) : Vals := 
-    let: (v, adv) := vs in 
-    let: orig_val := get_from_store st v in
-    if (is_untrusted v) is false then orig_val else
-    adv orig_val amem.
+  Import SigTNotations.
+  Axiom to_fill : forall T, T.
+
+  (* 
+    For dependent pattern matching, there seem to be the following appraoches:
+    - Painfully write using gallina 
+    - Use proof mode.
+      - Normal? 
+      - ssreflect? `Show Proof` is disgusting
+    - Use equations plugin
+
+    I'm using Normal proof mode. I should have a rename goal tactic
+  *)
+  Ltac name_gl name := refine ?[name].
+  Section def.
+    Let def (st : Store) (vs : VarSrc) (amem : AdvMem) : Vals. Proof.
+      destruct vs as [v adv].
+      pose orig_val := get_from_store st v.
+      destruct (is_untrusted v); [name_gl ADV| name_gl CLEAN].
+      [ADV]: { exact (adv orig_val amem). }
+      [CLEAN]: {exact orig_val. }
+    Defined.
+
+  Definition store_read_w_adv := Eval hnf in def.
+  End def.
 
   Definition val_exp_eval (e : ValExp) (store : Store) (amem : AdvMem) : Vals :=
     let: mk_vl_exp vs1 vs2 comp := e in
@@ -351,26 +348,30 @@ Section semantics.
     let: val2 := get_val vs2 in
     comp val1 val2.
 
-
   Definition bool_exp_eval (be : BoolExp) (store : Store) (amem : AdvMem) : bool :=
     let: mk_bl_exp vs test := be in
     let: val := store_read_w_adv store vs amem in 
     test val.
 
+  (* Can this be made better? *)
+  Section def.
+    Let def (s : Store) (vd : VarDst) (vl : Vals) (amem : AdvMem) : 
+          Store * AdvMem * Event. Proof.
+      destruct vd  as [v adv].
+      pose (s' := update_to_store s v vl).
+      pose (optupd := if (is_untrusted v) is true then None else Some (v,vl)).
+      destruct (is_public v); [name_gl ADV| name_gl CLEAN].
+      [ADV]: {
+        destruct (adv vl amem) as [lk amem'].
+        exact (s', amem', assignment optupd (Some lk)).
+        }
 
-  Definition store_update_w_adv
-          (s : Store) (vd : VarDst) (vl : Vals) (amem : AdvMem) : 
-          Store * AdvMem * Event :=
-    let: (v, adv) := vd in 
-    let: s' := update_to_store s v vl in
-    let: (lk, amem') := (adv vl amem) in
-    (* We leak only when the variable is public *)
-    let: optlk := if (is_public v) is false then None else Some lk in 
-    (* Only trusted updates are part of our trace *)
-    let: optupd := if (is_untrusted v) is true then None else Some (v,vl) in
-    (s',amem', assignment optupd optlk).
-
-
+      [CLEAN]: {
+        exact (s', amem, assignment optupd None).
+        }
+    Defined.
+  Definition store_update_w_adv := Eval hnf in def.
+  End def.
 
   Definition step (cfg : Cfg) : Cfg * Event:=
     let: mk_cfg store amem prog := cfg in
