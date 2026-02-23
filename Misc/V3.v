@@ -1,10 +1,10 @@
-From Stdlib Require Import (*Arith*) List String ssreflect.
+From Stdlib Require Import (*Arith*) List String ssreflect ssrbool.
 From QuickChick Require Import Decidability. 
 (* QuickCheck decidable equality classes are so good *)
 (* ssreflect for gallina extensions *)
 (* Arith for iter_nat *)
+(* ssrbool for boolean predicates *)
 
-(* Don't have this stupid ltac nonsense. TODO*)
 Class VarPrm := {Vars : Type ; vars_deceq :: Dec_Eq Vars}. 
 Class ValPrm := {Vals : Type}.
 (* 
@@ -217,9 +217,13 @@ Module AtkSyntax.
   (* When you instantiate an adversary, you also give it memory *)
   Class AdvMemPrm := {AdvMem : Type; adv_init : AdvMem}.
 
+  (* We also need to specify what variables the adversary has access to*)
+  Class AdvLvlPrm `{!VarPrm} := {is_untrusted : pred Vars ; is_public : pred Vars}.
+
+
   Import MetaSyntax.
   Section atksyntax.
-    Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvMemPrm}.
+    Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvMemPrm, !AdvLvlPrm}.
 
     (* When you write to an adversary readable variable, the adversary can exfiltrate the value *)
     Definition AdvExfiltrator := Vals -> AdvMem -> (LeakVals * AdvMem).
@@ -227,8 +231,30 @@ Module AtkSyntax.
     (* When you read from  an adversary writable variable, the adversary can maul *)
     Definition AdvCorruptor := Vals -> AdvMem -> Vals. 
 
-    Definition VarSrc := (Vars * AdvCorruptor)%type.
-    Definition VarDst := (Vars * AdvExfiltrator)%type.
+    Print sumbool.
+    Locate "+".
+    Search (Type -> Type -> Type).
+
+    Locate "~~".
+    Check negb.
+
+    (* 
+      Is this good? There is some repetition here...
+      Is this a standard pattern?
+    *)
+    Notation SrcAttachment v :=
+      (if (is_untrusted v) is true then AdvCorruptor else unit).
+
+    Notation DstAttachment v :=
+      (if (is_public v) is true then AdvExfiltrator else unit).
+
+    (* 
+      In order to construct these vars, you may have to do dependent pattern matching. 
+      I don't know how much it will bite us.
+      The other way to do it is +
+    *)
+    Definition VarSrc := {v : Vars & SrcAttachment v}.  
+    Definition VarDst := {v : Vars & DstAttachment v}.  
 
     Hint Extern 0 SrcDstVarPrm => 
       (exact {|SrcVarMeta := VarSrc; DstVarMeta := VarDst|}) : typeclass_instances.
@@ -240,7 +266,7 @@ Module AtkSyntax.
   End atksyntax.
 
   Section syntax_erase.
-    Context `{!VarPrm, !ValPrm, !AdvMemPrm, !AdvLeakPrm}.
+    Context `{!VarPrm, !ValPrm, !AdvMemPrm, !AdvLeakPrm, !AdvLvlPrm}.
 
     Notation AtkSrc := AtkSyntax.VarSrc.
     Notation AtkDst := AtkSyntax.VarDst.
@@ -248,10 +274,11 @@ Module AtkSyntax.
     Notation CleanSrc := CleanSyntax.VarSrc.
     Notation CleanDst := CleanSyntax.VarDst.
 
+    Import SigTNotations.
     Definition erase_var_src (vs : AtkSrc) : CleanSrc := 
-      let: (v, _) := vs in v.
+      let: (v; _) := vs in v.
     Definition erase_var_dst (vd : AtkDst) : CleanDst := 
-      let: (v, _) := vd in v.
+      let: (v; _) := vd in v.
 
     Notation L1 := 
       {|SrcVarMeta := AtkSrc; DstVarMeta := AtkDst |}.
@@ -276,6 +303,7 @@ Module AtkSyntax.
   End syntax_erase.
 End AtkSyntax.
 
+Fail Check 1.
 
 Section store.
   Context `{!VarPrm, !ValPrm}.
@@ -286,12 +314,10 @@ Section store.
     fun v' => if (v = v')? is true then vl else st v'.  (* The double colon in vars_deceq is needed here. *)
 End store.
 
-(* We only give semantics to attacked programs *)
-Class AdvLvlParam `{!VarPrm} := {is_untrusted : Vars -> bool ; is_public : Vars -> bool }.
 Section semantics.
   Import MetaSyntax.
   Import AtkSyntax.
-  Context `{!VarPrm, !ValPrm, !AdvMemPrm, !AdvLeakPrm, !AdvLvlParam}.
+  Context `{!VarPrm, !ValPrm, !AdvMemPrm, !AdvLeakPrm, !AdvLvlPrm}.
 
   (* What is 'state'? *)
   Inductive Cfg := mk_cfg (store : Store) (amem: AdvMem) (cont : Prog).
