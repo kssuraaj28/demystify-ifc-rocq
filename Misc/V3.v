@@ -198,14 +198,16 @@ End CleanSyntax.
 Module AtkSyntax.
   (* The type of messages that the adversary leaks.
   I made this a operational typeclass for some reason... *)
-  Class AdvLeakPrm := LeakVals : Type. 
+  Module Prms.
+    Class AdvLeakPrm := LeakVals : Type. 
 
-  (* When you instantiate an adversary, you also give it memory *)
-  Class AdvMemPrm := {AdvMem : Type; adv_init : AdvMem}.
+    (* When you instantiate an adversary, you also give it memory *)
+    Class AdvMemPrm := {AdvMem : Type; adv_init : AdvMem}.
 
-  (* We also need to specify what variables the adversary has access to*)
-  Class AdvLvlPrm `{!VarPrm} := {is_untrusted : pred Vars ; is_public : pred Vars}.
-
+    (* We also need to specify what variables the adversary has access to*)
+    Class AdvLvlPrm `{!VarPrm} := {is_untrusted : pred Vars ; is_public : pred Vars}.
+  End Prms.
+  Import Prms.
 
   Import MetaSyntax.
   Section atksyntax.
@@ -292,12 +294,16 @@ Section store.
 End store.
 
 Section semantics.
-  Import MetaSyntax.
-  Import AtkSyntax.
+  Import MetaSyntax AtkSyntax.Prms.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvMemPrm}.
+  Notation AtkProg := AtkSyntax.Prog.
+  Notation AtkVarSrc := AtkSyntax.VarSrc.
+  Notation AtkVarDst := AtkSyntax.VarDst.
+  Notation AtkValExp := AtkSyntax.ValExp.
+  Notation AtkBoolExp := AtkSyntax.BoolExp.
 
   (* What is 'state'? *)
-  Inductive Cfg := mk_cfg (store : Store) (amem: AdvMem) (cont : Prog).
+  Inductive Cfg := mk_cfg (store : Store) (amem: AdvMem) (cont : AtkProg).
 
   (* Our definition is super lockstep. 
      If it works, I think it's good.
@@ -326,7 +332,7 @@ Section semantics.
     I'm using Normal proof mode. I should have a rename goal tactic
   *)
   Section def.
-    Let def (st : Store) (vs : VarSrc) (amem : AdvMem) : Vals. Proof.
+    Let def (st : Store) (vs : AtkVarSrc) (amem : AdvMem) : Vals. Proof.
       move: vs => [v].
       pose (orig_val := get_from_store st v). (* What does () make?  *)
       case: (is_untrusted v) => [corr | _].
@@ -337,21 +343,21 @@ Section semantics.
   Definition store_read_w_adv := Eval hnf in def.
   End def.
 
-  Definition val_exp_eval (e : ValExp) (store : Store) (amem : AdvMem) : Vals :=
+  Definition val_exp_eval (e : AtkValExp) (store : Store) (amem : AdvMem) : Vals :=
     let: mk_vl_exp vs1 vs2 comp := e in
     let: get_val := fun vs => store_read_w_adv store vs amem in 
     let: val1 := get_val vs1 in
     let: val2 := get_val vs2 in
     comp val1 val2.
 
-  Definition bool_exp_eval (be : BoolExp) (store : Store) (amem : AdvMem) : bool :=
+  Definition bool_exp_eval (be : AtkBoolExp) (store : Store) (amem : AdvMem) : bool :=
     let: mk_bl_exp vs test := be in
     let: val := store_read_w_adv store vs amem in 
     test val.
 
   (* Can this be made better? *)
   Section def.
-    Let def (s : Store) (vd : VarDst) (vl : Vals) (amem : AdvMem) : 
+    Let def (s : Store) (vd : AtkVarDst) (vl : Vals) (amem : AdvMem) : 
           Store * AdvMem * Event. Proof.
       move: vd => [v].
       pose (s' := update_to_store s v vl).
@@ -394,7 +400,7 @@ Section semantics.
     What does behavior of program mean? 
   *)
   Parameter Behavior : Type.
-  Parameter prog_behavior : Prog -> Behavior.
+  Parameter prog_behavior : AtkProg -> Behavior.
   (* 
   Definition Behavior := Store -> nat -> Event.
   (* I think that it is possible to use iter_nat to make this so much simpler *)
@@ -423,13 +429,13 @@ Section semantics.
  *)
 End semantics.
 
-
 Section sim_security.
   (* You need a type and an interpretation as an AdvCorruptor *)
   (* You need a type and an interpretation as an AdvInfiltrator *)
   (* You could also have a predicate on AdvCorruptors.. *)
   Import MetaSyntax.
-  Import AtkSyntax (AdvMemPrm, AdvLeakPrm, AdvLvlPrm, AdvCorruptor, AdvExfiltrator, erase_prog, is_untrusted, is_public).
+  Import AtkSyntax.Prms.
+  Import AtkSyntax (AdvCorruptor, AdvExfiltrator, erase_prog).
   Notation CleanProg := CleanSyntax.Prog.
   Notation AtkProg := AtkSyntax.Prog.
   Notation AtkVarSrc := AtkSyntax.VarSrc.
@@ -500,8 +506,8 @@ Section sim_security.
 End sim_security.
 
 Section nmif.
-  Import MetaSyntax.
-  Import AtkSyntax (AdvMemPrm, AdvLeakPrm, AdvLvlPrm, AdvCorruptor, AdvExfiltrator).
+  Import MetaSyntax AtkSyntax.Prms.
+  Import AtkSyntax (AdvCorruptor, AdvExfiltrator).
   Context `{!VarPrm, !ValPrm,!AdvLeakPrm, !AdvLvlPrm}.
 
   Notation AtkVarSrc := AtkSyntax.VarSrc.
@@ -519,8 +525,8 @@ Section nmif.
 End nmif.
 
 Section ni.
-  Import MetaSyntax.
-  Import AtkSyntax (AdvMemPrm, AdvLeakPrm, AdvLvlPrm, AdvCorruptor, AdvExfiltrator).
+  Import MetaSyntax AtkSyntax.Prms.
+  Import AtkSyntax (AdvCorruptor, AdvExfiltrator).
   Context `{!VarPrm, !ValPrm,!AdvLeakPrm, !AdvLvlPrm}.
 
   Notation AtkVarSrc := AtkSyntax.VarSrc.
@@ -543,8 +549,8 @@ Section ni.
 End ni.
 
 Section rd.
-  Import MetaSyntax.
-  Import AtkSyntax (AdvMemPrm, AdvLeakPrm, AdvLvlPrm, AdvCorruptor, AdvExfiltrator).
+  Import MetaSyntax AtkSyntax.Prms.
+  Import AtkSyntax (AdvCorruptor, AdvExfiltrator).
   Context `{!VarPrm, !ValPrm,!AdvLeakPrm, !AdvLvlPrm}.
 
   Notation AtkVarSrc := AtkSyntax.VarSrc.
