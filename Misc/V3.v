@@ -499,8 +499,8 @@ Section sim_security.
 
   Let ExpMemAtkProg (m: AdvMemPrm) : Type := @AtkProg _ _ _ _ m.
   Definition atk_sim_sec (p : CleanProg) := Eval unfold ExpMemAtkProg in
-    forall rm (rp : ExpMemAtkProg rm),  erase_prog rp = p ->
-    exists im (ip : ExpMemAtkProg im),  erase_prog ip = p /\
+    forall ram (rp : ExpMemAtkProg ram),  erase_prog rp = p ->
+    exists iam (ip : ExpMemAtkProg iam),  erase_prog ip = p /\
     IdealProg ip /\
     prog_behavior rp = prog_behavior ip.
 End sim_security.
@@ -567,3 +567,18 @@ Section rd.
   I think that there should be no change? *)
   Definition RDSecurity := atk_sim_sec (fun _ => RDCorruptor) (fun _ _ => True).
 End rd.
+
+(* To define program behavior, 
+   we can just define mem_init, 
+   So, this can initialize adversary memory, 
+   and maybe leak something to the adversary initially as well.
+   The order should be leak then corrupt.
+   Semantics is soo good.
+   We can then think about
+   
+
+   Another thing to keep in mind is that we might want to
+   count the number of while iterations.
+
+
+*)
