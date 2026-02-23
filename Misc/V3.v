@@ -209,7 +209,7 @@ Module AtkSyntax.
 
   Import MetaSyntax.
   Section atksyntax.
-    Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvMemPrm, !AdvLvlPrm}.
+    Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvLvlPrm, !AdvMemPrm}.
 
     (* When you write to an adversary readable variable, the adversary can exfiltrate the value *)
     Definition AdvExfiltrator := Vals -> AdvMem -> (LeakVals * AdvMem).
@@ -245,7 +245,7 @@ Module AtkSyntax.
   End atksyntax.
 
   Section syntax_erase.
-    Context `{!VarPrm, !ValPrm, !AdvMemPrm, !AdvLeakPrm, !AdvLvlPrm}.
+    Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvLvlPrm, !AdvMemPrm}.
 
     Notation AtkSrc := AtkSyntax.VarSrc.
     Notation AtkDst := AtkSyntax.VarDst.
@@ -294,7 +294,7 @@ End store.
 Section semantics.
   Import MetaSyntax.
   Import AtkSyntax.
-  Context `{!VarPrm, !ValPrm, !AdvMemPrm, !AdvLeakPrm, !AdvLvlPrm}.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvMemPrm}.
 
   (* What is 'state'? *)
   Inductive Cfg := mk_cfg (store : Store) (amem: AdvMem) (cont : Prog).
@@ -315,9 +315,6 @@ Section semantics.
     We can strengthen or weaken the adversary later here.
   *)
 
-  Import SigTNotations.
-  Axiom to_fill : forall T, T.
-
   (* 
     For dependent pattern matching, there seem to be the following appraoches:
     - Painfully write using gallina 
@@ -328,14 +325,13 @@ Section semantics.
 
     I'm using Normal proof mode. I should have a rename goal tactic
   *)
-  Ltac name_gl name := refine ?[name].
   Section def.
     Let def (st : Store) (vs : VarSrc) (amem : AdvMem) : Vals. Proof.
-      destruct vs as [v adv].
-      pose orig_val := get_from_store st v.
-      destruct (is_untrusted v); [name_gl ADV| name_gl CLEAN].
-      [ADV]: { exact (adv orig_val amem). }
-      [CLEAN]: {exact orig_val. }
+      move: vs => [v].
+      pose (orig_val := get_from_store st v). (* What does () make?  *)
+      case: (is_untrusted v) => [corr | _].
+      - exact (corr orig_val amem).   
+      - exact (orig_val). 
     Defined.
 
   Definition store_read_w_adv := Eval hnf in def.
@@ -357,18 +353,13 @@ Section semantics.
   Section def.
     Let def (s : Store) (vd : VarDst) (vl : Vals) (amem : AdvMem) : 
           Store * AdvMem * Event. Proof.
-      destruct vd  as [v adv].
+      move: vd => [v].
       pose (s' := update_to_store s v vl).
-      pose (optupd := if (is_untrusted v) is true then None else Some (v,vl)).
-      destruct (is_public v); [name_gl ADV| name_gl CLEAN].
-      [ADV]: {
-        destruct (adv vl amem) as [lk amem'].
+      pose (optupd := if (is_untrusted v) is true then None else Some (v,vl)). (* Here () makes a difference TODO *)
+      case: (is_public v) => [exf | _]. 
+      - move: (exf vl amem) => [lk amem'].
         exact (s', amem', assignment optupd (Some lk)).
-        }
-
-      [CLEAN]: {
-        exact (s', amem, assignment optupd None).
-        }
+      - exact (s', amem, assignment optupd None).
     Defined.
   Definition store_update_w_adv := Eval hnf in def.
   End def.
@@ -438,14 +429,14 @@ Section sim_security.
   (* You need a type and an interpretation as an AdvInfiltrator *)
   (* You could also have a predicate on AdvCorruptors.. *)
   Import MetaSyntax.
-  Import AtkSyntax (AdvMemPrm, AdvLeakPrm, AdvCorruptor, AdvExfiltrator, erase_prog).
+  Import AtkSyntax (AdvMemPrm, AdvLeakPrm, AdvLvlPrm, AdvCorruptor, AdvExfiltrator, erase_prog, is_untrusted, is_public).
   Notation CleanProg := CleanSyntax.Prog.
   Notation AtkProg := AtkSyntax.Prog.
   Notation AtkVarSrc := AtkSyntax.VarSrc.
   Notation AtkVarDst := AtkSyntax.VarDst.
 
 
-  Context `{!VarPrm, !ValPrm, !AdvLeakPrm}.
+  Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvLvlPrm}.
 
   Hint Extern 0 SrcDstVarPrm => 
     (exact {|SrcVarMeta := AtkVarSrc; DstVarMeta := AtkVarDst|}) : typeclass_instances.
@@ -457,11 +448,39 @@ Section sim_security.
 
   Section lift.
     Context `{!AdvMemPrm}.
-    Definition IdealSrcVar (vs : AtkVarSrc) : Prop :=
-      let: (_, cor) := vs in IdealCorruptor cor.
 
-    Definition IdealDstVar (vd : AtkVarDst) : Prop :=
-      let: (_, exf) := vd in IdealExfiltrator exf.
+    (* I don't use exact: in def. *)
+    Section def.
+      Let def (vs : AtkVarSrc) : Prop. Proof.
+        move: vs => [v].
+        case: (is_untrusted v) => [corr | _].
+        - exact (IdealCorruptor corr).
+        - exact (True).
+      Defined.
+
+      Definition IdealSrcVar := 
+        ltac:(
+          let t := def in
+          let t := eval hnf in t in 
+          let t := eval cbv zeta in t in
+          exact t).
+    End def.
+
+    Section def.
+      Let def (vd : AtkVarDst) : Prop. Proof.
+        move: vd => [v].
+        case: (is_public v) => [exf | _].
+        - exact (IdealExfiltrator exf).
+        - exact (True).
+      Defined.
+
+    Definition IdealDstVar := ltac:(
+      let t := def in 
+      let t := eval hnf in t in
+      let t := eval cbv zeta in t in
+      exact t).
+    End def.
+    Eval red in IdealDstVar.
 
     Hint Extern 0 SrcDstPredPrm => exact ({|
         SrcPred := IdealSrcVar;
@@ -472,8 +491,7 @@ Section sim_security.
     Definition IdealProg := MetaSyntax.ProgPred.
   End lift.
 
-
-  Let ExpMemAtkProg: AdvMemPrm -> _ := @AtkProg _ _ _.
+  Let ExpMemAtkProg (m: AdvMemPrm) : Type := @AtkProg _ _ _ _ m.
   Definition atk_sim_sec (p : CleanProg) := Eval unfold ExpMemAtkProg in
     forall rm (rp : ExpMemAtkProg rm),  erase_prog rp = p ->
     exists im (ip : ExpMemAtkProg im),  erase_prog ip = p /\
@@ -483,8 +501,8 @@ End sim_security.
 
 Section nmif.
   Import MetaSyntax.
-  Import AtkSyntax (AdvMemPrm, AdvLeakPrm, AdvCorruptor, AdvExfiltrator).
-  Context `{!VarPrm, !ValPrm,!AdvLeakPrm}. (* TODO: Param vs Prm *)
+  Import AtkSyntax (AdvMemPrm, AdvLeakPrm, AdvLvlPrm, AdvCorruptor, AdvExfiltrator).
+  Context `{!VarPrm, !ValPrm,!AdvLeakPrm, !AdvLvlPrm}.
 
   Notation AtkVarSrc := AtkSyntax.VarSrc.
   Notation AtkVarDst := AtkSyntax.VarDst.
@@ -502,8 +520,8 @@ End nmif.
 
 Section ni.
   Import MetaSyntax.
-  Import AtkSyntax (AdvMemPrm, AdvLeakPrm, AdvCorruptor, AdvExfiltrator).
-  Context `{!VarPrm, !ValPrm,!AdvLeakPrm}. (* TODO: Param vs Prm *)
+  Import AtkSyntax (AdvMemPrm, AdvLeakPrm, AdvLvlPrm, AdvCorruptor, AdvExfiltrator).
+  Context `{!VarPrm, !ValPrm,!AdvLeakPrm, !AdvLvlPrm}.
 
   Notation AtkVarSrc := AtkSyntax.VarSrc.
   Notation AtkVarDst := AtkSyntax.VarDst.
@@ -526,8 +544,8 @@ End ni.
 
 Section rd.
   Import MetaSyntax.
-  Import AtkSyntax (AdvMemPrm, AdvLeakPrm, AdvCorruptor, AdvExfiltrator).
-  Context `{!VarPrm, !ValPrm,!AdvLeakPrm}. (* TODO: Param vs Prm *)
+  Import AtkSyntax (AdvMemPrm, AdvLeakPrm, AdvLvlPrm, AdvCorruptor, AdvExfiltrator).
+  Context `{!VarPrm, !ValPrm,!AdvLeakPrm, !AdvLvlPrm}.
 
   Notation AtkVarSrc := AtkSyntax.VarSrc.
   Notation AtkVarDst := AtkSyntax.VarDst.
