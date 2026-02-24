@@ -12,6 +12,14 @@ Class ValPrm := {Vals : Type}.
    There should be a string accessor
 *)
 
+(* This can be used in more places *)
+Ltac cleanup def :=
+    let t := def in
+    let t := eval red in t in 
+    let t := eval hnf in t in 
+    exact t.
+
+Ltac name_gl name := refine ?[name]. (* for convenience *)
 
 Module MetaSyntax.
   Class SrcDstVarPrm := {SrcVarMeta : Type ; DstVarMeta : Type}.
@@ -220,17 +228,27 @@ Module AtkSyntax.
 
 
     (* We also need to specify what variables the adversary has access to*)
-    Class AdvLvlPrm  `{!VarPrm}
-      := {is_untrusted : pred Vars ; is_public : pred Vars}.
+    Class AdvLvlPrm  `{!VarPrm} := {
+      is_untrusted : pred Vars ; 
+      is_public : pred Vars
+    }.
 
     (* 
       When you instantiate an adversary, you also give it memory.
       The adversary gets to access the public view of the store and initialize memory
       TODO: Eventually, we should also let it corrupt memory.
+      Should we let the adversary leak a value initially? 
     *)
+
     Class AdvDevicePrm  `{!VarPrm, !ValPrm, !AdvLvlPrm} := { 
         AdvMem : Type; 
-        adv_init : StoreView is_public -> AdvMem (* TODO: This could also leak a value *)
+        adv_mem_init : StoreView is_public -> AdvMem;
+        adv_maul_init : {v: Vars | is_untrusted v} -> Vals -> Vals 
+        (* 
+          I guess that there are other things that can be done:
+          - StoreView is_untrusted -> StoreView is_untrusted
+          Here, you can maul in a slightly weirder way
+        *)
       }.
   End Prms.
 
@@ -347,20 +365,27 @@ Section semantics.
       - Normal? 
       - ssreflect? `Show Proof` is disgusting
     - Use equations plugin
+  I use normal because ssreflect is too magical.
+  Also, I have eqn:E and stuff, which I don't know how to do using ssreflect
+  case E: X might be okay. However, ssreflect tactics seem to have trouble with typeclasses..
+  Another thing I don't like is destruct doing a let definition
 
-    I'm using Normal proof mode. I should have a rename goal tactic
+  With normal, I don't like how destruct makes a new let definition.
+  Perhaps the right way to solve this is targeted cbv..
   *)
   Section def.
     Let def (st : Store) (vs : AtkVarSrc) (amem : AdvMem) : Vals. Proof.
       move: vs => [v].
       pose (orig_val := get_from_store st v). (* What does () make?  *)
-      case: (is_untrusted v) => [corr | _].
-      - exact (corr orig_val amem).   
-      - exact (orig_val). 
+      case: (is_untrusted v) => [adv | _].
+      - exact (adv orig_val amem).
+      - exact (orig_val).
     Defined.
 
-  Definition store_read_w_adv := Eval hnf in def.
+    Definition store_read_w_adv := ltac:(cleanup def).
   End def.
+  Eval red in store_read_w_adv.
+
 
   Definition val_exp_eval (e : AtkValExp) (store : Store) (amem : AdvMem) : Vals :=
     let: mk_vl_exp vs1 vs2 comp := e in
@@ -380,7 +405,7 @@ Section semantics.
           Store * AdvMem * Event. Proof.
       move: vd => [v].
       pose (s' := update_to_store s v vl).
-      pose (optupd := if (is_untrusted v) is true then None else Some (v,vl)). (* Here () makes a difference TODO *)
+      pose optupd := if (is_untrusted v) is true then None else Some (v,vl). (* Here () makes a difference TODO *)
       case: (is_public v) => [exf | _]. 
       - move: (exf vl amem) => [lk amem'].
         exact (s', amem', assignment optupd (Some lk)).
@@ -427,14 +452,28 @@ Section semantics.
 
   Definition Behavior := Store -> nat -> list Event.
 
+  Section def.
+    Let def (s : Store) : Store. Proof.
+      move=> v.
+      pose (orig_val := s v).
+      destruct  (is_untrusted v).
+      - exact (adv_maul_init (exist (fun _ => _) v VE) orig_val).
+      - exact (orig_val).
+    Defined.
+    Definition init_source_maul := ltac:(cleanup def).
+  End def.
+  Print init_source_maul.
+
+
   Definition prog_behavior (p : AtkProg) : Behavior := 
     fun store_init step_cnt =>
-      let: init_adv := adv_init (construct_view store_init) in
+      let: init_adv := adv_mem_init (construct_view store_init) in
       let: init_cfg := mk_cfg store_init init_adv p in
       let: ((_, ev), lst) := multi_step step_cnt init_cfg in
       ev :: map snd lst.
 
 End semantics.
+Notation "⟦ p ⟧" := (prog_behavior p).
 
 Section sim_security.
   (* You need a type and an interpretation as an AdvCorruptor *)
@@ -509,7 +548,7 @@ Section sim_security.
     forall rad (rp : ExpAtkProg rad),  erase_prog rp = p ->
     exists iad (ip : ExpAtkProg iad),  erase_prog ip = p /\
     IdealProg ip /\
-    prog_behavior rp = prog_behavior ip.
+    ⟦ rp ⟧ = ⟦ ip ⟧.
 End sim_security.
 
 Section nmif.
