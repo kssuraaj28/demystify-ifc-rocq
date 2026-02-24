@@ -226,9 +226,12 @@ Module AtkSyntax.
     (* 
       When you instantiate an adversary, you also give it memory.
       The adversary gets to access the public view of the store and initialize memory
+      TODO: Eventually, we should also let it corrupt memory.
     *)
-    Class AdvDevicePrm  `{!VarPrm, !ValPrm, !AdvLvlPrm} := 
-      {AdvMem : Type; adv_init : StoreView is_public -> AdvMem}.
+    Class AdvDevicePrm  `{!VarPrm, !ValPrm, !AdvLvlPrm} := { 
+        AdvMem : Type; 
+        adv_init : StoreView is_public -> AdvMem (* TODO: This could also leak a value *)
+      }.
   End Prms.
 
   Import Prms.
@@ -371,7 +374,7 @@ Section semantics.
     let: val := store_read_w_adv store vs amem in 
     test val.
 
-  (* Can this be made better? *)
+  (* Maybe using the equations plugin is the right way to handle this.. *)
   Section def.
     Let def (s : Store) (vd : AtkVarDst) (vl : Vals) (amem : AdvMem) : 
           Store * AdvMem * Event. Proof.
@@ -411,38 +414,26 @@ Section semantics.
        (cfg, while_choice test)
     end.
 
+  Import ListNotations.
+  Notation NeList A := (A * list A)%type.
 
-  (* 
-    What does behavior of program mean? 
-  *)
-  Parameter Behavior : Type.
-  Parameter prog_behavior : AtkProg -> Behavior.
-  (* 
-  Definition Behavior := Store -> nat -> Event.
-  (* I think that it is possible to use iter_nat to make this so much simpler *)
-  (* 
-    TODO: I feel like this says nothing about the initial state.  
-    Perhaps that is okay?
-    I feel like the right way to have solved this would have been
-    Parameter Behavior and parameter prog_behavior..
+  Fixpoint multi_step (n : nat) (cfg: Cfg) : NeList (Cfg * Event) :=
+    match n with 
+    | 0 => (step cfg, [])
+    | S n' =>
+        let: ((cfg', ev'), lst') := multi_step n' cfg in
+        (step cfg', (cfg', ev') :: lst') (* This naming is a little stupid *)
+    end.
 
-    This is wrong anyway. We're letting the environment choose all input values.
-    The adversary needs a way to learn what the inputs are.
-    - There are a few other ways to get this done, I think...
- *)
-  Definition prog_behavior (p : Prog) : Behavior := 
+  Definition Behavior := Store -> nat -> list Event.
+
+  Definition prog_behavior (p : AtkProg) : Behavior := 
     fun store_init step_cnt =>
-      let: init_cfg := mk_cfg store_init adv_init p in
-      let: multi_step := 
-        fix multi_step cfg n {struct n} :=
-            if n isn't S n' then step cfg else 
-            let: (cfg, _) := multi_step cfg n' in
-            step cfg
-      in 
-      let: (_, ret) := multi_step init_cfg step_cnt in
-      ret.
+      let: init_adv := adv_init (construct_view store_init) in
+      let: init_cfg := mk_cfg store_init init_adv p in
+      let: ((_, ev), lst) := multi_step step_cnt init_cfg in
+      ev :: map snd lst.
 
- *)
 End semantics.
 
 Section sim_security.
@@ -512,10 +503,11 @@ Section sim_security.
     Definition IdealProg := MetaSyntax.ProgPred.
   End lift.
 
-  Let ExpMemAtkProg (m: AdvDevicePrm) : Type := @AtkProg _ _ _ _ m.
-  Definition atk_sim_sec (p : CleanProg) := Eval unfold ExpMemAtkProg in
-    forall ram (rp : ExpMemAtkProg ram),  erase_prog rp = p ->
-    exists iam (ip : ExpMemAtkProg iam),  erase_prog ip = p /\
+  Let ExpAtkProg (m: AdvDevicePrm) : Type := AtkProg.
+
+  Definition atk_sim_sec (p : CleanProg) := Eval unfold ExpAtkProg in
+    forall rad (rp : ExpAtkProg rad),  erase_prog rp = p ->
+    exists iad (ip : ExpAtkProg iad),  erase_prog ip = p /\
     IdealProg ip /\
     prog_behavior rp = prog_behavior ip.
 End sim_security.
