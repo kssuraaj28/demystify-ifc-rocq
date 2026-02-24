@@ -1,9 +1,17 @@
 From Stdlib Require Import (*Arith*) List String ssreflect ssrbool.
 From QuickChick Require Import Decidability. 
+From Ltac2 Require Import Ltac2. Set Default Proof Mode "Classic".
 (* QuickCheck decidable equality classes are so good *)
 (* ssreflect for gallina extensions *)
 (* Arith for iter_nat *)
 (* ssrbool for boolean predicates *)
+
+
+
+Ltac2 goals l :=
+  let name_goal x := ltac1:(x |- refine ?[x]) (Ltac1.of_ident x) in
+  Control.dispatch (List.map (fun x () => name_goal x) l).
+
 
 Class VarPrm := {Vars : Type ; vars_deceq :: Dec_Eq Vars}. 
 Class ValPrm := {Vals : Type}.
@@ -12,14 +20,13 @@ Class ValPrm := {Vals : Type}.
    There should be a string accessor
 *)
 
-(* This can be used in more places *)
-Ltac cleanup def :=
+(* This can be used in more places. TODO *)
+Ltac hnf_clean def :=
     let t := def in
     let t := eval red in t in 
     let t := eval hnf in t in 
     exact t.
 
-Ltac name_gl name := refine ?[name]. (* for convenience *)
 
 Module MetaSyntax.
   Class SrcDstVarPrm := {SrcVarMeta : Type ; DstVarMeta : Type}.
@@ -122,7 +129,7 @@ Module MetaSyntax.
     (* Don't double colon!! *)
     Fail Check ltac:(exact(_ : SrcDstVarPrm)). 
 
-    (* This should be refactored out *)
+    (* This should be refactored out. TODO *)
     Ltac clean cons := 
       let t := cons in
       let t := eval hnf in t in
@@ -371,21 +378,22 @@ Section semantics.
   Another thing I don't like is destruct doing a let definition
 
   With normal, I don't like how destruct makes a new let definition.
-  Perhaps the right way to solve this is targeted cbv..
+  Perhaps the right way to solve this is targeted cbv zeta, which is not possible also
+  I think that nonmagical coq tactics are the way to go..
+
+  Maybe use destruct along with move?
   *)
   Section def.
     Let def (st : Store) (vs : AtkVarSrc) (amem : AdvMem) : Vals. Proof.
-      move: vs => [v].
+      destruct vs as [v adv].
       pose (orig_val := get_from_store st v). (* What does () make?  *)
-      case: (is_untrusted v) => [adv | _].
-      - exact (adv orig_val amem).
-      - exact (orig_val).
+      destruct (is_untrusted v); ltac2:(goals [@UNTR; @TR]).
+      [UNTR]: { exact (adv orig_val amem). }
+      [TR]: { exact (orig_val). }
     Defined.
 
-    Definition store_read_w_adv := ltac:(cleanup def).
+    Definition store_read_w_adv := ltac:(hnf_clean def).
   End def.
-  Eval red in store_read_w_adv.
-
 
   Definition val_exp_eval (e : AtkValExp) (store : Store) (amem : AdvMem) : Vals :=
     let: mk_vl_exp vs1 vs2 comp := e in
@@ -403,15 +411,19 @@ Section semantics.
   Section def.
     Let def (s : Store) (vd : AtkVarDst) (vl : Vals) (amem : AdvMem) : 
           Store * AdvMem * Event. Proof.
-      move: vd => [v].
+      destruct vd as [v exf].
       pose (s' := update_to_store s v vl).
-      pose optupd := if (is_untrusted v) is true then None else Some (v,vl). (* Here () makes a difference TODO *)
-      case: (is_public v) => [exf | _]. 
-      - move: (exf vl amem) => [lk amem'].
+      pose (optupd := if (is_untrusted v) is true then None else Some (v,vl)). (* Here () makes a difference TODO *)
+      destruct (is_public v); ltac2:(goals [@PUB; @SEC]).
+      [PUB]: {
+        destruct (exf vl amem) as [lk amem'].
         exact (s', amem', assignment optupd (Some lk)).
-      - exact (s', amem, assignment optupd None).
+        }
+      [SEC]: {
+        exact (s', amem, assignment optupd None).
+        }
     Defined.
-  Definition store_update_w_adv := Eval hnf in def.
+  Definition store_update_w_adv := ltac:(hnf_clean def).
   End def.
 
   Definition step (cfg : Cfg) : Cfg * Event:=
@@ -454,20 +466,20 @@ Section semantics.
 
   Section def.
     Let def (s : Store) : Store. Proof.
-      move=> v.
+      intro v.
       pose (orig_val := s v).
-      destruct  (is_untrusted v).
-      - exact (adv_maul_init (exist (fun _ => _) v VE) orig_val).
-      - exact (orig_val).
+      destruct (is_untrusted v) eqn: VEq; ltac2:(goals [@UNTR; @TR]).
+      [UNTR]: { apply adv_maul_init; [esplit; exact VEq | exact orig_val]. }
+      [TR]: { exact (orig_val). }
     Defined.
-    Definition init_source_maul := ltac:(cleanup def).
+    Definition init_source_maul := ltac:(hnf_clean def).
   End def.
-  Print init_source_maul.
 
-
+  (* These names are absolutely disgusting. TODO *)
   Definition prog_behavior (p : AtkProg) : Behavior := 
     fun store_init step_cnt =>
       let: init_adv := adv_mem_init (construct_view store_init) in
+      let: init_store := init_source_maul store_init in
       let: init_cfg := mk_cfg store_init init_adv p in
       let: ((_, ev), lst) := multi_step step_cnt init_cfg in
       ev :: map snd lst.
