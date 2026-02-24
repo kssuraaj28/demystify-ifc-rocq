@@ -54,7 +54,7 @@ Module MetaSyntax.
 
       (* I don't know whether I'm using the right ssreflect thing *)
       Fixpoint CmdMeta_ind : forall c, P c. Proof.
-        case => c; (t assign || t cond || t while).
+        case => c; by [t assign | t cond | t while].
       Qed.
 
     End cmd_ind.
@@ -195,23 +195,47 @@ Module CleanSyntax.
   End clean_syntax.
 End CleanSyntax.
 
+Section store.
+  Context `{!VarPrm, !ValPrm}.
+
+  Definition Store := Vars -> Vals.
+  Definition get_from_store (st : Store) (v : Vars) : Vals := st v.
+  Definition update_to_store (st : Store) (v : Vars) (vl : Vals) : Store := 
+    fun v' => if (v = v')? is true then vl else st v'.  (* The double colon in vars_deceq is needed here. *)
+
+  Definition StoreView (p : pred Vars) := {v: Vars | p v} -> Vals.
+
+  (* Maybe we can make this a coercion? *)
+  Definition construct_view (s : Store) {p} : StoreView p :=
+      fun vp =>
+        let: exist x _ := vp in 
+        s x.
+End store.
+
 Module AtkSyntax.
   (* The type of messages that the adversary leaks.
   I made this a operational typeclass for some reason... *)
   Module Prms.
     Class AdvLeakPrm := LeakVals : Type. 
 
-    (* When you instantiate an adversary, you also give it memory *)
-    Class AdvMemPrm := {AdvMem : Type; adv_init : AdvMem}.
 
     (* We also need to specify what variables the adversary has access to*)
-    Class AdvLvlPrm `{!VarPrm} := {is_untrusted : pred Vars ; is_public : pred Vars}.
-  End Prms.
-  Import Prms.
+    Class AdvLvlPrm  `{!VarPrm}
+      := {is_untrusted : pred Vars ; is_public : pred Vars}.
 
+    (* 
+      When you instantiate an adversary, you also give it memory.
+      The adversary gets to access the public view of the store and initialize memory
+    *)
+    Class AdvDevicePrm  `{!VarPrm, !ValPrm, !AdvLvlPrm} := 
+      {AdvMem : Type; adv_init : StoreView is_public -> AdvMem}.
+  End Prms.
+
+  Import Prms.
   Import MetaSyntax.
+
   Section atksyntax.
-    Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvLvlPrm, !AdvMemPrm}.
+    Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvLvlPrm, !AdvDevicePrm}.
 
     (* When you write to an adversary readable variable, the adversary can exfiltrate the value *)
     Definition AdvExfiltrator := Vals -> AdvMem -> (LeakVals * AdvMem).
@@ -247,7 +271,7 @@ Module AtkSyntax.
   End atksyntax.
 
   Section syntax_erase.
-    Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvLvlPrm, !AdvMemPrm}.
+    Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvLvlPrm, !AdvDevicePrm}.
 
     Notation AtkSrc := AtkSyntax.VarSrc.
     Notation AtkDst := AtkSyntax.VarDst.
@@ -284,18 +308,10 @@ Module AtkSyntax.
   End syntax_erase.
 End AtkSyntax.
 
-Section store.
-  Context `{!VarPrm, !ValPrm}.
-
-  Definition Store := Vars -> Vals.
-  Definition get_from_store (st : Store) (v : Vars) : Vals := st v.
-  Definition update_to_store (st : Store) (v : Vars) (vl : Vals) : Store := 
-    fun v' => if (v = v')? is true then vl else st v'.  (* The double colon in vars_deceq is needed here. *)
-End store.
 
 Section semantics.
   Import MetaSyntax AtkSyntax.Prms.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvMemPrm}.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvDevicePrm}.
   Notation AtkProg := AtkSyntax.Prog.
   Notation AtkVarSrc := AtkSyntax.VarSrc.
   Notation AtkVarDst := AtkSyntax.VarDst.
@@ -449,11 +465,11 @@ Section sim_security.
   Check ltac:(exact SrcDstVarPrm).
 
   (* What went up must come down *)
-  Variable IdealCorruptor : forall `{!AdvMemPrm},  AdvCorruptor -> Prop.
-  Variable IdealExfiltrator : forall `{!AdvMemPrm}, AdvExfiltrator -> Prop.
+  Variable IdealCorruptor : forall `{!AdvDevicePrm},  AdvCorruptor -> Prop.
+  Variable IdealExfiltrator : forall `{!AdvDevicePrm}, AdvExfiltrator -> Prop.
 
   Section lift.
-    Context `{!AdvMemPrm}.
+    Context `{!AdvDevicePrm}.
 
     (* I don't use exact: in def. *)
     Section def.
@@ -486,7 +502,6 @@ Section sim_security.
       let t := eval cbv zeta in t in
       exact t).
     End def.
-    Eval red in IdealDstVar.
 
     Hint Extern 0 SrcDstPredPrm => exact ({|
         SrcPred := IdealSrcVar;
@@ -497,7 +512,7 @@ Section sim_security.
     Definition IdealProg := MetaSyntax.ProgPred.
   End lift.
 
-  Let ExpMemAtkProg (m: AdvMemPrm) : Type := @AtkProg _ _ _ _ m.
+  Let ExpMemAtkProg (m: AdvDevicePrm) : Type := @AtkProg _ _ _ _ m.
   Definition atk_sim_sec (p : CleanProg) := Eval unfold ExpMemAtkProg in
     forall ram (rp : ExpMemAtkProg ram),  erase_prog rp = p ->
     exists iam (ip : ExpMemAtkProg iam),  erase_prog ip = p /\
@@ -516,7 +531,7 @@ Section nmif.
   Hint Extern 0 SrcDstVarPrm => 
     (exact {|SrcVarMeta := AtkVarSrc; DstVarMeta := AtkVarDst|}) : typeclass_instances.
 
-  Definition NmifCorruptor `{!AdvMemPrm} (corr : AdvCorruptor) : Prop := 
+  Definition NmifCorruptor `{!AdvDevicePrm} (corr : AdvCorruptor) : Prop := 
     forall mem v1 v2, corr v1 mem = corr v2 mem.
 
   (* TODO: What happens when you make the variable thing have explicit param? 
@@ -536,10 +551,10 @@ Section ni.
     (exact {|SrcVarMeta := AtkVarSrc; DstVarMeta := AtkVarDst|}) : typeclass_instances.
 
   (* Noop *)
-  Definition NICorruptor `{!AdvMemPrm} (corr : AdvCorruptor) : Prop := 
+  Definition NICorruptor `{!AdvDevicePrm} (corr : AdvCorruptor) : Prop := 
     forall mem v, corr v mem = v.
 
-  Definition NIExfiltrator `{!AdvMemPrm} (exf : AdvExfiltrator) : Prop :=
+  Definition NIExfiltrator `{!AdvDevicePrm} (exf : AdvExfiltrator) : Prop :=
     forall v1 v2 amem,
       exf v1 amem = exf v2 amem.
 
@@ -560,7 +575,7 @@ Section rd.
     (exact {|SrcVarMeta := AtkVarSrc; DstVarMeta := AtkVarDst|}) : typeclass_instances.
 
   (* Passive *)
-  Definition RDCorruptor `{!AdvMemPrm} (corr : AdvCorruptor) : Prop := 
+  Definition RDCorruptor `{!AdvDevicePrm} (corr : AdvCorruptor) : Prop := 
     forall mem v, corr v mem = v.
 
   (* TODO: What happens when you make the variable thing have explicit param? 
@@ -573,7 +588,6 @@ End rd.
    So, this can initialize adversary memory, 
    and maybe leak something to the adversary initially as well.
    The order should be leak then corrupt.
-   Semantics is soo good.
    We can then think about
    
 
