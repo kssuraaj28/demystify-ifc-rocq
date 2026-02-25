@@ -6,19 +6,12 @@ From Ltac2 Require Import Ltac2. Set Default Proof Mode "Classic".
 (* Arith for iter_nat *)
 (* ssrbool for boolean predicates *)
 
-
-
 Ltac2 goals l :=
   let name_goal x := ltac1:(x |- refine ?[x]) (Ltac1.of_ident x) in
   Control.dispatch (List.map (fun x () => name_goal x) l).
 
-
 Class VarPrm := {Vars : Type ; vars_deceq :: Dec_Eq Vars}. 
 Class ValPrm := {Vals : Type}.
-(* 
-   This should be a helper defined somewhere else. 
-   There should be a string accessor
-*)
 
 (* This can be used in more places. TODO *)
 Ltac hnf_clean def :=
@@ -73,14 +66,13 @@ Module MetaSyntax.
       Qed.
 
     End cmd_ind.
+
     (* It is a little weird that a very syntactic  *_ind approach is used. *)
-    Goal forall c : CmdMeta, c = c. elim => c; reflexivity. Qed. 
+    Goal forall c : CmdMeta, c = c. Proof. elim; reflexivity. Qed. 
   End meta_syntax.
 
-  Section prm.
-    Context `{!SrcDstVarPrm}.
-    Class SrcDstPredPrm := {SrcPred : (SrcVarMeta -> Prop); DstPred : (DstVarMeta -> Prop)}.
-  End prm.
+  Class SrcDstPredPrm `{!SrcDstVarPrm}
+    := {SrcPred : (SrcVarMeta -> Prop); DstPred : (DstVarMeta -> Prop)}.
 
   Section syntax_pred.
     Context `{!VarPrm, !ValPrm}.
@@ -126,8 +118,6 @@ Module MetaSyntax.
     Context `{!VarPrm, !ValPrm}.
     Context `{!SynTransPrm}.
 
-    (* Don't double colon!! *)
-    Fail Check ltac:(exact(_ : SrcDstVarPrm)). 
 
     (* This should be refactored out. TODO *)
     Ltac clean cons := 
@@ -136,6 +126,9 @@ Module MetaSyntax.
       let t := eval unfold Lang1, Lang2, src_trans, dst_trans in t in
       let t := eval hnf in t in
       exact t.
+
+    (* Don't double colon!! *)
+    Fail Check ltac:(exact(_ : SrcDstVarPrm)). 
 
     Existing Instance Lang1. Check ltac:(exact(_ : SrcDstVarPrm)). 
       Let ValExp1 := ltac:(clean ValExpMeta).
