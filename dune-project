@@ -1,5 +1,6 @@
 (lang dune 3.21)
-(using rocq 0.11)
+(using coq 0.11)
+(warnings (deprecated_coq_lang disabled))
+; If you use rocq, then the --config thing is required.
+; This is a pain..
 
-; I'm using rocq 9.1.0.
-; I don't know where to specify this
