@@ -1,4 +1,5 @@
 Require VarVal MetaSyntax AtkSyntax SimSecurity.
+
 Import 
   VarVal
   MetaSyntax 
@@ -6,8 +7,8 @@ Import
   AtkSyntax (AdvCorruptor, AdvExfiltrator)
   SimSecurity.
 
-#[local]  Notation AtkVarSrc := AtkSyntax.VarSrc.
-#[local]  Notation AtkVarDst := AtkSyntax.VarDst.
+#[local] Notation AtkVarSrc := AtkSyntax.VarSrc.
+#[local] Notation AtkVarDst := AtkSyntax.VarDst.
 
 Module nmif.
   Section nmif.
@@ -69,3 +70,5 @@ Module rd.
     Definition Security := atk_sim_sec IdealCorruptor IdealExfiltrator.
   End rd.
 End rd.
+
+(* Blow people's mind by defining TE in one minute *)
