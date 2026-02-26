@@ -1,25 +1,25 @@
 From Stdlib Require List ssreflect.
 Import List List.ListNotations ssreflect.
 
-Require VarVal MetaSyntax AtkSyntax Semantics.
+Require VarVal MetaSyntax AtkSyntax Semantics Tacs.
 Import 
   VarVal
   MetaSyntax 
   AtkSyntax.Prms 
   AtkSyntax (AdvCorruptor, AdvExfiltrator, erase_prog)
-  Semantics.Notations.
+  Semantics.Notations
+  Tacs.
 
 #[local] Notation CleanProg := CleanSyntax.Prog.
 #[local] Notation AtkProg := AtkSyntax.Prog.
 #[local] Notation AtkVarSrc := AtkSyntax.VarSrc.
 #[local] Notation AtkVarDst := AtkSyntax.VarDst.
 
+(* 
+  You need to have a predicate over the initial adversary strategy as well.
+
+*)
 Section sim_security.
-  (* You need a type and an interpretation as an AdvCorruptor *)
-  (* You need a type and an interpretation as an AdvInfiltrator *)
-  (* You could also have a predicate on AdvCorruptors.. *)
-
-
   Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvLvlPrm}.
 
   Hint Extern 0 SrcDstVarPrm => 
@@ -36,12 +36,13 @@ Section sim_security.
     (* I don't use exact: in def. *)
     Section def.
       Let def (vs : AtkVarSrc) : Prop. Proof.
-        move: vs => [v].
-        case: (is_untrusted v) => [corr | _].
-        - exact (IdealCorruptor corr).
-        - exact (True).
+        destruct vs as [v corr].
+        destruct (is_untrusted v); ltac2:(goals [@CORR ; @CLEAN]).
+        [CORR]: { exact (IdealCorruptor corr). }
+        [CLEAN]: { exact (True). }
       Defined.
 
+      (* TODO: This should be refactored out.. *)
       Definition IdealSrcVar := 
         ltac:(
           let t := def in
@@ -52,10 +53,10 @@ Section sim_security.
 
     Section def.
       Let def (vd : AtkVarDst) : Prop. Proof.
-        move: vd => [v].
-        case: (is_public v) => [exf | _].
-        - exact (IdealExfiltrator exf).
-        - exact (True).
+        destruct vd as [v exf].
+        destruct (is_public v); ltac2:(goals [@CORR ; @CLEAN]).
+        [CORR]: { exact (IdealExfiltrator exf). }
+        [CLEAN]: { exact (True). }
       Defined.
 
     Definition IdealDstVar := ltac:(
