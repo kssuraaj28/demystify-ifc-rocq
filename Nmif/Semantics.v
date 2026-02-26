@@ -121,7 +121,7 @@ Section semantics.
   (* Ideally this would be a coinductive type *)
   Definition Behavior := Store -> nat -> list Event.
 
-  Section init_source_maul.
+  Section init_store_maul.
     Let def (s : Store) : Store. Proof.
       intro v.
       pose (orig_val := s v).
@@ -129,15 +129,15 @@ Section semantics.
       [UNTR]: { apply adv_maul_init; [esplit; exact VEq | exact orig_val]. }
       [TR]: { exact (orig_val). }
     Defined.
-    Definition init_source_maul := ltac:(hnf_clean def).
-  End init_source_maul.
+    Definition init_store_maul := ltac:(hnf_clean def).
+  End init_store_maul.
 
-  (* These names are absolutely disgusting. TODO *)
+  (* Maybe we keep in mind the number of while iterations.. *)
   Definition prog_behavior (p : AtkProg) : Behavior := 
-    fun store_init step_cnt =>
-      let: init_adv := adv_mem_init (construct_view store_init) in
-      let: init_store := init_source_maul store_init in
-      let: init_cfg := mk_cfg store_init init_adv p in
+    fun init_store step_cnt =>
+      let: init_adv := adv_mem_init (construct_view init_store) in
+      let: init_store_mauled := init_store_maul init_store in 
+      let: init_cfg := mk_cfg init_store_mauled init_adv p in
       let: ((_, ev), lst) := multi_step step_cnt init_cfg in
       ev :: map snd lst.
 End semantics.
@@ -145,5 +145,3 @@ End semantics.
 Module Notations.
   Notation "⟦ p ⟧" := (prog_behavior p).
 End Notations.
-
-(* Maybe we keep in mind the number of while iterations.. *)
