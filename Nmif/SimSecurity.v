@@ -15,10 +15,7 @@ Import
 #[local] Notation AtkVarSrc := AtkSyntax.VarSrc.
 #[local] Notation AtkVarDst := AtkSyntax.VarDst.
 
-(* 
-  You need to have a predicate over the initial adversary strategy as well.
-
-*)
+(* You need to have a predicate over the initial adversary strategy as well. *)
 Section sim_security.
   Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvLvlPrm}.
 
@@ -26,9 +23,22 @@ Section sim_security.
     (exact {|SrcVarMeta := AtkVarSrc; DstVarMeta := AtkVarDst|}) : typeclass_instances.
   Check ltac:(exact SrcDstVarPrm).
 
-  (* What went up must come down *)
-  Variable IdealCorruptor : forall `{!AdvDevicePrm},  AdvCorruptor -> Prop.
-  Variable IdealExfiltrator : forall `{!AdvDevicePrm}, AdvExfiltrator -> Prop.
+  (* This itself should not be Prop I think *)
+  (* Another thing we could do is make the AdvMem an operational type class..
+  *)
+  Fail Check 5.
+  Record InpType `{!AdvDevicePrm} :=
+    {
+      DevPred : Prop; (* Predicate on the device itself *)
+      CorruptorPred : AdvCorruptor -> Prop;
+      ExfiltratorPred : AdvExfiltrator -> Prop
+    }. 
+
+  Variable input : forall `{!AdvDevicePrm}, InpType.  Fail Check _ : input.
+
+  Notation IdealCorruptor := (CorruptorPred input).
+  Notation IdealExfiltrator := (ExfiltratorPred input).
+  Notation IdealDevice := ( forall `{!AdvDevicePrm}, Prop.
 
   Section lift.
     Context `{!AdvDevicePrm}.
@@ -44,11 +54,7 @@ Section sim_security.
 
       (* TODO: This should be refactored out.. *)
       Definition IdealSrcVar := 
-        ltac:(
-          let t := def in
-          let t := eval hnf in t in 
-          let t := eval cbv zeta in t in
-          exact t).
+        ltac:(hnf_clean def).
     End def.
 
     Section def.
@@ -59,11 +65,8 @@ Section sim_security.
         [CLEAN]: { exact (True). }
       Defined.
 
-    Definition IdealDstVar := ltac:(
-      let t := def in 
-      let t := eval hnf in t in
-      let t := eval cbv zeta in t in
-      exact t).
+    Definition IdealDstVar := 
+        ltac:(hnf_clean def).
     End def.
 
     Hint Extern 0 SrcDstPredPrm => exact ({|
@@ -81,5 +84,6 @@ Section sim_security.
     forall rad (rp : ExpAtkProg rad),  erase_prog rp = p ->
     exists iad (ip : ExpAtkProg iad),  erase_prog ip = p /\
     IdealProg ip /\
+    IdealAdvDevice iad /\
     ⟦ rp ⟧ = ⟦ ip ⟧.
 End sim_security.

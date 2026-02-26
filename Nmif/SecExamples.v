@@ -22,6 +22,9 @@ Module nmif.
       Notice here we make AdvDevicePrm explicit. 
       But in atk_sim_sec it was implicit?
     *)
+    Definition IdealCorruptor `(M : !AdvDevicePrm) (corr : AdvCorruptor) : Prop := 
+      forall mem v1 v2, corr v1 mem = corr v2 mem.
+
     Definition IdealCorruptor `(!AdvDevicePrm) (corr : AdvCorruptor) : Prop := 
       forall mem v1 v2, corr v1 mem = corr v2 mem.
 
