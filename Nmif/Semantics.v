@@ -2,31 +2,41 @@ From Stdlib Require List ssreflect.
 Import List List.ListNotations ssreflect.
 
 Require VarVal Store Tacs MetaSyntax AtkSyntax. 
-Import VarVal Store Tacs MetaSyntax.
+Import VarVal Store Tacs MetaSyntax AtkSyntax.Prms.
 
 #[local] Notation AtkProg := AtkSyntax.Prog.
 #[local] Notation AtkVarSrc := AtkSyntax.VarSrc.
 #[local] Notation AtkVarDst := AtkSyntax.VarDst.
 #[local] Notation AtkValExp := AtkSyntax.ValExp.
 #[local] Notation AtkBoolExp := AtkSyntax.BoolExp.
+#[local] Notation OptionalLeak := (option LeakVals).
 
-Section semantics.
-  Import AtkSyntax.Prms.
+Section cfg.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvDevicePrm}.
 
   (* What is 'state'? *)
-  Inductive Cfg := mk_cfg (store : Store) (amem: AdvMem) (cont : AtkProg).
+  Inductive Cfg := 
+    mk_cfg (store : Store) (amem: AdvMem) (cont : AtkProg).
+End cfg.
 
-  (* Our definition is super lockstep. 
-     If it works, I think it's good. *)
-  Inductive Event :=
-    | assignment (optupd: option (Vars * Vals)) (optlk : option LeakVals) 
-    | if_choice(choice : bool)
+Section event.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+
+  Inductive Action :=
+    | assignment (optlk : OptionalLeak)
+    | if_choice (choice : bool)
     | while_choice (choice : bool)
     | terminate.
 
-  (* Reading variables when attackers exist *)
-  (* Maybe I should be using the Equations plugin *)
+  (* Our definition is super lockstep. If it works, I think it's good. *)
+  Definition Event : Type :=
+    Action * StoreView is_trusted.
+End event.
+
+(* This section precisely defines adversary power *)
+Section store_interaction.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvDevicePrm}.
+
   Section store_read_w_adv.
     Let def (st : Store) (vs : AtkVarSrc) (amem : AdvMem) : Vals. Proof.
       destruct vs as [v adv].
@@ -38,6 +48,28 @@ Section semantics.
 
     Definition store_read_w_adv := ltac:(hnf_clean def).
   End store_read_w_adv.
+
+  Section store_update_w_adv.
+    Let def (s : Store) (vd : AtkVarDst) (vl : Vals) (amem : AdvMem) : 
+          Store * AdvMem *  OptionalLeak. Proof.
+      destruct vd as [v exf].
+      pose (s' := update_to_store s v vl).
+      destruct (is_public v); ltac2:(goals [@PUB; @SEC]).
+      [PUB]: {
+        destruct (exf vl amem) as [lk amem'].
+        exact (s', amem', (Some lk)).
+        }
+      [SEC]: {
+        exact (s', amem, None).
+        }
+    Defined.
+  Definition store_update_w_adv := ltac:(hnf_clean def).
+  End store_update_w_adv.
+End store_interaction.
+
+Section semantics.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvDevicePrm}.
+  Import Store.Notations. (* Where should these be imported. *)
 
   Definition val_exp_eval (e : AtkValExp) (store : Store) (amem : AdvMem) : Vals :=
     let: mk_vl_exp vs1 vs2 comp := e in
@@ -51,34 +83,16 @@ Section semantics.
     let: val := store_read_w_adv store vs amem in 
     test val.
 
-
-  Section store_update_w_adv.
-    Let def (s : Store) (vd : AtkVarDst) (vl : Vals) (amem : AdvMem) : 
-          Store * AdvMem * Event. Proof.
-      destruct vd as [v exf].
-      pose (s' := update_to_store s v vl).
-      pose (optupd := if (is_untrusted v) is true then None else Some (v,vl)). (* Here () makes a difference TODO *)
-      destruct (is_public v); ltac2:(goals [@PUB; @SEC]).
-      [PUB]: {
-        destruct (exf vl amem) as [lk amem'].
-        exact (s', amem', assignment optupd (Some lk)).
-        }
-      [SEC]: {
-        exact (s', amem, assignment optupd None).
-        }
-    Defined.
-  Definition store_update_w_adv := ltac:(hnf_clean def).
-  End store_update_w_adv.
-
   Definition step (cfg : Cfg) : Cfg * Event:=
     let: mk_cfg store amem prog := cfg in
-    if prog isn't (cmd :: prog') then (cfg, terminate) else  (* prog is skip *)
+    if prog isn't (cmd :: prog') then (cfg, (terminate , ⟨store⟩)) else  (* prog is skip *)
 
     match cmd with 
     | assign vd exp =>  
         let: cont := prog' in
         let: val := (val_exp_eval exp store amem) in
-        let: (store', amem', event) := store_update_w_adv store vd val amem in
+        let: (store', amem', optlk) := store_update_w_adv store vd val amem in
+        let: event := (assignment optlk , ⟨store'⟩) in
         (mk_cfg store' amem' prog', event)
 
     | cond exp b1 b2 =>
@@ -86,13 +100,13 @@ Section semantics.
         let: branch := if test is true then b1 else b2 in
         let: cont := (branch ++ prog') in
         let: cfg := mk_cfg store amem cont in
-        (cfg, if_choice test)
+        (cfg, (if_choice test, ⟨ store ⟩))
 
     | while exp while_bdy  =>  
        let: test := (bool_exp_eval exp store amem) in
        let: cont := if test is false then prog' else (while_bdy ++ prog) in
        let: cfg := mk_cfg store amem cont in
-       (cfg, while_choice test)
+       (cfg, (while_choice test, ⟨ store ⟩))
     end.
   Notation NeList A := (A * list A)%type.
 

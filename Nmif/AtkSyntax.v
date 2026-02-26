@@ -13,13 +13,13 @@ Module Prms.
     is_public : pred Vars
   }.
 
-  (* 
-    When you instantiate an adversary, you also give it memory.
-    The adversary gets to access the public view of the store and initialize memory
-    TODO: Eventually, we should also let it corrupt memory.
-    Should we let the adversary leak a value initially? 
-  *)
+  Section opp.
+    Context `{!VarPrm, !AdvLvlPrm}.
+    Definition is_secret v := ~~ is_public v.
+    Definition is_trusted v := ~~ is_untrusted v.
+  End opp.
 
+  (* Should we let the adversary leak a value initially? *)
   Class AdvDevicePrm  `{!VarPrm, !ValPrm, !AdvLvlPrm} := { 
       AdvMem : Type; 
       adv_mem_init : StoreView is_public -> AdvMem;

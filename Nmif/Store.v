@@ -20,3 +20,7 @@ Section store.
         let: exist x _ := vp in 
         s x.
 End store.
+
+Module Notations.
+  Notation "⟨ s ⟩" := (construct_view s).
+End Notations.
