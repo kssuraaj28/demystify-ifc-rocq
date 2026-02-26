@@ -1,4 +1,4 @@
-From QuickChick Require Import Decidability.
+From QuickChick Require Decidability.
 
 (* Should this be #[global]? *)
 Notation DecEq := Decidability.Dec_Eq.
