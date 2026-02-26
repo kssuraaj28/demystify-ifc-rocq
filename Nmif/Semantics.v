@@ -69,8 +69,12 @@ End store_interaction.
 
 Section semantics.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvDevicePrm}.
-  Import Store.Notations. (* Where should these be imported. *)
-
+  Import Store.Notations. 
+  (* 
+    Where should these be imported. Probably, I need to have a notation
+    delimiter key also.
+  *)
+  
   Definition val_exp_eval (e : AtkValExp) (store : Store) (amem : AdvMem) : Vals :=
     let: mk_vl_exp vs1 vs2 comp := e in
     let: get_val := fun vs => store_read_w_adv store vs amem in 
