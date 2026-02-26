@@ -23,25 +23,29 @@ Section sim_security.
     (exact {|SrcVarMeta := AtkVarSrc; DstVarMeta := AtkVarDst|}) : typeclass_instances.
   Check ltac:(exact SrcDstVarPrm).
 
-  (* This itself should not be Prop I think *)
-  (* Another thing we could do is make the AdvMem an operational type class..
+  (* 
+    This thing is useless being :Prop because
+    the elements are Props themselves
+    I'd be curious what the extraction behaviour is
+    TODO
   *)
-  Fail Check 5.
-  Record InpType `{!AdvDevicePrm} :=
+  Record InpType `{!AdvMemPrm} :=
     {
-      DevPred : Prop; (* Predicate on the device itself *)
+      MemInitPred : AdvMemIniter -> Prop; 
+      MaulInitPred : AdvMaulIniter -> Prop; 
       CorruptorPred : AdvCorruptor -> Prop;
       ExfiltratorPred : AdvExfiltrator -> Prop
     }. 
 
-  Variable input : forall `{!AdvDevicePrm}, InpType.  Fail Check _ : input.
+  Variable input : forall `{!AdvMemPrm}, InpType.  Fail Check _ : input.
 
+  Notation IdealMemInit := (MemInitPred input).
+  Notation IdealMaulInit := (MaulInitPred input).
   Notation IdealCorruptor := (CorruptorPred input).
   Notation IdealExfiltrator := (ExfiltratorPred input).
-  Notation IdealDevice := ( forall `{!AdvDevicePrm}, Prop.
 
   Section lift.
-    Context `{!AdvDevicePrm}.
+    Context `{!AdvMemPrm}.
 
     (* I don't use exact: in def. *)
     Section def.
@@ -78,12 +82,11 @@ Section sim_security.
     Definition IdealProg := MetaSyntax.ProgPred.
   End lift.
 
-  Let ExpAtkProg (m: AdvDevicePrm) : Type := AtkProg.
+  Let ExpAtkProg (m: AdvMemPrm) : Type := AtkProg.
 
   Definition atk_sim_sec (p : CleanProg) := Eval unfold ExpAtkProg in
     forall rad (rp : ExpAtkProg rad),  erase_prog rp = p ->
     exists iad (ip : ExpAtkProg iad),  erase_prog ip = p /\
     IdealProg ip /\
-    IdealAdvDevice iad /\
     ⟦ rp ⟧ = ⟦ ip ⟧.
 End sim_security.
