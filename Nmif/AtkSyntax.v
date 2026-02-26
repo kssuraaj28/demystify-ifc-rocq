@@ -6,6 +6,8 @@ Module Prms.
   (* The type of messages that the adversary leaks.
   I made this a operational typeclass for some reason... *)
   Class AdvLeakPrm := LeakVals : Type. 
+  (* Similarly with AdvMem *)
+  Class AdvMemPrm := AdvMem : Type.
 
   (* We also need to specify what variables the adversary has access to*)
   Class AdvLvlPrm  `{!VarPrm} := {
@@ -19,22 +21,24 @@ Module Prms.
     Definition is_trusted v := ~~ is_untrusted v.
   End opp.
 
-  (* Should we let the adversary leak a value initially? *)
-  Class AdvDevicePrm  `{!VarPrm, !ValPrm, !AdvLvlPrm} := { 
-      AdvMem : Type; 
-      adv_mem_init : StoreView is_public -> AdvMem;
-      adv_maul_init : {v: Vars | is_untrusted v} -> Vals -> Vals 
-      (* 
-        I guess that there are other things that can be done:
-        - StoreView is_untrusted -> StoreView is_untrusted
-        Here, you can maul in a slightly weirder way
-      *)
-    }.
+
+  (* How does the adversary initialize? *)
+  Section adv_init.
+    Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvMemPrm}.
+    Definition AdvMemIniter := StoreView is_public -> AdvMem.
+    Definition AdvMaulIniter := {v: Vars | is_untrusted v} -> Vals -> Vals.
+
+    Class AdvInitPrm  `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvMemPrm} := { 
+      adv_mem_init : AdvMemIniter;
+      adv_maul_init : AdvMaulIniter;
+      }.
+  End adv_init.
 End Prms.
 Import Prms.
 
 Section atksyntax.
-  Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvLvlPrm, !AdvDevicePrm}.
+  (* Do we need all of this? *)
+  Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvLvlPrm, !AdvMemPrm}.
 
   (* When you write to an adversary readable variable, the adversary can exfiltrate the value *)
   Definition AdvExfiltrator := Vals -> AdvMem -> (LeakVals * AdvMem).
@@ -70,7 +74,7 @@ Section atksyntax.
 End atksyntax.
 
 Section syntax_erase.
-  Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvLvlPrm, !AdvDevicePrm}.
+  Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvLvlPrm, !AdvMemPrm}.
 
   Notation AtkSrc := AtkSyntax.VarSrc.
   Notation AtkDst := AtkSyntax.VarDst.

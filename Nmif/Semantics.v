@@ -12,7 +12,7 @@ Import VarVal Store Tacs MetaSyntax AtkSyntax.Prms.
 #[local] Notation OptionalLeak := (option LeakVals).
 
 Section cfg.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvDevicePrm}.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvMemPrm}.
 
   (* What is 'state'? *)
   Inductive Cfg := 
@@ -35,7 +35,7 @@ End event.
 
 (* This section precisely defines adversary power *)
 Section store_interaction.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvDevicePrm}.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvMemPrm}.
 
   Section store_read_w_adv.
     Let def (st : Store) (vs : AtkVarSrc) (amem : AdvMem) : Vals. Proof.
@@ -68,7 +68,7 @@ Section store_interaction.
 End store_interaction.
 
 Section semantics.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvDevicePrm}.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvMemPrm, !AdvInitPrm}.
   Import Store.Notations. 
   (* 
     Where should these be imported. Probably, I need to have a notation
