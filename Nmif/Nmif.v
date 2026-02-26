@@ -1,25 +1,5 @@
 From Stdlib Require Import (*Arith*) List String ssreflect ssrbool.
-From QuickChick Require Import Decidability. 
-From Ltac2 Require Import Ltac2. Set Default Proof Mode "Classic".
-(* QuickCheck decidable equality classes are so good *)
-(* ssreflect for gallina extensions *)
-(* Arith for iter_nat *)
-(* ssrbool for boolean predicates *)
-
-Ltac2 goals l :=
-  let name_goal x := ltac1:(x |- refine ?[x]) (Ltac1.of_ident x) in
-  Control.dispatch (List.map (fun x () => name_goal x) l).
-
-Class VarPrm := {Vars : Type ; vars_deceq :: Dec_Eq Vars}. 
-Class ValPrm := {Vals : Type}.
-
-(* This can be used in more places. TODO *)
-Ltac hnf_clean def :=
-    let t := def in
-    let t := eval red in t in 
-    let t := eval hnf in t in 
-    exact t.
-
+Require Import Util Tacs VarVal.
 
 Module MetaSyntax.
   Class SrcDstVarPrm := {SrcVarMeta : Type ; DstVarMeta : Type}.
