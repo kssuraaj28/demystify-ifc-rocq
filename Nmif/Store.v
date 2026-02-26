@@ -1,5 +1,8 @@
-From Stdlib Require Import ssreflect ssrbool.
-Require Import Util VarVal.
+From Stdlib Require ssreflect ssrbool. 
+Import ssreflect ssrbool.
+
+Require Util VarVal.
+Import VarVal Util.Notations.
 
 Section store.
   Context `{!VarPrm, !ValPrm}.

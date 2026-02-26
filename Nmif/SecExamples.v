@@ -1,80 +1,71 @@
-From Stdlib Require Import (*Arith*) List String ssreflect ssrbool.
-Require Import Util Tacs VarVal MetaSyntax Store.
+Require VarVal MetaSyntax AtkSyntax SimSecurity.
+Import 
+  VarVal
+  MetaSyntax 
+  AtkSyntax.Prms
+  AtkSyntax (AdvCorruptor, AdvExfiltrator)
+  SimSecurity.
 
+#[local]  Notation AtkVarSrc := AtkSyntax.VarSrc.
+#[local]  Notation AtkVarDst := AtkSyntax.VarDst.
 
-Section nmif.
-  Import MetaSyntax AtkSyntax.Prms.
-  Import AtkSyntax (AdvCorruptor, AdvExfiltrator).
-  Context `{!VarPrm, !ValPrm,!AdvLeakPrm, !AdvLvlPrm}.
+Module nmif.
+  Section nmif.
+    Context `{!VarPrm, !ValPrm,!AdvLeakPrm, !AdvLvlPrm}.
 
-  Notation AtkVarSrc := AtkSyntax.VarSrc.
-  Notation AtkVarDst := AtkSyntax.VarDst.
+    Hint Extern 0 SrcDstVarPrm => 
+      (exact {|SrcVarMeta := AtkVarSrc; DstVarMeta := AtkVarDst|}) : typeclass_instances.
 
-  Hint Extern 0 SrcDstVarPrm => 
-    (exact {|SrcVarMeta := AtkVarSrc; DstVarMeta := AtkVarDst|}) : typeclass_instances.
+    (* 
+      TODO
+      Notice here we make AdvDevicePrm explicit. 
+      But in atk_sim_sec it was implicit?
+    *)
+    Definition IdealCorruptor `(!AdvDevicePrm) (corr : AdvCorruptor) : Prop := 
+      forall mem v1 v2, corr v1 mem = corr v2 mem.
 
-  Definition NmifCorruptor `{!AdvDevicePrm} (corr : AdvCorruptor) : Prop := 
-    forall mem v1 v2, corr v1 mem = corr v2 mem.
+    Definition IdealExfiltrator `(!AdvDevicePrm) (exf : AdvExfiltrator) : Prop := 
+      True.
 
-  (* TODO: What happens when you make the variable thing have explicit param? 
-  I think that there should be no change? *)
-  Definition NmifSecurity := atk_sim_sec (fun _ => NmifCorruptor) (fun _ _ => True).
+    Definition Security := atk_sim_sec IdealCorruptor IdealExfiltrator.
+  End nmif.
 End nmif.
 
-Section ni.
-  Import MetaSyntax AtkSyntax.Prms.
-  Import AtkSyntax (AdvCorruptor, AdvExfiltrator).
-  Context `{!VarPrm, !ValPrm,!AdvLeakPrm, !AdvLvlPrm}.
+Module ni.
+  Section ni.
+    Context `{!VarPrm, !ValPrm,!AdvLeakPrm, !AdvLvlPrm}.
 
-  Notation AtkVarSrc := AtkSyntax.VarSrc.
-  Notation AtkVarDst := AtkSyntax.VarDst.
+    Hint Extern 0 SrcDstVarPrm => 
+      (exact {|SrcVarMeta := AtkVarSrc; DstVarMeta := AtkVarDst|}) : typeclass_instances.
 
-  Hint Extern 0 SrcDstVarPrm => 
-    (exact {|SrcVarMeta := AtkVarSrc; DstVarMeta := AtkVarDst|}) : typeclass_instances.
+    (* Corruptor does not corrupt anything *)
+    Definition IdealCorruptor `(!AdvDevicePrm) (corr : AdvCorruptor) : Prop := 
+      forall mem v, corr v mem = v.
 
-  (* Noop *)
-  Definition NICorruptor `{!AdvDevicePrm} (corr : AdvCorruptor) : Prop := 
-    forall mem v, corr v mem = v.
+    (* Exfiltrator does not exfiltrate anything *)
+    Definition IdealExfiltrator `(!AdvDevicePrm) (exf : AdvExfiltrator) : Prop := 
+      forall v1 v2 amem,
+        exf v1 amem = exf v2 amem.
 
-  Definition NIExfiltrator `{!AdvDevicePrm} (exf : AdvExfiltrator) : Prop :=
-    forall v1 v2 amem,
-      exf v1 amem = exf v2 amem.
-
-  (* TODO: What happens when you make the variable thing have explicit param? 
-  I think that there should be no change? *)
-  Definition NISecurity := atk_sim_sec (fun _ => NICorruptor) (fun _ => NIExfiltrator).
+    Definition Security := atk_sim_sec IdealCorruptor IdealExfiltrator.
+  End ni.
 End ni.
 
-Section rd.
-  Import MetaSyntax AtkSyntax.Prms.
-  Import AtkSyntax (AdvCorruptor, AdvExfiltrator).
-  Context `{!VarPrm, !ValPrm,!AdvLeakPrm, !AdvLvlPrm}.
+Module rd.
+  Section rd.
+    Context `{!VarPrm, !ValPrm,!AdvLeakPrm, !AdvLvlPrm}.
 
-  Notation AtkVarSrc := AtkSyntax.VarSrc.
-  Notation AtkVarDst := AtkSyntax.VarDst.
+    Hint Extern 0 SrcDstVarPrm => 
+      (exact {|SrcVarMeta := AtkVarSrc; DstVarMeta := AtkVarDst|}) : typeclass_instances.
 
-  Hint Extern 0 SrcDstVarPrm => 
-    (exact {|SrcVarMeta := AtkVarSrc; DstVarMeta := AtkVarDst|}) : typeclass_instances.
+    (* Corruptor does not corrupt anything *)
+    Definition IdealCorruptor `(!AdvDevicePrm) (corr : AdvCorruptor) : Prop := 
+      forall mem v, corr v mem = v.
 
-  (* Passive *)
-  Definition RDCorruptor `{!AdvDevicePrm} (corr : AdvCorruptor) : Prop := 
-    forall mem v, corr v mem = v.
+    (* We don't place any restriction on exfiltrator *)
+    Definition IdealExfiltrator `(!AdvDevicePrm) (exf : AdvExfiltrator) : Prop := 
+      True.
 
-  (* TODO: What happens when you make the variable thing have explicit param? 
-  I think that there should be no change? *)
-  Definition RDSecurity := atk_sim_sec (fun _ => RDCorruptor) (fun _ _ => True).
+    Definition Security := atk_sim_sec IdealCorruptor IdealExfiltrator.
+  End rd.
 End rd.
-
-(* To define program behavior, 
-   we can just define mem_init, 
-   So, this can initialize adversary memory, 
-   and maybe leak something to the adversary initially as well.
-   The order should be leak then corrupt.
-   We can then think about
-   
-
-   Another thing to keep in mind is that we might want to
-   count the number of while iterations.
-
-
-*)

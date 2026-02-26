@@ -1,14 +1,23 @@
+From Stdlib Require List ssreflect.
+Import List List.ListNotations ssreflect.
+
+Require VarVal MetaSyntax AtkSyntax Semantics.
+Import 
+  VarVal
+  MetaSyntax 
+  AtkSyntax.Prms 
+  AtkSyntax (AdvCorruptor, AdvExfiltrator, erase_prog)
+  Semantics.Notations.
+
+#[local] Notation CleanProg := CleanSyntax.Prog.
+#[local] Notation AtkProg := AtkSyntax.Prog.
+#[local] Notation AtkVarSrc := AtkSyntax.VarSrc.
+#[local] Notation AtkVarDst := AtkSyntax.VarDst.
+
 Section sim_security.
   (* You need a type and an interpretation as an AdvCorruptor *)
   (* You need a type and an interpretation as an AdvInfiltrator *)
   (* You could also have a predicate on AdvCorruptors.. *)
-  Import MetaSyntax.
-  Import AtkSyntax.Prms.
-  Import AtkSyntax (AdvCorruptor, AdvExfiltrator, erase_prog).
-  Notation CleanProg := CleanSyntax.Prog.
-  Notation AtkProg := AtkSyntax.Prog.
-  Notation AtkVarSrc := AtkSyntax.VarSrc.
-  Notation AtkVarDst := AtkSyntax.VarDst.
 
 
   Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvLvlPrm}.

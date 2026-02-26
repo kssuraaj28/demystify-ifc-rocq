@@ -1,60 +1,43 @@
+From Stdlib Require List ssreflect.
+Import List List.ListNotations ssreflect.
+
+Require VarVal Store Tacs MetaSyntax AtkSyntax. 
+Import VarVal Store Tacs MetaSyntax.
+
+#[local] Notation AtkProg := AtkSyntax.Prog.
+#[local] Notation AtkVarSrc := AtkSyntax.VarSrc.
+#[local] Notation AtkVarDst := AtkSyntax.VarDst.
+#[local] Notation AtkValExp := AtkSyntax.ValExp.
+#[local] Notation AtkBoolExp := AtkSyntax.BoolExp.
+
 Section semantics.
-  Import MetaSyntax AtkSyntax.Prms.
+  Import AtkSyntax.Prms.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvDevicePrm}.
-  Notation AtkProg := AtkSyntax.Prog.
-  Notation AtkVarSrc := AtkSyntax.VarSrc.
-  Notation AtkVarDst := AtkSyntax.VarDst.
-  Notation AtkValExp := AtkSyntax.ValExp.
-  Notation AtkBoolExp := AtkSyntax.BoolExp.
 
   (* What is 'state'? *)
   Inductive Cfg := mk_cfg (store : Store) (amem: AdvMem) (cont : AtkProg).
 
   (* Our definition is super lockstep. 
-     If it works, I think it's good.
-  *)
+     If it works, I think it's good. *)
   Inductive Event :=
     | assignment (optupd: option (Vars * Vals)) (optlk : option LeakVals) 
     | if_choice(choice : bool)
     | while_choice (choice : bool)
     | terminate.
 
-  (* 
-    You check whether the variable is controlled by the attacker. 
-    If the variable is controlled by the attacker, then the adversary strat is active
-    I'm making a very important choice here. 
-    We can strengthen or weaken the adversary later here.
-  *)
-
-  (* 
-    For dependent pattern matching, there seem to be the following appraoches:
-    - Painfully write using gallina 
-    - Use proof mode.
-      - Normal? 
-      - ssreflect? `Show Proof` is disgusting
-    - Use equations plugin
-  I use normal because ssreflect is too magical.
-  Also, I have eqn:E and stuff, which I don't know how to do using ssreflect
-  case E: X might be okay. However, ssreflect tactics seem to have trouble with typeclasses..
-  Another thing I don't like is destruct doing a let definition
-
-  With normal, I don't like how destruct makes a new let definition.
-  Perhaps the right way to solve this is targeted cbv zeta, which is not possible also
-  I think that nonmagical coq tactics are the way to go..
-
-  Maybe use destruct along with move?
-  *)
-  Section def.
+  (* Reading variables when attackers exist *)
+  (* Maybe I should be using the Equations plugin *)
+  Section store_read_w_adv.
     Let def (st : Store) (vs : AtkVarSrc) (amem : AdvMem) : Vals. Proof.
       destruct vs as [v adv].
-      pose (orig_val := get_from_store st v). (* What does () make?  *)
+      pose (orig_val := get_from_store st v). 
       destruct (is_untrusted v); ltac2:(goals [@UNTR; @TR]).
       [UNTR]: { exact (adv orig_val amem). }
       [TR]: { exact (orig_val). }
     Defined.
 
     Definition store_read_w_adv := ltac:(hnf_clean def).
-  End def.
+  End store_read_w_adv.
 
   Definition val_exp_eval (e : AtkValExp) (store : Store) (amem : AdvMem) : Vals :=
     let: mk_vl_exp vs1 vs2 comp := e in
@@ -68,8 +51,8 @@ Section semantics.
     let: val := store_read_w_adv store vs amem in 
     test val.
 
-  (* Maybe using the equations plugin is the right way to handle this.. *)
-  Section def.
+
+  Section store_update_w_adv.
     Let def (s : Store) (vd : AtkVarDst) (vl : Vals) (amem : AdvMem) : 
           Store * AdvMem * Event. Proof.
       destruct vd as [v exf].
@@ -85,7 +68,7 @@ Section semantics.
         }
     Defined.
   Definition store_update_w_adv := ltac:(hnf_clean def).
-  End def.
+  End store_update_w_adv.
 
   Definition step (cfg : Cfg) : Cfg * Event:=
     let: mk_cfg store amem prog := cfg in
@@ -111,8 +94,6 @@ Section semantics.
        let: cfg := mk_cfg store amem cont in
        (cfg, while_choice test)
     end.
-
-  Import ListNotations.
   Notation NeList A := (A * list A)%type.
 
   Fixpoint multi_step (n : nat) (cfg: Cfg) : NeList (Cfg * Event) :=
@@ -123,9 +104,10 @@ Section semantics.
         (step cfg', (cfg', ev') :: lst') (* This naming is a little stupid *)
     end.
 
+  (* Ideally this would be a coinductive type *)
   Definition Behavior := Store -> nat -> list Event.
 
-  Section def.
+  Section init_source_maul.
     Let def (s : Store) : Store. Proof.
       intro v.
       pose (orig_val := s v).
@@ -134,7 +116,7 @@ Section semantics.
       [TR]: { exact (orig_val). }
     Defined.
     Definition init_source_maul := ltac:(hnf_clean def).
-  End def.
+  End init_source_maul.
 
   (* These names are absolutely disgusting. TODO *)
   Definition prog_behavior (p : AtkProg) : Behavior := 
@@ -144,6 +126,10 @@ Section semantics.
       let: init_cfg := mk_cfg store_init init_adv p in
       let: ((_, ev), lst) := multi_step step_cnt init_cfg in
       ev :: map snd lst.
-
 End semantics.
-Notation "⟦ p ⟧" := (prog_behavior p).
+
+Module Notations.
+  Notation "⟦ p ⟧" := (prog_behavior p).
+End Notations.
+
+(* Maybe we keep in mind the number of while iterations.. *)
