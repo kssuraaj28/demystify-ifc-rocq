@@ -48,7 +48,7 @@ Section sim_security.
     Context `{!AdvMemPrm}.
 
     (* I don't use exact: in def. *)
-    Section def.
+    Section ideal_src_var.
       Let def (vs : AtkVarSrc) : Prop. Proof.
         destruct vs as [v corr].
         destruct (is_untrusted v); ltac2:(goals [@CORR ; @CLEAN]).
@@ -56,12 +56,10 @@ Section sim_security.
         [CLEAN]: { exact (True). }
       Defined.
 
-      (* TODO: This should be refactored out.. *)
-      Definition IdealSrcVar := 
-        ltac:(hnf_clean def).
-    End def.
+      Definition IdealSrcVar := ltac:(hnf_clean def).
+    End ideal_src_var.
 
-    Section def.
+    Section ideal_dst_var.
       Let def (vd : AtkVarDst) : Prop. Proof.
         destruct vd as [v exf].
         destruct (is_public v); ltac2:(goals [@CORR ; @CLEAN]).
@@ -69,9 +67,8 @@ Section sim_security.
         [CLEAN]: { exact (True). }
       Defined.
 
-    Definition IdealDstVar := 
-        ltac:(hnf_clean def).
-    End def.
+    Definition IdealDstVar := ltac:(hnf_clean def).
+    End ideal_dst_var.
 
     Hint Extern 0 SrcDstPredPrm => exact ({|
         SrcPred := IdealSrcVar;
@@ -79,10 +76,12 @@ Section sim_security.
     |}) : typeclass_instances.
 
     (* This namespacing thing is stupid. TODO *)
-    Definition IdealProg := MetaSyntax.ProgPred.
+    Definition IdealProg := ltac:(hnf_clean MetaSyntax.ProgPred).
   End lift.
 
   Let ExpAtkProg (m: AdvMemPrm) : Type := AtkProg.
+  Set Printing Implicit.
+  Check @Semantics.prog_behavior _ _ _ _.
 
   Definition atk_sim_sec (p : CleanProg) := Eval unfold ExpAtkProg in
     forall rad (rp : ExpAtkProg rad),  erase_prog rp = p ->
