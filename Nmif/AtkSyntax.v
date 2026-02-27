@@ -11,7 +11,7 @@ Module Prms.
 
   (* We also need to specify what variables the adversary has access to*)
   Class AdvLvlPrm  `{!VarPrm} := {
-    is_untrusted : pred Vars ; 
+    is_untrusted : pred Vars ;
     is_public : pred Vars
   }.
 
@@ -39,7 +39,7 @@ Section atksyntax.
 
   (* When you read from  an adversary writable variable, the adversary can maul *)
   Definition AdvCorruptor := Vals -> AdvMem -> Vals. 
-  (* Andrew: should this have access to all of secret memory when mauling SU variables? *)
+  (* TODO Andrew: should this have access to all of secret memory when mauling SU variables? *)
 
   (*
      Maybe think about other ways? I use computation here.. 
@@ -106,6 +106,7 @@ Section syntax_erase.
   Definition erase_cmd := ltac:(hnf_clean cmd_trans).
   Definition erase_preprog := ltac:(hnf_clean prog_trans).
   Definition erase_prog (p : Prog) := 
-    let: (pp, _, _) := p in
-    erase_preprog pp.
+    let: (p, _, _) := p in
+    erase_preprog p.
+
 End syntax_erase.
