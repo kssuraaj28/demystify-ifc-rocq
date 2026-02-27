@@ -4,11 +4,13 @@ Import List List.ListNotations ssreflect.
 Require VarVal Store Tacs MetaSyntax AtkSyntax. 
 Import VarVal Store Tacs MetaSyntax AtkSyntax.Prms.
 
-#[local] Notation AtkProg := AtkSyntax.Prog.
+#[local] Notation AtkFullProg := AtkSyntax.Prog.
+#[local] Notation AtkPartProg := AtkSyntax.PreProg.
 #[local] Notation AtkVarSrc := AtkSyntax.VarSrc.
 #[local] Notation AtkVarDst := AtkSyntax.VarDst.
 #[local] Notation AtkValExp := AtkSyntax.ValExp.
 #[local] Notation AtkBoolExp := AtkSyntax.BoolExp.
+#[local] Notation AdvMaulIniter := AtkSyntax.AdvMaulIniter.
 #[local] Notation OptionalLeak := (option LeakVals).
 
 Section cfg.
@@ -16,7 +18,7 @@ Section cfg.
 
   (* What is 'state'? *)
   Inductive Cfg := 
-    mk_cfg (store : Store) (amem: AdvMem) (cont : AtkProg).
+    mk_cfg (store : Store) (amem: AdvMem) (cont : AtkPartProg).
 End cfg.
 
 Section event.
@@ -71,7 +73,7 @@ End store_interaction.
 
 (* Semantics of evaluation with an adversary *)
 Section semantics.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvMemPrm, !AdvInitPrm}.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvMemPrm}.
   Import Store.Notations. 
   (* 
     Where should these be imported. Probably, I need to have a notation
@@ -126,27 +128,29 @@ Section semantics.
     end.
 
   (* Ideally this would be a coinductive type *)
-  Definition Behavior := Store -> nat -> list Event.
+  Definition Behavior := Store -> nat -> NeList Event.
 
   Section init_store_maul.
-    Let def (s : Store) : Store. Proof.
+    Let def (s : Store) (amem : AdvMem) (adv_maul_init : AdvMaulIniter) : Store. Proof.
       intro v.
       pose (orig_val := s v).
       destruct (is_untrusted v) eqn: VEq; ltac2:(goals [@UNTR; @TR]).
-      [UNTR]: { apply adv_maul_init; [esplit; exact VEq | exact orig_val]. }
+      [UNTR]: { apply adv_maul_init; [exact amem| esplit; exact VEq | exact orig_val]. }
       [TR]: { exact (orig_val). }
     Defined.
     Definition init_store_maul := ltac:(hnf_clean def).
   End init_store_maul.
 
-  (* Maybe we keep in mind the number of while iterations.. *)
-  Definition prog_behavior (p : AtkProg) : Behavior := 
+  Definition prog_behavior (p : AtkFullProg) : Behavior :=
+    let: (prog, amem_init, amaul_init) := p in
     fun init_store step_cnt =>
-      let: init_adv := adv_mem_init (construct_view init_store) in
-      let: init_store_mauled := init_store_maul init_store in 
-      let: init_cfg := mk_cfg init_store_mauled init_adv p in
+      let: init_adv := amem_init ⟨init_store⟩ in
+      let: init_store_mauled := 
+        init_store_maul init_store init_adv amaul_init
+      in 
+      let: init_cfg := mk_cfg init_store_mauled init_adv prog in
       let: ((_, ev), lst) := multi_step step_cnt init_cfg in
-      ev :: map snd lst.
+      (ev, map snd lst).
 End semantics.
 
 Module Notations.
