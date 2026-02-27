@@ -14,7 +14,6 @@ Section store.
 
   Definition StoreView (p : pred Vars) := {v: Vars | p v} -> Vals.
 
-  (* Maybe we can make this a coercion? *)
   Definition construct_view (s : Store) {p} : StoreView p :=
       fun vp =>
         let: exist x _ := vp in 
@@ -22,5 +21,8 @@ Section store.
 End store.
 
 Module Notations.
+  (* 
+    TODO: Perhaps we want to have something like a notation key / delimiter?
+  *)
   Notation "⟨ s ⟩" := (construct_view s).
 End Notations.
