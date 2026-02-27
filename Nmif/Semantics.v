@@ -46,6 +46,7 @@ Section store_interaction.
       [TR]: { exact (orig_val). }
     Defined.
 
+    (* What does it mean to read from a store when you have an adversary *)
     Definition store_read_w_adv := ltac:(hnf_clean def).
   End store_read_w_adv.
 
@@ -63,10 +64,12 @@ Section store_interaction.
         exact (s', amem, None).
         }
     Defined.
+  (* What does it mean to write to a store when you have an adversary *)
   Definition store_update_w_adv := ltac:(hnf_clean def).
   End store_update_w_adv.
 End store_interaction.
 
+(* Semantics of evaluation with an adversary *)
 Section semantics.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvMemPrm, !AdvInitPrm}.
   Import Store.Notations. 

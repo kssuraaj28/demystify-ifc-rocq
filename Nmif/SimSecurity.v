@@ -47,7 +47,6 @@ Section sim_security.
   Section lift.
     Context `{!AdvMemPrm}.
 
-    (* I don't use exact: in def. *)
     Section ideal_src_var.
       Let def (vs : AtkVarSrc) : Prop. Proof.
         destruct vs as [v corr].
@@ -75,7 +74,6 @@ Section sim_security.
         DstPred := IdealDstVar;
     |}) : typeclass_instances.
 
-    (* This namespacing thing is stupid. TODO *)
     Definition IdealProg := ltac:(hnf_clean MetaSyntax.ProgPred).
   End lift.
 

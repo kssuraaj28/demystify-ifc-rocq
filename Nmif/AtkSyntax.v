@@ -32,15 +32,16 @@ Section atksyntax.
   Definition AdvMemIniter := StoreView is_public -> AdvMem.
 
   (* The adversary also can initially corrupt the store program *)
-  Definition AdvMaulIniter := {v: Vars | is_untrusted v} -> Vals -> Vals.
+  Definition AdvMaulIniter := AdvMem -> {v: Vars | is_untrusted v} -> Vals -> Vals.
 
   (* When you write to an adversary readable variable, the adversary can exfiltrate the value *)
   Definition AdvExfiltrator := Vals -> AdvMem -> (LeakVals * AdvMem).
 
   (* When you read from  an adversary writable variable, the adversary can maul *)
   Definition AdvCorruptor := Vals -> AdvMem -> Vals. 
+  (* Andrew: should this have access to all of secret memory when mauling SU variables? *)
 
-  (* 
+  (*
      Maybe think about other ways? I use computation here.. 
      Maybe the equations plugin helps..
   *)
