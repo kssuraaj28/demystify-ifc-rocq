@@ -117,6 +117,7 @@ Section semantics.
        let: cfg := mk_cfg store amem cont in
        (cfg, (while_choice test, ⟨ store ⟩))
     end.
+
   Notation NeList A := (A * list A)%type.
 
   Fixpoint multi_step (n : nat) (cfg: Cfg) : NeList (Cfg * Event) :=

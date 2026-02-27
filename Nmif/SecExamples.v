@@ -9,6 +9,7 @@ Import
 
 #[local] Notation AtkVarSrc := AtkSyntax.VarSrc.
 #[local] Notation AtkVarDst := AtkSyntax.VarDst.
+#[local] Notation SimInput := SimSecurity.InpType.
 
 Module nmif.
   Section nmif.
@@ -17,21 +18,25 @@ Module nmif.
     Hint Extern 0 SrcDstVarPrm => 
       (exact {|SrcVarMeta := AtkVarSrc; DstVarMeta := AtkVarDst|}) : typeclass_instances.
 
-    (* 
-      TODO
-      Notice here we make AdvDevicePrm explicit. 
-      But in atk_sim_sec it was implicit?
-    *)
-    Definition IdealCorruptor `(M : !AdvDevicePrm) (corr : AdvCorruptor) : Prop := 
-      forall mem v1 v2, corr v1 mem = corr v2 mem.
+    Definition IdealPreds `(!AdvMemPrm) : SimInput := {|
+        MemInitPred := fun amem_init => True;
 
-    Definition IdealCorruptor `(!AdvDevicePrm) (corr : AdvCorruptor) : Prop := 
-      forall mem v1 v2, corr v1 mem = corr v2 mem.
+        MaulInitPred := fun amaul_init => 
+                          forall amem var v1 v2, 
+                              amaul_init amem var v1 =
+                              amaul_init amem var v2; 
 
-    Definition IdealExfiltrator `(!AdvDevicePrm) (exf : AdvExfiltrator) : Prop := 
-      True.
+        (* TODO: Maybe have an `is_constant` function *)
+        CorruptorPred := fun corr => 
+                           forall mem v1 v2, 
+                             corr v1 mem = 
+                             corr v2 mem ;
 
-    Definition Security := atk_sim_sec IdealCorruptor IdealExfiltrator.
+        ExfiltratorPred := fun exf => 
+                             True ;
+     |}.
+
+    Definition Security := atk_sim_sec IdealPreds.
   End nmif.
 End nmif.
 
@@ -42,16 +47,27 @@ Module ni.
     Hint Extern 0 SrcDstVarPrm => 
       (exact {|SrcVarMeta := AtkVarSrc; DstVarMeta := AtkVarDst|}) : typeclass_instances.
 
-    (* Corruptor does not corrupt anything *)
-    Definition IdealCorruptor `(!AdvDevicePrm) (corr : AdvCorruptor) : Prop := 
-      forall mem v, corr v mem = v.
+    Definition IdealPreds `(!AdvMemPrm) : SimInput := {|
+        (* No restriction on initial initialization *)
+        MemInitPred := fun amem_init => True;
 
-    (* Exfiltrator does not exfiltrate anything *)
-    Definition IdealExfiltrator `(!AdvDevicePrm) (exf : AdvExfiltrator) : Prop := 
-      forall v1 v2 amem,
-        exf v1 amem = exf v2 amem.
+        (* No corruption allowed initially *)
+        MaulInitPred := fun amaul_init => 
+                          forall amem var val,
+                              amaul_init amem var val = val;
 
-    Definition Security := atk_sim_sec IdealCorruptor IdealExfiltrator.
+        (* No corruption allowed during runs *)
+        CorruptorPred := fun corr =>
+                           forall mem v,
+                             corr v mem = v;
+
+        (* Exfiltration does not get access to values*)
+        ExfiltratorPred := fun exf => 
+                             forall amem v1 v2,
+                               exf v1 amem = exf v2 amem
+     |}.
+
+    Definition Security := atk_sim_sec IdealPreds.
   End ni.
 End ni.
 
@@ -61,6 +77,26 @@ Module rd.
 
     Hint Extern 0 SrcDstVarPrm => 
       (exact {|SrcVarMeta := AtkVarSrc; DstVarMeta := AtkVarDst|}) : typeclass_instances.
+
+    Definition IdealPreds `(!AdvMemPrm) : SimInput := {|
+        (* No restriction on initial initialization *)
+        MemInitPred := fun amem_init => True;
+
+        (* No corruption allowed initially *)
+        MaulInitPred := fun amaul_init => 
+                          forall amem var val,
+                              amaul_init amem var val = val;
+
+        (* No corruption allowed during runs *)
+        CorruptorPred := fun corr =>
+                           forall mem v,
+                             corr v mem = v;
+
+        (* Declassification is allowed *)
+        ExfiltratorPred := fun exf => True
+     |}.
+
+    Definition Security := atk_sim_sec IdealPreds.
 
     (* Corruptor does not corrupt anything *)
     Definition IdealCorruptor `(!AdvDevicePrm) (corr : AdvCorruptor) : Prop := 

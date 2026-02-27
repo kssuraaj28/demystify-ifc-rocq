@@ -6,7 +6,12 @@ Import
   VarVal
   MetaSyntax 
   AtkSyntax.Prms 
-  AtkSyntax (AdvCorruptor, AdvExfiltrator, erase_prog)
+  AtkSyntax (
+    AdvCorruptor,
+    AdvExfiltrator,
+    AdvMemIniter,
+    AdvMaulIniter,
+    erase_prog)
   Semantics.Notations
   Tacs.
 
@@ -66,7 +71,7 @@ Section sim_security.
         [CLEAN]: { exact (True). }
       Defined.
 
-    Definition IdealDstVar := ltac:(hnf_clean def).
+      Definition IdealDstVar := ltac:(hnf_clean def).
     End ideal_dst_var.
 
     Hint Extern 0 SrcDstPredPrm => exact ({|
@@ -74,16 +79,21 @@ Section sim_security.
         DstPred := IdealDstVar;
     |}) : typeclass_instances.
 
-    Definition IdealProg := ltac:(hnf_clean MetaSyntax.ProgPred).
+    Definition IdealPartProg := ltac:(hnf_clean MetaSyntax.ProgPred).
+
+    Definition IdealProg : AtkProg -> Prop :=
+      fun '(p, amem_init, amaul_init) =>
+        IdealPartProg p /\
+        IdealMemInit amem_init/\
+        IdealMaulInit amaul_init.
+
   End lift.
 
   Let ExpAtkProg (m: AdvMemPrm) : Type := AtkProg.
-  Set Printing Implicit.
-  Check @Semantics.prog_behavior _ _ _ _.
-
   Definition atk_sim_sec (p : CleanProg) := Eval unfold ExpAtkProg in
-    forall rad (rp : ExpAtkProg rad),  erase_prog rp = p ->
-    exists iad (ip : ExpAtkProg iad),  erase_prog ip = p /\
-    IdealProg ip /\
+    forall rm (rp : ExpAtkProg rm),  erase_prog rp = p ->
+    exists im (ip : ExpAtkProg im),  erase_prog ip = p /\
+    IdealProg ip /\ 
     ⟦ rp ⟧ = ⟦ ip ⟧.
+
 End sim_security.
