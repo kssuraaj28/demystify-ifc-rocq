@@ -97,16 +97,6 @@ Module rd.
      |}.
 
     Definition Security := atk_sim_sec IdealPreds.
-
-    (* Corruptor does not corrupt anything *)
-    Definition IdealCorruptor `(!AdvDevicePrm) (corr : AdvCorruptor) : Prop := 
-      forall mem v, corr v mem = v.
-
-    (* We don't place any restriction on exfiltrator *)
-    Definition IdealExfiltrator `(!AdvDevicePrm) (exf : AdvExfiltrator) : Prop := 
-      True.
-
-    Definition Security := atk_sim_sec IdealCorruptor IdealExfiltrator.
   End rd.
 End rd.
 
