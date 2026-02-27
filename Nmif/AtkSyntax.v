@@ -21,24 +21,18 @@ Module Prms.
     Definition is_trusted v := ~~ is_untrusted v.
   End opp.
 
-
-  (* How does the adversary initialize? *)
-  Section adv_init.
-    Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvMemPrm}.
-    Definition AdvMemIniter := StoreView is_public -> AdvMem.
-    Definition AdvMaulIniter := {v: Vars | is_untrusted v} -> Vals -> Vals.
-
-    Class AdvInitPrm  `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvMemPrm} := { 
-      adv_mem_init : AdvMemIniter;
-      adv_maul_init : AdvMaulIniter;
-      }.
-  End adv_init.
 End Prms.
 Import Prms.
 
 Section atksyntax.
   (* Do we need all of this? *)
   Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvLvlPrm, !AdvMemPrm}.
+
+  (* How do you initialize adversary memory? *)
+  Definition AdvMemIniter := StoreView is_public -> AdvMem.
+
+  (* The adversary also can initially corrupt the store program *)
+  Definition AdvMaulIniter := {v: Vars | is_untrusted v} -> Vals -> Vals.
 
   (* When you write to an adversary readable variable, the adversary can exfiltrate the value *)
   Definition AdvExfiltrator := Vals -> AdvMem -> (LeakVals * AdvMem).
@@ -70,7 +64,8 @@ Section atksyntax.
   Definition ValExp := ValExpMeta.
   Definition BoolExp := BoolExpMeta.
   Definition Cmd := CmdMeta.
-  Definition Prog := ProgMeta.
+  Definition PreProg := ProgMeta.
+  Definition Prog := (PreProg * AdvMemIniter * AdvMaulIniter)%type.
 End atksyntax.
 
 Section syntax_erase.
@@ -104,8 +99,12 @@ Section syntax_erase.
   |}) : typeclass_instances.
   Check ltac:(exact(_ : SynTransPrm)).
 
-  Definition erase_val_exp := Eval red in val_exp_trans.
-  Definition erase_bool_exp := Eval red in bool_exp_trans.
-  Definition erase_cmd := Eval red in cmd_trans.
-  Definition erase_prog := Eval red in prog_trans.
+
+  Definition erase_val_exp := ltac:(hnf_clean val_exp_trans).
+  Definition erase_bool_exp := ltac:(hnf_clean bool_exp_trans).
+  Definition erase_cmd := ltac:(hnf_clean cmd_trans).
+  Definition erase_preprog := ltac:(hnf_clean prog_trans).
+  Definition erase_prog (p : Prog) := 
+    let: (pp, _, _) := p in
+    erase_preprog pp.
 End syntax_erase.
