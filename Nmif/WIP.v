@@ -10,15 +10,30 @@ From Stdlib Require (*Arith*) ssreflect ssrbool.
 Import ssreflect ssrbool.
 
 Require VarVal CleanSyntax AtkSyntax SimSecurity.
-Import VarVal CleanSyntax AtkSyntax.Prms CleanSyntax.
+Import VarVal CleanSyntax AtkSyntax.Prms CleanSyntax MetaSyntax.
 
-#[local] Notation CleanProg := CleanSyntax.Prog.
+(* TODO: This notatio is stupid *)
+#[local] Notation CleanProg := CleanSyntax.Cmd.
 
 Section welltyped.
   Context `{!ValPrm, !VarPrm, !AdvLvlPrm}.
 
-  (* TODO: Maybe abstract this out in MetaSyntax also*) 
-  Program Definition is_well_typed : pred CleanProg :=
+  (* The right way to define  *)
+  (* TODO: Maybe abstract this out in MetaSyntax also*)
+  Program Definition is_well_typed : pred CleanProg. Proof.
+  refine (
+    fun p =>
+      match p with
+      | skip => true
+      | assign d exp => _
+      | seq c1 c2 => _
+      | cond cond_var b1 b2 => _
+      | while cond_var body => _
+      end).
+    destruct 1. 
+
+    Show Proof.
+
     fun p =>
       true.
 

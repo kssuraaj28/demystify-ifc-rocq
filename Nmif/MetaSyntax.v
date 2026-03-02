@@ -23,13 +23,13 @@ Section meta_syntax.
 
 End meta_syntax.
 
-Class SrcDstPredPrm `{!SrcDstVarPrm}
-  := {SrcPred : (SrcVarMeta -> Prop); DstPred : (DstVarMeta -> Prop)}.
+Class SyntaxPropPredPrm `{!SrcDstVarPrm} := 
+  {SrcPred : (SrcVarMeta -> Prop); DstPred : (DstVarMeta -> Prop)}.
 
 Section syntax_pred.
   Context `{!VarPrm, !ValPrm}.
 
-  Context `{!SrcDstVarPrm,!SrcDstPredPrm}.
+  Context `{!SrcDstVarPrm,!SyntaxPropPredPrm}.
 
   Definition ValExpPred (exp: ValExpMeta): Prop := 
     let: mk_vl_exp vs1 vs2 _ := exp in
@@ -54,6 +54,44 @@ Section syntax_pred.
         CmdPred while_bdy
     end.
 End syntax_pred.
+
+Class SyntaxBoolPredPrm `{!SrcDstVarPrm} := 
+  {src_pred : (pred SrcVarMeta); dst_pred : pred DstVarMeta}.
+
+Section syntax_pred.
+  Context `{!VarPrm, !ValPrm}.
+
+  Context `{!SrcDstVarPrm,!SyntaxBoolPredPrm}.
+
+  Definition val_exp_pred: pred ValExpMeta :=
+    fun exp =>
+      let: mk_vl_exp vs1 vs2 _ := exp in
+      src_pred vs1 && src_pred vs2.
+
+  Definition bool_exp_pred : pred BoolExpMeta :=
+    fun exp =>
+      let: mk_bl_exp vs test := exp in
+      src_pred vs.
+
+  Fixpoint cmd_pred : pred CmdMeta :=
+    fun cmd =>
+      match cmd with
+      | skip => true
+      | assign vd exp => dst_pred vd && val_exp_pred exp
+      | seq c1 c2 => cmd_pred c1 && cmd_pred c2
+      | cond exp c1 c2 => 
+          bool_exp_pred exp &&
+          cmd_pred c1 &&
+          cmd_pred c2
+      | while exp while_bdy  => 
+          bool_exp_pred exp &&
+          cmd_pred while_bdy
+      end.
+End syntax_pred.
+
+
+
+
 
 (* Bundling is a little bit sad. *)
 Class SynTransPrm := {

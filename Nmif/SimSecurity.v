@@ -15,7 +15,7 @@ Import
   Semantics.Notations
   Tacs.
 
-#[local] Notation CleanProg := CleanSyntax.Prog.
+#[local] Notation CleanProg := CleanSyntax.Cmd.
 #[local] Notation AtkProg := AtkSyntax.Prog.
 #[local] Notation AtkVarSrc := AtkSyntax.VarSrc.
 #[local] Notation AtkVarDst := AtkSyntax.VarDst.
@@ -79,12 +79,13 @@ Section sim_security.
         DstPred := IdealDstVar;
     |}) : typeclass_instances.
 
-    Definition IdealPartProg := ltac:(hnf_clean MetaSyntax.ProgPred).
+    (* TODO: This naming is stupid *)
+    Definition IdealPartProg := ltac:(hnf_clean MetaSyntax.CmdPred).
 
     Definition IdealProg : AtkProg -> Prop :=
       fun '(p, amem_init, amaul_init) =>
         IdealPartProg p /\
-        IdealMemInit amem_init/\
+        IdealMemInit amem_init /\
         IdealMaulInit amaul_init.
 
   End lift.

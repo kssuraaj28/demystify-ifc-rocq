@@ -1,5 +1,5 @@
 From Stdlib Require List ssreflect.
-Import List List.ListNotations ssreflect.
+Import List ssreflect.
 
 Require VarVal Store Tacs MetaSyntax AtkSyntax. 
 Import VarVal Store Tacs MetaSyntax AtkSyntax.Prms.
@@ -133,7 +133,7 @@ Section semantics.
 
   Fixpoint multi_step (n : nat) (cfg: Cfg) : NeList (Cfg * Action) :=
     match n with 
-    | 0 => (step cfg, [])
+    | 0 => (step cfg, nil)
     | S n' =>
         let: ((cfg', ev'), lst') := multi_step n' cfg in
         (step cfg', (cfg', ev') :: lst') (* This naming is a little stupid *)
