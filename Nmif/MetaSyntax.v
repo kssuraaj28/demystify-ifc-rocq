@@ -1,4 +1,4 @@
-From Stdlib Require Import (*Arith*) List String ssreflect ssrbool.
+From Stdlib Require Import (*Arith*) ssreflect ssrbool.
 Require Import Util Tacs VarVal.
 
 Class SrcDstVarPrm := {SrcVarMeta : Type ; DstVarMeta : Type}.
@@ -13,41 +13,14 @@ Section meta_syntax.
   Inductive ValExpMeta := mk_vl_exp (v1 v2: SrcVarMeta) (comp : Vals -> Vals -> Vals).
   Inductive BoolExpMeta :=  mk_bl_exp (v: SrcVarMeta) (test : Vals -> bool).
 
-  Section cmd.
-    Notation ProgMeta' CmdMeta := (list CmdMeta).
+  (* My nested ind exp :( *)
+  Inductive CmdMeta :=
+    | skip
+    | assign (d : DstVarMeta) (exp : ValExpMeta)
+    | seq (c1 c2 : CmdMeta)
+    | cond (cond_var: BoolExpMeta) (b1 b2: CmdMeta)
+    | while (cond_var: BoolExpMeta) (body: CmdMeta). 
 
-    Unset Elimination Schemes. Inductive CmdMeta :=
-      | assign (d : DstVarMeta) (exp : ValExpMeta)
-      | cond (cond_var: BoolExpMeta) (b1 b2: ProgMeta' CmdMeta)
-      | while (cond_var: BoolExpMeta) (body: ProgMeta' CmdMeta).  Set Elimination Schemes.
-
-    Definition ProgMeta := ProgMeta' CmdMeta.
-  End cmd.
-
-  Section cmd_ind.
-    Variable P : CmdMeta -> Prop.
-    Generalizable All Variables.
-
-    Hypothesis assign : `(P (assign d exp)).
-
-    Hypothesis cond : `(Forall P b1 ->
-                        Forall P b2 ->
-                        P (cond cond_var b1 b2)).
-
-    Hypothesis while : `(Forall P body ->
-                          P (while cond_var body)).
-
-    Ltac t appl :=  intros; apply appl; match goal with |- Forall P ?b => elim: b; auto end.
-
-    (* I don't know whether I'm using the right ssreflect thing *)
-    Fixpoint CmdMeta_ind : forall c, P c. Proof.
-      case => c; by [t assign | t cond | t while].
-    Qed.
-
-  End cmd_ind.
-
-  (* It is a little weird that a very syntactic  *_ind approach is used. *)
-  Goal forall c : CmdMeta, c = c. Proof. elim; reflexivity. Qed. 
 End meta_syntax.
 
 Class SrcDstPredPrm `{!SrcDstVarPrm}
@@ -67,22 +40,19 @@ Section syntax_pred.
     let: mk_bl_exp vs test := exp in
     SrcPred vs.
 
-  Notation ProgPred' CmdPred prog :=  
-    (fold_left (fun rest cmd => rest /\ CmdPred cmd) prog True).
-
   Fixpoint CmdPred (cmd: CmdMeta) : Prop := 
     match cmd with
+    | skip => True
     | assign vd exp => DstPred vd /\ ValExpPred exp
-    | cond exp b1 b2 => 
+    | seq c1 c2 => CmdPred c1 /\ CmdPred c2
+    | cond exp c1 c2 => 
         BoolExpPred exp /\ 
-        ProgPred' CmdPred b1 /\
-        ProgPred' CmdPred b2
+        CmdPred c1 /\
+        CmdPred c2
     | while exp while_bdy  => 
         BoolExpPred exp /\ 
-        ProgPred' CmdPred while_bdy
+        CmdPred while_bdy
     end.
-
-  Definition ProgPred prog := ProgPred' CmdPred prog.
 End syntax_pred.
 
 (* Bundling is a little bit sad. *)
@@ -113,7 +83,6 @@ Section syntax_transform.
     Let ValExp1 := ltac:(clean ValExpMeta).
     Let BoolExp1 := ltac:(clean BoolExpMeta).
     Let Cmd1 := ltac:(clean CmdMeta).
-    Let Prog1 := ltac:(clean ProgMeta).
   Remove Hints Lang1: typeclass_instances. Fail Check ltac:(exact(_ : SrcDstVarPrm)). 
 
 
@@ -121,7 +90,6 @@ Section syntax_transform.
     Let ValExp2 := ltac:(clean ValExpMeta).
     Let BoolExp2 := ltac:(clean BoolExpMeta).
     Let Cmd2 := ltac:(clean CmdMeta).
-    Let Prog2 := ltac:(clean ProgMeta).
   Remove Hints Lang2: typeclass_instances. Fail Check ltac:(exact(_ : SrcDstVarPrm)). 
 
   (* I think that this can be abstracted out? *)
@@ -129,8 +97,8 @@ Section syntax_transform.
     let t := cons in 
     let t := eval hnf in t in
     let t := eval unfold
-      ValExp1,BoolExp1,Cmd1,Prog1,
-      ValExp2,BoolExp2,Cmd2,Prog2,
+      ValExp1,BoolExp1,Cmd1,
+      ValExp2,BoolExp2,Cmd2,
       Lang1, Lang2, src_trans, dst_trans
       in t in
     let t := eval hnf in t in
@@ -148,17 +116,14 @@ Section syntax_transform.
     mk_bl_exp (src_trans v) test
     )).
 
-  (* If map is opaque, I think that this would fail. *)
-  (* The termination checker cannot handle mutual recursion. Weird.*)
-  Notation prog_trans' p cmd_trans  := (map cmd_trans p).
-
   Fixpoint cmd_trans (a_cmd : ltac:(unfold_clean Cmd1)) : ltac:(unfold_clean Cmd2) :=
     ltac:(unfold_clean(
     match a_cmd with
+    | skip => skip
     | assign v exp => assign (dst_trans v) (val_exp_trans exp)
-    | cond test b1 b2 =>  cond (bool_exp_trans test) (prog_trans' b1 cmd_trans ) (prog_trans' b1 cmd_trans)
-    | while test p => while (bool_exp_trans test) (prog_trans' p cmd_trans)
+    | seq c1 c2 => seq (cmd_trans c1) (cmd_trans c2)
+    | cond test b1 b2 =>  cond (bool_exp_trans test) (cmd_trans b1) (cmd_trans b1)
+    | while test p => while (bool_exp_trans test) (cmd_trans p)
     end)).
-  Definition prog_trans p := ltac:(unfold_clean (prog_trans' p cmd_trans)).
 End syntax_transform.
 

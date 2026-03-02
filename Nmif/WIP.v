@@ -17,7 +17,10 @@ Import VarVal CleanSyntax AtkSyntax.Prms CleanSyntax.
 Section welltyped.
   Context `{!ValPrm, !VarPrm, !AdvLvlPrm}.
 
-  Definition is_well_typed : pred CleanProg. Admitted.
+  (* TODO: Maybe abstract this out in MetaSyntax also*) 
+  Program Definition is_well_typed : pred CleanProg :=
+    fun p =>
+      true.
 
 End welltyped.
 

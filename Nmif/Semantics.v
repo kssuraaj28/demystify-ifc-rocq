@@ -5,7 +5,7 @@ Require VarVal Store Tacs MetaSyntax AtkSyntax.
 Import VarVal Store Tacs MetaSyntax AtkSyntax.Prms.
 
 #[local] Notation AtkFullProg := AtkSyntax.Prog.
-#[local] Notation AtkPartProg := AtkSyntax.PreProg.
+#[local] Notation AtkPartProg := AtkSyntax.Cmd.
 #[local] Notation AtkVarSrc := AtkSyntax.VarSrc.
 #[local] Notation AtkVarDst := AtkSyntax.VarDst.
 #[local] Notation AtkValExp := AtkSyntax.ValExp.
@@ -28,6 +28,7 @@ Section event.
     | assignment (optlk : OptionalLeak)
     | if_choice (choice : bool)
     | while_choice (choice : bool)
+    | epsilon
     | terminate.
 
   (* Our definition is super lockstep. If it works, I think it's good. *)
@@ -92,41 +93,55 @@ Section semantics.
     let: val := store_read_w_adv store vs amem in 
     test val.
 
-  Definition step (cfg : Cfg) : Cfg * Event:=
-    let: mk_cfg store amem prog := cfg in
-    if prog isn't (cmd :: prog') then (cfg, (terminate , ⟨store⟩)) else  (* prog is skip *)
+  Definition step (cfg : Cfg) : Cfg * Action :=  
+    let: mk_cfg store amem cmd := cfg in 
+    ( fix step cmd store amem {struct cmd} :=
+      match cmd with 
+      | skip =>  
+        (mk_cfg store amem skip, terminate)
 
-    match cmd with 
-    | assign vd exp =>  
-        let: cont := prog' in
-        let: val := (val_exp_eval exp store amem) in
-        let: (store', amem', optlk) := store_update_w_adv store vd val amem in
-        let: event := (assignment optlk , ⟨store'⟩) in
-        (mk_cfg store' amem' prog', event)
+      | assign vd exp => 
+          let: val := (val_exp_eval exp store amem) in
+          let: (store', amem', optlk) := store_update_w_adv store vd val amem in
+          (mk_cfg store' amem' skip, assignment optlk)
 
-    | cond exp b1 b2 =>
-        let: test := (bool_exp_eval exp store amem) in
-        let: branch := if test is true then b1 else b2 in
-        let: cont := (branch ++ prog') in
-        let: cfg := mk_cfg store amem cont in
-        (cfg, (if_choice test, ⟨ store ⟩))
+      (* The order matters here *)
+      | seq skip c => 
+        (mk_cfg store amem c, epsilon)
 
-    | while exp while_bdy  =>  
-       let: test := (bool_exp_eval exp store amem) in
-       let: cont := if test is false then prog' else (while_bdy ++ prog) in
-       let: cfg := mk_cfg store amem cont in
-       (cfg, (while_choice test, ⟨ store ⟩))
-    end.
+      (* 
+        I hate this. However, maybe we can think about whether adversaries can get
+        some power here..
+      *)
+      | seq c1 c2 => 
+          let: (mk_cfg store' amem' c1', action) := step c1 store amem in
+          (mk_cfg store' amem' (seq c1' c2), action)
+
+      | cond exp b1 b2 =>
+          let: test := (bool_exp_eval exp store amem) in
+          let: branch := if test is true then b1 else b2 in
+          (mk_cfg store amem branch, if_choice test)
+
+      | while exp while_bdy  =>
+          let: test := (bool_exp_eval exp store amem) in
+          let: cont := if test is false then skip else while_bdy in
+          (mk_cfg store amem cont, while_choice test)
+      end
+    ) cmd store amem.
 
   Notation NeList A := (A * list A)%type.
 
-  Fixpoint multi_step (n : nat) (cfg: Cfg) : NeList (Cfg * Event) :=
+  Fixpoint multi_step (n : nat) (cfg: Cfg) : NeList (Cfg * Action) :=
     match n with 
     | 0 => (step cfg, [])
     | S n' =>
         let: ((cfg', ev'), lst') := multi_step n' cfg in
         (step cfg', (cfg', ev') :: lst') (* This naming is a little stupid *)
     end.
+
+  Definition create_event (inp : Cfg * Action) : Event :=
+    let: (mk_cfg s _ _, a) := inp in
+    (a, ⟨s⟩).
 
   (* Ideally this would be a coinductive type *)
   Definition Behavior := Store -> nat -> NeList Event.
@@ -150,8 +165,8 @@ Section semantics.
         init_store_maul init_store init_adv amaul_init
       in 
       let: init_cfg := mk_cfg init_store_mauled init_adv prog in
-      let: ((_, ev), lst) := multi_step step_cnt init_cfg in
-      (ev, map snd lst).
+      let: (fst, lst) := multi_step step_cnt init_cfg in
+      (create_event fst, map create_event lst).
 End semantics.
 
 Module Notations.

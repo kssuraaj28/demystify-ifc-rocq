@@ -12,5 +12,4 @@ Section clean_syntax.
   Definition ValExp := ValExpMeta.
   Definition BoolExp := BoolExpMeta.
   Definition Cmd := CmdMeta.
-  Definition Prog := ProgMeta.
 End clean_syntax.

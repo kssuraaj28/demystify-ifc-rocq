@@ -68,8 +68,7 @@ Section atksyntax.
   Definition ValExp := ValExpMeta.
   Definition BoolExp := BoolExpMeta.
   Definition Cmd := CmdMeta.
-  Definition PreProg := ProgMeta.
-  Definition Prog := (PreProg * AdvMemIniter * AdvMaulIniter)%type.
+  Definition Prog := (Cmd * AdvMemIniter * AdvMaulIniter)%type.
 End atksyntax.
 
 Section syntax_erase.
@@ -107,9 +106,8 @@ Section syntax_erase.
   Definition erase_val_exp := ltac:(hnf_clean val_exp_trans).
   Definition erase_bool_exp := ltac:(hnf_clean bool_exp_trans).
   Definition erase_cmd := ltac:(hnf_clean cmd_trans).
-  Definition erase_preprog := ltac:(hnf_clean prog_trans).
   Definition erase_prog (p : Prog) := 
-    let: (p, _, _) := p in
-    erase_preprog p.
+    let: (c, _, _) := p in
+    erase_cmd c.
 
 End syntax_erase.
