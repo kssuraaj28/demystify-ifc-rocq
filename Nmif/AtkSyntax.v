@@ -1,4 +1,7 @@
-From Stdlib Require Import (*Arith*) List String ssreflect ssrbool.
+From Stdlib Require (*Arith*) List String ssreflect ssrbool.
+Import List String ssreflect ssrbool.
+
+
 Require Import Util Tacs VarVal Store MetaSyntax.
 Require CleanSyntax. (* Should this be here? *)
 
