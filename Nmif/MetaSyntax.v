@@ -90,9 +90,6 @@ Section syntax_pred.
 End syntax_pred.
 
 
-
-
-
 (* Bundling is a little bit sad. *)
 Class SynTransPrm := {
   Lang1: SrcDstVarPrm; 
@@ -130,7 +127,9 @@ Section syntax_transform.
     Let Cmd2 := ltac:(clean CmdMeta).
   Remove Hints Lang2: typeclass_instances. Fail Check ltac:(exact(_ : SrcDstVarPrm)). 
 
-  (* I think that this can be abstracted out? *)
+  (* I think that this can be abstracted out? 
+     This should be an Ltac2 thing
+  *)
   Ltac unfold_clean cons :=
     let t := cons in 
     let t := eval hnf in t in
@@ -164,4 +163,3 @@ Section syntax_transform.
     | while test p => while (bool_exp_trans test) (cmd_trans p)
     end)).
 End syntax_transform.
-
