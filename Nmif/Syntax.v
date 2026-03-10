@@ -195,7 +195,6 @@ Section xxx.
   Parameter TODO : forall {T}, T.
   Import Store.Notations.
 
-
   (* You could do optional leak or 
      make adversaries fancier..
   *)
@@ -207,20 +206,24 @@ Section xxx.
 
         (* Part1 of adversary runs *)
         let: s := if is_atk is false then s else
-          TODO (* Need to update view *) in
+          ⟨ (corruptor atkst ⟨s⟩) → s ⟩
+        in
 
         (* Run your computation *)
         let: (s, pcont) := step c s in
 
-        
         (* 
           Part2 of adversary runs. 
           It is important that atkst is updated first, 
           because substeps and leak may depend on new information
         *)
         let: atkst := if is_atk is false then atkst else learner atkst ⟨s⟩ in
-        let: substeps := if is_atk is false then 0 else substeps atkst in
-        let: optleak := if is_atk is false then None else Some (leaker atkst) in
+        let: (substeps, optleak) :=
+          if is_atk is false then
+            (0, None)
+          else
+            (substeps atkst, Some (leaker atkst))
+        in
         (s, atkst, prog_zip pcont substeps, optleak).
 
 
