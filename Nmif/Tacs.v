@@ -12,7 +12,7 @@ Ltac hnf_clean def :=
     exact t.
 
 
-
+(* Agda-like in rocq *)
 Module HoleNotations.
   #[local] Ltac2 admit_tac does_print := 
     if  (neg does_print) then () else 
@@ -48,4 +48,5 @@ Module HoleNotations.
   Section test. Variable hole : bool.
     Fail Check ??.
   End test.
+
 End HoleNotations.

@@ -1,8 +1,8 @@
 From Stdlib Require List ssreflect ssrbool.
-Import List ListNotations ssreflect ssrbool. 
+Import List ListNotations ssreflect ssrbool.
 
-Require VarVal Store.
-Import VarVal Store.
+Require VarVal Store Tacs.
+Import VarVal Store Tacs.HoleNotations.
 
 Section syntax.
   Context `{!VarPrm, !ValPrm}.
