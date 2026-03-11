@@ -12,36 +12,40 @@ Ltac hnf_clean def :=
     exact t.
 
 
-#[local] Ltac2 admit_tac does_print := 
-  if  (neg does_print) then () else 
-  printf "Give me a ~%t~" (goal ());
-  let hole_constr := Control.hyp (@hole) in
-  refine (fun () => '($hole_constr _)). 
-  (* TODO: I wish that this was exact. 
-  I also wish that I could check the type of hole,
-  and make sure that it is forall T, T
-  *)
 
-Notation "??" := ltac2:(admit_tac false) (only parsing).
-Notation "??!" := ltac2:(admit_tac true) (only parsing).
+Module HoleNotations.
+  #[local] Ltac2 admit_tac does_print := 
+    if  (neg does_print) then () else 
+    printf "Give me a ~%t~" (goal ());
+    let hole_constr := Control.hyp (@hole) in
+    refine (fun () => '($hole_constr _)). 
+    (* TODO: I wish that this was exact. 
+    I also wish that I could check the type of hole,
+    and make sure that it is forall T, T
+    *)
 
-Fail Check ?? + 5.
+  Notation "??" := ltac2:(admit_tac false) (only parsing).
+  Notation "??!" := ltac2:(admit_tac true) (only parsing).
 
-Section test. Hypothesis hole : forall T, T.
+  Fail Check ?? + 5.
 
-  Check ??.
+  Section usage. Hypothesis hole : forall T, T.
 
-  Let x := ?? + ??.
-  Let y := ??! + ??.
-  Check ??! + 5.
+    Check ??.
 
-  Compute  (match ??! with 
-    | true => ??!
-    | false => ??
-    end).
-End test.
+    Let x := ?? + ??.
+    Let y := 5 + ??!.
+    Check ??! + 5.
+
+    Compute  (match ??! with 
+      | true => ??!
+      | false => ??
+      end).
+
+  End usage.
 
 
-Section test. Variable hole : bool.
-  Fail Check ??.
-End test.
+  Section test. Variable hole : bool.
+    Fail Check ??.
+  End test.
+End HoleNotations.
