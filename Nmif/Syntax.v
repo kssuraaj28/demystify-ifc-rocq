@@ -192,11 +192,13 @@ Section xxx.
   Notation substeps := (substeps adv).
             
   (* Make this a snippet *)
-  Parameter TODO : forall {T}, T.
+
+
   Import Store.Notations.
 
   (* You could do optional leak or 
      make adversaries fancier..
+     TODO: This name is stupid
   *)
   Definition step_w_atk 
       (c : ContinuationStep) (s : Store) (atkst : AtkStates) : 
@@ -212,20 +214,25 @@ Section xxx.
         (* Run your computation *)
         let: (s, pcont) := step c s in
 
-        (* 
-          Part2 of adversary runs. 
-          It is important that atkst is updated first, 
-          because substeps and leak may depend on new information
-        *)
+        (* Part2a of adversary runs. *)
         let: atkst := if is_atk is false then atkst else learner atkst ⟨s⟩ in
+
+        (* Part2b of adversary runs. *)
         let: (substeps, optleak) :=
           if is_atk is false then
             (0, None)
           else
             (substeps atkst, Some (leaker atkst))
         in
+
         (s, atkst, prog_zip pcont substeps, optleak).
 
+
+
+  (*
+    The idea would be to have a static analysis.
+    Then we show that endorse and declassify points are enough to enforce whatever we want..
+  *)
 
   (* Maybe make something Cfg *)
   (* What is 'state'? *)
@@ -233,7 +240,7 @@ Section xxx.
   Definition cfg_step 
                 (c: Continuation) (s: Store) (ast: AtkStates) : 
                 (Continuation * Store * AtkStates) := 
-                if c isn't cmd :: rest then ([::], s, ast) else
+                if c isn't cmd :: rest then ([], s, ast) else
                 let: (s', ast', cont') := step_w_atk cmd s ast in
                 (cont' ++ rest ,s', ast').
 End step.
