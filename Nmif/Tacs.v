@@ -4,7 +4,10 @@ Ltac2 goals l :=
   let name_goal x := ltac1:(x |- refine ?[x]) (Ltac1.of_ident x) in
   Control.dispatch (List.map (fun x () => name_goal x) l).
 
-(* This can be used in more places. TODO *)
+(*
+  This can be used in more places. TODO. 
+  This should also be in Ltac2
+*)
 Ltac hnf_clean def :=
     let t := def in
     let t := eval red in t in 

@@ -2,9 +2,10 @@ From Stdlib Require ssreflect ssrbool.
 Import ssreflect ssrbool.
 
 Require Util VarVal Tacs.
-Import VarVal Util.Notations Tacs.
+Import VarVal Tacs.
 
 Section store.
+  Import Util.Dec.Notations.
   Context `{!VarPrm, !ValPrm}.
 
   Definition Store := Vars -> Vals.
