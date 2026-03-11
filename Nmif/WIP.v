@@ -1,8 +1,8 @@
 From Stdlib Require List ssreflect ssrbool.
 Import List ListNotations ssreflect ssrbool.
 
-Require VarVal Store Tacs.
-Import VarVal Store.
+Require VarValStore Tacs.
+Import VarValStore.
 
 
 Section syntax.

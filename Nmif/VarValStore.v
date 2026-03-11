@@ -1,8 +1,11 @@
 From Stdlib Require ssreflect ssrbool. 
 Import ssreflect ssrbool.
 
-Require Util VarVal Tacs.
-Import VarVal Tacs.
+Require Util Tacs.
+Import Util.Dec Tacs.
+
+Class VarPrm := {Vars : Type ; vars_deceq :: DecEq Vars}. 
+Class ValPrm := {Vals : Type}.
 
 Section store.
   Import Util.Dec.Notations.
