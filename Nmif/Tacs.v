@@ -56,7 +56,7 @@ Module GallinaUtil.
   (* Inspection  *)
   #[local] Ltac2 inspect value tactic :=
     tactic value (Constr.type value);
-    exact $value.
+    exact value. (* Why does $value also work? *)
 
   Ltac2 Notation "⟦" v(constr) t(tactic) " ⟧"  := inspect v t.
 

@@ -34,6 +34,8 @@ End opposite.
 *)
 Class AdvSMPrm `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} := {
     AtkStates : Type;
+    init_state: (StoreView is_public) -> AtkStates;
+    init_substeps: AtkStates -> nat;
     corruptor: AtkStates -> (StoreView is_untrusted) -> (StoreView is_untrusted);
     learner : AtkStates -> (StoreView is_public) -> AtkStates;
     leaker : AtkStates -> LeakVals;

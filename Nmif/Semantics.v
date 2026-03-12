@@ -12,7 +12,7 @@ Section cleanstep.
   Definition clean_cmd_step (c: Cmd) (s: Store) : (Store * Continuation) := 
     match c with
     | skip => (s, [])
-    | assign comp => (comp s, [])
+    | assign comp => ( comp s, [])
     | cond tst b1 b2 => 
         (s, if (tst s) is true then 
               b1
@@ -108,21 +108,68 @@ Section cfg.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvSMPrm}.
 
   Definition Cfg := (Continuation * Store * AtkStates)%type.
-
-  Definition step (c : Cfg) : Cfg :=
-    let: (cont, store, atkst) := c in
-    if cont isn't (atk_cmd :: cont') then (cont, store, atkst) else
-    let: (store', atkst', extra_cont, _) := atk_cmd_step atk_cmd store atkst in (* _ is wrong. Need to have event!! *)
-    (extra_cont ++ cont', store', atkst'). 
-
 End cfg.
 
-(* 
-  What are the different ways we can define events?
-  We could
+Section init_cfg.
+  Import VarValStore.Notations. Check ⟨ _ ⟩.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvSMPrm}.
 
-TODO: Define configuration. 
-                step,
-                events,
-                behavior
-*)
+  Variables (p : Prog) (s : Store).
+
+  Definition initial_cfg : Cfg :=
+    let: atkst := init_state ⟨s⟩ in
+    let: init_cont := prog_zip p (init_substeps atkst) in
+    (init_cont, s, atkst).
+End init_cfg.
+
+Section obs.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Definition Observation := (StoreView is_trusted * option LeakVals)%type.
+
+  Definition ObservationTrace := list Observation.
+End obs.
+
+
+Section cfg_step.
+  Import VarValStore.Notations. Check ⟨ _ ⟩.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvSMPrm}.
+  (* Maybe it is worth separating AdvSMPrm.. We only care about the states type*)
+
+  Definition step (c : Cfg) : Cfg * Observation :=
+    let: (cont, store, atkst) := c in
+    let: (cont', store', atkst', optlk) := 
+      if cont isn't (atk_cmd :: cont') then (cont, store, atkst, None) else (* TODO: How to handle termination correctly *)
+      let: (store', atkst', extra_cont, optlk) := atk_cmd_step atk_cmd store atkst in (* _ is wrong. Need to have event!! *)
+      (extra_cont ++ cont', store', atkst', optlk)
+    in 
+    (cont', store', atkst', ( ⟨ store' ⟩, optlk)).
+
+  (* Man, testing this might be painful.. *)
+  Fixpoint multistep (gas: nat) (c : Cfg) : Cfg * ObservationTrace :=
+    match gas with
+    | 0 => 
+        (c, [])
+
+    | S gas => 
+        let: (c', tr) := multistep gas c in
+        let: (c'', obs) := step c' in
+        (c'', obs :: tr)
+    end.
+
+End cfg_step.
+
+
+Section program_sem.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvSMPrm}.
+
+  (* Simulating coinduction... *)
+  Definition Behavior := Store -> nat -> ObservationTrace.
+
+  Definition prog_behavior (p : Prog) : Behavior :=
+    fun init_store gas =>
+      let: init_cfg := initial_cfg p init_store in
+      let: (_, ret) := multistep gas init_cfg in
+      ret.
+
+End program_sem.
+
