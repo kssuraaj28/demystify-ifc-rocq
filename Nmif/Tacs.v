@@ -17,18 +17,28 @@ Ltac hnf_clean def :=
 
 (* Agda-like in rocq *)
 Module HoleNotations.
-  #[local] Ltac2 admit_tac does_print := 
-    if  (neg does_print) then () else 
-    printf "Give me a ~%t~" (goal ());
-    let hole_constr := Control.hyp (@hole) in
-    refine (fun () => '($hole_constr _)). 
+  #[local] Ltac2 admit_tac () := 
+    let hole_constr := Control.hyp @hole in
+    refine (fun () => '($hole_constr _)).
+
     (* TODO: I wish that this was exact. 
     I also wish that I could check the type of hole,
     and make sure that it is forall T, T
-    *)
 
-  Notation "??" := ltac2:(admit_tac false) (only parsing).
-  Notation "??!" := ltac2:(admit_tac true) (only parsing).
+    Maybe then have marked hole, etc.
+    You could have a way to look for marked holes, etc.
+
+    You could also attach arbitrary ltac2 things.
+    Maybe the right place for this is to know the types of certain things..
+    Can we get gallina notations for this?
+    Notation x _ := x.
+    *)
+  Section fail.
+    Notation " x ⟨  tac  ⟩ " :=  x (at level 11,only parsing).
+    Check 4 ⟨ ltac2:(printf "hello") ⟩.
+  End fail.
+
+  Notation "??" := ltac2:(admit_tac ()) (only parsing).
 
   Fail Check ?? + 5.
 
@@ -36,12 +46,12 @@ Module HoleNotations.
 
     Check ??.
 
-    Let x := ?? + ??.
-    Let y := 5 + ??!.
-    Check ??! + 5.
+    Let x := ?? + ??. Print x.
+    Let y := 5 + ??. Print x.
+    Check ?? + 5.
 
-    Compute  (match ??! with 
-      | true => ??!
+    Compute  (match ?? with 
+      | true => ??
       | false => ??
       end).
 
