@@ -172,3 +172,7 @@ Section program_sem.
       ret.
 
 End program_sem.
+
+Module Notations.
+  Notation "⟦ p ⟧" := (prog_behavior p).
+End Notations.
