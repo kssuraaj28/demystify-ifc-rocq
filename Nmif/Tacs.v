@@ -15,8 +15,8 @@ Ltac hnf_clean def :=
     exact t.
 
 
-(* Agda-like in rocq *)
-Module HoleNotations.
+Module GallinaUtil.
+  (* Holes *)
   #[local] Ltac2 admit_tac () := 
     let hole_constr := Control.hyp @hole in
     refine (fun () => '($hole_constr _)).
@@ -33,19 +33,12 @@ Module HoleNotations.
     Can we get gallina notations for this?
     Notation x _ := x.
     *)
-  Section fail.
-    Notation " x ⟨  tac  ⟩ " :=  x (at level 11,only parsing).
-    Check 4 ⟨ ltac2:(printf "hello") ⟩.
-  End fail.
-
   Notation "??" := ltac2:(admit_tac ()) (only parsing).
 
-  Fail Check ?? + 5.
-
-  Section usage. Hypothesis hole : forall T, T.
-
+  Section usage. 
+    Fail Check ?? + 5.
+    Hypothesis hole : forall T, T.
     Check ??.
-
     Let x := ?? + ??. Print x.
     Let y := 5 + ??. Print x.
     Check ?? + 5.
@@ -57,9 +50,23 @@ Module HoleNotations.
 
   End usage.
 
+  Section test. Variable hole : bool.   Fail Check ??.  End test.
 
-  Section test. Variable hole : bool.
-    Fail Check ??.
-  End test.
 
-End HoleNotations.
+  (* Inspection  *)
+  #[local] Ltac2 inspect value tactic :=
+    tactic value (Constr.type value);
+    exact $value.
+
+  Ltac2 Notation "⟦" v(constr) t(tactic) " ⟧"  := inspect v t.
+
+  Check ltac2:( ⟦ 5 (fun v t => printf "%t %t" v t)  ⟧).
+
+  Notation "⟦ v ⟧"  := 
+    ltac2:(
+    inspect (Constr.pretype v) (fun v t => printf "%t : %t" v t )) (only parsing).
+
+  Check ⟦ 4 ⟧.
+  (* Having arbitrary ltac2 functions in gallina does not seem very easy.. *)
+
+End GallinaUtil.

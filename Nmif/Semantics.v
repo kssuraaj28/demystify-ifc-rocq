@@ -1,10 +1,8 @@
 From Stdlib Require List ssreflect.
 Import List ListNotations ssreflect.
 
-From Ltac2 Require Ltac2.
-
 Require VarValStore Syntax Attacker Tacs Util.
-Import VarValStore Syntax Attacker Util.List. (* TODO: When to  import? *)
+Import VarValStore Syntax Attacker.
 
 Section cleanstep.
   Context `{!VarPrm, !ValPrm}.
@@ -30,6 +28,7 @@ Section cleanstep.
 End cleanstep.
 
 Section cont.
+  Import Util.List. (* When to import? TODO *)
   Context `{!VarPrm, !ValPrm}.
 
   Inductive AtkCmd :=
@@ -106,7 +105,6 @@ Section atk_cmd_step.
 End atk_cmd_step.
 
 Section cfg.
-  Import Ltac2.Ltac2 Ltac2.Printf.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvSMPrm}.
 
   Definition Cfg := (Continuation * Store * AtkStates)%type.
