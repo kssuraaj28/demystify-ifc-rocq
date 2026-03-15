@@ -36,8 +36,8 @@ Section cont.
 
   Definition Continuation := list AtkCmd.
 
-  Notation pure_atk := (mk_cstep true skip).
-  Notation pure_cmd := (mk_cstep false).
+  Notation pure_atk := (mk_cstep true skip) (only parsing).
+  Notation pure_cmd := (mk_cstep false) (only parsing).
 
   Fixpoint prog_zip (p: Prog) (atk_steps: nat) : Continuation :=
     match p, atk_steps with
@@ -139,7 +139,7 @@ Section cfg_step.
     let: (cont, store, atkst) := c in
     let: (cont', store', atkst', optlk) := 
       if cont isn't (atk_cmd :: cont') then (cont, store, atkst, None) else (* TODO: How to handle termination correctly *)
-      let: (store', atkst', extra_cont, optlk) := atk_cmd_step atk_cmd store atkst in (* _ is wrong. Need to have event!! *)
+      let: (store', atkst', extra_cont, optlk) := atk_cmd_step atk_cmd store atkst in 
       (extra_cont ++ cont', store', atkst', optlk)
     in 
     (cont', store', atkst', ( ⟨ store' ⟩, optlk)).
@@ -155,6 +155,25 @@ Section cfg_step.
         let: (c'', obs) := step c' in
         (c'', obs :: tr)
     end.
+
+  Ltac done ::= eauto; fail.
+
+  Goal forall g c, 
+      length (snd (multistep g c)) = g.
+  Proof.
+    elim=> //= ? + c => /(_ c).
+    by case: multistep step=> ? ? [? ?] /= ->.
+  Qed.
+
+  Goal forall g c, exists o,
+      o :: (snd (multistep g c)) = 
+      (snd (multistep (S g) c)).
+  Proof.
+    case=> > /=; first by case: step=> //=.
+    case: multistep => ? ?.
+    repeat case: step => ? ?. (* Does ssr use repeat?  *)
+    by move=> /=.
+  Qed.
 
 End cfg_step.
 
