@@ -161,8 +161,8 @@ Section cfg_step.
   Goal forall g c, 
       length (snd (multistep g c)) = g.
   Proof.
-    elim=> //= ? + c => /(_ c).
-    by case: multistep step=> ? ? [? ?] /= ->.
+    elim=> //= ?+c=> /(_ c).
+    by case: multistep step=> ??[??] /= ->.
   Qed.
 
   Goal forall g c, exists o,
@@ -170,10 +170,10 @@ Section cfg_step.
       (snd (multistep (S g) c)).
   Proof.
     case=> > /=; first by case: step=> //=.
-    case: multistep => ? ?.
-    repeat case: step => ? ?. (* Does ssr use repeat?  *)
-    by move=> /=.
+    move: multistep {-3}step=> [??] [??].
+    by case: step => /=.
   Qed.
+  
 
 End cfg_step.
 
