@@ -6,3 +6,4 @@
 *.glob
 *Makefile*
 _build
+.DS_Store
