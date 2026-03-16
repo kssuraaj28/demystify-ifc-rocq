@@ -43,4 +43,4 @@ Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
   }.
 
 Arguments AdvStateMachine: clear implicits.
-Arguments AdvStateMachine {_ _ _ _} (AtkStates).
+Arguments AdvStateMachine {_ _ _ _} AtkStates.

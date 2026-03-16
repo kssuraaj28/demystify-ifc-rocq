@@ -37,30 +37,30 @@ Definition simple_cmd : Cmd :=
 
 Instance lki : AdvLeakPrm := nat.
 
-Instance atk1i : AdvSMPrm := {
-    AtkStates := unit ;
+Definition AtkRealStates := unit.
+Definition atkreal : AdvStateMachine AtkRealStates := {|
     init_state := fun _ => tt ; 
     init_substeps := fun _ => 1 ;
     corruptor := fun _ sv => (fun v => 5) ;  (* Set all untrusted vars to 5 *)
     learner := fun _ _ => tt; (* This is lemunsnokun attacker *)
     leaker := fun _ => 67 ;
     substeps := fun _ => 0; (* simple man *)
-    }.
+  |}.
 
-Instance atk2i : AdvSMPrm := {
-    AtkStates := unit ;
+Definition AtkIdealStates := unit.
+Definition atkideal : AdvStateMachine AtkIdealStates := {|
     init_state := fun _ => tt ; 
     init_substeps := fun _ => 1 ;
     corruptor := fun _ sv => sv ;  (* Need to modify this appropriately *)
     learner := fun _ _ => tt; (* This is lemunsnokun attacker *)
     leaker := fun _ => 67 ;
     substeps := fun _ => 0; (* simple man *)
-    }.
+    |}.
 
 
 Import Semantics.Notations.
-Definition b1 := ⟦ [simple_cmd] ☠︎︎ atk1i ⟧.
-Definition b2 := ⟦ [simple_cmd] ☠︎︎ atk2i ⟧.
+Definition b1 := ⟦ [simple_cmd] ☠︎︎ atkreal ⟧.
+Definition b2 := ⟦ [simple_cmd] ☠︎︎ atkideal ⟧.
 
 
 Definition init_s :Store := 
@@ -77,10 +77,7 @@ Goal
 
 *)
 
-Parameter BisimRel: forall {a: AdvSMPrm}, Cfg -> 
-                    forall {a': AdvSMPrm}, Cfg -> Prop.
-Reset BisimRel.
-Parameter BisimRel: Cfg -> Cfg -> Prop.
+Parameter BisimRel: Cfg unit -> Cfg unit -> Prop.
 
 
 Check @initial_cfg.
@@ -89,15 +86,20 @@ Goal b1 = b2 . Proof.
   apply: functional_extensionality=> s; apply: functional_extensionality=> n.
   rewrite /b1 /b2 !/(⟦_☠︎︎_⟧).
   (* Set second? *) 
-  set c1 := (initial_cfg _ _); set c2 := (initial_cfg _ _).
-  set ms1 := (multistep _ _); set ms2 := (multistep _ _).
+  set c1 := (initial_cfg _ _ _); set c2 := (initial_cfg _ _ _).
+  move e1: (multistep _ _ c1) => ms1; move e2: (multistep _ _ c2) => ms2. 
 
   suff: BisimRel ms1 ms2 by admit. (* You need this *)
 
+  elim: n ms1 ms2 e1 e2=> >.
+    move=> <- <-; rewrite /c1 /c2 /=.
+    by admit.
+  move=> - ih. (* noop *)
 
-  (* I don't like this.. *)
-  have: ms1 = multistep n c1 by [].
-  have: ms2 = multistep n c2 by [].
+
+
+
+   
 
   elim:n ms1 ms2=> [/= > -> ->| ]; first by admit.
   move=> n ih ? ? -> ->.
