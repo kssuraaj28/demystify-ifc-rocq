@@ -32,8 +32,8 @@ End opposite.
 
   Prm naming scheme? TODO
 *)
-Class AdvSMPrm `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} := {
-    AtkStates : Type;
+Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} 
+    {AtkStates : Type} := {
     init_state: (StoreView is_public) -> AtkStates;
     init_substeps: AtkStates -> nat;
     corruptor: AtkStates -> (StoreView is_untrusted) -> (StoreView is_untrusted);
@@ -41,3 +41,6 @@ Class AdvSMPrm `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} := {
     leaker : AtkStates -> LeakVals;
     substeps : AtkStates -> nat;
   }.
+
+Arguments AdvStateMachine: clear implicits.
+Arguments AdvStateMachine {_ _ _ _} (AtkStates).

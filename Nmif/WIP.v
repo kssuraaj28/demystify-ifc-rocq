@@ -79,6 +79,11 @@ Goal
 
 Parameter BisimRel: forall {a: AdvSMPrm}, Cfg -> 
                     forall {a': AdvSMPrm}, Cfg -> Prop.
+Reset BisimRel.
+Parameter BisimRel: Cfg -> Cfg -> Prop.
+
+
+Check @initial_cfg.
 
 Goal b1 = b2 . Proof.
   apply: functional_extensionality=> s; apply: functional_extensionality=> n.

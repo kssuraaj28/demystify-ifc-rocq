@@ -73,7 +73,9 @@ End cont.
 Section atk_cmd_step.
   Import VarValStore.Notations. (* TODO: Import practice? *)
 
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvSMPrm}.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+
+  Context  {AtkStates : Type} (atksm: AdvStateMachine AtkStates).
 
   Definition atk_cmd_step 
       (c : AtkCmd) (s : Store) (atkst : AtkStates) : 
@@ -83,21 +85,21 @@ Section atk_cmd_step.
 
         (* Part1 of adversary runs *)
         let: s := if is_atk is false then s else
-          ⟨ (corruptor atkst ⟨s⟩) → s ⟩
+          ⟨ (corruptor atksm atkst ⟨s⟩) → s ⟩
         in
 
         (* Run your computation *)
         let: (s, pcont) := clean_cmd_step c s in
 
         (* Part2a of adversary runs. *)
-        let: atkst := if is_atk is false then atkst else learner atkst ⟨s⟩ in
+        let: atkst := if is_atk is false then atkst else learner atksm atkst ⟨s⟩ in
 
         (* Part2b of adversary runs. *)
         let: (substeps, optleak) :=
           if is_atk is false then
             (0, None)
           else
-            (substeps atkst, Some (leaker atkst))
+            (substeps atksm atkst, Some (leaker atksm atkst))
         in
 
         (s, atkst, prog_zip pcont substeps, optleak).
@@ -105,7 +107,8 @@ Section atk_cmd_step.
 End atk_cmd_step.
 
 Section cfg.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvSMPrm}.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Context (AtkStates : Type).
 
   Definition Observation := (StoreView is_trusted * option LeakVals)%type.
 
@@ -117,27 +120,28 @@ End cfg.
 
 Section init_cfg.
   Import VarValStore.Notations. Check ⟨ _ ⟩.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvSMPrm}.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Context {AtkStates : Type}.
 
-  Variables (p : Prog) (s : Store).
-
-  Definition initial_cfg : Cfg :=
-    let: atkst := init_state ⟨s⟩ in
-    let: init_cont := prog_zip p (init_substeps atkst) in
+  Definition initial_cfg (p: Prog) (atksm : AdvStateMachine AtkStates) (s: Store) : Cfg AtkStates :=
+    let: atkst := init_state atksm ⟨s⟩ in
+    let: init_cont := prog_zip p (init_substeps atksm atkst) in
     (init_cont, s, atkst, []).
 End init_cfg.
 
 Section cfg_step.
   Import VarValStore.Notations. Check ⟨ _ ⟩.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvSMPrm}.
-  (* Maybe it is worth separating AdvSMPrm.. We only care about the states type*)
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Context {AtkStates : Type} (atksm : AdvStateMachine AtkStates). (* TODO: unify *)
+
+  Notation Cfg := (Cfg AtkStates).
 
   Definition step (c : Cfg) : Cfg :=
     let: (cont, store, atkst, trace) := c in
 
     let: (cont', store', atkst', optlk) := 
       if cont isn't (atk_cmd :: cont') then (cont, store, atkst, None) else (* TODO: How to handle termination correctly *)
-      let: (store', atkst', extra_cont, optlk) := atk_cmd_step atk_cmd store atkst in 
+      let: (store', atkst', extra_cont, optlk) := atk_cmd_step atksm atk_cmd store atkst in 
       (extra_cont ++ cont', store', atkst', optlk)
     in 
 
@@ -155,19 +159,18 @@ Section cfg_step.
     cfg.
 End cfg_step.
 
-
 Section program_sem.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
-  Context (p: Prog) `(!AdvSMPrm).
-
-  (* Simulating coinduction... *)
   Definition Behavior := Store -> nat -> ObservationTrace.
 
-  Definition prog_behavior : Behavior :=
-    fun init_store gas =>
-      let: init_cfg := initial_cfg p init_store in
-      extract_trace (multistep gas init_cfg).
+  Context {AtkStates : Type} (atksm : AdvStateMachine AtkStates). (* TODO: unify *)
+
+  (* Simulating coinduction... *)
+  Definition prog_behavior {AtkStates} (p : Prog) (atksm : AdvStateMachine AtkStates) : Behavior :=
+                          fun init_store gas =>
+                            let: init_cfg := initial_cfg p atksm init_store in
+                            extract_trace (multistep atksm gas init_cfg).
 
 End program_sem.
 
