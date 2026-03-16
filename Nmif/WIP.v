@@ -77,36 +77,52 @@ Goal
 
 *)
 
-Parameter BisimRel: Cfg unit -> Cfg unit -> Prop.
+Section assumptions.
+  Notation CfgR := (Cfg AtkRealStates).
+  Notation CfgI := (Cfg AtkIdealStates).
 
+  Parameter BisimRel: CfgR -> CfgI -> Prop.
+
+  Check initial_cfg.
+  Parameter BisimInit: 
+    forall s,
+    BisimRel 
+      (initial_cfg [simple_cmd] atkreal  s)
+      (initial_cfg [simple_cmd] atkideal s).
+
+  Parameter BisimStep: forall c1 c2,
+                          BisimRel c1 c2 ->
+                          BisimRel (step atkreal c1) (step atkideal c2).
+
+  Parameter BisimExtract: forall c1 c2,
+                  BisimRel c1 c2 -> extract_trace c1 = extract_trace c2.
+
+End assumptions.
+
+(*
+BisimRel (step atkreal (multistep atkreal _n_ c1))
+  (step atkideal (multistep atkideal _n_ c2))
+  *)
 
 Check @initial_cfg.
 
 Goal b1 = b2 . Proof.
   apply: functional_extensionality=> s; apply: functional_extensionality=> n.
   rewrite /b1 /b2 !/(⟦_☠︎︎_⟧).
-  (* Set second? *) 
-  set c1 := (initial_cfg _ _ _); set c2 := (initial_cfg _ _ _).
+  
+  set c1 := (initial_cfg _ _ _); set c2 := (initial_cfg _ _ _). (* Set second? *) 
   move e1: (multistep _ _ c1) => ms1; move e2: (multistep _ _ c2) => ms2. 
 
-  suff: BisimRel ms1 ms2 by admit. (* You need this *)
+  apply: BisimExtract. Undo.
+  apply/BisimExtract.
 
-  elim: n ms1 ms2 e1 e2=> >.
-    move=> <- <-; rewrite /c1 /c2 /=.
-    by admit.
-  move=> - ih. (* noop *)
+  elim: n ms1 ms2 e1 e2=> [> | > ih >] <- <- /=.
+    rewrite /c1 /c2 /=.
+    by apply: BisimInit.
 
-
-
-
-   
-
-  elim:n ms1 ms2=> [/= > -> ->| ]; first by admit.
-  move=> n ih ? ? -> ->.
-
-  suff: BisimRel (multistep n c1) (multistep n c2) by admit. (* You need this *)
-  by apply: ih.
-Admitted.
+  by apply: BisimStep; apply: ih. Undo.
+  by apply/BisimStep /ih. (* What the hell is this *)
+Qed.
 
 (* There three admits exactly correspond to 
 the three things you need to prove when you have bisimulation relations
