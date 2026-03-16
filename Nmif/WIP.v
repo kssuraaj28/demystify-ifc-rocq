@@ -77,12 +77,34 @@ Goal
 
 *)
 
+Parameter BisimRel: forall {a: AdvSMPrm}, Cfg -> 
+                    forall {a': AdvSMPrm}, Cfg -> Prop.
+
 Goal b1 = b2 . Proof.
   apply: functional_extensionality=> s; apply: functional_extensionality=> n.
   rewrite /b1 /b2 !/(⟦_☠︎︎_⟧).
   (* Set second? *) 
-  set c1 := (initial_cfg _); set c2 := (initial_cfg _).
-  case E1: (multistep _ _)=> [c1n t1n].
-  case E2: (multistep _ _)=> [c2n t2n].
+  set c1 := (initial_cfg _ _); set c2 := (initial_cfg _ _).
+  set ms1 := (multistep _ _); set ms2 := (multistep _ _).
 
-Qed.
+  suff: BisimRel ms1 ms2 by admit. (* You need this *)
+
+
+  (* I don't like this.. *)
+  have: ms1 = multistep n c1 by [].
+  have: ms2 = multistep n c2 by [].
+
+  elim:n ms1 ms2=> [/= > -> ->| ]; first by admit.
+  move=> n ih ? ? -> ->.
+
+  suff: BisimRel (multistep n c1) (multistep n c2) by admit. (* You need this *)
+  by apply: ih.
+Admitted.
+
+(* There three admits exactly correspond to 
+the three things you need to prove when you have bisimulation relations
+- The first is BisimRel -> property you want
+- The second is what you want for initial states.
+- The third is your stepping relation
+
+*)

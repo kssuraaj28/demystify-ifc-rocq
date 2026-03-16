@@ -149,6 +149,10 @@ Section cfg_step.
     | 0 => c
     | S gas => step (multistep gas c) 
     end.
+
+  Definition extract_trace (c : Cfg) : ObservationTrace :=
+    let: (_,_,_,cfg) := c in
+    cfg.
 End cfg_step.
 
 
@@ -159,10 +163,6 @@ Section program_sem.
 
   (* Simulating coinduction... *)
   Definition Behavior := Store -> nat -> ObservationTrace.
-
-  Definition extract_trace (c : Cfg) : ObservationTrace :=
-    let: (_,_,_,cfg) := c in
-    cfg.
 
   Definition prog_behavior : Behavior :=
     fun init_store gas =>
