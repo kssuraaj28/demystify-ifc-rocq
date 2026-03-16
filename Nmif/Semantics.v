@@ -107,7 +107,12 @@ End atk_cmd_step.
 Section cfg.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvSMPrm}.
 
-  Definition Cfg := (Continuation * Store * AtkStates)%type.
+  Definition Observation := (StoreView is_trusted * option LeakVals)%type.
+
+  Definition ObservationTrace := list Observation.
+
+  (* It is useful to put everything in Cfg for bisimulation proofs *)
+  Definition Cfg := (Continuation * Store * AtkStates * ObservationTrace)%type.
 End cfg.
 
 Section init_cfg.
@@ -119,62 +124,31 @@ Section init_cfg.
   Definition initial_cfg : Cfg :=
     let: atkst := init_state ⟨s⟩ in
     let: init_cont := prog_zip p (init_substeps atkst) in
-    (init_cont, s, atkst).
+    (init_cont, s, atkst, []).
 End init_cfg.
-
-Section obs.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
-  Definition Observation := (StoreView is_trusted * option LeakVals)%type.
-
-  Definition ObservationTrace := list Observation.
-End obs.
-
 
 Section cfg_step.
   Import VarValStore.Notations. Check ⟨ _ ⟩.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvSMPrm}.
   (* Maybe it is worth separating AdvSMPrm.. We only care about the states type*)
 
-  Definition step (c : Cfg) : Cfg * Observation :=
-    let: (cont, store, atkst) := c in
+  Definition step (c : Cfg) : Cfg :=
+    let: (cont, store, atkst, trace) := c in
+
     let: (cont', store', atkst', optlk) := 
       if cont isn't (atk_cmd :: cont') then (cont, store, atkst, None) else (* TODO: How to handle termination correctly *)
       let: (store', atkst', extra_cont, optlk) := atk_cmd_step atk_cmd store atkst in 
       (extra_cont ++ cont', store', atkst', optlk)
     in 
-    (cont', store', atkst', ( ⟨ store' ⟩, optlk)).
+
+    (cont', store', atkst', ( ⟨ store' ⟩, optlk) :: trace).
 
   (* Man, testing this might be painful.. *)
-  Fixpoint multistep (gas: nat) (c : Cfg) : Cfg * ObservationTrace :=
+  Fixpoint multistep (gas: nat) (c : Cfg) : Cfg :=
     match gas with
-    | 0 => 
-        (c, [])
-
-    | S gas => 
-        let: (c', tr) := multistep gas c in
-        let: (c'', obs) := step c' in
-        (c'', obs :: tr)
+    | 0 => c
+    | S gas => step (multistep gas c) 
     end.
-
-  Ltac done ::= eauto; fail.
-
-  Goal forall g c, 
-      length (snd (multistep g c)) = g.
-  Proof.
-    elim=> //= ?+c=> /(_ c).
-    by case: multistep step=> ??[??] /= ->.
-  Qed.
-
-  Goal forall g c, exists o,
-      o :: (snd (multistep g c)) = 
-      (snd (multistep (S g) c)).
-  Proof.
-    case=> > /=; first by case: step=> //=.
-    move: multistep {-3}step=> [??] [??] /=.
-    by case: step => /=.
-  Qed.
-  
-
 End cfg_step.
 
 
@@ -186,11 +160,14 @@ Section program_sem.
   (* Simulating coinduction... *)
   Definition Behavior := Store -> nat -> ObservationTrace.
 
+  Definition extract_trace (c : Cfg) : ObservationTrace :=
+    let: (_,_,_,cfg) := c in
+    cfg.
+
   Definition prog_behavior : Behavior :=
     fun init_store gas =>
       let: init_cfg := initial_cfg p init_store in
-      let: (_, ret) := multistep gas init_cfg in
-      ret.
+      extract_trace (multistep gas init_cfg).
 
 End program_sem.
 
