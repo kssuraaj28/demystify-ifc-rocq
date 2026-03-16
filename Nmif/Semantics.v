@@ -170,7 +170,7 @@ Section cfg_step.
       (snd (multistep (S g) c)).
   Proof.
     case=> > /=; first by case: step=> //=.
-    move: multistep {-3}step=> [??] [??].
+    move: multistep {-3}step=> [??] [??] /=.
     by case: step => /=.
   Qed.
   
