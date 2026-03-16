@@ -179,12 +179,14 @@ End cfg_step.
 
 
 Section program_sem.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm, !AdvSMPrm}.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+
+  Context (p: Prog) `(!AdvSMPrm).
 
   (* Simulating coinduction... *)
   Definition Behavior := Store -> nat -> ObservationTrace.
 
-  Definition prog_behavior (p : Prog) : Behavior :=
+  Definition prog_behavior : Behavior :=
     fun init_store gas =>
       let: init_cfg := initial_cfg p init_store in
       let: (_, ret) := multistep gas init_cfg in
@@ -193,5 +195,5 @@ Section program_sem.
 End program_sem.
 
 Module Notations.
-  Notation "⟦ p ⟧" := (prog_behavior p).
+  Notation "⟦ p ☠︎︎ a ⟧" := (prog_behavior p a).
 End Notations.
