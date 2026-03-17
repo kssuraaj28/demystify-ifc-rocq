@@ -23,7 +23,7 @@ Section store.
     I would want to see how destruct, etc. are used
   *)
   Section store_to_view.
-    Context {p: pred Vars} (s: Store).
+    Context (p: pred Vars) (s: Store).
 
     Let def : StoreView p. Proof.
       intro vp.
@@ -36,7 +36,7 @@ Section store.
 
 
   Section view_to_store.
-    Context {p} (sv : StoreView p) (s: Store).
+    Context (p: pred Vars) (sv : StoreView p) (s: Store).
     (* There is a trick to {p} in previous also. *)
 
     Let def : Store. Proof.
@@ -58,6 +58,6 @@ End store.
 
 Module Notations.
   (* TODO: Perhaps we want to have something like a notation key / delimiter?  *)
-  Notation "⟨ s ⟩" := (store_to_view s).
-  Notation "⟨ sv → s ⟩" := (view_to_store sv s).
+  Notation "⟨ s ⟩" := (store_to_view _ s)(only parsing).
+  Notation "⟨ sv → s ⟩" := (view_to_store _ sv s)(only parsing).
 End Notations.

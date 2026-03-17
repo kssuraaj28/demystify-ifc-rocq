@@ -25,6 +25,13 @@ Section cleanstep.
               [])
     end.
 
+  Lemma clean_assign_nocont: forall comp s s' c,
+    clean_cmd_step (assign comp) s = (s', c) ->
+    c = [].
+  Proof.
+    by move=> > /= [].
+  Qed.
+
 End cleanstep.
 
 Section cont.

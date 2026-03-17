@@ -1,5 +1,5 @@
 (* Time to cook *)
-From Stdlib Require Import ssreflect List FunctionalExtensionality.
+From Stdlib Require Import ssreflect ssrbool List FunctionalExtensionality.
 Import ListNotations.
 
 
@@ -8,6 +8,35 @@ From QuickChick Require Import Decidability.
 
 Require Import Util VarValStore Syntax Semantics Attacker.
 Import Util.Dec.
+
+Section ni.
+  Import VarValStore.Notations.
+  Context `{!VarPrm, !ValPrm}.
+
+  Definition Noninterfering (p: pred Vars) (comp : Store -> Store) :=
+    forall s1 s2,
+      ⟨ s1 ⟩ = ⟨ s2 ⟩ :> StoreView p ->
+      ⟨ comp s1 ⟩ = ⟨ comp s2 ⟩ :> StoreView p.
+      
+End ni.
+
+Section ts.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
+
+  (* Should this be inductive? *)
+  Inductive CmdRestriction: Cmd -> Prop :=
+    nitr : forall comp, 
+        Noninterfering is_trusted comp ->
+        CmdRestriction (assign comp).
+
+  (* This name is stupid *)
+  Definition AtkCmdRestriction '(mk_cstep _ c) : Prop :=
+    CmdRestriction c.
+
+  Definition ContinuationRestriction: Continuation -> Prop :=
+    Forall AtkCmdRestriction.
+
+End ts.
 
 Instance vli : ValPrm := {Vals := nat}.
 Inductive EgVars := st | pt | pu | su. Instance eg_dec : DecEq EgVars. Proof. by dec_eq. Qed. (* I wonder whether there are better tactics *)
@@ -41,7 +70,7 @@ Definition AtkRealStates := unit.
 Definition atkreal : AdvStateMachine AtkRealStates := {|
     init_state := fun _ => tt ; 
     init_substeps := fun _ => 1 ;
-    corruptor := fun _ sv => (fun v => 5) ;  (* Set all untrusted vars to 5 *)
+    corruptor := fun _ sv => (fun v => 59) ;  (* Set all untrusted vars to 5 *)
     learner := fun _ _ => tt; (* This is lemunsnokun attacker *)
     leaker := fun _ => 67 ;
     substeps := fun _ => 0; (* simple man *)
@@ -87,19 +116,23 @@ Section assumptions.
   Notation CfgR := (Cfg AtkRealStates).
   Notation CfgI := (Cfg AtkIdealStates).
 
+  Import VarValStore.Notations.
+
   Definition BisimRel (cr : CfgR) (ci: CfgI) : Prop :=
     let: (contr, storer, asr, trr) :=  cr in
     let: (conti, storei, asi, tri) :=  ci in
+    ContinuationRestriction contr /\ (* I don't like this. Uniform object is better *)
     (conti = contr) /\
     (asr = asi) /\
-    (trr = tri). (* TODO Store equality *)
+    ⟨ storer ⟩ = ⟨ storei ⟩ :> StoreView is_trusted /\ 
+    (trr = tri). 
   
 
   Lemma bisim_extract: forall c1 c2,
                   BisimRel c1 c2 -> extract_trace c1 = extract_trace c2.
   Proof.
     move=> [[[? ?]?]?].
-    move=> [[[? ?]?]?] /=. 
+    move=> [[[? ?]?]?] /=.
     by intuition.
   Qed.
 
@@ -109,13 +142,52 @@ Section assumptions.
       (initial_cfg [simple_cmd] atkreal  s)
       (initial_cfg [simple_cmd] atkideal s).
   Proof.
-    by [].
+    move=> s /=; split => //=.
+    by constructor => //=.
   Qed.
 
 
-  Parameter bisim_step: forall c1 c2,
+  Lemma bisim_step: forall c1 c2,
                           BisimRel c1 c2 ->
                           BisimRel (step atkreal c1) (step atkideal c2).
+  Proof.
+    move=> [[[cont ?]?]?] [[[? ?]?]?].
+    move=> /= [wt [-> [-> [trseq ->]]]] /=.    (* How to simpl only in Hypothesis *)
+    case: cont wt=> [|atkcmd ? wt]; first by rewrite /= trseq //=.
+    case rst: (atk_cmd_step atkreal _ _ _) => [[[sr ar] cr ] lr].
+    case ist: (atk_cmd_step atkideal _ _ _) => [[[si ai] ci ] li].
+    move: wt=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _)=> wt1 wt2 /=.
+    set rsv := ⟨ sr ⟩; set isv := ⟨ si ⟩.
+    match goal with |- ?G => set goal := G end. (* ssr? *)
+    case: atkcmd wt1 ist rst=> [isatk cmd]. 
+    rewrite/AtkCmdRestriction; case. 
+    rewrite/Noninterfering/goal=> > ni {goal}.
+    case: isatk=> /= => e1 e2; 
+    case: e1=> e1 <- <- <-; 
+    case: e2=> e2 <- <- <- /=;
+    (suff ->: rsv=isv by repeat split=> //=); 
+    subst rsv isv; move: e1 e2=> <- <-; (* ssr for subst? *)
+    move: ni; apply; last by [].
+    (* Here, we need to prove something about adversary *)
+    move: trseq; clear=> hyp.
+    rewrite /is_trusted /is_untrusted /=.
+    set x := (fun _ => 59); move: x=> x.
+    rewrite
+
+    f_equal.
+
+    { admit. }
+    { by auto. }
+
+    }
+
+    {admit. }
+
+    { admit. }
+  Admitted.
+
+    (* This is actually wrong. We need all commands to be noninterfering *) 
+      
 
 
 End assumptions.
