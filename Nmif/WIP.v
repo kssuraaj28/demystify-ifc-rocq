@@ -104,8 +104,6 @@ BisimRel (step atkreal (multistep atkreal _n_ c1))
   (step atkideal (multistep atkideal _n_ c2))
   *)
 
-Check @initial_cfg.
-
 Goal b1 = b2 . Proof.
   apply: functional_extensionality=> s; apply: functional_extensionality=> n.
   rewrite /b1 /b2 !/(⟦_☠︎︎_⟧).
