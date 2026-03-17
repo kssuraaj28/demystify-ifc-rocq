@@ -77,25 +77,46 @@ Goal
 
 *)
 
+(* Can I construct a proof object with more state? 
+
+Parameter Po : Type.
+Parameter BisimRel : Po -> Type.
+You need to lift step to Po..
+*)
 Section assumptions.
   Notation CfgR := (Cfg AtkRealStates).
   Notation CfgI := (Cfg AtkIdealStates).
 
-  Parameter BisimRel: CfgR -> CfgI -> Prop.
+  Definition BisimRel (cr : CfgR) (ci: CfgI) : Prop :=
+    let: (contr, storer, asr, trr) :=  cr in
+    let: (conti, storei, asi, tri) :=  ci in
+    (conti = contr) /\
+    (asr = asi) /\
+    (trr = tri). (* TODO Store equality *)
+  
 
-  Check initial_cfg.
-  Parameter BisimInit: 
+  Lemma bisim_extract: forall c1 c2,
+                  BisimRel c1 c2 -> extract_trace c1 = extract_trace c2.
+  Proof.
+    move=> [[[? ?]?]?].
+    move=> [[[? ?]?]?] /=. 
+    by intuition.
+  Qed.
+
+  Lemma bisim_init: 
     forall s,
     BisimRel 
       (initial_cfg [simple_cmd] atkreal  s)
       (initial_cfg [simple_cmd] atkideal s).
+  Proof.
+    by [].
+  Qed.
 
-  Parameter BisimStep: forall c1 c2,
+
+  Parameter bisim_step: forall c1 c2,
                           BisimRel c1 c2 ->
                           BisimRel (step atkreal c1) (step atkideal c2).
 
-  Parameter BisimExtract: forall c1 c2,
-                  BisimRel c1 c2 -> extract_trace c1 = extract_trace c2.
 
 End assumptions.
 
@@ -111,15 +132,15 @@ Goal b1 = b2 . Proof.
   set c1 := (initial_cfg _ _ _); set c2 := (initial_cfg _ _ _). (* Set second? *) 
   move e1: (multistep _ _ c1) => ms1; move e2: (multistep _ _ c2) => ms2. 
 
-  apply: BisimExtract. Undo.
-  apply/BisimExtract.
+  apply: bisim_extract. Undo.
+  apply/bisim_extract.
 
   elim: n ms1 ms2 e1 e2=> [> | > ih >] <- <- /=.
     rewrite /c1 /c2 /=.
-    by apply: BisimInit.
+    by apply: bisim_init.
 
-  by apply: BisimStep; apply: ih. Undo.
-  by apply/BisimStep /ih. (* What the hell is this *)
+  by apply: bisim_step; apply: ih. Undo.
+  by apply/bisim_step /ih. (* What the hell is this *)
 Qed.
 
 (* There three admits exactly correspond to 
