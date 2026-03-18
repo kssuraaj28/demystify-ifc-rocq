@@ -1,8 +1,8 @@
 From Stdlib Require ssreflect ssrbool.
 Import ssreflect ssrbool.
 
-Require VarValStore.
-Import VarValStore.
+Require VarValStore Util.
+Import VarValStore Util.BoolPred.
 
 Class AdvLeakPrm := LeakVals : Type.
 
@@ -13,8 +13,8 @@ Class AdvLvlPrm  `{!VarPrm} := {
 
 Section opposite.
   Context `{!VarPrm, !AdvLvlPrm}.
-  Definition is_secret v := ~~ is_public v.
-  Definition is_trusted v := ~~ is_untrusted v.
+  Definition is_secret := inverse is_public.
+  Definition is_trusted := inverse is_untrusted.
 End opposite.
 
 
@@ -34,10 +34,12 @@ End opposite.
 *)
 Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} 
     {AtkStates : Type} := {
-    init_state: (StoreView is_public) -> AtkStates;
+    init_state: StoreView -> AtkStates; (* You only get untrusted*)
     init_substeps: AtkStates -> nat;
-    corruptor: AtkStates -> (StoreView is_untrusted) -> (StoreView is_untrusted);
-    learner : AtkStates -> (StoreView is_public) -> AtkStates;
+    corruptor: AtkStates -> StoreView -> StoreView;
+    corruptor_wf: forall ast sv var, is_trusted var ->
+                      corruptor ast sv var = None;
+    learner : AtkStates -> StoreView -> AtkStates;
     leaker : AtkStates -> LeakVals;
     substeps : AtkStates -> nat;
   }.

@@ -1,5 +1,5 @@
-From Stdlib Require List ssreflect.
-Import List ListNotations ssreflect.
+From Stdlib Require List ssreflect ssrbool.
+Import List ListNotations ssreflect ssrbool.
 
 From QuickChick Require Decidability.
 
@@ -11,6 +11,14 @@ Module Dec.
     Export (notations) Decidability.
   End Notations.
 End Dec.
+
+(* TODO: Pull ssrbool here here *)
+Module BoolPred.
+  Definition inverse {A} (p: pred A) : (pred A) :=
+    fun a => ~~ p a.
+
+
+End BoolPred.
 
 
 Module List.

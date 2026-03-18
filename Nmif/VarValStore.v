@@ -1,8 +1,8 @@
-From Stdlib Require ssreflect ssrbool. 
-Import ssreflect ssrbool.
+From Stdlib Require ssreflect ssrbool FunctionalExtensionality. 
+Import ssreflect ssrbool FunctionalExtensionality.
 
 Require Util Tacs.
-Import Util.Dec Tacs.
+Import Util.Dec Util.BoolPred Tacs.
 
 Class VarPrm := {Vars : Type ; vars_deceq :: DecEq Vars}. 
 Class ValPrm := {Vals : Type}.
@@ -16,48 +16,19 @@ Section store.
   Definition update_to_store (st : Store) (v : Vars) (vl : Vals) : Store := 
     fun v' => if (v = v')? is true then vl else st v'.  (* The double colon in vars_deceq is needed here. *)
 
-  Definition StoreView (p : pred Vars) := {v: Vars | p v} -> Vals.
+  (* I don't get dependent types :(. Maybe once I am good, I will use them *)
+  Definition StoreView := Vars -> option Vals.
 
-  (* 
-    I wonder whether it makes sense to use Ltac2 for this..
-    I would want to see how destruct, etc. are used
-  *)
-  Section store_to_view.
-    Context (p: pred Vars) (s: Store).
+  Definition store_to_view (s: Store) (p: pred Vars) : StoreView :=
+    fun v => if p v is true then Some (s v) else None.
 
-    Let def : StoreView p. Proof.
-      intro vp.
-      destruct vp as [v _].
-      exact (s v).
-    Defined.
-
-    Definition store_to_view : StoreView p := ltac:(hnf_clean (def)).
-  End store_to_view.
-
-
-  Section view_to_store.
-    Context (p: pred Vars) (sv : StoreView p) (s: Store).
-    (* There is a trick to {p} in previous also. *)
-
-    Let def : Store. Proof.
-      intro var.
-      destruct (p var) eqn: ?; ltac2:(goals [@TR; @FLS]).
-
-      [FLS]: { exact (s var). }
-
-      [TR]: {
-        refine (sv _).
-        unshelve esplit; [exact var | assumption].
-      }
-    Defined.
-
-    Definition view_to_store : Store := 
-      ltac:(hnf_clean def).
-  End view_to_store.
+  Definition view_to_store (sv: StoreView) (s_old: Store) : Store :=
+    fun v => if sv v is (Some vl) then vl else s_old v. 
 End store.
 
+(* Without dependent types, you lose the cool type inference.. *)
 Module Notations.
   (* TODO: Perhaps we want to have something like a notation key / delimiter?  *)
-  Notation "⟨ s ⟩" := (store_to_view _ s)(only parsing).
-  Notation "⟨ sv → s ⟩" := (view_to_store _ sv s)(only parsing).
+  Notation "⟨ s | p ⟩" := (store_to_view p s)(only parsing). 
+  Notation "⟨ sv → s ⟩" := (view_to_store sv s)(only parsing). (* TODO: Some warning here. *)
 End Notations.

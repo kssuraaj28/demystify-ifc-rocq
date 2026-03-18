@@ -6,8 +6,8 @@ Import ListNotations.
 (* This may be useful *)
 From QuickChick Require Import Decidability.
 
-Require Import Util VarValStore Syntax Semantics Attacker.
-Import Util.Dec.
+Require Import Util VarValStore Syntax Semantics Attacker Util. 
+Import Util.Dec Util.BoolPred.
 
 Section ni.
   Import VarValStore.Notations.
@@ -146,7 +146,6 @@ Section assumptions.
     by constructor => //=.
   Qed.
 
-
   Lemma bisim_step: forall c1 c2,
                           BisimRel c1 c2 ->
                           BisimRel (step atkreal c1) (step atkideal c2).
@@ -170,8 +169,21 @@ Section assumptions.
     move: ni; apply; last by [].
     (* Here, we need to prove something about adversary *)
     move: trseq; clear=> hyp.
-    rewrite /is_trusted /is_untrusted /=.
-    set x := (fun _ => 59); move: x=> x.
+
+    set untr_var := (fun _ => _). (* I don't like this *)
+
+    move: hyp;
+    have <-: inverse untr_var = [elaborate is_trusted]    by apply/functional_extensionality=> [[]]. 
+
+    (* Why can't I do other *)
+    rewrite <-x.
+
+
+
+
+    About store_to_view.
+    Notation 
+
     rewrite
 
     f_equal.
