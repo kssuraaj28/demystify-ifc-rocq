@@ -2,7 +2,7 @@ From Stdlib Require ssreflect ssrbool.
 Import ssreflect ssrbool.
 
 Require VarValStore Util.
-Import VarValStore Util.BoolPred.
+Import VarValStore. 
 
 Class AdvLeakPrm := LeakVals : Type.
 
@@ -13,8 +13,8 @@ Class AdvLvlPrm  `{!VarPrm} := {
 
 Section opposite.
   Context `{!VarPrm, !AdvLvlPrm}.
-  Definition is_secret := inverse is_public.
-  Definition is_trusted := inverse is_untrusted.
+  Definition is_secret v := ~~ is_public v.
+  Definition is_trusted v := ~~ is_untrusted v.
 End opposite.
 
 

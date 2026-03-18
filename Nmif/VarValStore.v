@@ -2,7 +2,7 @@ From Stdlib Require ssreflect ssrbool FunctionalExtensionality.
 Import ssreflect ssrbool FunctionalExtensionality.
 
 Require Util Tacs.
-Import Util.Dec Util.BoolPred Tacs.
+Import Util.Dec Tacs.
 
 Class VarPrm := {Vars : Type ; vars_deceq :: DecEq Vars}. 
 Class ValPrm := {Vals : Type}.
@@ -29,8 +29,8 @@ End store.
 (* Without dependent types, you lose the cool type inference.. *)
 Module Notations.
   (* TODO: Perhaps we want to have something like a notation key / delimiter?  *)
-  Notation "⟨ s | p ⟩" := (store_to_view s p)(only parsing). 
-  Notation "⟨ sv → s ⟩" := (view_to_store sv s)(only parsing). (* TODO: Some warning here. *)
+  Notation "⟨ s | p ⟩" := (store_to_view s p).
+  Notation "⟨ sv → s ⟩" := (view_to_store sv s). (* TODO: Some warning here. *)
   Section test.
     Context `{!VarPrm, !ValPrm}.
     Variable (s: Store) (sv: StoreView) (p : pred Vars).

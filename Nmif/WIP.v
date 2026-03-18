@@ -7,16 +7,17 @@ Import ListNotations.
 From QuickChick Require Import Decidability.
 
 Require Import Util VarValStore Syntax Semantics Attacker Util. 
-Import Util.Dec Util.BoolPred.
+Import Util.Dec. 
 
 Section ni.
   Import VarValStore.Notations.
   Context `{!VarPrm, !ValPrm}.
 
+  (* Is this the right definition? I don't even know *)
   Definition Noninterfering (p: pred Vars) (comp : Store -> Store) :=
     forall s1 s2,
-      ⟨ s1 ⟩ = ⟨ s2 ⟩ :> StoreView p ->
-      ⟨ comp s1 ⟩ = ⟨ comp s2 ⟩ :> StoreView p.
+    ⟨ s1 | p ⟩ = ⟨ s2 | p⟩ ->
+    ⟨ comp s1 | p ⟩ = ⟨ comp s2 | p⟩.
       
 End ni.
 
@@ -67,24 +68,34 @@ Definition simple_cmd : Cmd :=
 Instance lki : AdvLeakPrm := nat.
 
 Definition AtkRealStates := unit.
-Definition atkreal : AdvStateMachine AtkRealStates := {|
+Obligation Tactic := idtac.
+Program Definition atkreal : AdvStateMachine AtkRealStates := {|
     init_state := fun _ => tt ; 
     init_substeps := fun _ => 1 ;
-    corruptor := fun _ sv => (fun v => 59) ;  (* Set all untrusted vars to 5 *)
+    corruptor := fun _ sv => (fun v => if (is_untrusted v) then Some 59 else None) ;  (* Set all untrusted vars to 5 *)
     learner := fun _ _ => tt; (* This is lemunsnokun attacker *)
     leaker := fun _ => 67 ;
     substeps := fun _ => 0; (* simple man *)
   |}.
+  Next Obligation.
+    move=> >.
+    case E: is_trusted=> // _.
+    by move: E; rewrite /is_trusted; case: is_untrusted.
+  Qed.
+
 
 Definition AtkIdealStates := unit.
-Definition atkideal : AdvStateMachine AtkIdealStates := {|
+Program Definition atkideal : AdvStateMachine AtkIdealStates := {|
     init_state := fun _ => tt ; 
     init_substeps := fun _ => 1 ;
-    corruptor := fun _ sv => sv ;  (* Need to modify this appropriately *)
+    corruptor := fun _ sv _=>  None;
     learner := fun _ _ => tt; (* This is lemunsnokun attacker *)
     leaker := fun _ => 67 ;
     substeps := fun _ => 0; (* simple man *)
     |}.
+  Next Obligation.
+    intuition.
+  Defined.
 
 
 Import Semantics.Notations.
@@ -93,11 +104,11 @@ Definition b2 := ⟦ [simple_cmd] ☠︎︎ atkideal ⟧.
 
 
 Definition init_s :Store := 
-  fun v => 1.
+  fun v => 10.
 
 (* Can I quickchick this? *)
 Goal 
-  let: s := 100 in
+  let: s := 1000 in
   b1 init_s s = b2 init_s s. by []. Qed.
 
 (* TODO: More test. 
@@ -124,7 +135,7 @@ Section assumptions.
     ContinuationRestriction contr /\ (* I don't like this. Uniform object is better *)
     (conti = contr) /\
     (asr = asi) /\
-    ⟨ storer ⟩ = ⟨ storei ⟩ :> StoreView is_trusted /\ 
+    ⟨ storer | is_trusted ⟩ = ⟨ storei | is_trusted ⟩ /\
     (trr = tri). 
   
 
@@ -156,47 +167,41 @@ Section assumptions.
     case rst: (atk_cmd_step atkreal _ _ _) => [[[sr ar] cr ] lr].
     case ist: (atk_cmd_step atkideal _ _ _) => [[[si ai] ci ] li].
     move: wt=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _)=> wt1 wt2 /=.
-    set rsv := ⟨ sr ⟩; set isv := ⟨ si ⟩.
-    match goal with |- ?G => set goal := G end. (* ssr? *)
+    clear- trseq rst ist wt1 wt2.
+    set rsv := ⟨ sr | _ ⟩; set isv := ⟨ si | _⟩.
     case: atkcmd wt1 ist rst=> [isatk cmd]. 
-    rewrite/AtkCmdRestriction; case. 
-    rewrite/Noninterfering/goal=> > ni {goal}.
-    case: isatk=> /= => e1 e2; 
+    rewrite/AtkCmdRestriction=> - [].
+    rewrite/Noninterfering=> > ni.
+    move: (corruptor_wf atkideal) (corruptor_wf atkreal).
+    case: isatk=> /= => + + e1 e2; 
     case: e1=> e1 <- <- <-; 
     case: e2=> e2 <- <- <- /=;
-    (suff ->: rsv=isv by repeat split=> //=); 
-    subst rsv isv; move: e1 e2=> <- <-; (* ssr for subst? *)
-    move: ni; apply; last by [].
-    (* Here, we need to prove something about adversary *)
-    move: trseq; clear=> hyp.
+    move=> wta1 wta2;
+    (suff ->: rsv=isv by repeat split=> //=); rewrite {}/rsv {}/isv; (* How to subst *)
+    move: e1 e2=> <- <-; 
+    move: ni; apply; last by []. (* No attack case *)
 
-    set untr_var := (fun _ => _). (* I don't like this *)
+    move: wta2 trseq; rewrite /⟨_ |_⟩; clear => wta trseq.
+    apply/functional_extensionality=> v.
+    case E: is_trusted=> //=.
+    apply/f_equal; rewrite/⟨_ →_⟩ /=.
 
-    move: hyp;
-    have <-: inverse untr_var = [elaborate is_trusted]    by apply/functional_extensionality=> [[]]. 
+    set tst := if _ then _ else _. Undo.
+    (* This should be a matching algorithm *)
+    move: wta;
+    set tst := (match _ with
+      | st | pt => false | _ => _
+      end).
 
-    (* Why can't I do other *)
-    rewrite <-x.
+    have ->: tst = is_untrusted v by rewrite /tst;clear; case: v=> //=.
 
+    move: E trseq =>+ /equal_f /(_ v); clear.
 
+    move=> /(Bool.negb_true_iff) ->. Undo.
+    by rewrite/is_trusted=> /(Bool.negb_true_iff) -> /= []. (* Does not seem like ssr *)
+    Qed.
+    (* This wta nonsense is stupid *)
 
-
-    About store_to_view.
-    Notation 
-
-    rewrite
-
-    f_equal.
-
-    { admit. }
-    { by auto. }
-
-    }
-
-    {admit. }
-
-    { admit. }
-  Admitted.
 
     (* This is actually wrong. We need all commands to be noninterfering *) 
       

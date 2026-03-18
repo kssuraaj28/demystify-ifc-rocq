@@ -12,15 +12,6 @@ Module Dec.
   End Notations.
 End Dec.
 
-(* TODO: Pull ssrbool here here *)
-Module BoolPred.
-  Definition inverse {A} (p: pred A) : (pred A) :=
-    fun a => ~~ p a.
-
-
-End BoolPred.
-
-
 Module List.
   Section nlist.
     Context {A: Type}.
