@@ -92,14 +92,14 @@ Section atk_cmd_step.
 
         (* Part1 of adversary runs *)
         let: s := if is_atk is false then s else
-          ⟨ (corruptor atksm atkst ⟨s⟩) → s ⟩
+          ⟨ (corruptor atksm atkst ⟨s | is_untrusted⟩) → s ⟩
         in
 
         (* Run your computation *)
         let: (s, pcont) := clean_cmd_step c s in
 
         (* Part2a of adversary runs. *)
-        let: atkst := if is_atk is false then atkst else learner atksm atkst ⟨s⟩ in
+        let: atkst := if is_atk is false then atkst else learner atksm atkst ⟨s | is_public⟩ in
 
         (* Part2b of adversary runs. *)
         let: (substeps, optleak) :=
@@ -117,7 +117,8 @@ Section cfg.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
   Context (AtkStates : Type).
 
-  Definition Observation := (StoreView is_trusted * option LeakVals)%type.
+  (* Only trusted store view *)
+  Definition Observation := (StoreView * option LeakVals)%type.
 
   Definition ObservationTrace := list Observation.
 
@@ -126,18 +127,18 @@ Section cfg.
 End cfg.
 
 Section init_cfg.
-  Import VarValStore.Notations. Check ⟨ _ ⟩.
+  Import VarValStore.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
   Context {AtkStates : Type}.
 
   Definition initial_cfg (p: Prog) (atksm : AdvStateMachine AtkStates) (s: Store) : Cfg AtkStates :=
-    let: atkst := init_state atksm ⟨s⟩ in
+    let: atkst := init_state atksm ⟨s | is_public⟩ in
     let: init_cont := prog_zip p (init_substeps atksm atkst) in
     (init_cont, s, atkst, []).
 End init_cfg.
 
 Section cfg_step.
-  Import VarValStore.Notations. Check ⟨ _ ⟩.
+  Import VarValStore.Notations. 
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
   Context {AtkStates : Type} (atksm : AdvStateMachine AtkStates). (* TODO: unify *)
 
@@ -152,7 +153,7 @@ Section cfg_step.
       (extra_cont ++ cont', store', atkst', optlk)
     in 
 
-    (cont', store', atkst', ( ⟨ store' ⟩, optlk) :: trace).
+    (cont', store', atkst', ( ⟨ store' | is_trusted ⟩, optlk) :: trace).
 
   (* Man, testing this might be painful.. *)
   Fixpoint multistep (gas: nat) (c : Cfg) : Cfg :=

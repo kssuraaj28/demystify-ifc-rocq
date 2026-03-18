@@ -29,6 +29,12 @@ End store.
 (* Without dependent types, you lose the cool type inference.. *)
 Module Notations.
   (* TODO: Perhaps we want to have something like a notation key / delimiter?  *)
-  Notation "⟨ s | p ⟩" := (store_to_view p s)(only parsing). 
+  Notation "⟨ s | p ⟩" := (store_to_view s p)(only parsing). 
   Notation "⟨ sv → s ⟩" := (view_to_store sv s)(only parsing). (* TODO: Some warning here. *)
+  Section test.
+    Context `{!VarPrm, !ValPrm}.
+    Variable (s: Store) (sv: StoreView) (p : pred Vars).
+    Check ⟨ s | p ⟩.
+    Check ⟨ sv → s ⟩.
+  End test.
 End Notations.
