@@ -68,34 +68,17 @@ Definition simple_cmd : Cmd :=
 Instance lki : AdvLeakPrm := nat.
 
 Definition AtkRealStates := unit.
-Obligation Tactic := idtac. (* TODO: There is  *)
-Program Definition atkreal : AdvStateMachine AtkRealStates := {|
-    init_state := fun _ => tt ; 
-    init_substeps := fun _ => 1 ;
-    learner := fun _ _ => tt; (* This is lemunsnokun attacker *)
-    leaker := fun _ => 67 ;
-    substeps := fun _ => 0; (* simple man *)
-  |}.
-  Next Obligation.
-    admit.
-  Admitted.
-
-  Next Obligation.
-  Admitted.
-
+Parameter atkreal : AdvStateMachine AtkRealStates.
 
 Definition AtkIdealStates := unit.
 Program Definition atkideal : AdvStateMachine AtkIdealStates := {|
     init_state := fun _ => tt ; 
     init_substeps := fun _ => 1 ;
     corruptor := fun _ sv _=>  None;
-    learner := fun _ _ => tt; (* This is lemunsnokun attacker *)
-    leaker := fun _ => 67 ;
-    substeps := fun _ => 0; (* simple man *)
+    learner := learner atkreal;
+    leaker := leaker atkreal;
+    substeps := substeps atkreal
     |}.
-  Next Obligation.
-    by [].
-  Defined.
 
 
 Import Semantics.Notations.
@@ -106,10 +89,6 @@ Definition b2 := ⟦ [simple_cmd] ☠︎︎ atkideal ⟧.
 Definition init_s :Store := 
   fun v => 10.
 
-(* Can I quickchick this? *)
-Goal 
-  let: s := 1000 in
-  b1 init_s s = b2 init_s s. by []. Qed.
 
 (* TODO: More test. 
   TODO: Leak test.
@@ -170,11 +149,9 @@ Section bisim.
     clear- trseq rst ist wth wttl.
     set rsv := ⟨ sr | _ ⟩; set isv := ⟨ si | _⟩.
     case: atkcmd wth ist rst=> [isatk cmd]. 
-    rewrite/AtkCmdRestriction=> - [].
-    rewrite/Noninterfering=> > ni.
+    rewrite/AtkCmdRestriction=> [[]]; rewrite/Noninterfering=> > ni.
     move: (corruptor_wf atkreal)=> wtr.
-    case: isatk=> /= => e1 e2; 
-    case: e1=> e1 <-<-<-; case: e2=> e2 <-<-<- /=;
+    case: isatk=> /= => e1 e2; case: e1=> e1 <-<-<-; case: e2=> e2 <-<-<- /=;
     (suff ->: rsv=isv by repeat split=> //=); rewrite {}/rsv {}/isv; (* How to subst *)
     move: e1 e2=> <- <-; 
     move: ni; apply; 
@@ -183,8 +160,7 @@ Section bisim.
     case v_tr:(is_trusted v) => //=; apply/f_equal.
     set atk_out := (X in match X with | None => _ | _ => _  end).
     (have->: atk_out = None by apply/wtr); clear -trseq v_tr. (* Is this the best style? *)
-    move: trseq v_tr; rewrite /⟨_|_⟩. 
-    by move=>/equal_f/(_ v)/[swap]->[].
+    by apply/storeview_eq; eauto.
  Qed.
 End bisim.
 

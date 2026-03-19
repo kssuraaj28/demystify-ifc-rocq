@@ -38,3 +38,19 @@ Module Notations.
     Check ⟨ sv → s ⟩.
   End test.
 End Notations.
+
+Section thms.
+  Import Notations.
+  Context `{!VarPrm, !ValPrm}.
+
+  Theorem storeview_eq: 
+    forall s1 s2 p inp,
+      ⟨ s1 | p ⟩ = ⟨ s2 | p ⟩ ->
+      p inp -> 
+      s1 inp = s2 inp.
+  Proof.
+    move=>??? inp; rewrite/⟨_|_⟩.
+    by rewrite /⟨_|_⟩=> /equal_f/(_ inp)/[swap]->[].
+  Qed.
+
+End thms.
