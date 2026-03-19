@@ -123,7 +123,7 @@ Parameter Po : Type.
 Parameter BisimRel : Po -> Type.
 You need to lift step to Po..
 *)
-Section assumptions.
+Section bisim.
   Notation CfgR := (Cfg AtkRealStates).
   Notation CfgI := (Cfg AtkIdealStates).
 
@@ -174,8 +174,8 @@ Section assumptions.
     rewrite/Noninterfering=> > ni.
     move: (corruptor_wf atkideal) (corruptor_wf atkreal).
     case: isatk=> /= => + + e1 e2; 
-    case: e1=> e1 <- <- <-; 
-    case: e2=> e2 <- <- <- /=;
+    case: e1=> e1 <-<-<-; 
+    case: e2=> e2 <-<-<- /=;
     move=> _ wtr;
     (suff ->: rsv=isv by repeat split=> //=); rewrite {}/rsv {}/isv; (* How to subst *)
     move: e1 e2=> <- <-; 
@@ -183,18 +183,11 @@ Section assumptions.
     rewrite/⟨_ →_⟩ /⟨_|_⟩/=; apply/functional_extensionality=> v.
     case v_tr:(is_trusted v) => //=; apply/f_equal.
     set atk_out := (atkreal_obligation_1 _ _ _). (* TODO: This is stupid *)
-    have->: atk_out = None by apply/ wtr.
-    move: v_tr trseq; clear; rewrite /⟨_|_⟩. 
-    by move=> + /equal_f /(_ v)=> -> [].
-    Qed.
-    (* This wta nonsense is stupid *)
-
-
-    (* This is actually wrong. We need all commands to be noninterfering *) 
-      
-
-
-End assumptions.
+    have->: atk_out = None by apply/wtr.
+    move: trseq v_tr; clear; rewrite /⟨_|_⟩. 
+    by move=> /equal_f /(_ v) /[swap] -> [].
+ Qed.
+End bisim.
 
 (*
 BisimRel (step atkreal (multistep atkreal _n_ c1))
@@ -211,9 +204,7 @@ Goal b1 = b2 . Proof.
   apply: bisim_extract. Undo.
   apply/bisim_extract.
 
-  elim: n ms1 ms2 e1 e2=> [> | > ih >] <- <- /=.
-    rewrite /c1 /c2 /=.
-    by apply: bisim_init.
+  elim: n ms1 ms2 e1 e2=> [> | > ih >] <- <- /=; first by apply/ bisim_init.
 
   by apply: bisim_step; apply: ih. Undo.
   by apply/bisim_step /ih. (* What the hell is this *)
