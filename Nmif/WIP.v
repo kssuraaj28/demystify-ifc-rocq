@@ -37,6 +37,16 @@ Section ts.
   Definition ContinuationRestriction: Continuation -> Prop :=
     Forall AtkCmdRestriction.
 
+  Lemma restr_zip: forall p n, 
+    Forall CmdRestriction p ->
+    ContinuationRestriction (prog_zip p n).
+  Proof.
+    admit.
+  Admitted.
+
+
+
+
 End ts.
 
 Instance vli : ValPrm := {Vals := nat}.
@@ -73,7 +83,7 @@ Parameter atkreal : AdvStateMachine AtkRealStates.
 Definition AtkIdealStates := unit.
 Program Definition atkideal : AdvStateMachine AtkIdealStates := {|
     init_state := fun _ => tt ; 
-    init_substeps := fun _ => 1 ;
+    init_substeps := init_substeps atkreal;
     corruptor := fun _ sv _=>  None;
     learner := learner atkreal;
     leaker := leaker atkreal;
@@ -85,9 +95,6 @@ Import Semantics.Notations.
 Definition b1 := ⟦ [simple_cmd] ☠︎︎ atkreal ⟧.
 Definition b2 := ⟦ [simple_cmd] ☠︎︎ atkideal ⟧.
 
-
-Definition init_s :Store := 
-  fun v => 10.
 
 
 (* TODO: More test. 
@@ -132,8 +139,8 @@ Section bisim.
       (initial_cfg [simple_cmd] atkreal  s)
       (initial_cfg [simple_cmd] atkideal s).
   Proof.
-    move=> s /=; split => //=.
-    by constructor => //=.
+    move=> s; split; first by apply/restr_zip; constructor=> //=.
+    by repeat split=> //; repeat case: (init_state _ _).
   Qed.
 
   Lemma bisim_step: forall c1 c2,
@@ -143,25 +150,34 @@ Section bisim.
     move=> [[[cont ?]?]?] [[[? ?]?]?].
     move=> /= [wt [-> [-> [trseq ->]]]] /=.    (* How to simpl only in Hypothesis *)
     case: cont wt=> [|atkcmd ? wt]; first by rewrite /= trseq //=.
-    case rst: (atk_cmd_step atkreal _ _ _) => [[[sr ?] ? ] ?].
-    case ist: (atk_cmd_step atkideal _ _ _) => [[[si ?] ? ] ?].
+    case rst: (atk_cmd_step atkreal _ _ _) => [[[sr []] contr ] lkr]. (* Note how I make tt. TODO *)
+    case ist: (atk_cmd_step atkideal _ _ _) => [[[si []] conti ] lki].
     move: wt=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _)=> wth wttl /=.
     clear- trseq rst ist wth wttl.
     set rsv := ⟨ sr | _ ⟩; set isv := ⟨ si | _⟩.
-    case: atkcmd wth ist rst=> [isatk cmd]. 
+    suff: ([elaborate ContinuationRestriction contr /\ conti = contr /\  rsv = isv /\ lkr = lki])
+      by intuition; try congruence; apply/Forall_app.
+    rewrite {}/rsv {}/isv; case: atkcmd wth ist rst=> [isatk cmd]. 
     rewrite/AtkCmdRestriction=> [[]]; rewrite/Noninterfering=> > ni.
-    move: (corruptor_wf atkreal)=> wtr.
-    case: isatk=> /= => e1 e2; case: e1=> e1 <-<-<-; case: e2=> e2 <-<-<- /=;
-    (suff ->: rsv=isv by repeat split=> //=); rewrite {}/rsv {}/isv; (* How to subst *)
-    move: e1 e2=> <- <-; 
-    move: ni; apply; 
-    clear -trseq wtr; last by [].
-    rewrite/⟨_ →_⟩ /⟨_|_⟩/=; apply/functional_extensionality=> v.
-    case v_tr:(is_trusted v) => //=; apply/f_equal.
-    set atk_out := (X in match X with | None => _ | _ => _  end).
-    (have->: atk_out = None by apply/wtr); clear -trseq v_tr. (* Is this the best style? *)
+    move: (corruptor_wf atkreal)=> wtr; clear -wtr ni trseq.
+    rewrite/atk_cmd_step.
+    move cs1: (clean_cmd_step _ _)=> [? k1].
+    move cs2: (clean_cmd_step _ _)=> [? k2].
+    repeat move: (learner _ _ _)=> [] /=. (* TODO. *)
+    move: (substeps _ _)=> ?. (* TODO *)
+    move: (leaker _ _)=> ?. (* TODO *)
+    move=> e1 e2. 
+    case: isatk e1 e2 cs1 cs2=> 
+      [[<-<-<-] [<-<-<-]| [<-<-<-<-] [<-<-<-]]/=[<-<-][<-<-];
+      (repeat split; first by auto using restr_zip);
+      move: ni; apply; last by [].
+    rewrite/⟨_|_⟩/⟨_→_⟩; apply/functional_extensionality=> v.
+    case v_tr: (is_trusted _)=> //=; apply/f_equal.
+    set atk_out := (X in match X with | None => _ | _ => _  end).         
+    (have->: atk_out = None by apply/wtr); clear -trseq v_tr. (* Is this the best style? *) 
     by apply/storeview_eq; eauto.
- Qed.
+  Qed.
+
 End bisim.
 
 (*
