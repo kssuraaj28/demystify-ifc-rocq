@@ -172,21 +172,19 @@ Section bisim.
     case: atkcmd wth ist rst=> [isatk cmd]. 
     rewrite/AtkCmdRestriction=> - [].
     rewrite/Noninterfering=> > ni.
-    move: (corruptor_wf atkideal) (corruptor_wf atkreal).
-    case: isatk=> /= => + + e1 e2; 
-    case: e1=> e1 <-<-<-; 
-    case: e2=> e2 <-<-<- /=;
-    move=> _ wtr;
+    move: (corruptor_wf atkreal)=> wtr.
+    case: isatk=> /= => e1 e2; 
+    case: e1=> e1 <-<-<-; case: e2=> e2 <-<-<- /=;
     (suff ->: rsv=isv by repeat split=> //=); rewrite {}/rsv {}/isv; (* How to subst *)
     move: e1 e2=> <- <-; 
-    move: ni; apply; last by []. (* No attack case *)
-    clear -trseq wtr.
+    move: ni; apply; 
+    clear -trseq wtr; last by [].
     rewrite/⟨_ →_⟩ /⟨_|_⟩/=; apply/functional_extensionality=> v.
     case v_tr:(is_trusted v) => //=; apply/f_equal.
     set atk_out := (X in match X with | None => _ | _ => _  end).
-    have->: atk_out = None by apply/wtr.
-    move: trseq v_tr; clear; rewrite /⟨_|_⟩. 
-    by move=> /equal_f /(_ v) /[swap] -> [].
+    (have->: atk_out = None by apply/wtr); clear -trseq v_tr. (* Is this the best style? *)
+    move: trseq v_tr; rewrite /⟨_|_⟩. 
+    by move=>/equal_f/(_ v)/[swap]->[].
  Qed.
 End bisim.
 
