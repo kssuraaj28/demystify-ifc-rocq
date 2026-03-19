@@ -164,12 +164,12 @@ Section bisim.
     move=> [[[cont ?]?]?] [[[? ?]?]?].
     move=> /= [wt [-> [-> [trseq ->]]]] /=.    (* How to simpl only in Hypothesis *)
     case: cont wt=> [|atkcmd ? wt]; first by rewrite /= trseq //=.
-    case rst: (atk_cmd_step atkreal _ _ _) => [[[sr ar] cr ] lr].
-    case ist: (atk_cmd_step atkideal _ _ _) => [[[si ai] ci ] li].
-    move: wt=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _)=> wt1 wt2 /=.
-    clear- trseq rst ist wt1 wt2.
+    case rst: (atk_cmd_step atkreal _ _ _) => [[[sr ?] ? ] ?].
+    case ist: (atk_cmd_step atkideal _ _ _) => [[[si ?] ? ] ?].
+    move: wt=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _)=> wth wttl /=.
+    clear- trseq rst ist wth wttl.
     set rsv := ⟨ sr | _ ⟩; set isv := ⟨ si | _⟩.
-    case: atkcmd wt1 ist rst=> [isatk cmd]. 
+    case: atkcmd wth ist rst=> [isatk cmd]. 
     rewrite/AtkCmdRestriction=> - [].
     rewrite/Noninterfering=> > ni.
     move: (corruptor_wf atkideal) (corruptor_wf atkreal).
@@ -180,9 +180,10 @@ Section bisim.
     (suff ->: rsv=isv by repeat split=> //=); rewrite {}/rsv {}/isv; (* How to subst *)
     move: e1 e2=> <- <-; 
     move: ni; apply; last by []. (* No attack case *)
+    clear -trseq wtr.
     rewrite/⟨_ →_⟩ /⟨_|_⟩/=; apply/functional_extensionality=> v.
     case v_tr:(is_trusted v) => //=; apply/f_equal.
-    set atk_out := (atkreal_obligation_1 _ _ _). (* TODO: This is stupid *)
+    set atk_out := (X in match X with | None => _ | _ => _  end).
     have->: atk_out = None by apply/wtr.
     move: trseq v_tr; clear; rewrite /⟨_|_⟩. 
     by move=> /equal_f /(_ v) /[swap] -> [].
@@ -197,17 +198,11 @@ BisimRel (step atkreal (multistep atkreal _n_ c1))
 Goal b1 = b2 . Proof.
   apply: functional_extensionality=> s; apply: functional_extensionality=> n.
   rewrite /b1 /b2 !/(⟦_☠︎︎_⟧).
-  
   set c1 := (initial_cfg _ _ _); set c2 := (initial_cfg _ _ _). (* Set second? *) 
   move e1: (multistep _ _ c1) => ms1; move e2: (multistep _ _ c2) => ms2. 
-
-  apply: bisim_extract. Undo.
   apply/bisim_extract.
-
-  elim: n ms1 ms2 e1 e2=> [> | > ih >] <- <- /=; first by apply/ bisim_init.
-
-  by apply: bisim_step; apply: ih. Undo.
-  by apply/bisim_step /ih. (* What the hell is this *)
+  elim: n ms1 ms2 e1 e2=> [> | > ? >] <- <- /=; first by apply/ bisim_init.
+  by apply/bisim_step; auto. (* What the hell is this *)
 Qed.
 
 (* There three admits exactly correspond to 
