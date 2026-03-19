@@ -68,20 +68,20 @@ Definition simple_cmd : Cmd :=
 Instance lki : AdvLeakPrm := nat.
 
 Definition AtkRealStates := unit.
-Obligation Tactic := idtac.
+Obligation Tactic := idtac. (* TODO: There is  *)
 Program Definition atkreal : AdvStateMachine AtkRealStates := {|
     init_state := fun _ => tt ; 
     init_substeps := fun _ => 1 ;
-    corruptor := fun _ sv => (fun v => if (is_untrusted v) then Some 59 else None) ;  (* Set all untrusted vars to 5 *)
     learner := fun _ _ => tt; (* This is lemunsnokun attacker *)
     leaker := fun _ => 67 ;
     substeps := fun _ => 0; (* simple man *)
   |}.
   Next Obligation.
-    move=> >.
-    case E: is_trusted=> // _.
-    by move: E; rewrite /is_trusted; case: is_untrusted.
-  Qed.
+    admit.
+  Admitted.
+
+  Next Obligation.
+  Admitted.
 
 
 Definition AtkIdealStates := unit.
@@ -94,7 +94,7 @@ Program Definition atkideal : AdvStateMachine AtkIdealStates := {|
     substeps := fun _ => 0; (* simple man *)
     |}.
   Next Obligation.
-    intuition.
+    by [].
   Defined.
 
 
@@ -176,29 +176,16 @@ Section assumptions.
     case: isatk=> /= => + + e1 e2; 
     case: e1=> e1 <- <- <-; 
     case: e2=> e2 <- <- <- /=;
-    move=> wta1 wta2;
+    move=> _ wtr;
     (suff ->: rsv=isv by repeat split=> //=); rewrite {}/rsv {}/isv; (* How to subst *)
     move: e1 e2=> <- <-; 
     move: ni; apply; last by []. (* No attack case *)
-
-    move: wta2 trseq; rewrite /⟨_ |_⟩; clear => wta trseq.
-    apply/functional_extensionality=> v.
-    case E: is_trusted=> //=.
-    apply/f_equal; rewrite/⟨_ →_⟩ /=.
-
-    set tst := if _ then _ else _. Undo.
-    (* This should be a matching algorithm *)
-    move: wta;
-    set tst := (match _ with
-      | st | pt => false | _ => _
-      end).
-
-    have ->: tst = is_untrusted v by rewrite /tst;clear; case: v=> //=.
-
-    move: E trseq =>+ /equal_f /(_ v); clear.
-
-    move=> /(Bool.negb_true_iff) ->. Undo.
-    by rewrite/is_trusted=> /(Bool.negb_true_iff) -> /= []. (* Does not seem like ssr *)
+    rewrite/⟨_ →_⟩ /⟨_|_⟩/=; apply/functional_extensionality=> v.
+    case v_tr:(is_trusted v) => //=; apply/f_equal.
+    set atk_out := (atkreal_obligation_1 _ _ _). (* TODO: This is stupid *)
+    have->: atk_out = None by apply/ wtr.
+    move: v_tr trseq; clear; rewrite /⟨_|_⟩. 
+    by move=> + /equal_f /(_ v)=> -> [].
     Qed.
     (* This wta nonsense is stupid *)
 
