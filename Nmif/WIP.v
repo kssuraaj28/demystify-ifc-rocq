@@ -7,7 +7,7 @@ Import ListNotations.
 From QuickChick Require Import Decidability.
 
 Require Import Util VarValStore Syntax Semantics Attacker Util. 
-Import Util.Dec. 
+Import Util.Dec Util.List. 
 
 Section ni.
   Import VarValStore.Notations.
@@ -26,7 +26,7 @@ Section ts.
 
   (* Should this be inductive? *)
   Inductive CmdRestriction: Cmd -> Prop :=
-    nitr : forall comp, 
+    | nitr : forall comp, 
         Noninterfering is_trusted comp ->
         CmdRestriction (assign comp).
 
@@ -37,12 +37,28 @@ Section ts.
   Definition ContinuationRestriction: Continuation -> Prop :=
     Forall AtkCmdRestriction.
 
-  Lemma restr_zip: forall p n, 
+  Lemma map_wf: forall l b,
+      Forall CmdRestriction l ->
+      Forall AtkCmdRestriction (map (mk_cstep b) l).
+  Proof.
+    elim=> //= > ? > /[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _) /=.
+    by constructor; auto.
+  Qed.
+
+  (* I feel like you don't need so many lemmas *)
+  Theorem restr_zip: forall p n, 
     Forall CmdRestriction p ->
     ContinuationRestriction (prog_zip p n).
   Proof.
-    admit.
+    rewrite/ContinuationRestriction.
   Admitted.
+  (*
+    elim=> [n| > ih]; first by rewrite prog_zip_noprg=> _;  apply/skip_wf.
+    case=>[|>] /[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _) /= =>rc rl; 
+        constructor=> //=; last by apply: ih. (* : erases hyp *)
+    by clear -rl; auto using map_wf.
+  Qed.
+  *)
 
 
 
@@ -139,7 +155,8 @@ Section bisim.
       (initial_cfg [simple_cmd] atkreal  s)
       (initial_cfg [simple_cmd] atkideal s).
   Proof.
-    move=> s; split; first by apply/restr_zip; constructor=> //=.
+    move=> s; split; first by
+      apply/restr_zip;repeat constructor; cbv => //=.
     by repeat split=> //; repeat case: (init_state _ _).
   Qed.
 
@@ -153,8 +170,7 @@ Section bisim.
     case rst: (atk_cmd_step atkreal _ _ _) => [[[sr []] contr ] lkr]. (* Note how I make tt. TODO *)
     case ist: (atk_cmd_step atkideal _ _ _) => [[[si []] conti ] lki].
     move: wt=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _)=> wth wttl /=.
-    clear- trseq rst ist wth wttl.
-    set rsv := ⟨ sr | _ ⟩; set isv := ⟨ si | _⟩.
+    clear- trseq rst ist wth wttl; set rsv := ⟨ sr | _ ⟩; set isv := ⟨ si | _⟩.
     suff: ([elaborate ContinuationRestriction contr /\ conti = contr /\  rsv = isv /\ lkr = lki])
       by intuition; try congruence; apply/Forall_app.
     rewrite {}/rsv {}/isv; case: atkcmd wth ist rst=> [isatk cmd]. 
@@ -173,7 +189,7 @@ Section bisim.
       move: ni; apply; last by [].
     rewrite/⟨_|_⟩/⟨_→_⟩; apply/functional_extensionality=> v.
     case v_tr: (is_trusted _)=> //=; apply/f_equal.
-    set atk_out := (X in match X with | None => _ | _ => _  end).         
+    set atk_out := corruptor atkreal _ _ _.
     (have->: atk_out = None by apply/wtr); clear -trseq v_tr. (* Is this the best style? *) 
     by apply/storeview_eq; eauto.
   Qed.

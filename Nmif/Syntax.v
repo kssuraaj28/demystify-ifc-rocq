@@ -13,7 +13,6 @@ Section syntax.
 
     Unset Elimination Schemes. 
     Inductive Cmd :=
-      | skip
       | assign (comp : Store -> Store)
       | cond (tst: Store -> bool) (b1 b2: Prog' Cmd)
       | while (tst: Store -> bool) (b: Prog' Cmd). 

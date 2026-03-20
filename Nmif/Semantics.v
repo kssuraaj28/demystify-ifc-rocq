@@ -11,7 +11,6 @@ Section cleanstep.
 
   Definition clean_cmd_step (c: Cmd) (s: Store) : (Store * Continuation) := 
     match c with
-    | skip => (s, [])
     | assign comp => ( comp s, [])
     | cond tst b1 b2 => 
         (s, if (tst s) is true then 
@@ -43,6 +42,7 @@ Section cont.
 
   Definition Continuation := list AtkCmd.
 
+  Notation skip := (assign (fun s => s)) (only parsing).
   Notation pure_atk := (mk_cstep true skip) (only parsing).
   Notation pure_cmd := (mk_cstep false) (only parsing).
 
