@@ -138,10 +138,9 @@ Section bisim.
       (initial_cfg myprog atkreal  s)
       (initial_cfg myprog atkideal s).
   Proof.
-    move=> s; split; first by admit;
-      apply/restrict_rel;repeat constructor; cbv => //=.
+    move=> s; split; first by apply/restrict_rel/myprog_wt.
     by repeat split=> //; repeat case: (init_state _ _).
-  Admitted.
+  Qed.
 
   Lemma bisim_step: forall c1 c2,
                           BisimRel c1 c2 ->
@@ -168,14 +167,14 @@ Section bisim.
     move=> e1 e2. 
     case: isatk e1 e2 cs1 cs2=> 
       [[<-<-<-] [<-<-<-]| [<-<-<-<-] [<-<-<-]]/=[<-<-][<-<-];
-      (repeat split; first by admit; auto using restrict_rel);
+      (repeat split; first by apply/restrict_rel; red; auto);
       apply: ni; last by [].
     rewrite/⟨_|_⟩/⟨_→_⟩; apply/functional_extensionality=> v.
     case v_tr: (is_trusted _)=> //=; apply/f_equal.
     set atk_out := corruptor atkreal _ _ _.
     (have->: atk_out = None by apply/wtr); clear -trseq v_tr. (* Is this the best style? *) 
     by apply/storeview_eq; eauto.
-  Admitted.
+  Qed.
 
 End bisim.
 
