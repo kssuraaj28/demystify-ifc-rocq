@@ -30,6 +30,9 @@ Section ts.
         Noninterfering is_trusted comp ->
         CmdRestriction (assign comp).
 
+  Definition ProgRestriction: Prog -> Prop :=
+    Forall CmdRestriction.
+
   (* This name is stupid *)
   Definition AtkCmdRestriction '(mk_cstep _ c) : Prop :=
     CmdRestriction c.
@@ -39,8 +42,9 @@ Section ts.
 
   Lemma restrict_rel_inv: forall p,
     (forall n, ContinuationRestriction (prog_zip p n)) ->
-    Forall CmdRestriction p.
+    ProgRestriction p.
   Proof.
+    rewrite/ContinuationRestriction/ProgRestriction.
     move=> p /(_ 0).
     rewrite prog_zip_noatk /=.
     elim: p=> // > ih.
@@ -49,10 +53,11 @@ Section ts.
   Qed.
 
   Lemma restrict_rel: forall p,
-    Forall CmdRestriction p -> 
+    ProgRestriction p -> 
     (forall n, ContinuationRestriction (prog_zip p n)).
   Proof.
-    rewrite/ContinuationRestriction; elim=> [_ n|]. 
+    rewrite/ContinuationRestriction/ProgRestriction. 
+    elim=> [_ n|]. 
         { rewrite prog_zip_noprg. 
         by elim: n=> //= >; constructor; easy. } (* Is constructor ssreflecty? *)
     move=> c l ih /[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
@@ -63,33 +68,11 @@ Section ts.
 
 End ts.
 
-Instance vli : ValPrm := {Vals := nat}.
-Inductive EgVars := st | pt | pu | su. Instance eg_dec : DecEq EgVars. Proof. by dec_eq. Qed. (* I wonder whether there are better tactics *)
-Instance vri : VarPrm := {Vars := EgVars}.
+Parameter vli : ValPrm. Existing Instance vli.
+Parameter vri : VarPrm. Existing Instance vri.
+Parameter lvli : AdvLvlPrm. Existing Instance lvli.
+Parameter lki : AdvLeakPrm. Existing Instance lki.
 
-Instance lvli : AdvLvlPrm := {| 
-                  is_untrusted := 
-                    fun v => 
-                      match v with
-                      | st => false
-                      | pt => false
-                      | pu => true
-                      | su => true
-                      end ;
-                  is_public := 
-                    fun v =>
-                      match v with
-                      | st => false
-                      | pt => true
-                      | pu => true
-                      | su => false
-                      end ;
-                |}.
-
-Definition simple_cmd : Cmd := 
-      assign (fun _ => (fun _ => 1 )). (* Sets all variables to 1 *)
-
-Instance lki : AdvLeakPrm := nat.
 
 Definition AtkRealStates := unit.
 Parameter atkreal : AdvStateMachine AtkRealStates.
@@ -106,8 +89,10 @@ Program Definition atkideal : AdvStateMachine AtkIdealStates := {|
 
 
 Import Semantics.Notations.
-Definition b1 := ⟦ [simple_cmd] ☠︎︎ atkreal ⟧.
-Definition b2 := ⟦ [simple_cmd] ☠︎︎ atkideal ⟧.
+Parameter myprog : Prog.
+Axiom myprog_wt : ProgRestriction myprog.
+Definition b1 := ⟦ myprog ☠︎︎ atkreal ⟧.
+Definition b2 := ⟦ myprog ☠︎︎ atkideal ⟧.
 
 
 
@@ -150,13 +135,13 @@ Section bisim.
   Lemma bisim_init: 
     forall s,
     BisimRel 
-      (initial_cfg [simple_cmd] atkreal  s)
-      (initial_cfg [simple_cmd] atkideal s).
+      (initial_cfg myprog atkreal  s)
+      (initial_cfg myprog atkideal s).
   Proof.
-    move=> s; split; first by
+    move=> s; split; first by admit;
       apply/restrict_rel;repeat constructor; cbv => //=.
     by repeat split=> //; repeat case: (init_state _ _).
-  Qed.
+  Admitted.
 
   Lemma bisim_step: forall c1 c2,
                           BisimRel c1 c2 ->
@@ -183,14 +168,14 @@ Section bisim.
     move=> e1 e2. 
     case: isatk e1 e2 cs1 cs2=> 
       [[<-<-<-] [<-<-<-]| [<-<-<-<-] [<-<-<-]]/=[<-<-][<-<-];
-      (repeat split; first by auto using restrict_rel);
+      (repeat split; first by admit; auto using restrict_rel);
       apply: ni; last by [].
     rewrite/⟨_|_⟩/⟨_→_⟩; apply/functional_extensionality=> v.
     case v_tr: (is_trusted _)=> //=; apply/f_equal.
     set atk_out := corruptor atkreal _ _ _.
     (have->: atk_out = None by apply/wtr); clear -trseq v_tr. (* Is this the best style? *) 
     by apply/storeview_eq; eauto.
-  Qed.
+  Admitted.
 
 End bisim.
 
