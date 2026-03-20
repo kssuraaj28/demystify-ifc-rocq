@@ -21,13 +21,9 @@ Section ni.
       
 End ni.
 
-(* I wonder whether I can have an ssreflect extension.. *)
-Ltac forward_evar :=
-    let ev := open_constr:(_) in 
-    let id := fresh in pose id := ev; 
-    move=> /(_ id); subst id.
 Ltac Forall_inv := 
     move=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
+
 Section ts.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
 
@@ -57,13 +53,10 @@ Section ts.
   Proof.
     rewrite/ContinuationRestriction/ProgRestriction. 
     elim=> [_ n|]; first by elim: n=> //= >; constructor; easy.
-    move=> c l ih; Forall_inv.
+    move=> c l ih /ltac:(Forall_inv).
     move=> cr t; move: ih=> /(_ t) {t}=> cl n.
     case: n c l cr cl=> [> ? /(_ 0) |> ? ?]; last by constructor. (* Can I make 0 an evar? *)
     by rewrite !prog_zip_noatk /=; auto.
-    Undo. Undo.
-    case: n c l cr cl=> [> ? |> ? ?]; last by constructor. (* Can I make 0 an evar? *)
-    by forward_evar; erewrite !prog_zip_noatk=> /=; auto.
   Qed.
 
 End ts.
@@ -151,7 +144,7 @@ Section bisim.
     case: cont wt=> [|atkcmd ? wt]; first by rewrite /= trseq //=.
     case rst: (atk_cmd_step atkreal _ _ _) => [[[sr []] contr ] lkr]. (* Note how I make tt. TODO *)
     case ist: (atk_cmd_step atkideal _ _ _) => [[[si []] conti ] lki].
-    move: wt;Forall_inv=> wth wttl /=.
+    move: wt=>/ltac:(Forall_inv) wth wttl /=.
     clear- trseq rst ist wth wttl; set rsv := ⟨ sr | _ ⟩; set isv := ⟨ si | _⟩.
     suff: ([elaborate ContinuationRestriction contr /\ conti = contr /\  rsv = isv /\ lkr = lki])
       by intuition; try congruence; apply/Forall_app.
