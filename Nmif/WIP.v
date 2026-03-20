@@ -21,6 +21,11 @@ Section ni.
       
 End ni.
 
+(* I wonder whether I can have an ssreflect extension.. *)
+Ltac forward_evar :=
+    let ev := open_constr:(_) in 
+    let id := fresh in pose id := ev; 
+    move=> /(_ id); subst id.
 Ltac Forall_inv := 
     move=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
 Section ts.
@@ -56,6 +61,9 @@ Section ts.
     move=> cr t; move: ih=> /(_ t) {t}=> cl n.
     case: n c l cr cl=> [> ? /(_ 0) |> ? ?]; last by constructor. (* Can I make 0 an evar? *)
     by rewrite !prog_zip_noatk /=; auto.
+    Undo. Undo.
+    case: n c l cr cl=> [> ? |> ? ?]; last by constructor. (* Can I make 0 an evar? *)
+    by forward_evar; erewrite !prog_zip_noatk=> /=; auto.
   Qed.
 
 End ts.
@@ -69,12 +77,12 @@ Parameter lki : AdvLeakPrm. Existing Instance lki.
 Definition AtkRealStates := unit.
 Parameter atkreal : AdvStateMachine AtkRealStates.
 
-Definition AtkIdealStates := unit.
+Definition AtkIdealStates := AtkRealStates.
 Program Definition atkideal : AdvStateMachine AtkIdealStates := {|
     init_state := fun _ => tt ; 
     init_substeps := init_substeps atkreal;
     corruptor := fun _ sv _=>  None;
-    learner := learner atkreal;
+    learner := learner atkreal; 
     leaker := leaker atkreal;
     substeps := substeps atkreal
     |}.
