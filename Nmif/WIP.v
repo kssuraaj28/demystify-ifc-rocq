@@ -21,6 +21,8 @@ Section ni.
       
 End ni.
 
+Ltac Forall_inv := 
+    move=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
 Section ts.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
 
@@ -40,30 +42,20 @@ Section ts.
   Definition ContinuationRestriction: Continuation -> Prop :=
     Forall AtkCmdRestriction.
 
-  Lemma restrict_rel_inv: forall p,
-    (forall n, ContinuationRestriction (prog_zip p n)) ->
-    ProgRestriction p.
-  Proof.
-    rewrite/ContinuationRestriction/ProgRestriction.
-    move=> p /(_ 0).
-    rewrite prog_zip_noatk /=.
-    elim: p=> // > ih.
-    move =>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
-    by move=> /= cr t; move: ih=> /(_ t) {t}=> cl; auto.
-  Qed.
-
+  (* 
+    I think that constructor is okay to be part of finisher. 
+    Don't make it part of forward reasoning
+  *)
   Lemma restrict_rel: forall p,
     ProgRestriction p -> 
     (forall n, ContinuationRestriction (prog_zip p n)).
   Proof.
     rewrite/ContinuationRestriction/ProgRestriction. 
-    elim=> [_ n|]. 
-        { rewrite prog_zip_noprg. 
-        by elim: n=> //= >; constructor; easy. } (* Is constructor ssreflecty? *)
-    move=> c l ih /[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
+    elim=> [_ n|]; first by elim: n=> //= >; constructor; easy.
+    move=> c l ih; Forall_inv.
     move=> cr t; move: ih=> /(_ t) {t}=> cl n.
-    case: n c l cr cl=> [> ? /restrict_rel_inv|> ? ?] /=; constructor=> //=.
-    by apply/Forall_map; auto.
+    case: n c l cr cl=> [> ? /(_ 0) |> ? ?]; last by constructor. (* Can I make 0 an evar? *)
+    by rewrite !prog_zip_noatk /=; auto.
   Qed.
 
 End ts.
@@ -151,7 +143,7 @@ Section bisim.
     case: cont wt=> [|atkcmd ? wt]; first by rewrite /= trseq //=.
     case rst: (atk_cmd_step atkreal _ _ _) => [[[sr []] contr ] lkr]. (* Note how I make tt. TODO *)
     case ist: (atk_cmd_step atkideal _ _ _) => [[[si []] conti ] lki].
-    move: wt=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _)=> wth wttl /=.
+    move: wt;Forall_inv=> wth wttl /=.
     clear- trseq rst ist wth wttl; set rsv := ⟨ sr | _ ⟩; set isv := ⟨ si | _⟩.
     suff: ([elaborate ContinuationRestriction contr /\ conti = contr /\  rsv = isv /\ lkr = lki])
       by intuition; try congruence; apply/Forall_app.
@@ -161,9 +153,9 @@ Section bisim.
     rewrite/atk_cmd_step.
     move cs1: (clean_cmd_step _ _)=> [? k1].
     move cs2: (clean_cmd_step _ _)=> [? k2].
-    repeat move: (learner _ _ _)=> [] /=. (* TODO. *)
-    move: (substeps _ _)=> ?. (* TODO *)
-    move: (leaker _ _)=> ?. (* TODO *)
+    repeat move: (learner _ _ _)=> [] /=. (* TODO. This has to be two*)
+    move: (substeps _ _)=> ?. (* TODO: I think that this can just be one. Same for bottom also *)
+    move: (leaker _ _)=> ?. 
     move=> e1 e2. 
     case: isatk e1 e2 cs1 cs2=> 
       [[<-<-<-] [<-<-<-]| [<-<-<-<-] [<-<-<-]]/=[<-<-][<-<-];
