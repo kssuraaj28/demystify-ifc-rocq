@@ -37,31 +37,29 @@ Section ts.
   Definition ContinuationRestriction: Continuation -> Prop :=
     Forall AtkCmdRestriction.
 
-  Lemma map_wf: forall l b,
-      Forall CmdRestriction l ->
-      Forall AtkCmdRestriction (map (mk_cstep b) l).
+  Lemma restrict_rel_inv: forall p,
+    (forall n, ContinuationRestriction (prog_zip p n)) ->
+    Forall CmdRestriction p.
   Proof.
-    elim=> //= > ? > /[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _) /=.
-    by constructor; auto.
+    move=> p /(_ 0).
+    rewrite prog_zip_noatk /=.
+    elim: p=> // > ih.
+    move =>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
+    by move=> /= cr t; move: ih=> /(_ t) {t}=> cl; auto.
   Qed.
 
-  (* I feel like you don't need so many lemmas *)
-  Theorem restr_zip: forall p n, 
-    Forall CmdRestriction p ->
-    ContinuationRestriction (prog_zip p n).
+  Lemma restrict_rel: forall p,
+    Forall CmdRestriction p -> 
+    (forall n, ContinuationRestriction (prog_zip p n)).
   Proof.
-    rewrite/ContinuationRestriction.
-  Admitted.
-  (*
-    elim=> [n| > ih]; first by rewrite prog_zip_noprg=> _;  apply/skip_wf.
-    case=>[|>] /[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _) /= =>rc rl; 
-        constructor=> //=; last by apply: ih. (* : erases hyp *)
-    by clear -rl; auto using map_wf.
+    rewrite/ContinuationRestriction; elim=> [_ n|]. 
+        { rewrite prog_zip_noprg. 
+        by elim: n=> //= >; constructor; easy. } (* Is constructor ssreflecty? *)
+    move=> c l ih /[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
+    move=> cr t; move: ih=> /(_ t) {t}=> cl n.
+    case: n c l cr cl=> [> ? /restrict_rel_inv|> ? ?] /=; constructor=> //=.
+    by apply/Forall_map=> /=; auto.
   Qed.
-  *)
-
-
-
 
 End ts.
 
@@ -156,7 +154,7 @@ Section bisim.
       (initial_cfg [simple_cmd] atkideal s).
   Proof.
     move=> s; split; first by
-      apply/restr_zip;repeat constructor; cbv => //=.
+      apply/restrict_rel;repeat constructor; cbv => //=.
     by repeat split=> //; repeat case: (init_state _ _).
   Qed.
 
@@ -185,7 +183,7 @@ Section bisim.
     move=> e1 e2. 
     case: isatk e1 e2 cs1 cs2=> 
       [[<-<-<-] [<-<-<-]| [<-<-<-<-] [<-<-<-]]/=[<-<-][<-<-];
-      (repeat split; first by auto using restr_zip);
+      (repeat split; first by auto using restrict_rel);
       move: ni; apply; last by [].
     rewrite/⟨_|_⟩/⟨_→_⟩; apply/functional_extensionality=> v.
     case v_tr: (is_trusted _)=> //=; apply/f_equal.
