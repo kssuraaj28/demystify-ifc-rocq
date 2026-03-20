@@ -58,7 +58,7 @@ Section ts.
     move=> c l ih /[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
     move=> cr t; move: ih=> /(_ t) {t}=> cl n.
     case: n c l cr cl=> [> ? /restrict_rel_inv|> ? ?] /=; constructor=> //=.
-    by apply/Forall_map=> /=; auto.
+    by apply/Forall_map; auto.
   Qed.
 
 End ts.
@@ -184,7 +184,7 @@ Section bisim.
     case: isatk e1 e2 cs1 cs2=> 
       [[<-<-<-] [<-<-<-]| [<-<-<-<-] [<-<-<-]]/=[<-<-][<-<-];
       (repeat split; first by auto using restrict_rel);
-      move: ni; apply; last by [].
+      apply: ni; last by [].
     rewrite/⟨_|_⟩/⟨_→_⟩; apply/functional_extensionality=> v.
     case v_tr: (is_trusted _)=> //=; apply/f_equal.
     set atk_out := corruptor atkreal _ _ _.
