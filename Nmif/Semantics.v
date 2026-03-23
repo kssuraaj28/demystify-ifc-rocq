@@ -92,14 +92,14 @@ Section atk_cmd_step.
 
         (* Part1 of adversary runs *)
         let: s := if is_atk is false then s else
-          ⟨ (corruptor atksm atkst ⟨s | is_untrusted⟩) → s ⟩
+          corruptor atksm (atkst,s)
         in
 
         (* Run your computation *)
         let: (s, pcont) := clean_cmd_step c s in
 
         (* Part2a of adversary runs. *)
-        let: atkst := if is_atk is false then atkst else learner atksm atkst ⟨s | is_public⟩ in
+        let: atkst := if is_atk is false then atkst else learner atksm (atkst,s ) in
 
         (* Part2b of adversary runs. *)
         let: (substeps, optleak) :=

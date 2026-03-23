@@ -50,7 +50,7 @@ Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
 
     learner_wf:
       Noninterfering learner
-      (fun '(a, s) => (a, ⟨ s | is_public ⟩))
+      (fun '(a, s) => (a, ⟨ s | is_secret ⟩)) (* TODO: I need to think about this *)
       (fun s => s);
 
     leaker : AtkStates -> LeakVals;
