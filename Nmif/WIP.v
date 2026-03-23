@@ -156,12 +156,16 @@ Section bisim.
       [[<-<-<-] [<-<-<-]| [<-<-<-<-] [<-<-<-]]/=[<-<-][<-<-];
       (repeat split; first by apply/restrict_rel; red; auto);
       apply: ni; last by [].
+    rewrite/id -{}trseq. (* Okay, we cannot allow arbitrary computation in the attacker! *)
 
     set ast := (X in corruptor _ X); move: wtr=> /(_ ast); subst ast.
     move=> [] + _.
-    rewrite/id -{}trseq.
     move: (store_to_view _)=> view. (* TODO: Just unfold def without? *)
     move: (corruptor _ _) => comp. (* Here, we say that comp does not change *)
+    (* Possible issues: 
+          Incorrect ni def
+          Incorrect simulator
+    *)
     (* I don't think that this is even true.. *)
 
     (* I'm dying *)
