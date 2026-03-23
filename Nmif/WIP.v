@@ -12,13 +12,18 @@ Import Util.Dec Util.List.
 
 Ltac Forall_inv :=  move=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
 
+Ltac evar_spec :=  
+    let t := open_constr:(_) in 
+    let f := fresh in 
+    pose f := t=> /(_ f); subst f.
+
 Section ts.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
 
   (* Should this be inductive? *)
   Inductive CmdRestriction: Cmd -> Prop :=
     | nitr : forall comp, 
-        Noninterfering is_trusted comp ->
+        Noninterfering (store_to_view is_trusted) comp (store_to_view is_trusted) ->
         CmdRestriction (assign comp).
 
   Definition ProgRestriction: Prog -> Prop :=
@@ -43,7 +48,7 @@ Section ts.
     elim=> [_ n|]; first by elim: n=> //= >; constructor; easy.
     move=> c l ih /ltac:(Forall_inv).
     move=> cr t; move: ih=> /(_ t) {t}=> cl n.
-    case: n c l cr cl=> [> ? /(_ 0) |> ? ?]; last by constructor. (* Can I make 0 an evar? *)
+    case: n c l cr cl=> [> ? /(_ 0) |]; last by constructor. (* Can I make 0 an evar? *)
     by rewrite !prog_zip_noatk /=; auto.
   Qed.
 
@@ -59,11 +64,13 @@ Definition AtkRealStates := unit.
 Parameter atkreal : AdvStateMachine AtkRealStates.
 
 Definition AtkIdealStates := AtkRealStates.
-Program Definition atkideal : AdvStateMachine AtkIdealStates := {|
+Definition atkideal : AdvStateMachine AtkIdealStates := {|
     init_state := fun _ => tt ; 
     init_substeps := init_substeps atkreal;
-    corruptor := fun _ sv _=>  None;
+    corruptor _ := id;
+    corruptor_ni := ltac:(by split);
     learner := learner atkreal; 
+    learner_confni := ltac:(by move: (learner_confni atkreal));
     leaker := leaker atkreal;
     substeps := substeps atkreal
     |}.
@@ -137,7 +144,7 @@ Section bisim.
       by intuition; try congruence; apply/Forall_app.
     rewrite {}/rsv {}/isv; case: atkcmd wth ist rst=> [isatk cmd]. 
     rewrite/AtkCmdRestriction=> [[]]; rewrite/Noninterfering=> > ni.
-    move: (corruptor_wf atkreal)=> wtr; clear -wtr ni trseq.
+    move: (corruptor_ni atkreal)=> wtr; clear -wtr ni trseq.
     rewrite/atk_cmd_step.
     move cs1: (clean_cmd_step _ _)=> [? k1].
     move cs2: (clean_cmd_step _ _)=> [? k2].
@@ -149,11 +156,32 @@ Section bisim.
       [[<-<-<-] [<-<-<-]| [<-<-<-<-] [<-<-<-]]/=[<-<-][<-<-];
       (repeat split; first by apply/restrict_rel; red; auto);
       apply: ni; last by [].
-    rewrite/⟨_|_⟩/⟨_→_⟩; apply/functional_extensionality=> v.
-    case v_tr: (is_trusted _)=> //=; apply/f_equal.
+
+    set ast := (X in corruptor _ X); move: wtr=> /(_ ast); subst ast.
+    move=> [] + _.
+    move: (corruptor _ _) => comp.
+    rewrite/id -{}trseq.
+
+    (* I'm dying *)
+    move: (store_to_view _)=> view. (* TODO: Just unfold def without? *)
+    (* Is this even true? *)
+
+    rewrite /⟨_|_⟩; apply/functional_extensionality=> v.
+    case v_tr: (is_trusted _)=> //=; apply/f_equal; rewrite/id.
+    rewrite /Noninterfering=>/(_ _ _ trseq).
+
+
+
+    rewrite /Noninterfering=> /(_ _ _ trseq) /equal_f /(_ v).
+    rewrite/⟨_|_⟩ v_tr=> - [] ->.
+    clear -trseq v_tr.
+
+    intros x.
+    apply/storeview_eq.
+    eassumption.
+    by apply/storeview_eq; eassumption.
     set atk_out := corruptor atkreal _ _ _.
     (have->: atk_out = None by apply/wtr); clear -trseq v_tr. (* Is this the best style? *) 
-    by apply/storeview_eq; eassumption.
   Qed.
 
 End bisim.
