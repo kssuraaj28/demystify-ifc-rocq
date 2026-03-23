@@ -7,6 +7,7 @@ Import VarValStore.
 Section ni.
   Context {I Iv O Ov: Type}.
   Notation CompType := (I -> O).
+  (* You can think of *v as equivalence class *)
   Notation InpView := (I -> Iv).
   Notation OutView := (O -> Ov).
 

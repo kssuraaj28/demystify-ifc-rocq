@@ -32,14 +32,27 @@ End opposite.
 
   Prm naming scheme? TODO
 *)
+Check Noninterfering.
+Import VarValStore.Notations.
 Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} 
     {AtkStates : Type} := {
     init_state: StoreView -> AtkStates; (* You only get untrusted*)
     init_substeps: AtkStates -> nat;
-    corruptor: AtkStates -> Store -> Store;
-    corruptor_wf: forall ast, 
-      Noninterfering is_trusted (corruptor ast);
-    learner : AtkStates -> StoreView -> AtkStates;
+    corruptor: (AtkStates * Store) -> Store;
+
+    (* I don't know whether this is correct. TODO *)
+    corruptor_wf: 
+      Noninterfering corruptor 
+      (fun '(a, s) => (a, ⟨s | is_trusted ⟩))
+      (fun s => ⟨s | is_trusted⟩);
+
+    learner : (AtkStates * Store) -> AtkStates;
+
+    learner_wf:
+      Noninterfering learner
+      (fun '(a, s) => (a, ⟨ s | is_public ⟩))
+      (fun s => s);
+
     leaker : AtkStates -> LeakVals;
     substeps : AtkStates -> nat;
   }.
