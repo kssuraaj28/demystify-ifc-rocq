@@ -1,21 +1,11 @@
-From Stdlib Require ssreflect ssrbool.
-Import ssreflect ssrbool.
-
-Require VarValStore.
-Import VarValStore.
-
 Section ni.
   Context {I Iv O Ov: Type}.
-  Notation CompType := (I -> O).
-  (* You can think of *v as equivalence class *)
-  Notation InpView := (I -> Iv).
-  Notation OutView := (O -> Ov).
+  Notation Comp := (I -> O).
+  Notation Iview := (I -> Iv).
+  Notation Oview := (O -> Ov).
 
-
-  Definition Noninterfering (comp : CompType) (iview : InpView) (oview : OutView): Prop :=
+  Definition Noninterfering (iv: Iview) (comp: Comp) (ov: Oview) := 
     forall i1 i2,
-      iview i1 = iview i2 ->
-      oview (comp i1) = oview (comp i2).
+      iv i1 = iv i2 ->
+      ov (comp i1) = ov (comp i2).
 End ni.
-
-(* TODO: Examples and tests.. *)
