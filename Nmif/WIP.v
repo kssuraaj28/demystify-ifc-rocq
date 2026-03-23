@@ -6,20 +6,9 @@ Import ListNotations.
 (* This may be useful *)
 From QuickChick Require Import Decidability.
 
-Require Import Util VarValStore Syntax Semantics Attacker Util. 
+Require Import Util VarValStore Syntax Semantics Attacker Util Noninterference. 
 Import Util.Dec Util.List. 
 
-Section ni.
-  Import VarValStore.Notations.
-  Context `{!VarPrm, !ValPrm}.
-
-  (* Is this the right definition? I don't even know *)
-  Definition Noninterfering (p: pred Vars) (comp : Store -> Store) :=
-    forall s1 s2,
-    ⟨ s1 | p ⟩ = ⟨ s2 | p⟩ ->
-    ⟨ comp s1 | p ⟩ = ⟨ comp s2 | p⟩.
-      
-End ni.
 
 Ltac Forall_inv :=  move=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
 

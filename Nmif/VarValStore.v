@@ -19,7 +19,7 @@ Section store.
   (* I don't get dependent types :(. Maybe once I am good, I will use them *)
   Definition StoreView := Vars -> option Vals.
 
-  Definition store_to_view (s: Store) (p: pred Vars) : StoreView :=
+  Definition store_to_view (p: pred Vars) (s: Store) : StoreView :=
     fun v => if p v is true then Some (s v) else None.
 
   Definition view_to_store (sv: StoreView) (s_old: Store) : Store :=
@@ -29,7 +29,7 @@ End store.
 (* Without dependent types, you lose the cool type inference.. *)
 Module Notations.
   (* TODO: Perhaps we want to have something like a notation key / delimiter?  *)
-  Notation "⟨ s | p ⟩" := (store_to_view s p).
+  Notation "⟨ s | p ⟩" := (store_to_view p s).
   Notation "⟨ sv → s ⟩" := (view_to_store sv s). (* TODO: Some warning here. *)
   Section test.
     Context `{!VarPrm, !ValPrm}.
@@ -45,12 +45,11 @@ Section thms.
 
   Theorem storeview_eq: 
     forall s1 s2 p inp,
-      ⟨ s1 | p ⟩ = ⟨ s2 | p ⟩ ->
-      p inp -> 
+      ⟨ s1 | p ⟩ = ⟨ s2 | p ⟩ -> p inp -> 
       s1 inp = s2 inp.
   Proof.
     move=>??? inp; rewrite/⟨_|_⟩.
-    by rewrite /⟨_|_⟩=> /equal_f/(_ inp)/[swap]->[].
+    by move=> /equal_f/(_ inp)/[swap]->[].
   Qed.
 
 End thms.
