@@ -21,8 +21,7 @@ Section ni.
       
 End ni.
 
-Ltac Forall_inv := 
-    move=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
+Ltac Forall_inv :=  move=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
 
 Section ts.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.

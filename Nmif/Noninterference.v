@@ -5,13 +5,16 @@ Require VarValStore.
 Import VarValStore.
 
 Section ni.
-  Import VarValStore.Notations.
-  Context `{!VarPrm, !ValPrm}.
+  Context {I Iv O Ov: Type}.
+  Notation CompType := (I -> O).
+  Notation InpView := (I -> Iv).
+  Notation OutView := (O -> Ov).
 
-  (* Is this the right definition? I don't even know *)
-  Definition Noninterfering (p: pred Vars) (comp : Store -> Store) :=
-    forall s1 s2,
-    ⟨ s1 | p ⟩ = ⟨ s2 | p⟩ ->
-    ⟨ comp s1 | p ⟩ = ⟨ comp s2 | p⟩.
-      
+
+  Definition Noninterfering (comp : CompType) (iview : InpView) (oview : OutView): Prop :=
+    forall i1 i2,
+      iview i1 = iview i2 ->
+      oview (comp i1) = oview (comp i2).
 End ni.
+
+(* TODO: Examples and tests.. *)

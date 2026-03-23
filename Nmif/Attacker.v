@@ -1,8 +1,8 @@
 From Stdlib Require ssreflect ssrbool.
 Import ssreflect ssrbool.
 
-Require VarValStore Util.
-Import VarValStore. 
+Require VarValStore Util Noninterference.
+Import VarValStore Noninterference. 
 
 Class AdvLeakPrm := LeakVals : Type.
 
@@ -36,9 +36,9 @@ Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
     {AtkStates : Type} := {
     init_state: StoreView -> AtkStates; (* You only get untrusted*)
     init_substeps: AtkStates -> nat;
-    corruptor: AtkStates -> StoreView -> StoreView;
-    corruptor_wf: forall ast sv var, is_trusted var ->
-                      corruptor ast sv var = None;
+    corruptor: AtkStates -> Store -> Store;
+    corruptor_wf: forall ast, 
+      Noninterfering is_trusted (corruptor ast);
     learner : AtkStates -> StoreView -> AtkStates;
     leaker : AtkStates -> LeakVals;
     substeps : AtkStates -> nat;
