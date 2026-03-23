@@ -82,8 +82,7 @@ Program Definition atkideal : AdvStateMachine AtkIdealStates := {|
 
 
 Import Semantics.Notations.
-Parameter myprog : Prog.
-Axiom myprog_wt : ProgRestriction myprog.
+Parameter myprog : Prog. Axiom myprog_wt : ProgRestriction myprog.
 Definition b1 := ⟦ myprog ☠︎︎ atkreal ⟧.
 Definition b2 := ⟦ myprog ☠︎︎ atkideal ⟧.
 
@@ -166,7 +165,7 @@ Section bisim.
     case v_tr: (is_trusted _)=> //=; apply/f_equal.
     set atk_out := corruptor atkreal _ _ _.
     (have->: atk_out = None by apply/wtr); clear -trseq v_tr. (* Is this the best style? *) 
-    by apply/storeview_eq; eauto.
+    by apply/storeview_eq; eassumption.
   Qed.
 
 End bisim.
