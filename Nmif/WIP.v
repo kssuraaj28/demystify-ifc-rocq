@@ -159,11 +159,12 @@ Section bisim.
 
     set ast := (X in corruptor _ X); move: wtr=> /(_ ast); subst ast.
     move=> [] + _.
-    move: (corruptor _ _) => comp.
     rewrite/id -{}trseq.
+    move: (store_to_view _)=> view. (* TODO: Just unfold def without? *)
+    move: (corruptor _ _) => comp. (* Here, we say that comp does not change *)
+    (* I don't think that this is even true.. *)
 
     (* I'm dying *)
-    move: (store_to_view _)=> view. (* TODO: Just unfold def without? *)
     (* Is this even true? *)
 
     rewrite /⟨_|_⟩; apply/functional_extensionality=> v.
