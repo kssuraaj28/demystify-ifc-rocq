@@ -1,13 +1,14 @@
 From Stdlib Require List ssreflect.
 Import List ListNotations ssreflect.
 
-Require VarValStore Syntax Attacker Tacs Util.
-Import VarValStore Syntax Attacker.
+Require Tacs Util VarValStore Attacker Syntax. 
+Import Tacs Util VarValStore Attacker Syntax. 
+(* TODO: Order seems to matter. Syntax before fails *)
 
 Section cleanstep.
   Context `{!VarPrm, !ValPrm}.
 
-  Notation Continuation := Prog.
+  Notation Continuation := Syntax.Prog.
 
   Definition clean_cmd_step (c: Cmd) (s: Store) : (Store * Continuation) := 
     match c with
