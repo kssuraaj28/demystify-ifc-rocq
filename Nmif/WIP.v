@@ -181,11 +181,3 @@ Goal b1 = b2 . Proof.
   elim: n ms1 ms2 e1 e2=> [> | > ? >] <- <- /=; first by apply/ bisim_init.
   by apply/bisim_step; auto. (* What the hell is this *)
 Qed.
-
-(* There three admits exactly correspond to 
-the three things you need to prove when you have bisimulation relations
-- The first is BisimRel -> property you want
-- The second is what you want for initial states.
-- The third is your stepping relation
-
-*)
