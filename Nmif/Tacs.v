@@ -27,7 +27,7 @@ Module SsrHack.
                         idtac "Warning: Remove this in the final proof"))
                   (at level 0, only parsing) : ssripat_scope.
 
-  Notation "?" := (ltac:(intros;
+  Notation "?" := (ltac:(intro;
                         idtac "Warning: Remove this in the final proof"))
                   (at level 0, only parsing) : ssripat_scope.
 

@@ -129,12 +129,13 @@ Section bisim.
     by repeat split=> //; repeat case: (init_state _ _).
   Qed.
 
+  Import Tacs.SsrHack.
   Lemma bisim_step: forall c1 c2,
                           BisimRel c1 c2 ->
                           BisimRel (step atkreal c1) (step atkideal c2).
   Proof.
-    move=> [[[cont /?]/?]/?] [[[? ?]?]?].
-    move=> /= [wt [-> [-> [trseq ->]]]] /=.    (* How to simpl only in Hypothesis *)
+    move=> [[[cont ? ]astr] ?] [[[? ?]asti]?].
+    move=> /= [wt [-> [-> [trseq ->]]]] /=.
     case: cont wt=> [|atkcmd ? wt]; first by rewrite /= trseq //=.
     case rst: (atk_cmd_step atkreal _ _ _) => [[[sr []] contr ] lkr]. (* Note how I make tt. TODO *)
     case ist: (atk_cmd_step atkideal _ _ _) => [[[si []] conti ] lki].
@@ -157,8 +158,8 @@ Section bisim.
       (repeat split; first by apply/restrict_rel; red; auto);
       apply: ni; last by [].
 
-
     rewrite/id -{}trseq. (* Okay, we cannot allow arbitrary computation in the attacker! *)
+    move: wtr =>/(_ asti) [+ _]; clear=> wtint.
 
     set ast := (X in corruptor _ X); move: wtr=> /(_ ast); subst ast.
     move=> [] + _.

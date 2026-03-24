@@ -1,5 +1,5 @@
-From Stdlib Require ssreflect ssrbool.
-Import ssreflect ssrbool.
+From Stdlib Require Program ssreflect ssrbool.
+Import Basics ssreflect ssrbool.
 
 Require VarValStore Util Noninterference. 
 Import VarValStore Noninterference.
@@ -18,6 +18,7 @@ Section opposite.
 End opposite.
 
 
+
 (* 
   TODO
   You need to eventually corrupt store,
@@ -32,24 +33,27 @@ End opposite.
 
   Prm naming scheme? TODO
 *)
+
+#[local] Open Scope program_scope.
 Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} 
     {AtkStates : Type} := {
     init_state: StoreView -> AtkStates; (* You only get untrusted*)
     init_substeps: AtkStates -> nat;
     corruptor: AtkStates -> Store -> Store;
 
-    corruptor_ni: 
+    corruptor_wf: 
       forall ast, 
         let: ast_corr := corruptor ast in
         let: tr_view := (store_to_view is_trusted) in
-        let: pub_view := (store_to_view is_public) in
+        let: pub_view := (store_to_view is_public) in 
+        tr_view ∘ ast_corr = tr_view /\  (* The adversary does not touch trusted computation. This is a little bit ugly *)
         Noninterfering tr_view ast_corr tr_view /\ (* trusted outputs don't change if trusted inputs don't *)
         Noninterfering pub_view ast_corr pub_view; (* public outputs don't chnage if public inputs don't *)
 
 
     learner : AtkStates -> Store -> AtkStates;
 
-    learner_confni:
+    learner_wf:
       forall ast,
         let: ast_lrn := learner ast in
         let: pub_view := store_to_view is_public in
