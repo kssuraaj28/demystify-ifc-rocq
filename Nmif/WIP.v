@@ -161,9 +161,8 @@ Section bisim.
       [[<-<-<-] [<-<-<-]| [<-<-<-<-] [<-<-<-]]/=[<-<-][<-<-];
       (repeat split; first by apply/restrict_rel; red; auto);
       apply: ni; last by [].
-    rewrite/id -{}trseq. (* Okay, we cannot allow arbitrary computation in the attacker! *)
-    move: wfr =>/(_ asti) [+ _]; clear=> wtint.
-    by move: (corruptor _ _) (store_to_view _) wtint => comp view /(equal_f); apply. (* TODO: I proved an useless lemma in storeview *)
+    rewrite -{}trseq. 
+    by firstorder.
   Qed.
 
 End bisim.
