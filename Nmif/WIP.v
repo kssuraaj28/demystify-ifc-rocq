@@ -63,12 +63,23 @@ Parameter lki : AdvLeakPrm. Existing Instance lki.
 Definition AtkRealStates := unit.
 Parameter atkreal : AdvStateMachine AtkRealStates.
 
-Definition AtkIdealStates := AtkRealStates.
 Section idealatk.
-  Import Tacs.SsrHack.
-  Obligation Tactic := idtac.
+  Parameter SimExtraStates : Set.
+  Parameter s : SimExtraStates.
+  (*
+  Definition AtkIdealStates := (AtkRealStates * SimExtraStates)%type. 
+  *)
+  Definition AtkIdealStates := AtkRealStates.
+  (* TODO: Add more things here 
+      Maybe add a counter? 
+      Maybe add the program configuration? + Store? We can
+      just add some whole store, 
+      but maintain the invariant that 
+  *)
+
+  Obligation Tactic := idtac. (* TODO: Program cases or whatnot *)
   Program Definition atkideal : AdvStateMachine AtkIdealStates := {|
-      init_state := fun _ => tt ; 
+      init_state := init_state atkreal;
       init_substeps := init_substeps atkreal;
       corruptor _ := id;
       corruptor_wf := _;
@@ -87,19 +98,12 @@ Definition b1 := ⟦ myprog ☠︎︎ atkreal ⟧.
 Definition b2 := ⟦ myprog ☠︎︎ atkideal ⟧.
 
 
-
-(* TODO: More test. 
-  TODO: Leak test.
-  Define in terms of real attacker
-
-*)
-
 (* Can I construct a proof object with more state? 
-
 Parameter Po : Type.
 Parameter BisimRel : Po -> Type.
 You need to lift step to Po..
 *)
+
 Section bisim.
   Notation CfgR := (Cfg AtkRealStates).
   Notation CfgI := (Cfg AtkIdealStates).
