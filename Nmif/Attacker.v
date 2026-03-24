@@ -1,5 +1,5 @@
 From Stdlib Require Program ssreflect ssrbool.
-Import Basics ssreflect ssrbool.
+Import ssreflect ssrbool.
 
 Require VarValStore Util Noninterference. 
 Import VarValStore Noninterference.
@@ -34,7 +34,6 @@ End opposite.
   Prm naming scheme? TODO
 *)
 
-#[local] Open Scope program_scope.
 Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} 
     {AtkStates : Type} := {
     init_state: StoreView -> AtkStates; (* You only get untrusted*)
@@ -46,7 +45,7 @@ Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
         let: ast_corr := corruptor ast in
         let: tr_view := (store_to_view is_trusted) in
         let: pub_view := (store_to_view is_public) in 
-        tr_view ∘ ast_corr = tr_view /\  (* The adversary does not touch trusted computation. This is a little bit ugly *)
+        (forall st, tr_view (ast_corr st) = (tr_view st)) /\  (* The adversary does not touch trusted computation. This is a little bit ugly *)
         Noninterfering tr_view ast_corr tr_view /\ (* trusted outputs don't change if trusted inputs don't *)
         Noninterfering pub_view ast_corr pub_view; (* public outputs don't chnage if public inputs don't *)
 

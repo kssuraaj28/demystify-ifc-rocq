@@ -64,17 +64,22 @@ Definition AtkRealStates := unit.
 Parameter atkreal : AdvStateMachine AtkRealStates.
 
 Definition AtkIdealStates := AtkRealStates.
-Definition atkideal : AdvStateMachine AtkIdealStates := {|
-    init_state := fun _ => tt ; 
-    init_substeps := init_substeps atkreal;
-    corruptor _ := id;
-    corruptor_ni := ltac:(by split);
-    learner := learner atkreal; 
-    learner_confni := ltac:(by move: (learner_confni atkreal));
-    leaker := leaker atkreal;
-    substeps := substeps atkreal
-    |}.
-
+Section idealatk.
+  Import Tacs.SsrHack.
+  Obligation Tactic := idtac.
+  Program Definition atkideal : AdvStateMachine AtkIdealStates := {|
+      init_state := fun _ => tt ; 
+      init_substeps := init_substeps atkreal;
+      corruptor _ := id;
+      corruptor_wf := _;
+      learner := learner atkreal; 
+      learner_wf := _;
+      leaker := leaker atkreal;
+      substeps := substeps atkreal
+      |}.
+  Next Obligation. by easy. Qed.
+  Next Obligation. by move: (learner_wf atkreal); firstorder. Qed.
+End idealatk.
 
 Import Semantics.Notations.
 Parameter myprog : Prog. Axiom myprog_wt : ProgRestriction myprog.
@@ -129,7 +134,6 @@ Section bisim.
     by repeat split=> //; repeat case: (init_state _ _).
   Qed.
 
-  Import Tacs.SsrHack.
   Lemma bisim_step: forall c1 c2,
                           BisimRel c1 c2 ->
                           BisimRel (step atkreal c1) (step atkideal c2).
@@ -145,7 +149,7 @@ Section bisim.
       by intuition; try congruence; apply/Forall_app.
     rewrite {}/rsv {}/isv; case: atkcmd wth ist rst=> [isatk cmd]. 
     rewrite/AtkCmdRestriction=> [[]]; rewrite/Noninterfering=> > ni.
-    move: (corruptor_ni atkreal)=> wtr; clear -wtr ni trseq.
+    move: (corruptor_wf atkreal)=> wfr; clear -wfr ni trseq.
     rewrite/atk_cmd_step.
     move cs1: (clean_cmd_step _ _)=> [? k1].
     move cs2: (clean_cmd_step _ _)=> [? k2].
@@ -157,39 +161,9 @@ Section bisim.
       [[<-<-<-] [<-<-<-]| [<-<-<-<-] [<-<-<-]]/=[<-<-][<-<-];
       (repeat split; first by apply/restrict_rel; red; auto);
       apply: ni; last by [].
-
     rewrite/id -{}trseq. (* Okay, we cannot allow arbitrary computation in the attacker! *)
-    move: wtr =>/(_ asti) [+ _]; clear=> wtint.
-
-    set ast := (X in corruptor _ X); move: wtr=> /(_ ast); subst ast.
-    move=> [] + _.
-    move: (store_to_view _)=> view. (* TODO: Just unfold def without? *)
-    move: (corruptor _ _) => comp. (* Here, we say that comp does not change *)
-    (* Possible issues: 
-          Incorrect ni def
-          Incorrect simulator
-    *)
-    (* I don't think that this is even true.. *)
-
-    (* I'm dying *)
-    (* Is this even true? *)
-
-    rewrite /⟨_|_⟩; apply/functional_extensionality=> v.
-    case v_tr: (is_trusted _)=> //=; apply/f_equal; rewrite/id.
-    rewrite /Noninterfering=>/(_ _ _ trseq).
-
-
-
-    rewrite /Noninterfering=> /(_ _ _ trseq) /equal_f /(_ v).
-    rewrite/⟨_|_⟩ v_tr=> - [] ->.
-    clear -trseq v_tr.
-
-    intros x.
-    apply/storeview_eq.
-    eassumption.
-    by apply/storeview_eq; eassumption.
-    set atk_out := corruptor atkreal _ _ _.
-    (have->: atk_out = None by apply/wtr); clear -trseq v_tr. (* Is this the best style? *) 
+    move: wfr =>/(_ asti) [+ _]; clear=> wtint.
+    by move: (corruptor _ _) (store_to_view _) wtint => comp view /(equal_f); apply. (* TODO: I proved an useless lemma in storeview *)
   Qed.
 
 End bisim.
