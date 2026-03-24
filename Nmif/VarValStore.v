@@ -2,7 +2,7 @@ From Stdlib Require ssreflect ssrbool FunctionalExtensionality.
 Import ssreflect ssrbool FunctionalExtensionality.
 
 Require Util Tacs.
-Import Util.Dec Tacs.
+Import Util.Dec.
 
 Class VarPrm := {Vars : Type ; vars_deceq :: DecEq Vars}. 
 Class ValPrm := {Vals : Type}.

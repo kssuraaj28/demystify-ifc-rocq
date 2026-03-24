@@ -6,7 +6,7 @@ Import ListNotations.
 (* This may be useful *)
 From QuickChick Require Import Decidability.
 
-Require Import Util VarValStore Syntax Semantics Attacker Util Noninterference. 
+Require Import Util VarValStore Syntax Semantics Attacker Util Noninterference Tacs. 
 Import Util.Dec Util.List. 
 
 
@@ -133,7 +133,7 @@ Section bisim.
                           BisimRel c1 c2 ->
                           BisimRel (step atkreal c1) (step atkideal c2).
   Proof.
-    move=> [[[cont ?]?]?] [[[? ?]?]?].
+    move=> [[[cont /?]/?]/?] [[[? ?]?]?].
     move=> /= [wt [-> [-> [trseq ->]]]] /=.    (* How to simpl only in Hypothesis *)
     case: cont wt=> [|atkcmd ? wt]; first by rewrite /= trseq //=.
     case rst: (atk_cmd_step atkreal _ _ _) => [[[sr []] contr ] lkr]. (* Note how I make tt. TODO *)
@@ -156,6 +156,8 @@ Section bisim.
       [[<-<-<-] [<-<-<-]| [<-<-<-<-] [<-<-<-]]/=[<-<-][<-<-];
       (repeat split; first by apply/restrict_rel; red; auto);
       apply: ni; last by [].
+
+
     rewrite/id -{}trseq. (* Okay, we cannot allow arbitrary computation in the attacker! *)
 
     set ast := (X in corruptor _ X); move: wtr=> /(_ ast); subst ast.
