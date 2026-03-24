@@ -62,14 +62,10 @@ Parameter lki : AdvLeakPrm. Existing Instance lki.
 
 Definition AtkRealStates := unit.
 Parameter atkreal : AdvStateMachine AtkRealStates.
-
 Section idealatk.
   Parameter SimExtraStates : Set.
   Parameter s : SimExtraStates.
-  (*
   Definition AtkIdealStates := (AtkRealStates * SimExtraStates)%type. 
-  *)
-  Definition AtkIdealStates := AtkRealStates.
   (* TODO: Add more things here 
       Maybe add a counter? 
       Maybe add the program configuration? + Store? We can
@@ -79,17 +75,22 @@ Section idealatk.
 
   Obligation Tactic := idtac. (* TODO: Program cases or whatnot *)
   Program Definition atkideal : AdvStateMachine AtkIdealStates := {|
-      init_state := init_state atkreal;
-      init_substeps := init_substeps atkreal;
-      corruptor _ := id;
-      corruptor_wf := _;
-      learner := learner atkreal; 
-      learner_wf := _;
-      leaker := leaker atkreal;
-      substeps := substeps atkreal
+      init_state mem := (init_state atkreal mem, s);
+      init_substeps '(ar, _) := init_substeps atkreal ar;
+      corruptor _ := id; (* TODO: We need to show a stronger property, which we don't.. But which is obvious..*)
+      learner '(ar, _) mem := (learner atkreal ar mem, s);  
+      leaker '(ar, _) := leaker atkreal ar;
+      substeps '(ar, _) := substeps atkreal ar
       |}.
+
   Next Obligation. by easy. Qed.
-  Next Obligation. by move: (learner_wf atkreal); firstorder. Qed.
+  Next Obligation. 
+    move=> /= [arst _].
+    move: (learner_wf atkreal)=> /(_ arst).
+    move: (store_to_view _) (learner _ _)=> > nirl.
+    move=> s1 s2; move: nirl=> /(_ s1 s2) /[apply]. 
+    by rewrite /id=> ->. 
+  Qed.
 End idealatk.
 
 Import Semantics.Notations.
@@ -112,19 +113,20 @@ Section bisim.
 
   Definition BisimRel (cr : CfgR) (ci: CfgI) : Prop :=
     let: (contr, storer, asr, trr) :=  cr in
-    let: (conti, storei, asi, tri) :=  ci in
+    let: (conti, storei, (asrsim, _), tri) :=  ci in
     ContinuationRestriction contr /\ (* I don't like this. Uniform object is better *)
     (conti = contr) /\
-    (asr = asi) /\
+    (asr = asrsim) /\
     ⟨ storer | is_trusted ⟩ = ⟨ storei | is_trusted ⟩ /\
     (trr = tri). 
   
 
+  Import Tacs.SsrHack.
   Lemma bisim_extract: forall c1 c2,
                   BisimRel c1 c2 -> extract_trace c1 = extract_trace c2.
   Proof.
     move=> [[[? ?]?]?].
-    move=> [[[? ?]?]?] /=.
+    move=> [[[? ?][? _]]?] /=. (* _ is s  *)
     by intuition.
   Qed.
 
