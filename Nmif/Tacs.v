@@ -1,12 +1,15 @@
+(* TODO: too many imports *)
 From Ltac2 Require Import Ltac2 Bool Control Printf.
+From Corelib Require Import ssreflect.
 
+(* TODO: Notation for this *)
 Ltac2 goals l :=
   let name_goal x := ltac1:(x |- refine ?[x]) (Ltac1.of_ident x) in
   Control.dispatch (List.map (fun x () => name_goal x) l).
 
 (*
-  This can be used in more places. TODO. 
-  This should also be in Ltac2
+  This can be used in more places. 
+  TODO.  This should also be in Ltac2
 *)
 Ltac hnf_clean def :=
     let t := def in
@@ -14,6 +17,22 @@ Ltac hnf_clean def :=
     let t := eval hnf in t in 
     exact t.
 
+(* ssreflect helpers. 
+Goal discipline is annoying when you are exploring
+*)
+Notation ">" := (ltac:(intros *;
+                      idtac "Warning: Remove this in the final proof"))
+                (at level 0, only parsing) : ssripat_scope.
+
+Notation "*" := (ltac:(intros;
+                      idtac "Warning: Remove this in the final proof"))
+                (at level 0, only parsing) : ssripat_scope.
+
+Notation "?" := (ltac:(intros;
+                      idtac "Warning: Remove this in the final proof"))
+                (at level 0, only parsing) : ssripat_scope.
+
+Goal forall x, x + 1 = x + 1. Proof Mode "Classic".  by move=> /> //. Abort.
 
 Module GallinaUtil.
   (* Holes *)
