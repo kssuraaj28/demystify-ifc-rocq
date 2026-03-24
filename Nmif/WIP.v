@@ -151,24 +151,17 @@ Section bisim.
     rewrite/AtkCmdRestriction=> [[]]; rewrite/Noninterfering=> > ni.
     move: (corruptor_wf atkreal)=> wfr; clear -wfr ni trseq.
     rewrite/atk_cmd_step.
-    move cs1: (clean_cmd_step _ _)=> [? k1].
-    move cs2: (clean_cmd_step _ _)=> [? k2].
+    move cs1: (clean_cmd_step _ _)=> [>]; move cs2: (clean_cmd_step _ _)=> [>].
     repeat move: (learner _ _ _)=> [] /=. (* TODO. This has to be two*)
     move: (substeps _ _)=> ?. (* TODO: I think that this can just be one. Same for bottom also *)
     move: (leaker _ _)=> ?. 
-    move=> e1 e2.
-    case: isatk e1 e2 cs1 cs2=> 
-      [[<-<-<-] [<-<-<-]| [<-<-<-<-] [<-<-<-]]/=[<-<-][<-<-];
+    move=> e1 e2; move: isatk e1 e2 cs1 cs2.
+    case=> [[<-<-<-] [<-<-<-]| [<-<-<-<-] [<-<-<-]]/=[<-<-][<-<-];
       (repeat split; first by apply/restrict_rel; red; auto);
       apply: ni; rewrite -{}trseq //.
     by firstorder.
   Qed.
 End bisim.
-
-(*
-BisimRel (step atkreal (multistep atkreal _n_ c1))
-  (step atkideal (multistep atkideal _n_ c2))
-  *)
 
 Goal b1 = b2 . Proof.
   apply: functional_extensionality=> s; apply: functional_extensionality=> n.
