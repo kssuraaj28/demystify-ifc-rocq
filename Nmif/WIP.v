@@ -65,7 +65,7 @@ Parameter atkreal : AdvStateMachine AtkRealStates.
 Section idealatk.
   Parameter SimExtraStates : Set.
   Parameter s : SimExtraStates.
-  Definition AtkIdealStates := (AtkRealStates * SimExtraStates)%type. 
+  Record SimStates := mk_sim_state {real_sim : AtkRealStates ; extra: SimExtraStates}.
   (* TODO: Add more things here 
       Maybe add a counter? 
       Maybe add the program configuration? + Store? We can
@@ -74,23 +74,24 @@ Section idealatk.
   *)
 
   Obligation Tactic := idtac. (* TODO: Program cases or whatnot *)
-  Program Definition atkideal : AdvStateMachine AtkIdealStates := {|
-      init_state mem := (init_state atkreal mem, s);
-      init_substeps '(ar, _) := init_substeps atkreal ar;
+  Program Definition atkideal : AdvStateMachine SimStates := {|
+      init_state mem := mk_sim_state (init_state atkreal mem) s;
+      init_substeps st := init_substeps atkreal (real_sim st);
       corruptor _ := id; (* TODO: We need to show a stronger property, which we don't.. But which is obvious..*)
-      learner '(ar, _) mem := (learner atkreal ar mem, s);  
-      leaker '(ar, _) := leaker atkreal ar;
-      substeps '(ar, _) := substeps atkreal ar
+      learner st mem := mk_sim_state (learner atkreal (real_sim st) mem) s;  
+      leaker st := leaker atkreal (real_sim st);
+      substeps st := substeps atkreal (real_sim st)
       |}.
 
   Next Obligation. by easy. Qed.
   Next Obligation. 
-    move=> /= [arst _].
+    move=> [] /= arst _.
     move: (learner_wf atkreal)=> /(_ arst).
     move: (store_to_view _) (learner _ _)=> > nirl.
     move=> s1 s2; move: nirl=> /(_ s1 s2) /[apply]. 
     by rewrite /id=> ->. 
   Qed.
+  Print atkideal.
 End idealatk.
 
 Import Semantics.Notations.
@@ -107,13 +108,13 @@ You need to lift step to Po..
 
 Section bisim.
   Notation CfgR := (Cfg AtkRealStates).
-  Notation CfgI := (Cfg AtkIdealStates).
+  Notation CfgI := (Cfg SimStates).
 
   Import VarValStore.Notations.
 
   Definition BisimRel (cr : CfgR) (ci: CfgI) : Prop :=
     let: (contr, storer, asr, trr) :=  cr in
-    let: (conti, storei, (asrsim, _), tri) :=  ci in
+    let: (conti, storei, (mk_sim_state asrsim _), tri) :=  ci in
     ContinuationRestriction contr /\ (* I don't like this. Uniform object is better *)
     (conti = contr) /\
     (asr = asrsim) /\
@@ -144,19 +145,20 @@ Section bisim.
                           BisimRel c1 c2 ->
                           BisimRel (step atkreal c1) (step atkideal c2).
   Proof.
-    move=> [[[cont ? ]astr] ?] [[[? ?]asti]?].
+    move=> [[[cont ? ]astr] ?] [[[? ?] [artrsim ?]]?].
     move=> /= [wt [-> [-> [trseq ->]]]] /=.
     case: cont wt=> [|atkcmd ? wt]; first by rewrite /= trseq //=.
     case rst: (atk_cmd_step atkreal _ _ _) => [[[sr []] contr ] lkr]. (* Note how I make tt. TODO *)
-    case ist: (atk_cmd_step atkideal _ _ _) => [[[si []] conti ] lki].
+    case ist: (atk_cmd_step atkideal _ _ _) => [[[si [[] ?]] conti] lki].
     move: wt=>/ltac:(Forall_inv_ssr) wth wttl /=.
     clear- trseq rst ist wth wttl; set rsv := ⟨ sr | _ ⟩; set isv := ⟨ si | _⟩.
     suff: ([elaborate ContinuationRestriction contr /\ conti = contr /\  rsv = isv /\ lkr = lki])
       by intuition; try congruence; apply/Forall_app.
     rewrite {}/rsv {}/isv; case: atkcmd wth ist rst=> [isatk cmd]. 
-    rewrite/AtkCmdRestriction=> [[]]; rewrite/Noninterfering=> > ni.
-    move: (corruptor_wf atkreal)=> wfr; clear -wfr ni trseq.
-    rewrite/atk_cmd_step.
+    rewrite/AtkCmdRestriction=> [[]]; rewrite/Noninterfering; clear -trseq=> > ni.
+    rewrite/atk_cmd_step. 
+    (* TODO: Need to search for rewrite patterns!! *)
+    fail.
     move cs1: (clean_cmd_step _ _)=> [>]; move cs2: (clean_cmd_step _ _)=> [>].
     repeat move: (learner _ _ _)=> [] /=. (* TODO. This has to be two*)
     move: (substeps _ _)=> ?. (* TODO: I think that this can just be one. Same for bottom also *)
@@ -165,6 +167,7 @@ Section bisim.
     case=> [[<-<-<-] [<-<-<-]| [<-<-<-<-] [<-<-<-]]/=[<-<-][<-<-];
       (repeat split; first by apply/restrict_rel; red; auto);
       apply: ni; rewrite -{}trseq //.
+    move: (corruptor_wf atkreal)=> wfr; clear -wfr ni trseq.
     by firstorder.
   Qed.
 End bisim.
