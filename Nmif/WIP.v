@@ -66,6 +66,7 @@ Section idealatk.
   Parameter SimExtraStates : Set.
   Parameter s : SimExtraStates.
   Record SimStates := mk_sim_state {real_sim : AtkRealStates ; extra: SimExtraStates}.
+  Parameter f : SimStates -> SimExtraStates.
   (* TODO: Add more things here 
       Maybe add a counter? 
       Maybe add the program configuration? + Store? We can
@@ -77,21 +78,20 @@ Section idealatk.
   Program Definition atkideal : AdvStateMachine SimStates := {|
       init_state mem := mk_sim_state (init_state atkreal mem) s;
       init_substeps st := init_substeps atkreal (real_sim st);
-      corruptor _ := id; (* TODO: We need to show a stronger property, which we don't.. But which is obvious..*)
-      learner st mem := mk_sim_state (learner atkreal (real_sim st) mem) s;  
+      corruptor _ := id; (* TODO: We need to show a stronger property, which we don't.. But which is obvious.. We need to say that simulator only does things at x or y*)
+      learner st mem := mk_sim_state (learner atkreal (real_sim st) mem) (f st);
       leaker st := leaker atkreal (real_sim st);
       substeps st := substeps atkreal (real_sim st)
       |}.
 
   Next Obligation. by easy. Qed.
   Next Obligation. 
-    move=> [] /= arst _.
+    move=> [] /= arst ?.
     move: (learner_wf atkreal)=> /(_ arst).
     move: (store_to_view _) (learner _ _)=> > nirl.
     move=> s1 s2; move: nirl=> /(_ s1 s2) /[apply]. 
     by rewrite /id=> ->. 
   Qed.
-  Print atkideal.
 End idealatk.
 
 Import Semantics.Notations.
