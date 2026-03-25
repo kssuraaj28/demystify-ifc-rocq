@@ -156,19 +156,23 @@ Section bisim.
       by intuition; try congruence; apply/Forall_app.
     rewrite {}/rsv {}/isv; case: atkcmd wth ist rst=> [isatk cmd]. 
     rewrite/AtkCmdRestriction=> [[]]; rewrite/Noninterfering; clear -trseq=> > ni.
-    rewrite/atk_cmd_step. 
-    (* TODO: Need to search for rewrite patterns!! *)
-    fail.
+    rewrite/atk_cmd_step ![corruptor atkideal _ _]/=.
     move cs1: (clean_cmd_step _ _)=> [>]; move cs2: (clean_cmd_step _ _)=> [>].
-    repeat move: (learner _ _ _)=> [] /=. (* TODO. This has to be two*)
-    move: (substeps _ _)=> ?. (* TODO: I think that this can just be one. Same for bottom also *)
-    move: (leaker _ _)=> ?. 
-    move=> e1 e2; move: isatk e1 e2 cs1 cs2.
-    case=> [[<-<-<-] [<-<-<-]| [<-<-<-<-] [<-<-<-]]/=[<-<-][<-<-];
-      (repeat split; first by apply/restrict_rel; red; auto);
-      apply: ni; rewrite -{}trseq //.
-    move: (corruptor_wf atkreal)=> wfr; clear -wfr ni trseq.
-    by firstorder.
+    case: isatk cs1 cs2; last 
+      by move=> /= [<- <-] [<- <-] [<- <- _ <- <-] [<- <- <-]; (repeat split; try red; auto).
+    move lrnrle:(learner atkreal _ _)=> lrnrl; move lrnide:(learner atkideal _ _) => [lrnid lrnidex].
+    move subrle:(substeps atkreal _)=> subrl; move subide :(substeps atkideal _) => subid.
+    rewrite /=/id in subrle lrnrle lrnide subide *; case: lrnide=> lrnide lrnidexe.
+    case=> e; rewrite -{}e /=in lrnide *=> <-.
+    case=> e; rewrite -{}e /=in lrnrle *=> <-.
+    case=> <- e; rewrite {}e in subide lrnide *=> e; rewrite {}e in lrnidexe=> <- <-.
+    case=> <- e; rewrite {}e in subrle lrnrle *=> <- <-.
+    rewrite /= in subide subrle lrnide lrnrle *.
+    (have ->: subid = subrl by congruence); clear subide subrle.
+    (have _: lrnrl = lrnid by case: lrnrl; case: lrnid); clear lrnide lrnrle lrnidexe. (* TODO When we say improve more than tt, we will get this ..*)
+    repeat split; first by rewrite -/(prog_zip [] _); apply/restrict_rel; auto.
+    apply: ni; rewrite -{}trseq; clear.
+    by move: (corruptor_wf atkreal); firstorder.
   Qed.
 End bisim.
 
