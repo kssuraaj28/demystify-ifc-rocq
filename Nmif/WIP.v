@@ -146,15 +146,15 @@ Section bisim.
                           BisimRel (step atkreal c1) (step atkideal c2).
   Proof.
     move=> [[[cont ? ]astr] ?] [[[? ?] [artrsim ?]]?].
-    move=> /= [wt [-> [-> [trseq ->]]]] /=.
+    move=> [wt [-> [-> [trseq ->]]]] /=.
     case: cont wt=> [|atkcmd ? wt]; first by rewrite /= trseq //=.
-    case rst: (atk_cmd_step atkreal _ _ _) => [[[sr []] contr ] lkr]. (* Note how I make tt. TODO *)
-    case ist: (atk_cmd_step atkideal _ _ _) => [[[si [[] ?]] conti] lki].
+    move rst: (atk_cmd_step atkreal _ _ _) => [[[sr []] contr ] lkr]. (* Note how I make tt. TODO *)
+    move ist: (atk_cmd_step atkideal _ _ _) => [[[si [[] ?]] conti] lki].
     move: wt=>/ltac:(Forall_inv_ssr) wth wttl /=.
     clear- trseq rst ist wth wttl; set rsv := ⟨ sr | _ ⟩; set isv := ⟨ si | _⟩.
     suff: ([elaborate ContinuationRestriction contr /\ conti = contr /\  rsv = isv /\ lkr = lki])
       by intuition; try congruence; apply/Forall_app.
-    rewrite {}/rsv {}/isv; case: atkcmd wth ist rst=> [isatk cmd]. 
+    rewrite {}/rsv {}/isv; move: atkcmd wth ist rst=> [isatk cmd]. 
     rewrite/AtkCmdRestriction=> [[]]; rewrite/Noninterfering; clear -trseq=> > ni.
     rewrite/atk_cmd_step ![corruptor atkideal _ _]/=.
     move cs1: (clean_cmd_step _ _)=> [>]; move cs2: (clean_cmd_step _ _)=> [>].
