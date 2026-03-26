@@ -36,6 +36,11 @@ Section ts.
   Definition ContinuationRestriction: Continuation -> Prop :=
     Forall AtkCmdRestriction.
 
+  (* TODO: Maybe show some safety lemma..
+    If x sats continuation restruction and takes a step to x', then x' also satisfies that.
+    This is true for all states, and whatnot
+  *)
+
   (* 
     I think that constructor is okay to be part of finisher. 
     Don't make it part of forward reasoning
@@ -62,9 +67,45 @@ Parameter lki : AdvLeakPrm. Existing Instance lki.
 
 Definition AtkRealStates := unit.
 Parameter atkreal : AdvStateMachine AtkRealStates.
+
 Section idealatk.
+   (*
+
+    Okay, there are the following things to do:
+    There must be
+
+    - real store
+    - ideal store
+    - sim store
+
+    Moreover, there will be invariants.
+    ⟨ real_store | is_trusted  ⟩ = ⟨ ideal_store | is_trusted ⟩
+    ⟨ real_store | is_public  ⟩ = ⟨ sim_store | is_public ⟩
+
+    Moreover, different from viaduct, we will also have:
+
+    - real continuation
+    - ideal continuation
+    - sim continuation
+
+    The invariants should be:
+    - When the PC is public trusted, all three should be equal
+    - When the PC is secret trusted, real = ideal continuation. the sim continuation must be 'I don't know'
+    - When the PC is untrusted,  ??. 
+
+    The proof sketch maybe should look like this..
+
+   * When the pc is untrusted, there should not be any changes to the real store
+     trusted or ideal store trusted in any substep
+
+   * When the pc is secret, there should not be any changes to the real store public.
+    
+     trusted or ideal store trusted in any substep
+
+
+   *)
   Parameter SimExtraStates : Set.
-  Parameter s : SimExtraStates.
+  Parameter s_init : SimExtraStates.
   Record SimStates := mk_sim_state {real_sim : AtkRealStates ; extra: SimExtraStates}.
   Parameter f : SimStates -> SimExtraStates.
   (* TODO: Add more things here 
@@ -76,7 +117,7 @@ Section idealatk.
 
   Obligation Tactic := idtac. (* TODO: Program cases or whatnot *)
   Program Definition atkideal : AdvStateMachine SimStates := {|
-      init_state mem := mk_sim_state (init_state atkreal mem) s;
+      init_state mem := mk_sim_state (init_state atkreal mem) s_init;
       init_substeps st := init_substeps atkreal (real_sim st);
       corruptor _ := id; (* TODO: We need to show a stronger property, which we don't.. But which is obvious.. We need to say that simulator only does things at x or y*)
       learner st mem := mk_sim_state (learner atkreal (real_sim st) mem) (f st);
@@ -99,6 +140,18 @@ Parameter myprog : Prog. Axiom myprog_wt : ProgRestriction myprog.
 Definition b1 := ⟦ myprog ☠︎︎ atkreal ⟧.
 Definition b2 := ⟦ myprog ☠︎︎ atkideal ⟧.
 
+(* 
+Constructing a combined object.
+I will use refinement types..
+CombObj will contain the  data as well as the invariant.
+There should be a function extracts CfgI and CfgR from it
+There should be a stepping relation on this object also.
+Finally, there should be 
+Figuring out this single object approach would be a good task for the day..
+
+
+
+*)
 
 (* Can I construct a proof object with more state? 
 Parameter Po : Type.
@@ -106,16 +159,16 @@ Parameter BisimRel : Po -> Type.
 You need to lift step to Po..
 *)
 
+Notation CfgR := (Cfg AtkRealStates).
+Notation CfgI := (Cfg SimStates).
 Section bisim.
-  Notation CfgR := (Cfg AtkRealStates).
-  Notation CfgI := (Cfg SimStates).
 
   Import VarValStore.Notations.
 
   Definition BisimRel (cr : CfgR) (ci: CfgI) : Prop :=
     let: (contr, storer, asr, trr) :=  cr in
     let: (conti, storei, (mk_sim_state asrsim _), tri) :=  ci in
-    ContinuationRestriction contr /\ (* I don't like this. Uniform object is better *)
+    ContinuationRestriction contr /\  (* I don't like this*)
     (conti = contr) /\
     (asr = asrsim) /\
     ⟨ storer | is_trusted ⟩ = ⟨ storei | is_trusted ⟩ /\
@@ -170,7 +223,7 @@ Section bisim.
     rewrite /= in subide subrle lrnide lrnrle *.
     (have ->: subid = subrl by congruence); clear subide subrle.
     (have _: lrnrl = lrnid by case: lrnrl; case: lrnid); clear lrnide lrnrle lrnidexe. (* TODO When we say improve more than tt, we will get this ..*)
-    repeat split; first by rewrite -/(prog_zip [] _); apply/restrict_rel; auto.
+    repeat split; first by rewrite -/(prog_zip [] _); apply/restrict_rel.
     apply: ni; rewrite -{}trseq; clear.
     by move: (corruptor_wf atkreal); firstorder.
   Qed.
@@ -185,3 +238,18 @@ Goal b1 = b2 . Proof.
   elim: n ms1 ms2 e1 e2=> [> | > ? >] <- <- /=; first by apply/ bisim_init.
   by apply/bisim_step; auto. (* What the hell is this *)
 Qed.
+
+
+(* Combined Object... *)
+Parameter Comb : Type.
+Parameter extract_r : Comb -> CfgR.
+Parameter extract_i : Comb -> CfgI.
+(* TODO: Does this work? *)
+Parameter comb_step :   AdvStateMachine AtkRealStates -> 
+                        AdvStateMachine SimStates -> Comb -> Comb.
+Check @step _ _ _ _ SimStates.
+Axiom comb_step_i : 
+    forall c ar ai, extract_i (comb_step ar ai c) = step ai (extract_i c). 
+
+Axiom comb_step_r : 
+    forall c ar ai, extract_i (comb_step ar ai c) = step ai (extract_i c). 

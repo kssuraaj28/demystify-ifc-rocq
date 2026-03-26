@@ -116,7 +116,7 @@ End atk_cmd_step.
 
 Section cfg.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
-  Context (AtkStates : Type).
+  Context {AtkStates : Type}.
 
   (* Only trusted store view *)
   Definition Observation := (StoreView * option LeakVals)%type.
@@ -124,8 +124,18 @@ Section cfg.
   Definition ObservationTrace := list Observation.
 
   (* It is useful to put everything in Cfg for bisimulation proofs *)
-  Definition Cfg := (Continuation * Store * AtkStates * ObservationTrace)%type.
+  Record Cfg := 
+    mk_cfg {
+        atk: AdvStateMachine AtkStates;
+        cont: Continuation;
+        store: Store;
+        atkst: AtkStates;
+        trace: ObservationTrace;
+    }.
 End cfg.
+Arguments Cfg: clear implicits.
+Arguments Cfg {_ _ _ _} _. 
+(*  Can I make this better?  I essentially need to just make one particular argument implicit  *)
 
 Section init_cfg.
   Import VarValStore.Notations.
@@ -135,18 +145,18 @@ Section init_cfg.
   Definition initial_cfg (p: Prog) (atksm : AdvStateMachine AtkStates) (s: Store) : Cfg AtkStates :=
     let: atkst := init_state atksm ⟨s | is_public⟩ in
     let: init_cont := prog_zip p (init_substeps atksm atkst) in
-    (init_cont, s, atkst, []).
+    mk_cfg atksm init_cont s atkst [].
 End init_cfg.
 
 Section cfg_step.
   Import VarValStore.Notations. 
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
-  Context {AtkStates : Type} (atksm : AdvStateMachine AtkStates). (* TODO: unify *)
+  Context {AtkStates : Type}. (* TODO: unify *)
 
   Notation Cfg := (Cfg AtkStates).
 
   Definition step (c : Cfg) : Cfg :=
-    let: (cont, store, atkst, trace) := c in
+    let: mk_cfg atksm cont store atkst trace := c in
 
     let: (cont', store', atkst', optlk) := 
       if cont isn't (atk_cmd :: cont') then (cont, store, atkst, None) else (* TODO: How to handle termination correctly *)
@@ -154,7 +164,7 @@ Section cfg_step.
       (extra_cont ++ cont', store', atkst', optlk)
     in 
 
-    (cont', store', atkst', ( ⟨ store' | is_trusted ⟩, optlk) :: trace).
+    mk_cfg atksm cont' store' atkst' (( ⟨ store' | is_trusted ⟩, optlk) :: trace).
 
   (* Man, testing this might be painful.. *)
   Fixpoint multistep (gas: nat) (c : Cfg) : Cfg :=
@@ -163,23 +173,19 @@ Section cfg_step.
     | S gas => step (multistep gas c) 
     end.
 
-  Definition extract_trace (c : Cfg) : ObservationTrace :=
-    let: (_,_,_,cfg) := c in
-    cfg.
 End cfg_step.
 
 Section program_sem.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Context {AtkStates : Type}.
 
   Definition Behavior := Store -> nat -> ObservationTrace.
-
-  Context {AtkStates : Type} (atksm : AdvStateMachine AtkStates). (* TODO: unify *)
 
   (* Simulating coinduction... *)
   Definition prog_behavior {AtkStates} (p : Prog) (atksm : AdvStateMachine AtkStates) : Behavior :=
                           fun init_store gas =>
                             let: init_cfg := initial_cfg p atksm init_store in
-                            extract_trace (multistep atksm gas init_cfg).
+                            trace (multistep gas init_cfg).
 
 End program_sem.
 
