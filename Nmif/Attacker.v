@@ -46,7 +46,6 @@ Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
         let: tr_view := (store_to_view is_trusted) in
         let: pub_view := (store_to_view is_public) in 
         (forall st, tr_view (ast_corr st) = (tr_view st)) /\  (* The adversary does not touch trusted computation. This is a little bit ugly *)
-        Noninterfering tr_view ast_corr tr_view /\ (* trusted outputs don't change if trusted inputs don't *)
         Noninterfering pub_view ast_corr pub_view; (* public outputs don't chnage if public inputs don't *)
 
 
