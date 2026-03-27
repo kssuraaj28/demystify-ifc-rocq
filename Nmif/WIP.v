@@ -240,16 +240,55 @@ Goal b1 = b2 . Proof.
 Qed.
 
 
-(* Combined Object... *)
-Parameter Comb : Type.
-Parameter extract_r : Comb -> CfgR.
-Parameter extract_i : Comb -> CfgI.
-(* TODO: Does this work? *)
-Parameter comb_step :   AdvStateMachine AtkRealStates -> 
-                        AdvStateMachine SimStates -> Comb -> Comb.
-Check @step _ _ _ _ SimStates.
-Axiom comb_step_i : 
-    forall c ar ai, extract_i (comb_step ar ai c) = step ai (extract_i c). 
+(* Combined Object...
+This will contain:
+- Continuation
+- Real store
+- Ideal store
+- Trace
+*)
+Record CombObj := mk_combobj{
+     cont : Continuation; (* A single continuation is shared between everything *)
+     real_st : Store; (* Store for the real system *)
+     ideal_st : Store; (* Store for the ideal system *)
+     sim_extra: SimExtraStates;
+     trace: ObservationTrace; (* Trace for everything *)
+     cont_wf : ContinuationRestriction cont
+    }. 
 
-Axiom comb_step_r : 
-    forall c ar ai, extract_i (comb_step ar ai c) = step ai (extract_i c). 
+Definition extract_r (comb : CombObj): CfgR :=
+    let: mk_combobj cont real_st _ _ trace _ := comb in
+    (cont,real_st,tt,trace).
+
+Definition extract_i (comb : CombObj): CfgI :=
+    let: mk_combobj cont real_st ideal_st sim_extra trace _ := comb in
+    (cont,ideal_st, mk_sim_state tt sim_extra, trace).
+
+Parameter comb_step : CombObj -> CombObj.
+
+(* TODO: Take more things as input? *)
+Parameter comb_init: Store ->  CombObj.
+Axiom comb_init_valid: forall s,
+    extract_r (comb_init s) = initial_cfg myprog atkreal s /\
+    extract_i (comb_init s) = initial_cfg myprog atkideal s.
+
+Axiom comb_step_valid : forall c , 
+    extract_i (comb_step c) = step atkideal (extract_i c) /\
+    extract_r (comb_step c) = step atkreal (extract_r c). 
+
+Definition P: CfgI -> CfgR -> Prop :=
+    fun ci cr => extract_trace ci = extract_trace cr.
+
+Axiom comb_P: forall c, P (extract_i c) (extract_r c).
+
+Goal b1 = b2. 
+Proof.
+    rewrite/b1/b2/⟦ _ ☠︎︎  _⟧.
+    apply/functional_extensionality=> s; apply/functional_extensionality=> n.
+    set msr:= (multistep _ _ _); set msi := (multistep _ _ _).
+    suff: exists c, msr = extract_r c  /\ msi = extract_i c by move=> [? [-> ->]]; rewrite comb_P.
+    subst msr msi;  elim: n=> [|> [c [*]]]; first by
+        exists (comb_init s); move: (comb_init_valid s)=> [-> ->].
+    exists (comb_step c); move: (comb_step_valid c)=> [-> ->] /=.
+    by intuition congruence.
+Qed.
