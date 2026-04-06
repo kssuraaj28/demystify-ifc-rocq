@@ -45,6 +45,15 @@ Section ts.
     I think that constructor is okay to be part of finisher. 
     Don't make it part of forward reasoning
   *)
+  Lemma pure_atk_wt : AtkCmdRestriction pure_atk. 
+  Proof. by constructor. Qed.
+
+  Lemma pure_atklst_wt: forall n, 
+    Forall AtkCmdRestriction (nlist  pure_atk n).
+  Proof. 
+    elim=> /=; auto using pure_atk_wt.
+  Qed.
+
   Lemma restrict_rel: forall p,
     ProgRestriction p -> 
     (forall n, ContinuationRestriction (prog_zip p n)).
@@ -300,6 +309,15 @@ Qed.
 
 Section def.
     Obligation Tactic := try done. (* TODO: Program cases or whatnot *)
+
+    Ltac comp_ni := 
+       let comp := fresh in 
+       set comp := (X in ⟨ X _ | is_trusted ⟩ = _);
+       (have: Noninterfering (store_to_view is_trusted) comp (store_to_view is_trusted)
+          by match goal with H : Forall AtkCmdRestriction _ |- _ => 
+                subst; move: H; Forall_inv_ssr=> + _; inversion 1
+             end);
+        subst comp.
 (*
 atk_cmd_step atkreal ?c ?s tt
      : Store * AtkRealStates * Continuation * option LeakVals
@@ -333,30 +351,53 @@ where
                real_st := comp (corruptor atkreal tt real_st);
                ideal_st := comp ideal_st; (* Does this even get corrupted? *)
                sim_extra := f (mk_sim_state tt sim_extra);
-               cont :=  cont'; (* This is not correct.. *)
+               cont :=  (nlist pure_atk (substeps atkreal tt)) ++ cont'; (* This is not correct.. *)
                trace := ((⟨real_st |is_trusted ⟩, Some (leaker atkreal tt))::trace)  (* You could also use ⟨ ideal_st | is_trusted ⟩ here! *)
             |}.
-           
-         (* Just handcode everything that will happen *)
+    Import Tacs.SsrHack.
+    Next Obligation. 
+        rewrite/ContinuationRestriction => *.
+        by subst; eauto using Forall_inv_tail.
+    Qed.
 
-        (* Maybe rewrite atk_cmd_step here? 
-           The fact that I am rewriting makes me a litte uneasy..
+    Next Obligation. 
+       rewrite/ContinuationRestriction=> *.
+       by comp_ni; auto.
+    Qed.
 
-        *)
-        (* What should be done? We need to show that there is a single continuation 
-        - real_st
-        - ideal_st
-        - sim_extra
-        - trace
-        Maybe the right thing to do is to redefine everything.. 
-        When there is no attack..
-        -- 
-        *)
-    Next Obligation. Admitted.
-    Next Obligation. Admitted.
-    Next Obligation. Admitted.
-    Next Obligation. Admitted.
-    Next Obligation. Admitted.
+    Next Obligation. 
+       rewrite/ContinuationRestriction=> *.
+       apply/Forall_app; split; first by apply/pure_atklst_wt.
+       by 
+        subst;
+        match goal with 
+            H : Forall AtkCmdRestriction _ |- _ => move: H; Forall_inv_ssr=> _
+        end.
+    Qed.
+
+    Next Obligation. 
+       rewrite/ContinuationRestriction=> *.
+       comp_ni; apply.
+       by match goal with H : _ = ?rhs |- _ = ?rhs => 
+         rewrite -H; 
+         move: (corruptor_wf atkreal tt);
+         firstorder
+       end.
+    Qed.
+
+    Next Obligation. 
+      rewrite/ContinuationRestriction=> /*.
+      by
+        subst;
+        match goal with H : Forall AtkCmdRestriction  (?cmd :: _) |- _ =>  
+          move:(H); Forall_inv_ssr=> + _;
+          destruct cmd
+        end; 
+        inversion 1; subst;
+        match goal with H : _  |- _ =>
+          eapply H
+        end.
+    Qed.
 End def.
 
 
