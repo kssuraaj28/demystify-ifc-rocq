@@ -184,7 +184,6 @@ Section bisim.
     (trr = tri). 
   
 
-  Import Tacs.SsrHack.
   Lemma bisim_extract: forall c1 c2,
                   BisimRel c1 c2 -> extract_trace c1 = extract_trace c2.
   Proof.
@@ -328,6 +327,7 @@ where
     (* This is really how you should think about it.. 
        Maybe it is not a terrible idea to replicate things
     *)
+
     Program Definition comb_step (c: CombObj): CombObj :=
         let: 
             {| cont := cont; 
@@ -336,7 +336,12 @@ where
                sim_extra := sim_extra ; 
                trace := trace |} := c
         in
-        if cont isn't (cmd :: cont') then c else  (* Is this correct? *)
+        if cont isn't (cmd :: cont') 
+            then {| cont := cont; 
+                    real_st := real_st; 
+                    ideal_st := ideal_st; 
+                    sim_extra := sim_extra ; 
+                    trace := (⟨real_st| is_trusted⟩, None) :: trace |} else
         if cmd isn't (mk_cstep is_atk (assign comp)) then False_rect _ _ else (* Here, we throw an exception *)
         if is_atk is false then 
             {| 
@@ -354,7 +359,6 @@ where
                cont :=  (nlist pure_atk (substeps atkreal tt)) ++ cont'; (* This is not correct.. *)
                trace := ((⟨real_st |is_trusted ⟩, Some (leaker atkreal tt))::trace)  (* You could also use ⟨ ideal_st | is_trusted ⟩ here! *)
             |}.
-    Import Tacs.SsrHack.
     Next Obligation. 
         rewrite/ContinuationRestriction => *.
         by subst; eauto using Forall_inv_tail.
@@ -368,11 +372,7 @@ where
     Next Obligation. 
        rewrite/ContinuationRestriction=> *.
        apply/Forall_app; split; first by apply/pure_atklst_wt.
-       by 
-        subst;
-        match goal with 
-            H : Forall AtkCmdRestriction _ |- _ => move: H; Forall_inv_ssr=> _
-        end.
+       by subst; apply: Forall_inv_tail; eauto.
     Qed.
 
     Next Obligation. 
@@ -386,31 +386,35 @@ where
     Qed.
 
     Next Obligation. 
-      rewrite/ContinuationRestriction=> /*.
-      by
+      rewrite/ContinuationRestriction=> *.
+      by (* Is there a better way? subst should really by finisher *)
         subst;
         match goal with H : Forall AtkCmdRestriction  (?cmd :: _) |- _ =>  
-          move:(H); Forall_inv_ssr=> + _;
-          destruct cmd
+          move:(H); Forall_inv_ssr=> + _; destruct cmd;
+          inversion 1; subst
         end; 
-        inversion 1; subst;
-        match goal with H : _  |- _ =>
-          eapply H
-        end.
+        match goal with H : _  |- _ => eapply H=> /= end.
     Qed.
 End def.
 
-
-Axiom comb_step_valid : forall c , 
+Lemma comb_step_valid : forall c , 
     extract_i (comb_step c) = step atkideal (extract_i c) /\
     extract_r (comb_step c) = step atkreal (extract_r c). 
+Proof.
+    move=> c; split. {
+        case: c=> - [] *. 
+        {
+            rewrite/extract_i /=.
+            move=> /=.
+        rewrite [RHS]/=.
+
+    case.
 
 
 Theorem comb_extract: 
     forall c, extract_trace (extract_i c) = extract_trace (extract_r c). 
 Proof. by case. Qed.
 
-Import Tacs.SsrHack.
 Goal b1 = b2. 
 Proof.
     rewrite/b1/b2/⟦ _ ☠︎︎  _⟧.
