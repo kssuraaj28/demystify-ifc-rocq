@@ -246,24 +246,23 @@ This will contain:
 - Ideal store
 - Trace
 *)
+Import VarValStore.Notations. 
 Record CombObj := mk_combobj{
      cont : Continuation; (* A single continuation is shared between everything *)
      real_st : Store; (* Store for the real system *)
      ideal_st : Store; (* Store for the ideal system *)
      sim_extra: SimExtraStates;
      trace: ObservationTrace; (* Trace for everything *)
-     cont_wf : ContinuationRestriction cont
+     cont_wf : ContinuationRestriction cont;
+     tr_match : ⟨ real_st | is_trusted ⟩ = ⟨ ideal_st | is_trusted ⟩
     }. 
 
 Definition extract_r (comb : CombObj): CfgR :=
-    let: mk_combobj cont real_st _ _ trace _ := comb in
-    (cont,real_st,tt,trace).
+    (cont comb, real_st comb, tt , trace comb).
 
 Definition extract_i (comb : CombObj): CfgI :=
-    let: mk_combobj cont real_st ideal_st sim_extra trace _ := comb in
-    (cont,ideal_st, mk_sim_state tt sim_extra, trace).
+    (cont comb, ideal_st comb, mk_sim_state tt (sim_extra comb), trace comb).
 
-Print Cfg.
 (*
 Cfg =
 fun (H : VarPrm) (H0 : ValPrm) (H2 : AdvLeakPrm) (AtkStates : Type) =>
@@ -274,7 +273,7 @@ Arguments Cfg {H H0 H2} AtkStates%type_scope
 *)
 (* TODO: Take more things as input? *)
 Section def.
-    Obligation Tactic := idtac. (* TODO: Program cases or whatnot *)
+    Obligation Tactic := try done. (* TODO: Program cases or whatnot *)
     Program Definition comb_init (s_init : Store):  CombObj :=
         (* TODO: There should be attacker state also, which we'll do later  *)
         let: (cont, st, (mk_sim_state _ sim_extra), init_tr) := initial_cfg myprog atkideal s_init in 
@@ -308,14 +307,33 @@ where
 ?c : [ |- AtkCmd]
 ?s : [ |- Store]
 *)
+    (* This is really how you should think about it.. 
+       Maybe it is not a terrible idea to replicate things
+    *)
     Program Definition comb_step (c: CombObj): CombObj :=
         let: mk_combobj cont real_st ideal_st sim_extra trace cont_wf := c in
-        if cont isn't (cmd :: cont') then c else 
+        if cont isn't (cmd :: cont') then c else  (* Is this correct? *)
         if cmd isn't (mk_cstep is_atk (assign comp)) then False_rect _ _ else (* Here, we throw an exception *)
-        let: (real_st', _, _,_) := atk_cmd_step atkreal cmd real_st tt in (* Here, we have another thing to keep in mind *)
-        _
-        (* What should be done? We need to show that there is a single continuation *)
-        .
+        if is_atk is false then 
+            mk_combobj 
+                cont' 
+                (comp real_st) (comp ideal_st) sim_extra 
+                ((⟨real_st |is_trusted ⟩,None)::trace) _ else  (* You could also use ⟨ ideal_st | is_trusted ⟩ here! *)
+         _. 
+
+        (* Maybe rewrite atk_cmd_step here? 
+           The fact that I am rewriting makes me a litte uneasy..
+
+        *)
+        (* What should be done? We need to show that there is a single continuation 
+        - real_st
+        - ideal_st
+        - sim_extra
+        - trace
+        Maybe the right thing to do is to redefine everything.. 
+        When there is no attack..
+        -- 
+        *)
     Next Obligation. Admitted.
     Next Obligation. Admitted.
     Next Obligation. Admitted.
