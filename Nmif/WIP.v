@@ -104,7 +104,7 @@ Section idealatk.
 
 
    *)
-  Parameter SimExtraStates : Set.
+  Parameter SimExtraStates : Type.
   Parameter s_init : SimExtraStates.
   Record SimStates := mk_sim_state {real_sim : AtkRealStates ; extra: SimExtraStates}.
   Parameter f : SimStates -> SimExtraStates.
@@ -220,7 +220,6 @@ Section bisim.
     case=> e; rewrite -{}e /=in lrnrle *=> <-.
     case=> <- e; rewrite {}e in subide lrnide *=> e; rewrite {}e in lrnidexe=> <- <-.
     case=> <- e; rewrite {}e in subrle lrnrle *=> <- <-.
-    rewrite /= in subide subrle lrnide lrnrle *.
     (have ->: subid = subrl by congruence); clear subide subrle.
     (have _: lrnrl = lrnid by case: lrnrl; case: lrnid); clear lrnide lrnrle lrnidexe. (* TODO When we say improve more than tt, we will get this ..*)
     repeat split; first by rewrite -/(prog_zip [] _); apply/restrict_rel.
@@ -264,29 +263,82 @@ Definition extract_i (comb : CombObj): CfgI :=
     let: mk_combobj cont real_st ideal_st sim_extra trace _ := comb in
     (cont,ideal_st, mk_sim_state tt sim_extra, trace).
 
-Parameter comb_step : CombObj -> CombObj.
+Print Cfg.
+(*
+Cfg =
+fun (H : VarPrm) (H0 : ValPrm) (H2 : AdvLeakPrm) (AtkStates : Type) =>
+(Continuation * Store * AtkStates * ObservationTrace)%type
+     : VarPrm -> ValPrm -> AdvLeakPrm -> Type -> Type
 
+Arguments Cfg {H H0 H2} AtkStates%type_scope
+*)
 (* TODO: Take more things as input? *)
-Parameter comb_init: Store ->  CombObj.
-Axiom comb_init_valid: forall s,
+Section def.
+    Obligation Tactic := idtac. (* TODO: Program cases or whatnot *)
+    Program Definition comb_init (s_init : Store):  CombObj :=
+        (* TODO: There should be attacker state also, which we'll do later  *)
+        let: (cont, st, (mk_sim_state _ sim_extra), init_tr) := initial_cfg myprog atkideal s_init in 
+        {|
+         cont := cont ;
+         real_st := st ;
+         ideal_st := st ;
+         sim_extra := sim_extra ;
+         trace := init_tr 
+        |}.
+    Next Obligation.
+      move=> /= > [] -> *; clear.
+      by auto using restrict_rel, myprog_wt.
+    Qed.
+End def.
+
+Lemma comb_init_valid: forall s,
     extract_r (comb_init s) = initial_cfg myprog atkreal s /\
     extract_i (comb_init s) = initial_cfg myprog atkideal s.
+Proof.
+    move=> ?; rewrite /initial_cfg/extract_r/extract_i /=. 
+    by case: (init_state _ _). (*  Here, we are doing something  sus*)
+Qed.
+
+Section def.
+    Obligation Tactic := idtac. (* TODO: Program cases or whatnot *)
+(*
+atk_cmd_step atkreal ?c ?s tt
+     : Store * AtkRealStates * Continuation * option LeakVals
+where
+?c : [ |- AtkCmd]
+?s : [ |- Store]
+*)
+    Program Definition comb_step (c: CombObj): CombObj :=
+        let: mk_combobj cont real_st ideal_st sim_extra trace cont_wf := c in
+        if cont isn't (cmd :: cont') then c else 
+        if cmd isn't (mk_cstep is_atk (assign comp)) then False_rect _ _ else (* Here, we throw an exception *)
+        let: (real_st', _, _,_) := atk_cmd_step atkreal cmd real_st tt in (* Here, we have another thing to keep in mind *)
+        _
+        (* What should be done? We need to show that there is a single continuation *)
+        .
+    Next Obligation. Admitted.
+    Next Obligation. Admitted.
+    Next Obligation. Admitted.
+    Next Obligation. Admitted.
+    Next Obligation. Admitted.
+End def.
+
 
 Axiom comb_step_valid : forall c , 
     extract_i (comb_step c) = step atkideal (extract_i c) /\
     extract_r (comb_step c) = step atkreal (extract_r c). 
 
-Definition P: CfgI -> CfgR -> Prop :=
-    fun ci cr => extract_trace ci = extract_trace cr.
 
-Axiom comb_P: forall c, P (extract_i c) (extract_r c).
+Theorem comb_extract: 
+    forall c, extract_trace (extract_i c) = extract_trace (extract_r c). 
+Proof. by case. Qed.
 
 Goal b1 = b2. 
 Proof.
     rewrite/b1/b2/⟦ _ ☠︎︎  _⟧.
     apply/functional_extensionality=> s; apply/functional_extensionality=> n.
     set msr:= (multistep _ _ _); set msi := (multistep _ _ _).
-    suff: exists c, msr = extract_r c  /\ msi = extract_i c by move=> [? [-> ->]]; rewrite comb_P.
+    suff: exists c, msr = extract_r c  /\ msi = extract_i c by move=> [? [-> ->]]; rewrite comb_extract.
     subst msr msi;  elim: n=> [|> [c [*]]]; first by
         exists (comb_init s); move: (comb_init_valid s)=> [-> ->].
     exists (comb_step c); move: (comb_step_valid c)=> [-> ->] /=.
