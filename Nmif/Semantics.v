@@ -41,11 +41,12 @@ Section cont.
   Inductive AtkCmd :=
     mk_cstep (is_attacked: bool) (cmd : Cmd).
 
+  Definition skip := (assign id).
+  Definition pure_atk := (mk_cstep true skip).
+  Definition pure_cmd c := (mk_cstep false c).
+
   Definition Continuation := list AtkCmd.
 
-  Notation skip := (assign id) (only parsing).
-  Notation pure_atk := (mk_cstep true skip) (only parsing).
-  Notation pure_cmd := (mk_cstep false) (only parsing).
 
   Fixpoint prog_zip (p: Prog) (atk_steps: nat) : Continuation :=
     match p, atk_steps with

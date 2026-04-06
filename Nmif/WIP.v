@@ -247,7 +247,7 @@ This will contain:
 - Trace
 *)
 Import VarValStore.Notations. 
-Record CombObj := mk_combobj{
+Record CombObj := {
      cont : Continuation; (* A single continuation is shared between everything *)
      real_st : Store; (* Store for the real system *)
      ideal_st : Store; (* Store for the ideal system *)
@@ -299,7 +299,7 @@ Proof.
 Qed.
 
 Section def.
-    Obligation Tactic := idtac. (* TODO: Program cases or whatnot *)
+    Obligation Tactic := try done. (* TODO: Program cases or whatnot *)
 (*
 atk_cmd_step atkreal ?c ?s tt
      : Store * AtkRealStates * Continuation * option LeakVals
@@ -311,15 +311,33 @@ where
        Maybe it is not a terrible idea to replicate things
     *)
     Program Definition comb_step (c: CombObj): CombObj :=
-        let: mk_combobj cont real_st ideal_st sim_extra trace cont_wf := c in
+        let: 
+            {| cont := cont; 
+               real_st := real_st; 
+               ideal_st := ideal_st; 
+               sim_extra := sim_extra ; 
+               trace := trace |} := c
+        in
         if cont isn't (cmd :: cont') then c else  (* Is this correct? *)
         if cmd isn't (mk_cstep is_atk (assign comp)) then False_rect _ _ else (* Here, we throw an exception *)
         if is_atk is false then 
-            mk_combobj 
-                cont' 
-                (comp real_st) (comp ideal_st) sim_extra 
-                ((⟨real_st |is_trusted ⟩,None)::trace) _ else  (* You could also use ⟨ ideal_st | is_trusted ⟩ here! *)
-         _. 
+            {| 
+               real_st := comp real_st; 
+               ideal_st := comp ideal_st; 
+               sim_extra := sim_extra;
+               cont :=  cont';
+               trace := ((⟨real_st |is_trusted ⟩,None)::trace)  (* You could also use ⟨ ideal_st | is_trusted ⟩ here! *)
+            |}
+         else  
+            {| 
+               real_st := comp (corruptor atkreal tt real_st);
+               ideal_st := comp ideal_st; (* Does this even get corrupted? *)
+               sim_extra := f (mk_sim_state tt sim_extra);
+               cont :=  cont'; (* This is not correct.. *)
+               trace := ((⟨real_st |is_trusted ⟩, Some (leaker atkreal tt))::trace)  (* You could also use ⟨ ideal_st | is_trusted ⟩ here! *)
+            |}.
+           
+         (* Just handcode everything that will happen *)
 
         (* Maybe rewrite atk_cmd_step here? 
            The fact that I am rewriting makes me a litte uneasy..
@@ -351,6 +369,7 @@ Theorem comb_extract:
     forall c, extract_trace (extract_i c) = extract_trace (extract_r c). 
 Proof. by case. Qed.
 
+Import Tacs.SsrHack.
 Goal b1 = b2. 
 Proof.
     rewrite/b1/b2/⟦ _ ☠︎︎  _⟧.
@@ -359,6 +378,7 @@ Proof.
     suff: exists c, msr = extract_r c  /\ msi = extract_i c by move=> [? [-> ->]]; rewrite comb_extract.
     subst msr msi;  elim: n=> [|> [c [*]]]; first by
         exists (comb_init s); move: (comb_init_valid s)=> [-> ->].
-    exists (comb_step c); move: (comb_step_valid c)=> [-> ->] /=.
-    by intuition congruence.
+    exists (comb_step c); move: (comb_step_valid c)=> [-> ->].
+    move ? : (step atkreal _)=> ?;  move ? : (step atkideal _)=> ? /=. (* Controlled simpl. Locking is actually sick *)
+    by intuition; congruence.
 Qed.
