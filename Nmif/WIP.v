@@ -349,7 +349,8 @@ where
                ideal_st := comp ideal_st; 
                sim_extra := sim_extra;
                cont :=  cont';
-               trace := ((⟨real_st |is_trusted ⟩,None)::trace)  (* You could also use ⟨ ideal_st | is_trusted ⟩ here! *)
+               trace := ((⟨comp real_st |is_trusted ⟩,None)::trace)  (* You could also use ⟨ ideal_st | is_trusted ⟩ here! *)
+               (* I 'dont like the fact that we repeat comp. This can lead to bugs.. *)
             |}
          else  
             {| 
@@ -357,7 +358,7 @@ where
                ideal_st := comp ideal_st; (* Does this even get corrupted? *)
                sim_extra := f (mk_sim_state tt sim_extra);
                cont :=  (nlist pure_atk (substeps atkreal tt)) ++ cont'; (* This is not correct.. *)
-               trace := ((⟨real_st |is_trusted ⟩, Some (leaker atkreal tt))::trace)  (* You could also use ⟨ ideal_st | is_trusted ⟩ here! *)
+               trace := ((⟨comp real_st |is_trusted ⟩, Some (leaker atkreal tt))::trace)  (* You could also use ⟨ ideal_st | is_trusted ⟩ here! *)
             |}.
     Next Obligation. 
         rewrite/ContinuationRestriction => *.
@@ -397,19 +398,19 @@ where
     Qed.
 End def.
 
+Import Tacs.SsrHack.
 Lemma comb_step_valid : forall c , 
     extract_i (comb_step c) = step atkideal (extract_i c) /\
     extract_r (comb_step c) = step atkreal (extract_r c). 
 Proof.
-    move=> c; split. {
-        case: c=> - [] *. 
-        {
-            rewrite/extract_i /=.
-            move=> /=.
-        rewrite [RHS]/=.
-
-    case.
-
+    case=> c ? ? ? ?; case :c; first 
+        by rewrite/extract_i/extract_r/==> _ ->.
+    move=> [is_atk ?]  ? /[dup];  Forall_inv_ssr; rewrite{1}/AtkCmdRestriction=> - []; rewrite/Noninterfering=> ? ni _.
+    case: is_atk;rewrite /extract_i/extract_r/==> _; last by split;  congr (_, (_,_) :: _); auto.
+    repeat case: (learner _ _ _)=> *;rewrite /id.
+    split;  congr (_, (_,_) :: _);  apply: ni; auto.
+    by move: (corruptor_wf atkreal); evar_spec_ssr=>-  [] eq _; erewrite eq.
+Qed.
 
 Theorem comb_extract: 
     forall c, extract_trace (extract_i c) = extract_trace (extract_r c). 
