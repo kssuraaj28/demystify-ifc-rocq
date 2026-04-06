@@ -398,7 +398,6 @@ where
     Qed.
 End def.
 
-Import Tacs.SsrHack.
 Lemma comb_step_valid : forall c , 
     extract_i (comb_step c) = step atkideal (extract_i c) /\
     extract_r (comb_step c) = step atkreal (extract_r c). 
