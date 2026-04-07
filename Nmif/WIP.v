@@ -198,6 +198,16 @@ Proof.
     by case: (init_state _ _). (*  Here, we are doing something  sus*)
 Qed.
 
+Check atk_cmd_step.
+(*
+atk_cmd_step
+     : AdvStateMachine ?AtkStates ->
+       AtkCmd ->
+       Store ->
+       ?AtkStates -> Store * ?AtkStates * Continuation * option LeakVals
+where
+?AtkStates : [ |- Type]
+*)
 Definition comb_step (c: CombObj): CombObj :=
     let: 
         {| cont := cont; 
@@ -206,30 +216,30 @@ Definition comb_step (c: CombObj): CombObj :=
            sim_extra := sim_extra ; 
            trace := trace |} := c
     in
-    let: (cont', real_st', ideal_st', sim_extra') :=
+    let: (cont', real_st', ideal_st', sim_extra', leak') :=
       (* If the program is empty *)
-      if cont isn't (cmd :: cont') then ([], real_st, ideal_st, sim_extra) else 
+      if cont isn't (cmd :: cont') then ([], real_st, ideal_st, sim_extra, None) else 
 
       (* If the program is not empty *)
       let: (real_st', _, _, _) := atk_cmd_step atkreal cmd real_st tt in
-      let: (ideal_st', mk_sim_state _ sim_extra', _, _) := 
+      let: (ideal_st', mk_sim_state _ sim_extra', extra_cont', leak') := 
         atk_cmd_step atkideal cmd ideal_st (mk_sim_state tt sim_extra) 
       in
 
 
-      ((nlist pure_atk (substeps atkreal tt)) ++ cont',
-      real_st', ideal_st', sim_extra')
+      (extra_cont' ++ cont', real_st', ideal_st', sim_extra', leak')
     in
     {| cont := cont'; 
        real_st := real_st'; 
        ideal_st := ideal_st'; 
        sim_extra := sim_extra'; 
-       trace := (⟨real_st'| is_trusted⟩, None) :: trace |}.
+       trace := (⟨real_st'| is_trusted⟩, leak') :: trace |}.
 
 Lemma comb_step_inv: forall c, 
                         CombObjInv c ->
                         CombObjInv (comb_step c).
 Proof.
+    case; rewrite /CombObjInv=> > [cr treq]; rewrite/= in cr treq.
 Admitted.
 
 
@@ -245,22 +255,29 @@ Arguments Cfg {H H0 H2} AtkStates%type_scope
 
 
 
-Lemma comb_step_valid : forall c , 
-    CombObjInv c ->
-    extract_i (comb_step c) = step atkideal (extract_i c) /\
-    extract_r (comb_step c) = step atkreal (extract_r c). 
-Proof.
-(*
-    case=> c ? ? ? ?; case :c; first 
-        by rewrite/extract_i/extract_r/==> _ ->.
-    move=> [is_atk ?]  ? /[dup];  Forall_inv_ssr; rewrite{1}/AtkCmdRestriction=> - []; rewrite/Noninterfering=> ? ni _.
-    case: is_atk;rewrite /extract_i/extract_r/==> _; last by split;  congr (_, (_,_) :: _); auto.
-    repeat case: (learner _ _ _)=> *;rewrite /id.
-    split;  congr (_, (_,_) :: _); apply: ni; auto.
-    by move: (corruptor_wf atkreal); evar_spec_ssr=>-  [] eq _; erewrite eq.
-Qed.
-    *)
-Admitted.
+Section thm.
+  Lemma comb_step_valid : forall c , 
+      CombObjInv c ->
+      extract_i (comb_step c) = step atkideal (extract_i c) /\
+      extract_r (comb_step c) = step atkreal (extract_r c). 
+  Proof.
+      case=> c ? ? ? ?; case :c=> [[_ -]| [isatk cmd] ? [wt treq]]; first 
+          by rewrite/CombObjInv/extract_i/extract_r/==> - ->.
+      rewrite/CombObjInv/= in wt treq.
+      move: wt; Forall_inv_ssr=> wtc ?.
+      by case: cmd wtc=> [|_]; [rewrite/AtkCmdRestriction=> ? [? ni]|];  (* I think that CPDT style automation might be useful here *)
+        do !(
+          case: isatk ||
+          rewrite/extract_i/extract_r/comb_step/id/=||
+          case: (learner _ _ _) || 
+          split || 
+          apply: ni ||
+          congr (_, (_,_) :: _) ||
+          rewrite -{}treq  ||
+            (move: (corruptor_wf atkreal); evar_spec_ssr=>-  [] eq _; erewrite eq)
+          ). (* I need to think of the best way to this. The one downside I might see is destruct. *)
+  Qed.
+End thm.
 
 Theorem comb_extract: 
     forall c, extract_trace (extract_i c) = extract_trace (extract_r c). 
