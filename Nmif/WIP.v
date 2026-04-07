@@ -278,6 +278,7 @@ Section thm.
           by rewrite/CombObjInv/extract_i/extract_r/==> - ->.
       rewrite/CombObjInv/= in wt treq.
       move: wt; Forall_inv_ssr=> wtc ?.
+      (* I'm so bad. Need  more automation !! *)
       by case: cmd wtc=> [|_]; [rewrite/AtkCmdRestriction=> ? [? ni]|];  (* I think that CPDT style automation might be useful here *)
         do !(
           case: isatk ||
