@@ -239,8 +239,26 @@ Lemma comb_step_inv: forall c,
                         CombObjInv c ->
                         CombObjInv (comb_step c).
 Proof.
-    case; rewrite /CombObjInv=> > [cr treq]; rewrite/= in cr treq.
-Admitted.
+    case; rewrite /CombObjInv=> cnt >  [cr treq]; rewrite/= in cr treq. 
+    split; rewrite/comb_step; 
+        case: cnt cr=> // [[isatk cmd] ?]; 
+        rewrite/ContinuationRestriction; Forall_inv_ssr=> + ?.
+
+    { case: cmd=> [|_].  
+      1: case: isatk=> ? [? ni]; rewrite/=/id=> //.
+      2: case: isatk=> //=. 
+      all: by apply/Forall_app; split=> //; apply/pure_atklst_wt. }
+    { case: cmd=> [|_].  
+      { case: isatk=> ? [? ni]; rewrite/=/id; apply: ni=> //.
+        (* This ni, thing should be finisher  *)
+        by move: (corruptor_wf atkreal); evar_spec_ssr=>-  [] eq _; erewrite eq. 
+        }
+      {
+        case: isatk=> //=. 
+        by move: (corruptor_wf atkreal); evar_spec_ssr=>-  [] eq _; erewrite eq. 
+      }
+    } 
+Qed.
 
 
 (*
@@ -292,11 +310,11 @@ Proof.
       by move=> [? [_ [-> ->]]]; rewrite comb_extract.
     rewrite{}/msr{}/msi.
     elim: n=> [|> [c [cinv [e1 e2]]]].
-    - exists (comb_init s) => /=.
+    { exists (comb_init s) => /=.
       split; first by apply/comb_init_inv.    
       move:(comb_init_extraction)=> /(_ s).
-      by intuition.
-    - exists (comb_step c)=> /=. 
+      by intuition. }
+    { exists (comb_step c)=> /=. 
       split; first by apply/comb_step_inv.
-      by move: (comb_step_valid c cinv) e1 e2 => [-> ->] -> ->.
+      by move: (comb_step_valid c cinv) e1 e2 => [-> ->] -> -> . }
 Qed.
