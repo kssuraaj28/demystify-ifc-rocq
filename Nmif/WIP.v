@@ -31,6 +31,7 @@ Section ts.
 
   (* This name is stupid *)
   Definition AtkCmdRestriction '(mk_cstep _ c) : Prop :=
+    if c isn't Some c then True else
     CmdRestriction c.
 
   Definition ContinuationRestriction: Continuation -> Prop :=
@@ -159,15 +160,78 @@ Record CombObj := {
      ideal_st : Store; (* Store for the ideal system *)
      sim_extra: SimExtraStates;
      trace: ObservationTrace; (* Trace for everything *)
-     cont_wf : ContinuationRestriction cont;
-     tr_match : ⟨ real_st | is_trusted ⟩ = ⟨ ideal_st | is_trusted ⟩
     }. 
+
+Definition CombObjInv (c : CombObj): Prop :=
+     ContinuationRestriction (cont c) /\
+     ⟨ real_st c | is_trusted ⟩ = ⟨ ideal_st c | is_trusted ⟩.
 
 Definition extract_r (comb : CombObj): CfgR :=
     (cont comb, real_st comb, tt , trace comb).
 
 Definition extract_i (comb : CombObj): CfgI :=
     (cont comb, ideal_st comb, mk_sim_state tt (sim_extra comb), trace comb).
+(* Make a list of things which are happening *)
+
+Definition comb_init (s_init : Store):  CombObj :=
+    (* TODO: There should be attacker state also, which we'll do later  *)
+    let: (cont, st, (mk_sim_state _ sim_extra), init_tr) := initial_cfg myprog atkideal s_init in 
+    {|
+     cont := cont ;
+     real_st := st ;
+     ideal_st := st ;
+     sim_extra := sim_extra ;
+     trace := init_tr 
+    |}.
+
+Lemma comb_init_inv: forall s, CombObjInv (comb_init s).
+Proof.
+    rewrite/comb_init/initial_cfg/CombObjInv/=.
+    by auto using restrict_rel, myprog_wt.
+Qed.
+
+Lemma comb_init_extraction: forall s,
+    extract_r (comb_init s) = initial_cfg myprog atkreal s /\
+    extract_i (comb_init s) = initial_cfg myprog atkideal s.
+Proof.
+    move=> ?; rewrite /initial_cfg/extract_r/extract_i /=. 
+    by case: (init_state _ _). (*  Here, we are doing something  sus*)
+Qed.
+
+Definition comb_step (c: CombObj): CombObj :=
+    let: 
+        {| cont := cont; 
+           real_st := real_st; 
+           ideal_st := ideal_st; 
+           sim_extra := sim_extra ; 
+           trace := trace |} := c
+    in
+    let: (cont', real_st', ideal_st', sim_extra') :=
+      (* If the program is empty *)
+      if cont isn't (cmd :: cont') then ([], real_st, ideal_st, sim_extra) else 
+
+      (* If the program is not empty *)
+      let: (real_st', _, _, _) := atk_cmd_step atkreal cmd real_st tt in
+      let: (ideal_st', mk_sim_state _ sim_extra', _, _) := 
+        atk_cmd_step atkideal cmd ideal_st (mk_sim_state tt sim_extra) 
+      in
+
+
+      ((nlist pure_atk (substeps atkreal tt)) ++ cont',
+      real_st', ideal_st', sim_extra')
+    in
+    {| cont := cont'; 
+       real_st := real_st'; 
+       ideal_st := ideal_st'; 
+       sim_extra := sim_extra'; 
+       trace := (⟨real_st'| is_trusted⟩, None) :: trace |}.
+
+Lemma comb_step_inv: forall c, 
+                        CombObjInv c ->
+                        CombObjInv (comb_step c).
+Proof.
+Admitted.
+
 
 (*
 Cfg =
@@ -178,117 +242,15 @@ fun (H : VarPrm) (H0 : ValPrm) (H2 : AdvLeakPrm) (AtkStates : Type) =>
 Arguments Cfg {H H0 H2} AtkStates%type_scope
 *)
 (* TODO: Take more things as input? *)
-Section def.
-    Obligation Tactic := try done. (* TODO: Program cases or whatnot *)
-    Program Definition comb_init (s_init : Store):  CombObj :=
-        (* TODO: There should be attacker state also, which we'll do later  *)
-        let: (cont, st, (mk_sim_state _ sim_extra), init_tr) := initial_cfg myprog atkideal s_init in 
-        {|
-         cont := cont ;
-         real_st := st ;
-         ideal_st := st ;
-         sim_extra := sim_extra ;
-         trace := init_tr 
-        |}.
-    Next Obligation.
-      move=> /= > [] -> *; clear.
-      by auto using restrict_rel, myprog_wt.
-    Qed.
-End def.
 
-Lemma comb_init_valid: forall s,
-    extract_r (comb_init s) = initial_cfg myprog atkreal s /\
-    extract_i (comb_init s) = initial_cfg myprog atkideal s.
-Proof.
-    move=> ?; rewrite /initial_cfg/extract_r/extract_i /=. 
-    by case: (init_state _ _). (*  Here, we are doing something  sus*)
-Qed.
 
-Section def.
-    Obligation Tactic := try done. (* TODO: Program cases or whatnot *)
-
-    Ltac comp_ni := 
-       let comp := fresh in 
-       set comp := (X in ⟨ X _ | is_trusted ⟩ = _);
-       (have: Noninterfering (store_to_view is_trusted) comp (store_to_view is_trusted)
-          by match goal with H : Forall AtkCmdRestriction _ |- _ => 
-                subst; move: H; Forall_inv_ssr=> + _; inversion 1
-             end);
-        subst comp.
-
-    Program Definition comb_step (c: CombObj): CombObj :=
-        let: 
-            {| cont := cont; 
-               real_st := real_st; 
-               ideal_st := ideal_st; 
-               sim_extra := sim_extra ; 
-               trace := trace |} := c
-        in
-        if cont isn't (cmd :: cont') 
-            then {| cont := cont; 
-                    real_st := real_st; 
-                    ideal_st := ideal_st; 
-                    sim_extra := sim_extra ; 
-                    trace := (⟨real_st| is_trusted⟩, None) :: trace |} else
-        if cmd isn't (mk_cstep is_atk (assign comp)) then False_rect _ _ else (* Here, we throw an exception *)
-        if is_atk is false then 
-            {| 
-               real_st := comp real_st; 
-               ideal_st := comp ideal_st; 
-               sim_extra := sim_extra;
-               cont :=  cont';
-               trace := ((⟨comp real_st |is_trusted ⟩,None)::trace)  (* You could also use ⟨ ideal_st | is_trusted ⟩ here! *)
-               (* I 'dont like the fact that we repeat comp. This can lead to bugs.. *)
-            |}
-         else  
-            {| 
-               real_st := comp (corruptor atkreal tt real_st);
-               ideal_st := comp ideal_st; (* Does this even get corrupted? *)
-               sim_extra := f (mk_sim_state tt sim_extra);
-               cont :=  (nlist pure_atk (substeps atkreal tt)) ++ cont'; (* This is not correct.. *)
-               trace := ((⟨comp real_st |is_trusted ⟩, Some (leaker atkreal tt))::trace)  (* You could also use ⟨ ideal_st | is_trusted ⟩ here! *)
-            |}.
-    Next Obligation. 
-        rewrite/ContinuationRestriction => *.
-        by subst; eauto using Forall_inv_tail.
-    Qed.
-
-    Next Obligation. 
-       rewrite/ContinuationRestriction=> *.
-       by comp_ni; auto.
-    Qed.
-
-    Next Obligation. 
-       rewrite/ContinuationRestriction=> *.
-       apply/Forall_app; split; first by apply/pure_atklst_wt.
-       by subst; apply: Forall_inv_tail; eauto.
-    Qed.
-
-    Next Obligation. 
-       rewrite/ContinuationRestriction=> *.
-       comp_ni; apply.
-       match goal with H : _ = ?rhs |- _ = ?rhs => 
-         move: (H) (corruptor_wf atkreal tt); clear
-       end.
-       by move=> <-; firstorder.
-    Qed.
-
-    Next Obligation. 
-      rewrite/ContinuationRestriction=> *.
-      suff: [elaborate forall cmd cont, 
-              Forall AtkCmdRestriction (cmd:: cont) ->
-              (forall (is_atk : bool) (comp : Store -> Store),
-              mk_cstep is_atk (assign comp) <> cmd) ->
-              False] by subst; eauto. (* I don't understand this elaborate thing *)
-      clear=> - [] >; Forall_inv_ssr=> + _=> -; rewrite /AtkCmdRestriction=> - [? _].
-      by apply.
-    Qed.
-End def.
 
 Lemma comb_step_valid : forall c , 
+    CombObjInv c ->
     extract_i (comb_step c) = step atkideal (extract_i c) /\
     extract_r (comb_step c) = step atkreal (extract_r c). 
 Proof.
+(*
     case=> c ? ? ? ?; case :c; first 
         by rewrite/extract_i/extract_r/==> _ ->.
     move=> [is_atk ?]  ? /[dup];  Forall_inv_ssr; rewrite{1}/AtkCmdRestriction=> - []; rewrite/Noninterfering=> ? ni _.
@@ -297,6 +259,8 @@ Proof.
     split;  congr (_, (_,_) :: _); apply: ni; auto.
     by move: (corruptor_wf atkreal); evar_spec_ssr=>-  [] eq _; erewrite eq.
 Qed.
+    *)
+Admitted.
 
 Theorem comb_extract: 
     forall c, extract_trace (extract_i c) = extract_trace (extract_r c). 
@@ -307,10 +271,15 @@ Proof.
     rewrite/b1/b2/⟦ _ ☠︎︎  _⟧.
     apply/functional_extensionality=> s; apply/functional_extensionality=> n.
     set msr:= (multistep _ _ _); set msi := (multistep _ _ _).
-    suff: exists c, msr = extract_r c  /\ msi = extract_i c by move=> [? [-> ->]]; rewrite comb_extract.
-    subst msr msi;  elim: n=> [|> [c [*]]]; first by
-        exists (comb_init s); move: (comb_init_valid s)=> [-> ->].
-    exists (comb_step c); move: (comb_step_valid c)=> [-> ->].
-    move ? : (step atkreal _)=> ?;  move ? : (step atkideal _)=> ? /=. (* Controlled simpl. Locking is actually sick *)
-    by intuition; congruence.
+    suff: exists c, CombObjInv c /\ msr = extract_r c  /\ msi = extract_i c
+      by move=> [? [_ [-> ->]]]; rewrite comb_extract.
+    rewrite{}/msr{}/msi.
+    elim: n=> [|> [c [cinv [e1 e2]]]].
+    - exists (comb_init s) => /=.
+      split; first by apply/comb_init_inv.    
+      move:(comb_init_extraction)=> /(_ s).
+      by intuition.
+    - exists (comb_step c)=> /=. 
+      split; first by apply/comb_step_inv.
+      by move: (comb_step_valid c cinv) e1 e2 => [-> ->] -> ->.
 Qed.

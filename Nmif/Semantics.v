@@ -37,21 +37,24 @@ End cleanstep.
 Section cont.
   Import Util.List. (* When to import? TODO *)
   Context `{!VarPrm, !ValPrm}.
-
+  
+  (* 
+    When executing, steps are like  
+    (enabled?) attack - (enabled?) prog 
+  *)
   Inductive AtkCmd :=
-    mk_cstep (is_attacked: bool) (cmd : Cmd).
+    mk_cstep (is_attacked: bool) (cmd : option Cmd).
 
-  Definition skip := (assign id).
-  Definition pure_atk := (mk_cstep true skip).
-  Definition pure_cmd c := (mk_cstep false c).
+  Definition pure_atk := (mk_cstep true None).
+  Definition pure_cmd c := (mk_cstep false (Some c)).
 
   Definition Continuation := list AtkCmd.
 
-
+  (*  *)
   Fixpoint prog_zip (p: Prog) (atk_steps: nat) : Continuation :=
     match p, atk_steps with
     | cmd :: p', S atk_steps' =>
-          (mk_cstep true cmd) :: (prog_zip p' atk_steps')
+          (mk_cstep true (Some cmd)) :: (prog_zip p' atk_steps')
 
     | [], _ => 
         nlist pure_atk atk_steps
@@ -86,6 +89,11 @@ Section atk_cmd_step.
 
   Context  {AtkStates : Type} (atksm: AdvStateMachine AtkStates).
 
+  Definition optcmd_step c s :=
+        if c isn't (Some c) then (s, []) else
+        clean_cmd_step c s.
+
+  (* I think that eventually, you'd want to put the observations here also.. *)
   Definition atk_cmd_step 
       (c : AtkCmd) (s : Store) (atkst : AtkStates) : 
       (Store * AtkStates * Continuation * option LeakVals) := 
@@ -98,7 +106,7 @@ Section atk_cmd_step.
         in
 
         (* Run your computation *)
-        let: (s, pcont) := clean_cmd_step c s in
+        let: (s, pcont) := optcmd_step c s in
 
         (* Part2a of adversary runs. *)
         let: atkst := if is_atk is false then atkst else learner atksm atkst s  in
