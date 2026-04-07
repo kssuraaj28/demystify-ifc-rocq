@@ -249,15 +249,10 @@ Proof.
       2: case: isatk=> //=. 
       all: by apply/Forall_app; split=> //; apply/pure_atklst_wt. }
     { case: cmd=> [|_].  
-      { case: isatk=> ? [? ni]; rewrite/=/id; apply: ni=> //.
-        (* This ni, thing should be finisher  *)
-        by move: (corruptor_wf atkreal); evar_spec_ssr=>-  [] eq _; erewrite eq. 
-        }
-      {
-        case: isatk=> //=. 
-        by move: (corruptor_wf atkreal); evar_spec_ssr=>-  [] eq _; erewrite eq. 
-      }
-    } 
+      1: case: isatk=> ? [? ni]; rewrite/=/id; apply: ni=> //.
+      2: case: isatk=> //=.
+      all:  by move: (corruptor_wf atkreal); evar_spec_ssr=>-  [] eq _; erewrite eq. 
+    }
 Qed.
 
 
