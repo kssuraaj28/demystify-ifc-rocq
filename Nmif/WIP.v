@@ -149,111 +149,9 @@ Parameter myprog : Prog. Axiom myprog_wt : ProgRestriction myprog.
 Definition b1 := ⟦ myprog ☠︎︎ atkreal ⟧.
 Definition b2 := ⟦ myprog ☠︎︎ atkideal ⟧.
 
-(* 
-Constructing a combined object.
-I will use refinement types..
-CombObj will contain the  data as well as the invariant.
-There should be a function extracts CfgI and CfgR from it
-There should be a stepping relation on this object also.
-Finally, there should be 
-Figuring out this single object approach would be a good task for the day..
-
-
-
-*)
-
-(* Can I construct a proof object with more state? 
-Parameter Po : Type.
-Parameter BisimRel : Po -> Type.
-You need to lift step to Po..
-*)
-
 Notation CfgR := (Cfg AtkRealStates).
 Notation CfgI := (Cfg SimStates).
-Section bisim.
 
-  Import VarValStore.Notations.
-
-  Definition BisimRel (cr : CfgR) (ci: CfgI) : Prop :=
-    let: (contr, storer, asr, trr) :=  cr in
-    let: (conti, storei, (mk_sim_state asrsim _), tri) :=  ci in
-    ContinuationRestriction contr /\  (* I don't like this*)
-    (conti = contr) /\
-    (asr = asrsim) /\
-    ⟨ storer | is_trusted ⟩ = ⟨ storei | is_trusted ⟩ /\
-    (trr = tri). 
-  
-
-  Lemma bisim_extract: forall c1 c2,
-                  BisimRel c1 c2 -> extract_trace c1 = extract_trace c2.
-  Proof.
-    move=> [[[? ?]?]?].
-    move=> [[[? ?][? _]]?] /=. (* _ is s  *)
-    by intuition.
-  Qed.
-
-  Lemma bisim_init: 
-    forall s,
-    BisimRel 
-      (initial_cfg myprog atkreal  s)
-      (initial_cfg myprog atkideal s).
-  Proof.
-    move=> s; split; first by apply/restrict_rel/myprog_wt.
-    by repeat split=> //; repeat case: (init_state _ _).
-  Qed.
-
-  Lemma bisim_step: forall c1 c2,
-                          BisimRel c1 c2 ->
-                          BisimRel (step atkreal c1) (step atkideal c2).
-  Proof.
-    move=> [[[cont ? ]astr] ?] [[[? ?] [artrsim ?]]?].
-    move=> [wt [-> [-> [trseq ->]]]] /=.
-    case: cont wt=> [|atkcmd ? wt]; first by rewrite /= trseq //=.
-    move rst: (atk_cmd_step atkreal _ _ _) => [[[sr []] contr ] lkr]. (* Note how I make tt. TODO *)
-    move ist: (atk_cmd_step atkideal _ _ _) => [[[si [[] ?]] conti] lki].
-    move: wt=>/ltac:(Forall_inv_ssr) wth wttl /=.
-    clear- trseq rst ist wth wttl; set rsv := ⟨ sr | _ ⟩; set isv := ⟨ si | _⟩.
-    suff: ([elaborate ContinuationRestriction contr /\ conti = contr /\  rsv = isv /\ lkr = lki])
-      by intuition; try congruence; apply/Forall_app.
-    rewrite {}/rsv {}/isv; move: atkcmd wth ist rst=> [isatk cmd]. 
-    rewrite/AtkCmdRestriction=> [[]]; rewrite/Noninterfering; clear -trseq=> > ni.
-    rewrite/atk_cmd_step ![corruptor atkideal _ _]/=.
-    move cs1: (clean_cmd_step _ _)=> [>]; move cs2: (clean_cmd_step _ _)=> [>].
-    case: isatk cs1 cs2; last 
-      by move=> /= [<- <-] [<- <-] [<- <- _ <- <-] [<- <- <-]; (repeat split; try red; auto).
-    move lrnrle:(learner atkreal _ _)=> lrnrl; move lrnide:(learner atkideal _ _) => [lrnid lrnidex].
-    move subrle:(substeps atkreal _)=> subrl; move subide :(substeps atkideal _) => subid.
-    rewrite /=/id in subrle lrnrle lrnide subide *; case: lrnide=> lrnide lrnidexe.
-    case=> e; rewrite -{}e /=in lrnide *=> <-.
-    case=> e; rewrite -{}e /=in lrnrle *=> <-.
-    case=> <- e; rewrite {}e in subide lrnide *=> e; rewrite {}e in lrnidexe=> <- <-.
-    case=> <- e; rewrite {}e in subrle lrnrle *=> <- <-.
-    (have ->: subid = subrl by congruence); clear subide subrle.
-    (have _: lrnrl = lrnid by case: lrnrl; case: lrnid); clear lrnide lrnrle lrnidexe. (* TODO When we say improve more than tt, we will get this ..*)
-    repeat split; first by rewrite -/(prog_zip [] _); apply/restrict_rel.
-    apply: ni; rewrite -{}trseq; clear.
-    by move: (corruptor_wf atkreal); firstorder.
-  Qed.
-End bisim.
-
-Goal b1 = b2 . Proof.
-  apply: functional_extensionality=> s; apply: functional_extensionality=> n.
-  rewrite /b1 /b2 !/(⟦_☠︎︎_⟧).
-  set c1 := (initial_cfg _ _ _); set c2 := (initial_cfg _ _ _). (* Set second? *) 
-  move e1: (multistep _ _ c1) => ms1; move e2: (multistep _ _ c2) => ms2. 
-  apply/bisim_extract.
-  elim: n ms1 ms2 e1 e2=> [> | > ? >] <- <- /=; first by apply/ bisim_init.
-  by apply/bisim_step; auto. (* What the hell is this *)
-Qed.
-
-
-(* Combined Object...
-This will contain:
-- Continuation
-- Real store
-- Ideal store
-- Trace
-*)
 Import VarValStore.Notations. 
 Record CombObj := {
      cont : Continuation; (* A single continuation is shared between everything *)
@@ -317,16 +215,6 @@ Section def.
                 subst; move: H; Forall_inv_ssr=> + _; inversion 1
              end);
         subst comp.
-(*
-atk_cmd_step atkreal ?c ?s tt
-     : Store * AtkRealStates * Continuation * option LeakVals
-where
-?c : [ |- AtkCmd]
-?s : [ |- Store]
-*)
-    (* This is really how you should think about it.. 
-       Maybe it is not a terrible idea to replicate things
-    *)
 
     Program Definition comb_step (c: CombObj): CombObj :=
         let: 
@@ -379,22 +267,21 @@ where
     Next Obligation. 
        rewrite/ContinuationRestriction=> *.
        comp_ni; apply.
-       by match goal with H : _ = ?rhs |- _ = ?rhs => 
-         rewrite -H; 
-         move: (corruptor_wf atkreal tt);
-         firstorder
+       match goal with H : _ = ?rhs |- _ = ?rhs => 
+         move: (H) (corruptor_wf atkreal tt); clear
        end.
+       by move=> <-; firstorder.
     Qed.
 
     Next Obligation. 
       rewrite/ContinuationRestriction=> *.
-      by (* Is there a better way? subst should really by finisher *)
-        subst;
-        match goal with H : Forall AtkCmdRestriction  (?cmd :: _) |- _ =>  
-          move:(H); Forall_inv_ssr=> + _; destruct cmd;
-          inversion 1; subst
-        end; 
-        match goal with H : _  |- _ => eapply H=> /= end.
+      suff: [elaborate forall cmd cont, 
+              Forall AtkCmdRestriction (cmd:: cont) ->
+              (forall (is_atk : bool) (comp : Store -> Store),
+              mk_cstep is_atk (assign comp) <> cmd) ->
+              False] by subst; eauto. (* I don't understand this elaborate thing *)
+      clear=> - [] >; Forall_inv_ssr=> + _=> -; rewrite /AtkCmdRestriction=> - [? _].
+      by apply.
     Qed.
 End def.
 
@@ -407,7 +294,7 @@ Proof.
     move=> [is_atk ?]  ? /[dup];  Forall_inv_ssr; rewrite{1}/AtkCmdRestriction=> - []; rewrite/Noninterfering=> ? ni _.
     case: is_atk;rewrite /extract_i/extract_r/==> _; last by split;  congr (_, (_,_) :: _); auto.
     repeat case: (learner _ _ _)=> *;rewrite /id.
-    split;  congr (_, (_,_) :: _);  apply: ni; auto.
+    split;  congr (_, (_,_) :: _); apply: ni; auto.
     by move: (corruptor_wf atkreal); evar_spec_ssr=>-  [] eq _; erewrite eq.
 Qed.
 
