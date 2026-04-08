@@ -1,8 +1,5 @@
-(coq.theory
+(rocq.theory
   (name Nmif)
   (theories 
     Ltac2
     Stdlib)) 
-
-; I don't know why you have to mention all of this..
-; TODO
