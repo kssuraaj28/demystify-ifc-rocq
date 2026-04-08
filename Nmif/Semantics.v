@@ -29,7 +29,7 @@ Section cleanstep.
     clean_cmd_step (assign comp) s = (s', c) ->
     c = [].
   Proof.
-    by move=> > /= [].
+    move=> > /= [] //.
   Qed.
 
 End cleanstep.
@@ -64,12 +64,12 @@ Section cont.
     end.
 
   Lemma prog_zip_noprg: forall n, prog_zip [] n = nlist pure_atk n. Proof.
-    by [].
+    move=> //.
   Qed.
 
   Lemma prog_zip_noatk: forall p, prog_zip p 0 = map pure_cmd p. Proof.
-    Fail by [].
-    by case.
+    Fail move=> //; fail.
+    case=>//.
   Qed.
 
   Section check.

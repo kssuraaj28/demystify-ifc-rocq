@@ -1,6 +1,10 @@
 From Ltac2 Require Ltac2 Bool Control Printf.
 From Corelib Require ssreflect.
 
+Set Default Goal Selector "!".
+Set Bullet Behavior "Strict Subproofs".
+Set Mangle Names. Set Mangle Names Light.
+
 (* TODO: Notation for this *)
 Ltac2 goals l :=
   let name_goal x := ltac1:(x |- refine ?[x]) (Ltac1.of_ident x) in
@@ -31,7 +35,7 @@ Module SsrHack.
                         idtac "Warning: Remove this in the final proof"))
                   (at level 0, only parsing) : ssripat_scope.
 
-  Goal forall x, x + 1 = x + 1. Proof Mode "Classic".  by move=> /> //. Abort.
+  Goal forall x, x + 1 = x + 1. Proof Mode "Classic".  move=> /> //. Qed.
 End SsrHack.
 
 Module GallinaUtil.

@@ -4,6 +4,10 @@ Import ssreflect ssrbool FunctionalExtensionality.
 Require Util Tacs.
 Import Util.Dec.
 
+Set Default Goal Selector "!".
+Set Bullet Behavior "Strict Subproofs".
+Set Mangle Names. Set Mangle Names Light.
+
 Class VarPrm := {Vars : Type ; vars_deceq :: DecEq Vars}. 
 Class ValPrm := {Vals : Type}.
 
@@ -49,7 +53,7 @@ Section thms.
       s1 inp = s2 inp.
   Proof.
     move=>??? inp; rewrite/⟨_|_⟩.
-    by move=> /equal_f/(_ inp)/[swap]->[].
+    move=> /equal_f/(_ inp)/[swap]->[] //.
   Qed.
 
 End thms.

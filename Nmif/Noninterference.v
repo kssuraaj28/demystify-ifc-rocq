@@ -1,3 +1,7 @@
+Set Default Goal Selector "!".
+Set Bullet Behavior "Strict Subproofs".
+Set Mangle Names. Set Mangle Names Light.
+
 Section ni.
   Context {I Iv O Ov: Type}.
   Notation Comp := (I -> O).

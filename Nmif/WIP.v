@@ -9,6 +9,10 @@ From QuickChick Require Import Decidability.
 Require Import Util VarValStore Syntax Semantics Attacker Util Noninterference Tacs. 
 Import Util.Dec Util.List. 
 
+Set Default Goal Selector "!".
+Set Mangle Names. Set Mangle Names Light.
+Set Bullet Behavior "Strict Subproofs".
+
 (* An *_ssr tactic follows the ssr philosophy*)
 Ltac Forall_inv_ssr :=  move=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
 
@@ -47,7 +51,7 @@ Section ts.
     Don't make it part of forward reasoning
   *)
   Lemma pure_atk_wt : AtkCmdRestriction pure_atk. 
-  Proof. by constructor. Qed.
+  Proof. constructor. Qed.
 
   Lemma pure_atklst_wt: forall n, 
     Forall AtkCmdRestriction (nlist  pure_atk n).
@@ -60,11 +64,11 @@ Section ts.
     (forall n, ContinuationRestriction (prog_zip p n)).
   Proof.
     rewrite/ContinuationRestriction/ProgRestriction. 
-    elim=> [_ n|]; first by elim: n=> //= >; constructor; easy.
+    elim=> [_ n|]; first (elim: n=> //= >; constructor; easy).
     move=> c l ih /ltac:(Forall_inv_ssr).
     move=> cr t; move: ih=> /(_ t) {t}=> cl n.
-    case: n c l cr cl=> [> ? /(_ 0) |]; last by constructor. (* Can I make 0 an evar? *)
-    by rewrite !prog_zip_noatk /=; auto.
+    case: n c l cr cl=> [> ? /(_ 0) |]; last constructor=> //. 
+    rewrite !prog_zip_noatk /=; auto.
   Qed.
 
 End ts.
@@ -135,13 +139,13 @@ Section idealatk.
       substeps st := substeps atkreal (real_sim st)
       |}.
 
-  Next Obligation. by easy. Qed.
+  Next Obligation. easy. Qed.
   Next Obligation. 
     move=> [] /= arst ?.
     move: (learner_wf atkreal)=> /(_ arst).
     move: (store_to_view _) (learner _ _)=> > nirl.
     move=> s1 s2; move: nirl=> /(_ s1 s2) /[apply]. 
-    by rewrite /id=> ->. 
+    rewrite /id=> -> //. 
   Qed.
 End idealatk.
 
@@ -187,7 +191,7 @@ Definition comb_init (s_init : Store):  CombObj :=
 Lemma comb_init_inv: forall s, CombObjInv (comb_init s).
 Proof.
     rewrite/comb_init/initial_cfg/CombObjInv/=.
-    by auto using restrict_rel, myprog_wt.
+    auto using restrict_rel, myprog_wt.
 Qed.
 
 Lemma comb_init_extraction: forall s,
@@ -195,7 +199,7 @@ Lemma comb_init_extraction: forall s,
     extract_i (comb_init s) = initial_cfg myprog atkideal s.
 Proof.
     move=> ?; rewrite /initial_cfg/extract_r/extract_i /=. 
-    by case: (init_state _ _). (*  Here, we are doing something  sus*)
+    case: (init_state _ _)=> //. (*  Here, we are doing something  sus*)
 Qed.
 
 Check atk_cmd_step.
@@ -244,16 +248,17 @@ Proof.
         case: cnt cr=> // [[isatk cmd] ?]; 
         rewrite/ContinuationRestriction; Forall_inv_ssr=> + ?.
 
-    { case: cmd=> [|_].  
+    - case: cmd=> [|_].  
       1: case: isatk=> ? [? ni]; rewrite/=/id=> //.
       2: case: isatk=> //=. 
-      all: by apply/Forall_app; split=> //; apply/pure_atklst_wt. }
-    { case: cmd=> [|_].  
+      all: apply/Forall_app; split=> //; apply/pure_atklst_wt.
+
+    - case: cmd=> [|_].  
       1: case: isatk=> ? [? ni]; rewrite/=/id; apply: ni=> //.
       2: case: isatk=> //=.
-      all:  by move: (corruptor_wf atkreal); evar_spec_ssr=>-  [] eq _; erewrite eq. 
-    }
+      all: move: (corruptor_wf atkreal); evar_spec_ssr=>-  [] eq _; erewrite eq=> //. 
 Qed.
+
 
 
 (*
@@ -275,11 +280,12 @@ Section thm.
       extract_r (comb_step c) = step atkreal (extract_r c). 
   Proof.
       case=> c ? ? ? ?; case :c=> [[_ -]| [isatk cmd] ? [wt treq]]; first 
-          by rewrite/CombObjInv/extract_i/extract_r/==> - ->.
+          rewrite/CombObjInv/extract_i/extract_r/==> - -> //.
       rewrite/CombObjInv/= in wt treq.
       move: wt; Forall_inv_ssr=> wtc ?.
       (* I'm so bad. Need  more automation !! *)
-      by case: cmd wtc=> [|_]; [rewrite/AtkCmdRestriction=> ? [? ni]|];  (* I think that CPDT style automation might be useful here *)
+      case: cmd wtc=> [|_]; [rewrite/AtkCmdRestriction=> ? [? ni]|].  (* I think that CPDT style automation might be useful here *)
+      all:
         do !(
           case: isatk ||
           rewrite/extract_i/extract_r/comb_step/id/=||
@@ -295,22 +301,25 @@ End thm.
 
 Theorem comb_extract: 
     forall c, extract_trace (extract_i c) = extract_trace (extract_r c). 
-Proof. by case. Qed.
+Proof. case=> //. Qed.
+
 
 Goal b1 = b2. 
 Proof.
     rewrite/b1/b2/⟦ _ ☠︎︎  _⟧.
     apply/functional_extensionality=> s; apply/functional_extensionality=> n.
     set msr:= (multistep _ _ _); set msi := (multistep _ _ _).
-    suff: exists c, CombObjInv c /\ msr = extract_r c  /\ msi = extract_i c
-      by move=> [? [_ [-> ->]]]; rewrite comb_extract.
+    suff: exists c, CombObjInv c /\ msr = extract_r c  /\ msi = extract_i c;
+      first (move=> [? [_ [-> ->]]]; rewrite comb_extract //).
     rewrite{}/msr{}/msi.
+
     elim: n=> [|> [c [cinv [e1 e2]]]].
-    { exists (comb_init s) => /=.
-      split; first by apply/comb_init_inv.    
+    - exists (comb_init s) => /=.
+      split; first apply/comb_init_inv.    
       move:(comb_init_extraction)=> /(_ s).
-      by intuition. }
-    { exists (comb_step c)=> /=. 
-      split; first by apply/comb_step_inv.
-      by move: (comb_step_valid c cinv) e1 e2 => [-> ->] -> -> . }
+      intuition.
+
+    - exists (comb_step c)=> /=. 
+      split; first apply/comb_step_inv=> //.
+      move: (comb_step_valid c cinv) e1 e2 => [-> ->] -> -> //.
 Qed.

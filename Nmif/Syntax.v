@@ -4,6 +4,9 @@ Import List ListNotations ssreflect.
 Require VarValStore Tacs.
 Import VarValStore.
 
+Set Default Goal Selector "!".
+Set Bullet Behavior "Strict Subproofs".
+Set Mangle Names. Set Mangle Names Light.
 
 Section syntax.
   Context `{!VarPrm, !ValPrm}.
@@ -43,10 +46,10 @@ Section syntax.
 
     Fixpoint Cmd_ind : forall c, P c. 
     Proof.
-      by case=> >;
-         apply: hyp_skip + apply: hyp_assign + apply: hyp_cond + apply: hyp_while;
-         lazymatch goal with |- Forall _ ?l => elim: l end;
-         auto.
+      case=> >;
+        apply: hyp_skip + apply: hyp_assign + apply: hyp_cond + apply: hyp_while;
+        lazymatch goal with |- Forall _ ?l => elim: l end;
+        auto.
     Qed.
   End cmd_ind.
 End syntax.
