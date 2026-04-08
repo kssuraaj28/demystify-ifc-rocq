@@ -20,24 +20,6 @@ Ltac hnf_clean def :=
     let t := eval hnf in t in 
     exact t.
 
-Module SsrHack.
-  Import ssreflect.
-  (* ssreflect helpers.  Goal discipline is annoying when you are exploring *)
-  Notation ">" := (ltac:(intros *;
-                        idtac "Warning: Remove this in the final proof"))
-                  (at level 0, only parsing) : ssripat_scope.
-
-  Notation "*" := (ltac:(intros;
-                        idtac "Warning: Remove this in the final proof"))
-                  (at level 0, only parsing) : ssripat_scope.
-
-  Notation "?" := (ltac:(intro;
-                        idtac "Warning: Remove this in the final proof"))
-                  (at level 0, only parsing) : ssripat_scope.
-
-  Goal forall x, x + 1 = x + 1. Proof Mode "Classic".  move=> /> //. Qed.
-End SsrHack.
-
 Module GallinaUtil.
   Import Ltac2 Bool Control Printf.
   (* Holes *)
