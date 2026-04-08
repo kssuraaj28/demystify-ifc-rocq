@@ -247,18 +247,6 @@ Qed.
 
 
 
-(*
-Cfg =
-fun (H : VarPrm) (H0 : ValPrm) (H2 : AdvLeakPrm) (AtkStates : Type) =>
-(Continuation * Store * AtkStates * ObservationTrace)%type
-     : VarPrm -> ValPrm -> AdvLeakPrm -> Type -> Type
-
-Arguments Cfg {H H0 H2} AtkStates%type_scope
-*)
-(* TODO: Take more things as input? *)
-
-
-
 Section thm.
   Lemma comb_step_valid : forall c , 
       CombObjInv c ->
