@@ -1,20 +1,30 @@
 From Stdlib Require List ssreflect ssrbool.
 Import List ListNotations ssreflect ssrbool.
 
-From QuickChick Require Decidability.
 
 Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
-Module Dec.
-  (* Should this be #[global]? *)
-  Notation DecEq := Decidability.Dec_Eq.
+Module DecEq.
+  (* 
+    I got this from QuickChick.
+    Ideally there should be one library for all of this.
+    TODO
+  *)
+  Class DecEq (A : Type) := {
+    dec_eq : forall (x y : A), decidable (x = y)
+  }.
 
   Module Notations.
-    Export (notations) Decidability.
+    Notation "x '=?' y" := 
+        (match (dec_eq x y) with
+           | left _ => true
+           | right _ => false
+         end) (at level 100).
+
   End Notations.
-End Dec.
+End DecEq.
 
 Module List.
   Section nlist.

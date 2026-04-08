@@ -2,12 +2,8 @@
 From Stdlib Require Import ssreflect ssrbool List FunctionalExtensionality.
 Import ListNotations.
 
-
-(* This may be useful *)
-From QuickChick Require Import Decidability.
-
 Require Import Util VarValStore Syntax Semantics Attacker Util Noninterference Tacs. 
-Import Util.Dec Util.List. 
+Import Util.DecEq Util.List. 
 
 Set Default Goal Selector "!".
 Set Mangle Names. Set Mangle Names Light.
@@ -202,16 +198,6 @@ Proof.
     case: (init_state _ _)=> //. (*  Here, we are doing something  sus*)
 Qed.
 
-Check atk_cmd_step.
-(*
-atk_cmd_step
-     : AdvStateMachine ?AtkStates ->
-       AtkCmd ->
-       Store ->
-       ?AtkStates -> Store * ?AtkStates * Continuation * option LeakVals
-where
-?AtkStates : [ |- Type]
-*)
 Definition comb_step (c: CombObj): CombObj :=
     let: 
         {| cont := cont; 

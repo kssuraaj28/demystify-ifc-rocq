@@ -2,7 +2,7 @@ From Stdlib Require ssreflect ssrbool FunctionalExtensionality.
 Import ssreflect ssrbool FunctionalExtensionality.
 
 Require Util Tacs.
-Import Util.Dec.
+Import Util.DecEq.
 
 Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
@@ -12,13 +12,13 @@ Class VarPrm := {Vars : Type ; vars_deceq :: DecEq Vars}.
 Class ValPrm := {Vals : Type}.
 
 Section store.
-  Import Util.Dec.Notations.
+  Import Util.DecEq.Notations.
   Context `{!VarPrm, !ValPrm}.
 
   Definition Store := Vars -> Vals.
   Definition get_from_store (st : Store) (v : Vars) : Vals := st v.
   Definition update_to_store (st : Store) (v : Vars) (vl : Vals) : Store := 
-    fun v' => if (v = v')? is true then vl else st v'.  (* The double colon in vars_deceq is needed here. *)
+    fun v' => if (v =? v') is true then vl else st v'.  (* The double colon in vars_deceq is needed here. *)
 
   (* I don't get dependent types :(. Maybe once I am good, I will use them *)
   Definition StoreView := Vars -> option Vals.

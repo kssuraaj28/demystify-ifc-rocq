@@ -2,12 +2,6 @@
   (name Nmif)
   (theories 
     Ltac2
-    ExtLib
-    mathcomp
-    HB
-    elpi
-    elpi_elpi
-    QuickChick
     Stdlib)) 
 
 ; I don't know why you have to mention all of this..
