@@ -1,5 +1,4 @@
 From Ltac2 Require Ltac2 Bool Control Printf.
-From Corelib Require ssreflect.
 
 Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
@@ -19,6 +18,7 @@ Ltac hnf_clean def :=
     let t := eval red in t in 
     let t := eval hnf in t in 
     exact t.
+
 
 Module GallinaUtil.
   Import Ltac2 Bool Control Printf.
