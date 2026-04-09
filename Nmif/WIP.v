@@ -9,6 +9,7 @@ Set Default Goal Selector "!".
 Set Mangle Names. Set Mangle Names Light.
 Set Bullet Behavior "Strict Subproofs".
 
+
 (* An *_ssr tactic follows the ssr philosophy*)
 Ltac Forall_inv_ssr :=  move=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
 
@@ -16,6 +17,19 @@ Ltac evar_spec_ssr :=
     let t := open_constr:(_) in 
     let f := fresh in 
     pose f := t=> /(_ f); subst f.
+Ltac assert_single_goal := assert_fails (only 2: idtac).
+
+
+Import VarValStore.Notations. 
+
+Ltac corruptor_wf :=
+  lazymatch goal with
+  |- context [ ⟨ corruptor ?atk ?ast ?st | is_trusted ⟩] => 
+    let t := constr:(⟨ corruptor atk ast st | is_trusted ⟩) in
+    have: t = ⟨ st | is_trusted ⟩=> [| ->];
+    [move: (corruptor_wf atk); evar_spec_ssr=> - [] + _; intros ->;done|]
+  end;
+  assert_single_goal.
 
 Section ts.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
@@ -61,7 +75,7 @@ Section ts.
   Proof.
     rewrite/ContinuationRestriction/ProgRestriction. 
     elim=> [_ n|]; first (elim: n=> //= >; constructor; easy).
-    move=> c l ih /ltac:(Forall_inv_ssr).
+    move=> c l ih; Forall_inv_ssr.
     move=> cr t; move: ih=> /(_ t) {t}=> cl n.
     case: n c l cr cl=> [> ? /(_ 0) |]; last constructor=> //. 
     rewrite !prog_zip_noatk /=; auto.
@@ -164,7 +178,6 @@ Definition b2 := ⟦ myprog ☠︎︎ atkideal ⟧.
 Notation CfgR := (Cfg AtkRealStates).
 Notation CfgI := (Cfg SimStates).
 
-Import VarValStore.Notations. 
 Record CombObj := {
      cont : Continuation; (* A single continuation is shared between everything *)
      real_st : Store; (* Store for the real system *)
@@ -236,24 +249,58 @@ Definition comb_step (c: CombObj): CombObj :=
        sim_extra := sim_extra'; 
        trace := (⟨real_st'| is_trusted⟩, leak') :: trace |}.
 
+Ltac Forall_app_gl :=
+  lazymatch goal with |- Forall _ (_ ++ _) => apply/Forall_app end;
+  assert_single_goal.
+
+Ltac destruct_units_gl :=
+  match goal with
+  |- context [?x : unit] => 
+    let t := type of x in 
+    assert_fails (is_constructor x);
+    convert t unit;
+    destruct x
+  end;
+  assert_single_goal.
+
+(* TODO: Need to think about the right way to structure proofs and so on *)
+Ltac dominate := 
+    progress (
+        auto +
+        done +
+        idtac
+    ); fail.
+
+Ltac grind := 
+  (
+  (do 3 dominate) ||
+  split ||
+  unfold id in * ||
+  Forall_app_gl ||
+  destruct_units_gl ||
+  idtac
+  )=> //.
+
+
 Lemma comb_step_inv: forall c, 
                         CombObjInv c ->
                         CombObjInv (comb_step c).
 Proof.
     case; rewrite /CombObjInv=> cnt >  [cr treq]; rewrite/= in cr treq. 
-    split; rewrite/comb_step; 
+    rewrite/comb_step; split;
         case: cnt cr=> // [[isatk cmd] ?]; 
         rewrite/ContinuationRestriction; Forall_inv_ssr=> + ?.
 
     - case: cmd=> [|_].  
-      1: case: isatk=> ? [? ni]; rewrite/=/id=> //.
+      1: case: isatk=> ? [? ni]; grind=> /=.
       2: case: isatk=> //=. 
-      all: apply/Forall_app; split=> //; apply/pure_atklst_wt.
+      all: do !grind; apply/pure_atklst_wt.
+
 
     - case: cmd=> [|_].  
       1: case: isatk=> ? [? ni]; rewrite/=/id; apply: ni=> //.
       2: case: isatk=> //=.
-      all: move: (corruptor_wf atkreal); evar_spec_ssr=>-  [] eq _; erewrite eq=> //. 
+      all: corruptor_wf=> //.
 Qed.
 
 
@@ -279,7 +326,7 @@ Section thm.
           apply: ni ||
           congr (_, (_,_) :: _) ||
           rewrite -{}treq  ||
-            (move: (corruptor_wf atkreal); evar_spec_ssr=>-  [] eq _; erewrite eq)
+          corruptor_wf
           ). (* I need to think of the best way to this. The one downside I might see is destruct. *)
   Qed.
 End thm.
