@@ -42,8 +42,8 @@ Section cont.
     When executing, steps are like  
     (enabled?) attack - (enabled?) prog 
   *)
-  Inductive AtkCmd :=
-    mk_cstep (is_attacked: bool) (cmd : option Cmd).
+  Record AtkCmd :=
+    mk_cstep {is_attacked: bool; cmd : option Cmd}.
 
   Definition pure_atk := (mk_cstep true None).
   Definition pure_cmd c := (mk_cstep false (Some c)).
@@ -182,7 +182,7 @@ Section program_sem.
 
   Definition Behavior := Store -> nat -> ObservationTrace.
 
-  Context {AtkStates : Type} (atksm : AdvStateMachine AtkStates). (* TODO: unify *)
+  Context {AtkStates : Type} (atksm : AdvStateMachine AtkStates).
 
   (* Simulating coinduction... *)
   Definition prog_behavior {AtkStates} (p : Prog) (atksm : AdvStateMachine AtkStates) : Behavior :=

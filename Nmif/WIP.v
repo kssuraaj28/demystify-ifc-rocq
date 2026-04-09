@@ -74,6 +74,7 @@ Parameter vri : VarPrm. Existing Instance vri.
 Parameter lvli : AdvLvlPrm. Existing Instance lvli.
 Parameter lki : AdvLeakPrm. Existing Instance lki.
 
+Parameter myprog : Prog. Axiom myprog_wt : ProgRestriction myprog.
 
 Definition AtkRealStates := unit.
 Parameter atkreal : AdvStateMachine AtkRealStates.
@@ -114,21 +115,32 @@ Section idealatk.
 
 
    *)
-  Parameter SimExtraStates : Type.
-  Parameter s_init : SimExtraStates.
+  (* For now, just assert that you will have P*)
+  Record SimExtraStates := {
+     (* 
+       The simulator keeps in its head the program. Moreover, it does not need
+       to keep the attacked program, because it will only keep the subset of
+       the real program which will
+     *)
+      clean_cont : Prog ;
+  }.
+  Print AtkCmd.
+
+  Check filter is_attacked _.
+  Definition s_init : SimExtraStates := {|
+     clean_cont := myprog (* This is not the case. *)
+  |}.
+
   Record SimStates := mk_sim_state {real_sim : AtkRealStates ; extra: SimExtraStates}.
   Parameter f : SimStates -> SimExtraStates.
-  (* TODO: Add more things here 
-      Maybe add a counter? 
-      Maybe add the program configuration? + Store? We can
-      just add some whole store, 
-      but maintain the invariant that 
-  *)
+   
+  Definition sim_init_substeps ast := init_substeps atkreal ast.
+  Definition sim_init_state mem := mk_sim_state (init_state atkreal mem) s_init.
 
   Obligation Tactic := idtac. (* TODO: Program cases or whatnot *)
   Program Definition atkideal : AdvStateMachine SimStates := {|
       init_state mem := mk_sim_state (init_state atkreal mem) s_init;
-      init_substeps st := init_substeps atkreal (real_sim st);
+      init_substeps st := sim_init_substeps (real_sim st);
       corruptor _ := id; (* TODO: We need to show a stronger property, which we don't.. But which is obvious.. We need to say that simulator only does things at x or y*)
       learner st mem := mk_sim_state (learner atkreal (real_sim st) mem) (f st);
       leaker st := leaker atkreal (real_sim st);
@@ -146,7 +158,6 @@ Section idealatk.
 End idealatk.
 
 Import Semantics.Notations.
-Parameter myprog : Prog. Axiom myprog_wt : ProgRestriction myprog.
 Definition b1 := ⟦ myprog ☠︎︎ atkreal ⟧.
 Definition b2 := ⟦ myprog ☠︎︎ atkideal ⟧.
 
@@ -276,6 +287,7 @@ End thm.
 Theorem comb_extract: 
     forall c, extract_trace (extract_i c) = extract_trace (extract_r c). 
 Proof. case=> //. Qed.
+
 
 
 Goal b1 = b2. 
