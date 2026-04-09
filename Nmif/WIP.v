@@ -13,9 +13,24 @@ Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
-(*   If t is a tactic that takes in a hypothesis, 
-    this tactic will apply the top hypothesis on it *)
-Tactic Notation "top_tac" tactic(t) := let f := fresh in intro f; t f. (* Tactic Notation vs Ltac Notation *)
+(*  
+    If t is a tactic that takes in a hypothesis, 
+    this tactic will apply the top hypothesis on it
+    The top hypothesis might go away
+*)
+(* TODO: Can I make this part of ssr => *)
+(* TODO: I use ⟨  ⟩ too much *)
+Tactic Notation "⟨" tactic(t)  "⟩" := let f := fresh in (move=> f); t f. (* Tactic Notation vs Ltac Notation *)
+Tactic Notation "⟨⟨" tactic(t) "⟩⟩" :=
+    match goal with
+    H : _ |- _ => t H
+    end.
+Section test.
+  Ltac t H := idtac H.
+  Goal False -> False.  Proof.  ⟨ t ⟩. Abort.
+  Goal False -> False.  Proof.  move=> *; ⟨⟨ t ⟩⟩. Abort.
+End test.
+
 
 Ltac2 assert_goals n :=
   if Int.equal (Control.numgoals ()) n then ()
@@ -25,14 +40,18 @@ Ltac assert_single_goal := ltac2:(assert_goals 1).
 Goal False. assert_single_goal. Abort.
 Goal False /\ False. Fail split; assert_single_goal. Abort.
 
-Ltac Forall_app_gl :=
+(* TODO: What naming conventions am I using? *)
+Ltac stp_Forall_app_gl :=
   lazymatch goal with |- Forall _ (_ ++ _) => apply/Forall_app end;  assert_single_goal.
+
 Section test.
   Generalizable All Variables.
   Goal `(Forall (A := A) P (l1 ++ l2)).
-  Proof.  move=> *; Forall_app_gl.  Abort.
+  Proof.  move=> *; stp_Forall_app_gl.  Abort.
 End test.
 
+(* A high good tactic consumes 'low grade' hypotheses (in context), 
+  and produces high grade hypotheses *)
 Ltac Forall_inv H :=  
     move: H=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
 (* TODO: Test for these also *)
@@ -47,19 +66,22 @@ Ltac evar_spec H :=
 
 Import VarValStore.Notations. 
 
-Ltac corruptor_wf :=
+(* Stepping tactics will not take any arguments.  *)
+(* TODO:  *)
+Ltac stp_corr_wf_gl :=
   lazymatch goal with
   |- context [ ⟨ corruptor ?atk ?ast ?st | is_trusted ⟩] => 
     let t := constr:(⟨ corruptor atk ast st | is_trusted ⟩) in
     have: t = ⟨ st | is_trusted ⟩=> [| ->]; [ 
-    move: (corruptor_wf atk); (top_tac evar_spec)=> - [] + _; intros ->;done|]
+    move: (corruptor_wf atk);  ⟨ evar_spec ⟩=> - [] + _; intros ->;done|]
   end;
   assert_single_goal.
+
 Section test.
   Context `{!VarPrm,!ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
   Generalizable All Variables.
   Goal `(forall P, P ⟨ corruptor (AtkStates := A) adv ast st  | is_trusted ⟩).
-  Proof. move=> *. corruptor_wf. Abort.
+  Proof. move=> *. stp_corr_wf_gl. Abort.
 End test.
 
 Section ts.
@@ -106,7 +128,7 @@ Section ts.
   Proof.
     rewrite/ContinuationRestriction/ProgRestriction. 
     elim=> [_ n|]; first (elim: n=> //= >; constructor; easy).
-    move=> c l ih; top_tac Forall_inv.
+    move=> c l ih; ⟨ Forall_inv ⟩.
     move=> cr t; move: ih=> /(_ t) {t}=> cl n.
     case: n c l cr cl=> [> ? /(_ 0) |]; last constructor=> //. 
     rewrite !prog_zip_noatk /=; auto.
@@ -281,7 +303,7 @@ Definition comb_step (c: CombObj): CombObj :=
        trace := (⟨real_st'| is_trusted⟩, leak') :: trace |}.
 
 
-Ltac destruct_units_gl :=
+Ltac stp_destruct_units_gl :=
   match goal with
   |- context [?x : unit] => 
     let t := type of x in 
@@ -293,24 +315,44 @@ Ltac destruct_units_gl :=
 Section test.
   Generalizable All Variables.
   Goal `(P (x :> unit)).
-  Proof. move=> *; destruct_units_gl. Abort.
+  Proof. move=> *; stp_destruct_units_gl. Abort.
 End test.
 
-(* TODO: Need to think about the right way to structure proofs and so on *)
-Ltac dominate := 
-    progress (
-        auto +
-        done +
-        idtac
-    ); fail.
+Ltac stp_cnt_dst_gl :=
+        match goal with
+        |- context [match ?cnt with [] => _ | _ => _ end] => 
+        let t := type of cnt in 
+        unify t Continuation; (* I don't get this unify, etc. *)
+        destruct cnt 
+        end.
 
+Ltac stp_dst_atkcmd :=
+    lazymatch goal with
+    [ H : AtkCmdRestriction ?a |- _ ] => 
+      let isatk := fresh in let cmd := fresh in 
+      is_var a; destruct a as [isatk cmd];
+      destruct isatk; destruct cmd;
+      destruct H
+    end.
+
+(* TODO: Need to think about the right way to structure proofs and so on 
+finisher backtracking proofs?
+*)
+
+(* TODO: Make this better *)
 Ltac grind := 
   (
-  (do 3 dominate) ||
+  stp_Forall_app_gl ||
+  stp_destruct_units_gl ||
+  stp_cnt_dst_gl ||
+  stp_dst_atkcmd ||
+  stp_corr_wf_gl ||
+  apply/ pure_atklst_wt ||
+  hnf ||
   split ||
   unfold id in * ||
-  Forall_app_gl ||
-  destruct_units_gl ||
+  ⟨⟨ Forall_inv ⟩⟩ ||
+  intros ||
   idtac
   )=> //.
 
@@ -319,21 +361,9 @@ Lemma comb_step_inv: forall c,
                         CombObjInv c ->
                         CombObjInv (comb_step c).
 Proof.
-    case; rewrite /CombObjInv=> cnt >  [cr treq]; rewrite/= in cr treq. 
-    rewrite/comb_step; split;
-        case: cnt cr=> // [[isatk cmd] ?]; 
-        rewrite/ContinuationRestriction; Forall_inv_ssr=> + ?.
+    case; rewrite /CombObjInv=> cnt >  /= [cr treq].
+    rewrite/comb_step; do !grind=> //=; auto.
 
-    - case: cmd=> [|_].  
-      1: case: isatk=> ? [? ni]; grind=> /=.
-      2: case: isatk=> //=. 
-      all: do !grind; apply/pure_atklst_wt.
-
-
-    - case: cmd=> [|_].  
-      1: case: isatk=> ? [? ni]; rewrite/=/id; apply: ni=> //.
-      2: case: isatk=> //=.
-      all: corruptor_wf=> //.
 Qed.
 
 
