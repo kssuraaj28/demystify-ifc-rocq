@@ -2,22 +2,47 @@
 From Stdlib Require Import ssreflect ssrbool List FunctionalExtensionality.
 Import ListNotations.
 
+From Ltac2 Require Import Ltac2.
+
 Require Import Util VarValStore Syntax Semantics Attacker Util Noninterference Tacs. 
 Import Util.DecEq Util.List. 
 
+
+Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
-Set Mangle Names. Set Mangle Names Light.
 Set Bullet Behavior "Strict Subproofs".
+Set Mangle Names. Set Mangle Names Light.
 
+(*   If t is a tactic that takes in a hypothesis, 
+    this tactic will apply the top hypothesis on it *)
+Tactic Notation "top_tac" tactic(t) := let f := fresh in intro f; t f. (* Tactic Notation vs Ltac Notation *)
 
-(* An *_ssr tactic follows the ssr philosophy*)
-Ltac Forall_inv_ssr :=  move=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
+Ltac2 assert_goals n :=
+  if Int.equal (Control.numgoals ()) n then ()
+  else Control.throw (Tactic_failure (Some (Message.of_string "Expected exactly one goal"))).
 
-Ltac evar_spec_ssr :=  
+Ltac assert_single_goal := ltac2:(assert_goals 1).
+Goal False. assert_single_goal. Abort.
+Goal False /\ False. Fail split; assert_single_goal. Abort.
+
+Ltac Forall_app_gl :=
+  lazymatch goal with |- Forall _ (_ ++ _) => apply/Forall_app end;  assert_single_goal.
+Section test.
+  Generalizable All Variables.
+  Goal `(Forall (A := A) P (l1 ++ l2)).
+  Proof.  move=> *; Forall_app_gl.  Abort.
+End test.
+
+Ltac Forall_inv H :=  
+    move: H=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
+(* TODO: Test for these also *)
+
+Ltac evar_spec H :=  
+    move: H;
     let t := open_constr:(_) in 
     let f := fresh in 
     pose f := t=> /(_ f); subst f.
-Ltac assert_single_goal := assert_fails (only 2: idtac).
+(* TODO: Test for these also *)
 
 
 Import VarValStore.Notations. 
@@ -26,10 +51,16 @@ Ltac corruptor_wf :=
   lazymatch goal with
   |- context [ ⟨ corruptor ?atk ?ast ?st | is_trusted ⟩] => 
     let t := constr:(⟨ corruptor atk ast st | is_trusted ⟩) in
-    have: t = ⟨ st | is_trusted ⟩=> [| ->];
-    [move: (corruptor_wf atk); evar_spec_ssr=> - [] + _; intros ->;done|]
+    have: t = ⟨ st | is_trusted ⟩=> [| ->]; [ 
+    move: (corruptor_wf atk); (top_tac evar_spec)=> - [] + _; intros ->;done|]
   end;
   assert_single_goal.
+Section test.
+  Context `{!VarPrm,!ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Generalizable All Variables.
+  Goal `(forall P, P ⟨ corruptor (AtkStates := A) adv ast st  | is_trusted ⟩).
+  Proof. move=> *. corruptor_wf. Abort.
+End test.
 
 Section ts.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
@@ -75,7 +106,7 @@ Section ts.
   Proof.
     rewrite/ContinuationRestriction/ProgRestriction. 
     elim=> [_ n|]; first (elim: n=> //= >; constructor; easy).
-    move=> c l ih; Forall_inv_ssr.
+    move=> c l ih; top_tac Forall_inv.
     move=> cr t; move: ih=> /(_ t) {t}=> cl n.
     case: n c l cr cl=> [> ? /(_ 0) |]; last constructor=> //. 
     rewrite !prog_zip_noatk /=; auto.
@@ -249,9 +280,6 @@ Definition comb_step (c: CombObj): CombObj :=
        sim_extra := sim_extra'; 
        trace := (⟨real_st'| is_trusted⟩, leak') :: trace |}.
 
-Ltac Forall_app_gl :=
-  lazymatch goal with |- Forall _ (_ ++ _) => apply/Forall_app end;
-  assert_single_goal.
 
 Ltac destruct_units_gl :=
   match goal with
@@ -262,6 +290,11 @@ Ltac destruct_units_gl :=
     destruct x
   end;
   assert_single_goal.
+Section test.
+  Generalizable All Variables.
+  Goal `(P (x :> unit)).
+  Proof. move=> *; destruct_units_gl. Abort.
+End test.
 
 (* TODO: Need to think about the right way to structure proofs and so on *)
 Ltac dominate := 
