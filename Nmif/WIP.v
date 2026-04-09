@@ -335,6 +335,11 @@ Ltac stp_dst_atkcmd :=
       destruct H
     end.
 
+Ltac stp_ni :=
+    lazymatch goal with
+    H : Noninterfering (store_to_view ?p) ?comp (store_to_view ?p) |-⟨ ?comp _ | is_trusted ⟩ =⟨ ?comp _ | is_trusted ⟩ => apply:H
+    end.
+
 (* TODO: Need to think about the right way to structure proofs and so on 
 finisher backtracking proofs?
 *)
@@ -347,6 +352,7 @@ Ltac grind :=
   stp_cnt_dst_gl ||
   stp_dst_atkcmd ||
   stp_corr_wf_gl ||
+  stp_ni ||
   apply/ pure_atklst_wt ||
   hnf ||
   split ||
@@ -362,8 +368,7 @@ Lemma comb_step_inv: forall c,
                         CombObjInv (comb_step c).
 Proof.
     case; rewrite /CombObjInv=> cnt >  /= [cr treq].
-    rewrite/comb_step; do !grind=> //=; auto.
-
+    do !grind=> //=; auto.
 Qed.
 
 
@@ -377,7 +382,7 @@ Section thm.
       case=> c ? ? ? ?; case :c=> [[_ -]| [isatk cmd] ? [wt treq]]; first 
           rewrite/CombObjInv/extract_i/extract_r/==> - -> //.
       rewrite/CombObjInv/= in wt treq.
-      move: wt; Forall_inv_ssr=> wtc ?.
+      move: wt; ⟨ Forall_inv ⟩=> wtc ?.
       (* I'm so bad. Need  more automation !! *)
       case: cmd wtc=> [|_]; [rewrite/AtkCmdRestriction=> ? [? ni]|].  (* I think that CPDT style automation might be useful here *)
       all:
@@ -389,7 +394,7 @@ Section thm.
           apply: ni ||
           congr (_, (_,_) :: _) ||
           rewrite -{}treq  ||
-          corruptor_wf
+          stp_corr_wf_gl
           ). (* I need to think of the best way to this. The one downside I might see is destruct. *)
   Qed.
 End thm.
