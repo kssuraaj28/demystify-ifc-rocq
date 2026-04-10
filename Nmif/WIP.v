@@ -260,12 +260,14 @@ Definition comb_step (c: CombObj): CombObj :=
 Ltac stp_destruct_units_gl :=
   let f := fresh in 
   set (f := _ :> unit);
+  let t := eval cbv delta [f] in f in
+  assert_fails (is_constructor t);
   case: f ; assert_goal 1.
 
 Section test.
   Generalizable All Variables.
   Goal `(P (x :> unit)).
-  Proof. move=> *. stp_destruct_units_gl. Abort.
+  Proof. move=> *.   stp_destruct_units_gl.  Fail stp_destruct_units_gl.  Abort.
 End test.
 
 Ltac stp_cnt_dst_gl :=
