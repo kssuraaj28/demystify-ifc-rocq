@@ -4,6 +4,11 @@ Import ssreflect ssrbool.
 Require VarValStore Util Noninterference. 
 Import VarValStore Noninterference.
 
+Set Default Proof Mode "Classic".
+Set Default Goal Selector "!".
+Set Bullet Behavior "Strict Subproofs".
+Set Mangle Names. Set Mangle Names Light.
+
 Class AdvLeakPrm := LeakVals : Type.
 
 Class AdvLvlPrm  `{!VarPrm} := {
@@ -37,7 +42,7 @@ End opposite.
 Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} 
     {AtkStates : Type} := {
     init_state: StoreView -> AtkStates; (* You only get untrusted*)
-    init_substeps: AtkStates -> nat;
+    init_substeps: AtkStates -> nat; (* We allow atkstates because this can depend on the public store *)
     corruptor: AtkStates -> Store -> Store;
 
     corruptor_wf: 

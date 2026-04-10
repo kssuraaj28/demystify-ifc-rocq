@@ -135,7 +135,6 @@ Section idealatk.
 
 
    *)
-  (* For now, just assert that you will have P*)
   Record SimExtraStates := {
      (* 
        The simulator keeps in its head the program. Moreover, it does not need
@@ -144,17 +143,17 @@ Section idealatk.
      *)
       clean_cont : Prog ;
   }.
-  Print AtkCmd.
 
-  Check filter is_attacked _.
-  Definition s_init : SimExtraStates := {|
-     clean_cont := myprog (* This is not the case. *)
-  |}.
 
   Record SimStates := mk_sim_state {real_sim : AtkRealStates ; extra: SimExtraStates}.
   Parameter f : SimStates -> SimExtraStates.
    
   Definition sim_init_substeps ast := init_substeps atkreal ast.
+
+  Check filter is_attacked _.
+  Definition s_init : SimExtraStates := {|
+     clean_cont := myprog (* This is not the case. *)
+  |}.
   Definition sim_init_state mem := mk_sim_state (init_state atkreal mem) s_init.
 
   Obligation Tactic := idtac. (* TODO: Program cases or whatnot *)
