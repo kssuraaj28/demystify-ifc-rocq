@@ -13,39 +13,6 @@ Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
-(*  
-    If t is a tactic that takes in a hypothesis, 
-    this tactic will apply the top hypothesis on it
-    The top hypothesis might go away
-*)
-(* TODO: Can I make this part of ssr => *)
-(* TODO: I use ⟨  ⟩ too much *)
-Tactic Notation "⟨" tactic(t)  "⟩" := let f := fresh in (move=> f); t f. (* Tactic Notation vs Ltac Notation *)
-
-(* This is a little hacky because you don't you are doing trial and error.. 
-   Maybe better to specialize *)
-Tactic Notation "⟨⟨" tactic(t) "⟩⟩" :=
-    match goal with
-    H : _ |- _ => t H
-    end.
-Section test.
-  Ltac t H := idtac H.
-  Goal False -> False.  Proof.  ⟨ t ⟩. Abort.
-  Goal False -> False.  Proof.  move=> *. ⟨⟨ t ⟩⟩. Abort.
-End test.
-
-
-(* TODO: This should be somewhere else *)
-Ltac2 assert_goals n :=
-  if Int.equal (Control.numgoals ()) n then ()
-  else Control.throw (Tactic_failure (Some (Message.of_string "Expected exactly one goal"))).
-
-Tactic Notation "assert_goal" integer(n) :=
-  let f := ltac2:(n |- assert_goals (Option.get (Ltac1.to_int n))) in
-  f n.
-Goal False. assert_goal 1. Abort.
-Goal False /\ False. Fail split; assert_goal 1. Abort.
-Goal False /\ False. split; assert_goal 2. Abort.
 
 (* TODO: What naming conventions am I using? *)
 Ltac stp_Forall_app_gl :=
@@ -63,12 +30,6 @@ Ltac Forall_inv H :=
     move: H=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
 (* TODO: Test for these also *)
 
-Ltac evar_spec H :=  
-    move: H;
-    let t := open_constr:(_) in 
-    let f := fresh in 
-    pose f := t=> /(_ f); subst f.
-(* TODO: Test for these also *)
 
 
 Import VarValStore.Notations. 
@@ -330,8 +291,8 @@ Ltac stp_cnt_dst_gl :=
         |- context [match ?cnt with [] => _ | _ => _ end] => 
         let t := type of cnt in 
         unify t Continuation; (* I don't get this unify, etc. *)
-        destruct cnt 
-        end.
+        destruct cnt
+        end; assert_goal 2.
 
 Ltac stp_dst_atkcmd :=
     lazymatch goal with
@@ -340,7 +301,7 @@ Ltac stp_dst_atkcmd :=
       is_var a; destruct a as [isatk cmd];
       destruct isatk; destruct cmd;
       destruct H
-    end.
+    end; assert_goal 4.
 
 Ltac stp_ni :=
     lazymatch goal with

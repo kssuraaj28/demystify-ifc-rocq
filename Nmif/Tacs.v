@@ -1,23 +1,58 @@
-From Ltac2 Require Ltac2 Bool Control Printf.
+From Ltac2 Require Import Ltac2 Bool Control Printf. (* TODO: Hygiene *)
+Require Import ssreflect.
 
+Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
+
+
+(* TODO: This file structure is ugly *)
 
 (* TODO: Notation for this *)
 Ltac2 goals l :=
   let name_goal x := ltac1:(x |- refine ?[x]) (Ltac1.of_ident x) in
   Control.dispatch (List.map (fun x () => name_goal x) l).
 
-(*
-  This can be used in more places. 
-  TODO.  This should also be in Ltac2
+Ltac2 assert_goals n :=
+  if Int.equal (Control.numgoals ()) n then ()
+  else Control.throw (Tactic_failure (Some
+    (fprintf "Expected exactly %i goal(s), found %i" n (Control.numgoals ())))).
+
+Tactic Notation "assert_goal" integer(n) :=
+  let f := ltac2:(n |- assert_goals (Option.get (Ltac1.to_int n))) in
+  f n.
+Goal False. assert_goal 1. Abort.
+Goal False /\ False. Fail split; assert_goal 1. Abort.
+Goal False /\ False. split; assert_goal 2. Abort.
+
+(*  
+    If t is a tactic that takes in a hypothesis, 
+    this tactic will apply the top hypothesis on it
+    The top hypothesis might go away
 *)
-Ltac hnf_clean def :=
-    let t := def in
-    let t := eval red in t in 
-    let t := eval hnf in t in 
-    exact t.
+(* TODO: Can I make this part of ssr => *)
+(* TODO: I use ⟨  ⟩ too much *)
+Tactic Notation "⟨" tactic(t)  "⟩" := let f := fresh in (move=> f); t f. (* Tactic Notation vs Ltac Notation *)
+
+(* This is a little hacky because you don't you are doing trial and error.. 
+   Maybe better to specialize *)
+Tactic Notation "⟨⟨" tactic(t) "⟩⟩" :=
+    match goal with
+    H : _ |- _ => t H
+    end.
+Section test.
+  Ltac t H := idtac H.
+  Goal False -> False.  Proof.  ⟨ t ⟩. Abort.
+  Goal False -> False.  Proof.  move=> *. ⟨⟨ t ⟩⟩. Abort.
+End test.
+
+Ltac evar_spec H :=  
+    move: H;
+    let t := open_constr:(_) in 
+    let f := fresh in 
+    pose f := t=> /(_ f); subst f.
+(* TODO: Test for these also *)
 
 
 Module GallinaUtil.
@@ -76,3 +111,4 @@ Module GallinaUtil.
   (* Having arbitrary ltac2 functions in gallina does not seem very easy.. *)
 
 End GallinaUtil.
+
