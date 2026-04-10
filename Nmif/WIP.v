@@ -14,21 +14,6 @@ Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
 
-(* TODO: What naming conventions am I using? *)
-Ltac stp_Forall_app_gl :=
-  lazymatch goal with |- Forall _ (_ ++ _) => apply/Forall_app end;  assert_goal 1.
-
-Section test.
-  Generalizable All Variables.
-  Goal `(Forall (A := A) P (l1 ++ l2)).
-  Proof.  move=> *; stp_Forall_app_gl.  Abort.
-End test.
-
-(* A high good tactic consumes 'low grade' hypotheses (in context), 
-  and produces high grade hypotheses *)
-Ltac Forall_inv H :=  
-    move: H=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
-(* TODO: Test for these also *)
 
 
 
@@ -271,19 +256,16 @@ Definition comb_step (c: CombObj): CombObj :=
        trace := (⟨real_st'| is_trusted⟩, leak') :: trace |}.
 
 
+(* TODO: This seems like a very very inefficient way to do this*)
 Ltac stp_destruct_units_gl :=
-  match goal with
-  |- context [?x : unit] => 
-    let t := type of x in 
-    assert_fails (is_constructor x);
-    convert t unit;
-    destruct x
-  end; assert_goal 1.
+  let f := fresh in 
+  set (f := _ :> unit);
+  case: f ; assert_goal 1.
 
 Section test.
   Generalizable All Variables.
   Goal `(P (x :> unit)).
-  Proof. move=> *; stp_destruct_units_gl. Abort.
+  Proof. move=> *. stp_destruct_units_gl. Abort.
 End test.
 
 Ltac stp_cnt_dst_gl :=
