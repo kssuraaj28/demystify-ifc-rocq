@@ -35,6 +35,7 @@ Section test.
 End test.
 
 
+(* TODO: This should be somewhere else *)
 Ltac2 assert_goals n :=
   if Int.equal (Control.numgoals ()) n then ()
   else Control.throw (Tactic_failure (Some (Message.of_string "Expected exactly one goal"))).
