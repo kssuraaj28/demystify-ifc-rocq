@@ -21,6 +21,9 @@ Set Mangle Names. Set Mangle Names Light.
 (* TODO: Can I make this part of ssr => *)
 (* TODO: I use ⟨  ⟩ too much *)
 Tactic Notation "⟨" tactic(t)  "⟩" := let f := fresh in (move=> f); t f. (* Tactic Notation vs Ltac Notation *)
+
+(* This is a little hacky because you don't you are doing trial and error.. 
+   Maybe better to specialize *)
 Tactic Notation "⟨⟨" tactic(t) "⟩⟩" :=
     match goal with
     H : _ |- _ => t H
@@ -28,7 +31,7 @@ Tactic Notation "⟨⟨" tactic(t) "⟩⟩" :=
 Section test.
   Ltac t H := idtac H.
   Goal False -> False.  Proof.  ⟨ t ⟩. Abort.
-  Goal False -> False.  Proof.  move=> *; ⟨⟨ t ⟩⟩. Abort.
+  Goal False -> False.  Proof.  move=> *. ⟨⟨ t ⟩⟩. Abort.
 End test.
 
 
@@ -36,13 +39,16 @@ Ltac2 assert_goals n :=
   if Int.equal (Control.numgoals ()) n then ()
   else Control.throw (Tactic_failure (Some (Message.of_string "Expected exactly one goal"))).
 
-Ltac assert_single_goal := ltac2:(assert_goals 1).
-Goal False. assert_single_goal. Abort.
-Goal False /\ False. Fail split; assert_single_goal. Abort.
+Tactic Notation "assert_goal" integer(n) :=
+  let f := ltac2:(n |- assert_goals (Option.get (Ltac1.to_int n))) in
+  f n.
+Goal False. assert_goal 1. Abort.
+Goal False /\ False. Fail split; assert_goal 1. Abort.
+Goal False /\ False. split; assert_goal 2. Abort.
 
 (* TODO: What naming conventions am I using? *)
 Ltac stp_Forall_app_gl :=
-  lazymatch goal with |- Forall _ (_ ++ _) => apply/Forall_app end;  assert_single_goal.
+  lazymatch goal with |- Forall _ (_ ++ _) => apply/Forall_app end;  assert_goal 1.
 
 Section test.
   Generalizable All Variables.
@@ -75,7 +81,7 @@ Ltac stp_corr_wf_gl :=
     have: t = ⟨ st | is_trusted ⟩=> [| ->]; [ 
     move: (corruptor_wf atk);  ⟨ evar_spec ⟩=> - [] + _; intros ->;done|]
   end;
-  assert_single_goal.
+  assert_goal 1.
 
 Section test.
   Context `{!VarPrm,!ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
@@ -310,8 +316,8 @@ Ltac stp_destruct_units_gl :=
     assert_fails (is_constructor x);
     convert t unit;
     destruct x
-  end;
-  assert_single_goal.
+  end; assert_goal 1.
+
 Section test.
   Generalizable All Variables.
   Goal `(P (x :> unit)).
