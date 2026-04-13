@@ -20,12 +20,12 @@ Import VarValStore.Notations.
 (* Stepping tactics will not take any arguments.  *)
 (* TODO:  *)
 Ltac stp_corr_wf_gl :=
-  ASSERT (lazymatch goal with
+  lazymatch goal with
   |- context [ ⟨ corruptor ?atk ?ast ?st | is_trusted ⟩] => 
     let t := constr:(⟨ corruptor atk ast st | is_trusted ⟩) in
     have: t = ⟨ st | is_trusted ⟩=> [| ->]; [ 
     move: (corruptor_wf atk);  ⟨ evar_spec ⟩=> - [] + _; intros ->;done|]
-  end) GOALS 1.
+  end.
 
 Section test.
   Context `{!VarPrm,!ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
@@ -244,30 +244,27 @@ Definition comb_step (c: CombObj): CombObj :=
 
 
 (* TODO: This seems like a very very inefficient way to do this*)
-
 Ltac stp_cnt_dst_gl :=
-    ASSERT (
         match goal with
         |- context [match ?cnt with [] => _ | _ => _ end] => 
         let t := type of cnt in 
         unify t Continuation; (* I don't get this unify, etc. *)
         destruct cnt
-        end) GOALS 2.
+        end.
 
 Ltac stp_dst_atkcmd :=
-  ASSERT (
     lazymatch goal with
     [ H : AtkCmdRestriction ?a |- _ ] => 
       let isatk := fresh in let cmd := fresh in 
       is_var a; destruct a as [isatk cmd];
       destruct isatk; destruct cmd;
       destruct H
-    end) GOALS 4.
+    end.
 
 Ltac stp_ni :=
-    ASSERT (lazymatch goal with
+    lazymatch goal with
     H : Noninterfering (store_to_view ?p) ?comp (store_to_view ?p) |-⟨ ?comp _ | is_trusted ⟩ =⟨ ?comp _ | is_trusted ⟩ => apply:H
-    end ) GOALS 1.
+    end.
 
 (* TODO: Need to think about the right way to structure proofs and so on 
 finisher backtracking proofs?
@@ -311,15 +308,6 @@ Lemma comb_step_inv: forall c,
                         CombObjInv (comb_step c).
 Proof.
     case; rewrite /CombObjInv=> cnt >  /= [cr treq].
-    ASSERT (match goal with
-    |- context [match ?cnt with [] => _ | _ => _ end] => 
-    let t := type of cnt in 
-    unify t Continuation; (* I don't get this unify, etc. *)
-    destruct cnt
-    end ) GOALS 1.
-    stp_cnt_dst_gl.
-    grind_step engine finisher.
-    
     mygrind.
     all: (dst_hyp_type SimExtraStates).
     all: (mygrind).
@@ -341,20 +329,15 @@ Section thm.
       case: cmd wtc=> [|_]; [rewrite/AtkCmdRestriction=> ? [? ni]|].  (* I think that CPDT style automation might be useful here *)
       all: dst_hyp_type bool.
       all: mygrind.
-      all: stp_abstract_units_gl; case.
       all:
         do !(
           case: isatk ||
           rewrite/extract_i/extract_r/comb_step/id/=||
           (dst_hyp_type SimExtraStates) ||
           case: (learner _ _ _) || 
-          split || 
-          apply: ni ||
-          congr (_, _) ||
-          congr (_::_) ||
-          rewrite -{}treq  ||
-          stp_corr_wf_gl
+          idtac
           ). (* I need to think of the best way to this. The one downside I might see is destruct. *)
+      all: mygrind.
   Qed.
 End thm.
 
