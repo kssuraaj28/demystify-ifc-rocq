@@ -60,6 +60,21 @@ Ltac dst_hyp_type ty :=
 Goal nat -> False. Proof. move=> *.  dst_hyp_type nat. Abort.
 Goal nat -> nat -> False. Proof. move=> *.  Fail dst_hyp_type nat. Abort.
 
+Ltac cnstrct_eq_gl :=
+  let t f := is_constructor f; congr f in
+  match goal with
+  | |- ?f _ = ?f _ => t f
+  | |- ?f _ _ = ?f _ _ => t f
+  | |- ?f _ _ _ = ?f _ _ _ => t f
+  | |- ?f _ _ _ _ = ?f _ _ _ _ => t f
+  | |- ?f _ _ _ _ _ = ?f _ _ _ _ _ => t f 
+  | |- ?f _ _ _ _ _ _ = ?f _ _ _ _ _ _ => t f (* TODO: Better way? *)
+  end.
+
+Section test.
+    Goal forall n m, S n = S m.
+    Proof. move=> *. cnstrct_eq_gl. Abort.
+End test.
 
 Module GallinaUtil.
   Import Ltac2 Bool Control Printf.

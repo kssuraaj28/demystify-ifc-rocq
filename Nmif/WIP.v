@@ -111,6 +111,8 @@ Definition AtkRealStates := unit.
 Parameter atkreal : AdvStateMachine AtkRealStates.
  
 
+(* TODO: Goes elsewhere *)
+Notation only_atk_steps c := (map get_cmd (filter is_attacked c)) (only parsing).
 Section idealatk.
   Record SimExtraStates := mk_sim_extra {
       sim_cont : list (option Cmd) ; 
@@ -118,7 +120,6 @@ Section idealatk.
    
 
   Record SimStates := mk_sim_state {real_sim : AtkRealStates ; extra: SimExtraStates}.
-  Definition only_atk_steps (c : Continuation) := map get_cmd (filter is_attacked c).
 
 
   Definition sim_init_state (inp: StoreView):  SimStates := 
@@ -271,7 +272,7 @@ This should ideally take a tactic
 *)
 
 
-Ltac grind_step engine finisher := engine; try finisher.
+Ltac grind_step engine finisher := (engine || idtac); intros ; try finisher.
 
 Ltac grind engine finisher :=  do ! [grind_step engine finisher].
     
@@ -282,15 +283,16 @@ Ltac engine :=
   stp_dst_atkcmd ||
   stp_corr_wf_gl ||
   stp_ni ||
+  cnstrct_eq_gl || (* TODO: Naming convention *)
   apply/ pure_atklst_wt ||
   hnf ||
   split ||
   unfold id in * ||
   ⟨⟨ Forall_inv ⟩⟩ ||
+  rewrite filter_app ||
+  rewrite map_app ||
   congr (_, _) ||
-  congr (_::_) ||
-  intros ||
-  idtac
+  congr (_::_)
   ).
 
 (* TODO; This is actually quite sad *)
@@ -320,43 +322,30 @@ Section thm.
     split.
     {
         rewrite/extract_i/=.
-        dst_hyp_type Continuation; first mygrind=> //.
         mygrind; auto.
         all: (do !(stp_abstract_units_gl=> /=; do!case)=> //).
+        all: mygrind; auto.
 
         {
-            congr mk_sim_state.
-            congr mk_sim_extra.
-            do !(stp_abstract_units_gl=> /=; do!case).
-            rewrite/only_atk_steps.
-            rewrite filter_app. (* Should go in grind *)
-            rewrite map_app. (* Should go in grind *)
-            congr (_ ++ _).
-            move: (substeps _ _); clear=> n.
-            Search filter (_=_).
-            rewrite forallb_filter_id; first  elim: n=> //. (* There is elim here. Would be good to lemma this out*)
+            do !(stp_abstract_units_gl=> /=; do!case). (* TODO: This should be automated as well *)
+            f_equal.
+            move: (substeps _ _); clear=> n. 
+            rewrite forallb_filter_id; first  elim: n=> //. (* There is elim here. Would be good to lemma this out. Both *)
             elim: n=> //= > -> //.
         }
         {
-            congr mk_sim_state.
-            congr mk_sim_extra.
-            do !(stp_abstract_units_gl=> /=; do!case).
-            rewrite/only_atk_steps.
-            rewrite filter_app. (* Should go in grind *)
-            rewrite map_app. (* Should go in grind *)
-            congr (_ ++ _).
-            move: (substeps _ _); clear=> n.
-            Search filter (_=_).
-            rewrite forallb_filter_id; first  elim: n=> //. (* There is elim here. Would be good to lemma this out*)
+            do !(stp_abstract_units_gl=> /=; do!case). (* TODO: This should be automated as well *)
+            f_equal.
+            move: (substeps _ _); clear=> n. 
+            rewrite forallb_filter_id; first  elim: n=> //. (* There is elim here. Would be good to lemma this out. Both *)
             elim: n=> //= > -> //.
         }
     }
 
     {
         rewrite/extract_r/=.
-        dst_hyp_type Continuation; first mygrind=> //.
         mygrind; auto.
-        all: case: (learner _ _)=> //.
+        all: case: (learner _ _)=> //. (* TODO: This should be done in grind also *)
     }
   Qed.
 
