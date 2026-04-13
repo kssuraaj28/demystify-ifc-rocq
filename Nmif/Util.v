@@ -56,7 +56,7 @@ Module List.
 
   (* TODO: What naming conventions am I using? *)
   Ltac stp_Forall_app_gl :=
-    lazymatch goal with |- Forall _ (_ ++ _) => apply/Forall_app end;  assert_goal 1.
+    ASSERT (lazymatch goal with |- Forall _ (_ ++ _) => apply/Forall_app end)  GOALS 1.
   
   Section test.
     Generalizable All Variables.
@@ -67,6 +67,6 @@ Module List.
   (* A high good tactic consumes 'low grade' hypotheses (in context), 
     and produces high grade hypotheses *)
   Ltac Forall_inv H :=  
-      move: H=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
+    ASSERT ( move: H=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _) ) GOALS 1.
   (* TODO: Test for these also *)
 End List.

@@ -14,17 +14,22 @@ Ltac2 goals l :=
   let name_goal x := ltac1:(x |- refine ?[x]) (Ltac1.of_ident x) in
   Control.dispatch (List.map (fun x () => name_goal x) l).
 
-Ltac2 assert_goals n :=
-  if Int.equal (Control.numgoals ()) n then ()
-  else Control.throw (Tactic_failure (Some
-    (fprintf "Expected exactly %i goal(s), found %i" n (Control.numgoals ())))).
 
-Tactic Notation "assert_goal" integer(n) :=
-  let f := ltac2:(n |- assert_goals (Option.get (Ltac1.to_int n))) in
-  f n.
-Goal False. assert_goal 1. Abort.
-Goal False /\ False. Fail split; assert_goal 1. Abort.
-Goal False /\ False. split; assert_goal 2. Abort.
+Ltac2 assert_goals (tac : unit -> unit) (n : int) :=
+  Control.enter (fun () =>
+    tac ();
+    if Int.equal (Control.numgoals ()) n then ()
+    else Control.throw (Tactic_failure (Some
+      (fprintf "Expected exactly %i goal(s), found %i" n (Control.numgoals ()))))).
+
+Tactic Notation "ASSERT" "(" tactic(t) ")"  "GOALS" integer(n) :=
+  let f := ltac2:(t n |- assert_goals
+    (fun () => Ltac1.run t)
+    (Option.get (Ltac1.to_int n))) in
+  f t n.
+Goal False. ASSERT (idtac) GOALS 1. Abort.
+Goal False /\ False. ASSERT (split) GOALS 2. Abort.
+Goal False /\ False. Fail ASSERT (split) GOALS 3. Abort.
 
 (*  
     If t is a tactic that takes in a hypothesis, 

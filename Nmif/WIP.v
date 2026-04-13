@@ -20,12 +20,12 @@ Import VarValStore.Notations.
 (* Stepping tactics will not take any arguments.  *)
 (* TODO:  *)
 Ltac stp_corr_wf_gl :=
-  lazymatch goal with
+  ASSERT (lazymatch goal with
   |- context [ ⟨ corruptor ?atk ?ast ?st | is_trusted ⟩] => 
     let t := constr:(⟨ corruptor atk ast st | is_trusted ⟩) in
     have: t = ⟨ st | is_trusted ⟩=> [| ->]; [ 
     move: (corruptor_wf atk);  ⟨ evar_spec ⟩=> - [] + _; intros ->;done|]
-  end;  assert_goal 1.
+  end) GOALS 1.
 
 Section test.
   Context `{!VarPrm,!ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
@@ -246,26 +246,28 @@ Definition comb_step (c: CombObj): CombObj :=
 (* TODO: This seems like a very very inefficient way to do this*)
 
 Ltac stp_cnt_dst_gl :=
+    ASSERT (
         match goal with
         |- context [match ?cnt with [] => _ | _ => _ end] => 
         let t := type of cnt in 
         unify t Continuation; (* I don't get this unify, etc. *)
         destruct cnt
-        end; assert_goal 2.
+        end) GOALS 2.
 
 Ltac stp_dst_atkcmd :=
+  ASSERT (
     lazymatch goal with
     [ H : AtkCmdRestriction ?a |- _ ] => 
       let isatk := fresh in let cmd := fresh in 
       is_var a; destruct a as [isatk cmd];
       destruct isatk; destruct cmd;
       destruct H
-    end; assert_goal 4.
+    end) GOALS 4.
 
 Ltac stp_ni :=
-    lazymatch goal with
+    ASSERT (lazymatch goal with
     H : Noninterfering (store_to_view ?p) ?comp (store_to_view ?p) |-⟨ ?comp _ | is_trusted ⟩ =⟨ ?comp _ | is_trusted ⟩ => apply:H
-    end; assert_goal 1.
+    end ) GOALS 1.
 
 (* TODO: Need to think about the right way to structure proofs and so on 
 finisher backtracking proofs?
@@ -309,6 +311,15 @@ Lemma comb_step_inv: forall c,
                         CombObjInv (comb_step c).
 Proof.
     case; rewrite /CombObjInv=> cnt >  /= [cr treq].
+    ASSERT (match goal with
+    |- context [match ?cnt with [] => _ | _ => _ end] => 
+    let t := type of cnt in 
+    unify t Continuation; (* I don't get this unify, etc. *)
+    destruct cnt
+    end ) GOALS 1.
+    stp_cnt_dst_gl.
+    grind_step engine finisher.
+    
     mygrind.
     all: (dst_hyp_type SimExtraStates).
     all: (mygrind).
