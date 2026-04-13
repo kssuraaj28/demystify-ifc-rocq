@@ -293,9 +293,11 @@ Ltac engine :=
   idtac
   ).
 
-Ltac finisher := do ! progress(simpl; auto). (* (simpl + auto + done); fail does not work. Why? *)
+(* TODO; This is actually quite sad *)
+Ltac finisher := do ! progress(auto). (* (simpl + auto + done); fail does not work. Why? *)
 
-Ltac mygrind := grind engine finisher.
+Ltac mygrind := grind engine idtac.
+Ltac mygrindstep := grind_step engine idtac.
 
 
 Lemma comb_step_inv: forall c, 
@@ -303,9 +305,8 @@ Lemma comb_step_inv: forall c,
                         CombObjInv (comb_step c).
 Proof.
     case; rewrite /CombObjInv=> cnt >  /= [cr treq].
-    mygrind.
-    all: (dst_hyp_type SimExtraStates).
-    all: (mygrind).
+    mygrind=> /=.
+    all: (mygrind)=> //=.
 Qed.
 
 
@@ -315,8 +316,50 @@ Section thm.
       extract_i (comb_step c) = step atkideal (extract_i c) /\
       extract_r (comb_step c) = step atkreal (extract_r c). 
   Proof.
-  (* TODO: Claude. Do this proof *)
-  Admitted.
+    move=> [] > [cnt treq]; rewrite /= in cnt treq. (* TODO: Need to have this be good *)
+    split.
+    {
+        rewrite/extract_i/=.
+        dst_hyp_type Continuation; first mygrind=> //.
+        mygrind; auto.
+        all: (do !(stp_abstract_units_gl=> /=; do!case)=> //).
+
+        {
+            congr mk_sim_state.
+            congr mk_sim_extra.
+            do !(stp_abstract_units_gl=> /=; do!case).
+            rewrite/only_atk_steps.
+            rewrite filter_app. (* Should go in grind *)
+            rewrite map_app. (* Should go in grind *)
+            congr (_ ++ _).
+            move: (substeps _ _); clear=> n.
+            Search filter (_=_).
+            rewrite forallb_filter_id; first  elim: n=> //. (* There is elim here. Would be good to lemma this out*)
+            elim: n=> //= > -> //.
+        }
+        {
+            congr mk_sim_state.
+            congr mk_sim_extra.
+            do !(stp_abstract_units_gl=> /=; do!case).
+            rewrite/only_atk_steps.
+            rewrite filter_app. (* Should go in grind *)
+            rewrite map_app. (* Should go in grind *)
+            congr (_ ++ _).
+            move: (substeps _ _); clear=> n.
+            Search filter (_=_).
+            rewrite forallb_filter_id; first  elim: n=> //. (* There is elim here. Would be good to lemma this out*)
+            elim: n=> //= > -> //.
+        }
+    }
+
+    {
+        rewrite/extract_r/=.
+        dst_hyp_type Continuation; first mygrind=> //.
+        mygrind; auto.
+        all: case: (learner _ _)=> //.
+    }
+  Qed.
+
 End thm.
 
 Theorem comb_extract: 
