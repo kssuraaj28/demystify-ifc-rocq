@@ -55,6 +55,20 @@ Ltac evar_spec H :=
 (* TODO: Test for these also *)
 
 
+(* This maybe needs to go somewhere else. *)
+Ltac2 dst_hyp_type (ty : constr) :=
+  let hyps := List.filter (fun h => let (_, _, t) := h in Constr.equal t ty) (Control.hyps ()) in
+  match hyps with
+  | [(h, _, _)] => let hcnstr := hyp h in destruct $hcnstr
+  | [] => Control.throw (Tactic_failure (Some (fprintf "No hypothesis of type %t" ty)))
+  | _ => Control.throw (Tactic_failure (Some (fprintf "Multiple hypotheses of type %t" ty)))
+  end.
+
+Ltac dst_hyp_type ty :=
+  let f := ltac2:(ty |- dst_hyp_type (Option.get (Ltac1.to_constr ty))) in
+  f ty.
+
+
 Module GallinaUtil.
   Import Ltac2 Bool Control Printf.
   (* Holes *)

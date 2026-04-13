@@ -15,8 +15,6 @@ Set Mangle Names. Set Mangle Names Light.
 
 
 
-
-
 Import VarValStore.Notations. 
 
 (* Stepping tactics will not take any arguments.  *)
@@ -27,8 +25,7 @@ Ltac stp_corr_wf_gl :=
     let t := constr:(⟨ corruptor atk ast st | is_trusted ⟩) in
     have: t = ⟨ st | is_trusted ⟩=> [| ->]; [ 
     move: (corruptor_wf atk);  ⟨ evar_spec ⟩=> - [] + _; intros ->;done|]
-  end;
-  assert_goal 1.
+  end;  assert_goal 1.
 
 Section test.
   Context `{!VarPrm,!ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
@@ -98,73 +95,44 @@ Parameter myprog : Prog. Axiom myprog_wt : ProgRestriction myprog.
 
 Definition AtkRealStates := unit.
 Parameter atkreal : AdvStateMachine AtkRealStates.
+ 
 
 Section idealatk.
-   (*
-
-    Okay, there are the following things to do:
-    There must be
-
-    - real store
-    - ideal store
-    - sim store
-
-    Moreover, there will be invariants.
-    ⟨ real_store | is_trusted  ⟩ = ⟨ ideal_store | is_trusted ⟩
-    ⟨ real_store | is_public  ⟩ = ⟨ sim_store | is_public ⟩
-
-    Moreover, different from viaduct, we will also have:
-
-    - real continuation
-    - ideal continuation
-    - sim continuation
-
-    The invariants should be:
-    - When the PC is public trusted, all three should be equal
-    - When the PC is secret trusted, real = ideal continuation. the sim continuation must be 'I don't know'
-    - When the PC is untrusted,  ??. 
-
-    The proof sketch maybe should look like this..
-
-   * When the pc is untrusted, there should not be any changes to the real store
-     trusted or ideal store trusted in any substep
-
-   * When the pc is secret, there should not be any changes to the real store public.
-    
-     trusted or ideal store trusted in any substep
-
-
-   *)
-  Record SimExtraStates := {
-     (* 
-       The simulator keeps in its head the program. Moreover, it does not need
-       to keep the attacked program, because it will only keep the subset of
-       the real program which will
-     *)
-      clean_cont : Prog ;
+  Record SimExtraStates := mk_sim_extra {
+      cont : list (option Cmd) ; 
   }.
+   
 
 
   Record SimStates := mk_sim_state {real_sim : AtkRealStates ; extra: SimExtraStates}.
-  Parameter f : SimStates -> SimExtraStates.
-   
-  Definition sim_init_substeps ast := init_substeps atkreal ast.
 
-  Check filter is_attacked _.
-  Definition s_init : SimExtraStates := {|
-     clean_cont := myprog (* This is not the case. *)
-  |}.
-  Definition sim_init_state mem := mk_sim_state (init_state atkreal mem) s_init.
+
+  Definition sim_init_state (inp: StoreView):  SimStates := 
+    let: init_realatk := init_state atkreal inp in 
+    let: init_realsubstps := init_substeps atkreal init_realatk in 
+    let: init_cont := prog_zip myprog init_realsubstps in
+    let: init_optprog := map cmd (filter is_attacked init_cont) in 
+    mk_sim_state init_realatk (mk_sim_extra init_optprog).
+
+  Definition sim_learner (s : SimStates) (_: Store):  SimStates :=
+    let: mk_sim_state real_st (mk_sim_extra cont) := s in 
+    let: substeps := substeps atkreal real_st in
+    let: real_st' := real_st in (* TODO: This should be fixed eventually *)
+    mk_sim_state real_st' (mk_sim_extra ((nlist None substeps) ++ (tl cont))). 
 
   Obligation Tactic := idtac. (* TODO: Program cases or whatnot *)
   Program Definition atkideal : AdvStateMachine SimStates := {|
-      init_state mem := mk_sim_state (init_state atkreal mem) s_init;
-      init_substeps st := sim_init_substeps (real_sim st);
+      init_state := sim_init_state ;
+      learner := sim_learner;
+
+      (* These  things are fixed. Things probably can be refactored better, but I don't care *)
+
+      init_substeps st := init_substeps atkreal (real_sim st);
       corruptor _ := id; (* TODO: We need to show a stronger property, which we don't.. But which is obvious.. We need to say that simulator only does things at x or y*)
-      learner st mem := mk_sim_state (learner atkreal (real_sim st) mem) (f st);
       leaker st := leaker atkreal (real_sim st);
       substeps st := substeps atkreal (real_sim st)
       |}.
+  
 
   Next Obligation. easy. Qed.
   Next Obligation. 
@@ -172,7 +140,7 @@ Section idealatk.
     move: (learner_wf atkreal)=> /(_ arst).
     move: (store_to_view _) (learner _ _)=> > nirl.
     move=> s1 s2; move: nirl=> /(_ s1 s2) /[apply]. 
-    rewrite /id=> -> //. 
+    dst_hyp_type SimExtraStates=>//=.
   Qed.
 End idealatk.
 
@@ -253,6 +221,7 @@ Definition comb_step (c: CombObj): CombObj :=
        ideal_st := ideal_st'; 
        sim_extra := sim_extra'; 
        trace := (⟨real_st'| is_trusted⟩, leak') :: trace |}.
+
 
 
 (* TODO: This seems like a very very inefficient way to do this*)
