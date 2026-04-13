@@ -68,6 +68,9 @@ Ltac dst_hyp_type ty :=
   let f := ltac2:(ty |- dst_hyp_type (Option.get (Ltac1.to_constr ty))) in
   f ty.
 
+Goal nat -> False. Proof. move=> *.  dst_hyp_type nat. Abort.
+Goal nat -> nat -> False. Proof. move=> *.  Fail dst_hyp_type nat. Abort.
+
 
 Module GallinaUtil.
   Import Ltac2 Bool Control Printf.
