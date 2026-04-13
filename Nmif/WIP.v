@@ -34,6 +34,19 @@ Section test.
   Proof. move=> *. stp_corr_wf_gl. Abort.
 End test.
 
+(* You ideally want to make everything tt  *)
+Ltac stp_abstract_units_gl :=
+  do !(let f := fresh in 
+  set (f := _ :> unit); 
+  move: [elaborate f]);
+  assert_goal 1.
+
+Section test.
+  Goal `(forall P (x : unit),  P tt x).
+  Proof. move=> *.   stp_abstract_units_gl.   Abort.
+End test.
+
+
 Section ts.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
 
@@ -99,7 +112,7 @@ Parameter atkreal : AdvStateMachine AtkRealStates.
 
 Section idealatk.
   Record SimExtraStates := mk_sim_extra {
-      cont : list (option Cmd) ; 
+      sim_cont : list (option Cmd) ; 
   }.
    
 
@@ -192,7 +205,12 @@ Lemma comb_init_extraction: forall s,
     extract_i (comb_init s) = initial_cfg myprog atkideal s.
 Proof.
     move=> ?; rewrite /initial_cfg/extract_r/extract_i /=. 
-    case: (init_state _ _)=> //. (*  Here, we are doing something  sus*)
+    case: (init_state _ _)=> //. 
+    split=> //. do ! congr (_,_).
+    rewrite/sim_init_state.
+    stp_abstract_units_gl; do 2 case.
+    congr mk_sim_state.
+    (*  Here, we are doing something  sus*)
 Qed.
 
 Definition comb_step (c: CombObj): CombObj :=
@@ -225,18 +243,6 @@ Definition comb_step (c: CombObj): CombObj :=
 
 
 (* TODO: This seems like a very very inefficient way to do this*)
-Ltac stp_destruct_units_gl :=
-  let f := fresh in 
-  set (f := _ :> unit);
-  let t := eval cbv delta [f] in f in
-  assert_fails (is_constructor t);
-  case: f ; assert_goal 1.
-
-Section test.
-  Generalizable All Variables.
-  Goal `(P (x :> unit)).
-  Proof. move=> *.   stp_destruct_units_gl.  Fail stp_destruct_units_gl.  Abort.
-End test.
 
 Ltac stp_cnt_dst_gl :=
         match goal with
@@ -268,7 +274,6 @@ finisher backtracking proofs?
 Ltac grind := 
   (
   stp_Forall_app_gl ||
-  stp_destruct_units_gl ||
   stp_cnt_dst_gl ||
   stp_dst_atkcmd ||
   stp_corr_wf_gl ||
@@ -289,6 +294,8 @@ Lemma comb_step_inv: forall c,
 Proof.
     case; rewrite /CombObjInv=> cnt >  /= [cr treq].
     do !grind=> //=; auto.
+    all: (dst_hyp_type SimExtraStates).
+    all: do !grind=> //=; auto.
 Qed.
 
 
@@ -309,6 +316,7 @@ Section thm.
         do !(
           case: isatk ||
           rewrite/extract_i/extract_r/comb_step/id/=||
+          (dst_hyp_type SimExtraStates) ||
           case: (learner _ _ _) || 
           split || 
           apply: ni ||
