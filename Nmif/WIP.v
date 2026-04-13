@@ -34,17 +34,39 @@ Section test.
   Proof. move=> *. stp_corr_wf_gl. Abort.
 End test.
 
-(* You ideally want to make everything tt  *)
-Ltac stp_abstract_units_gl :=
-  do !(let f := fresh in 
-  set (f := _ :> unit); 
-  move: [elaborate f]);
-  idtac.
+
+    Ltac2 Eval 
+
+    let count :int ref := {contents := 0} in 
+    repeat (
+      count.(contents) := Int.add (count.(contents)) 1;
+      ltac1:(split)); 
+    do (count.(contents)) 
+        ltac1:(idtac "x").
+
+
+
+
+
+Ltac2 stp_abstract_units_gl () :=
+  repeat (
+    let count :int ref := {contents := 0} in 
+    repeat (
+      ltac1:(let f := fresh in   set (f := _ : unit); move: f);
+      count.(contents) := Int.add (count.(contents)) 1);
+    do (count.(contents))  ltac1:(case)).
+        
+
+Ltac stp_destruct_units_gl :=
+  ltac2:(stp_abstract_units_gl ()).
   (*assert_goal 1. The issue is that there needs to be some focusing done. all: things stress this out. TODO: How to fix?*)
 
 Section test.
   Goal `(forall P (x : unit),  P tt x).
-  Proof. move=> *.   stp_abstract_units_gl.   Abort.
+  Proof.
+  move=> *.
+  stp_destruct_units_gl.  
+  Abort.
 End test.
 
 
@@ -209,7 +231,7 @@ Proof.
     case: (init_state _ _)=> //. 
     split=> //. do ! congr (_,_).
     rewrite/sim_init_state.
-    stp_abstract_units_gl; do 2 case.
+    stp_destruct_units_gl.
     congr mk_sim_state.
     (*  Here, we are doing something  sus*)
 Qed.
@@ -283,6 +305,7 @@ Ltac engine :=
   stp_dst_atkcmd ||
   stp_corr_wf_gl ||
   stp_ni ||
+  stp_destruct_units_gl ||
   cnstrct_eq_gl || (* TODO: Naming convention *)
   apply/ pure_atklst_wt ||
   hnf ||
@@ -312,6 +335,7 @@ Proof.
 Qed.
 
 
+
 Section thm.
   Lemma comb_step_valid : forall c , 
       CombObjInv c ->
@@ -319,22 +343,17 @@ Section thm.
       extract_r (comb_step c) = step atkreal (extract_r c). 
   Proof.
     move=> [] > [cnt treq]; rewrite /= in cnt treq. (* TODO: Need to have this be good *)
-    split.
+    mygrind; auto=> //=.
     {
-        rewrite/extract_i/=.
-        mygrind; auto.
-        all: (do !(stp_abstract_units_gl=> /=; do!case)=> //).
-        all: mygrind; auto.
-
+        all: mygrind; auto=> //=. (* TODO: This should go elsewhere *)
+        all: mygrind; auto=> //=. (* TODO: This should go elsewhere *)
         {
-            do !(stp_abstract_units_gl=> /=; do!case). (* TODO: This should be automated as well *)
             f_equal.
             move: (substeps _ _); clear=> n. 
             rewrite forallb_filter_id; first  elim: n=> //. (* There is elim here. Would be good to lemma this out. Both *)
             elim: n=> //= > -> //.
         }
         {
-            do !(stp_abstract_units_gl=> /=; do!case). (* TODO: This should be automated as well *)
             f_equal.
             move: (substeps _ _); clear=> n. 
             rewrite forallb_filter_id; first  elim: n=> //. (* There is elim here. Would be good to lemma this out. Both *)
@@ -343,7 +362,7 @@ Section thm.
     }
 
     {
-        rewrite/extract_r/=.
+        rewrite/=.
         mygrind; auto.
         all: case: (learner _ _)=> //. (* TODO: This should be done in grind also *)
     }
