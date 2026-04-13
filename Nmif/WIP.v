@@ -117,15 +117,15 @@ Section idealatk.
   }.
    
 
-
   Record SimStates := mk_sim_state {real_sim : AtkRealStates ; extra: SimExtraStates}.
+  Definition only_atk_steps (c : Continuation) := map get_cmd (filter is_attacked c).
 
 
   Definition sim_init_state (inp: StoreView):  SimStates := 
     let: init_realatk := init_state atkreal inp in 
     let: init_realsubstps := init_substeps atkreal init_realatk in 
     let: init_cont := prog_zip myprog init_realsubstps in
-    let: init_optprog := map cmd (filter is_attacked init_cont) in 
+    let: init_optprog := only_atk_steps init_cont in
     mk_sim_state init_realatk (mk_sim_extra init_optprog).
 
   Definition sim_learner (s : SimStates) (_: Store):  SimStates :=
@@ -169,7 +169,7 @@ Record CombObj := {
      cont : Continuation; (* A single continuation is shared between everything *)
      real_st : Store; (* Store for the real system *)
      ideal_st : Store; (* Store for the ideal system *)
-     sim_extra: SimExtraStates;
+     (* sim_st: Store; (* This will  *) *)
      trace: ObservationTrace; (* Trace for everything *)
     }. 
 
@@ -181,7 +181,7 @@ Definition extract_r (comb : CombObj): CfgR :=
     (cont comb, real_st comb, tt , trace comb).
 
 Definition extract_i (comb : CombObj): CfgI :=
-    (cont comb, ideal_st comb, mk_sim_state tt (sim_extra comb), trace comb).
+    (cont comb, ideal_st comb, mk_sim_state tt (mk_sim_extra(only_atk_steps (cont comb))), trace comb).
 (* Make a list of things which are happening *)
 
 Definition comb_init (s_init : Store):  CombObj :=
@@ -191,7 +191,6 @@ Definition comb_init (s_init : Store):  CombObj :=
      cont := cont ;
      real_st := st ;
      ideal_st := st ;
-     sim_extra := sim_extra ;
      trace := init_tr 
     |}.
 
@@ -219,26 +218,22 @@ Definition comb_step (c: CombObj): CombObj :=
         {| cont := cont; 
            real_st := real_st; 
            ideal_st := ideal_st; 
-           sim_extra := sim_extra ; 
            trace := trace |} := c
     in
-    let: (cont', real_st', ideal_st', sim_extra', leak') :=
+    let: (cont', real_st', ideal_st', leak') :=
       (* If the program is empty *)
-      if cont isn't (cmd :: cont') then ([], real_st, ideal_st, sim_extra, None) else 
+      if cont isn't (atkcmd :: cont') then ([], real_st, ideal_st, None) else 
 
       (* If the program is not empty *)
-      let: (real_st', _, _, _) := atk_cmd_step atkreal cmd real_st tt in
-      let: (ideal_st', mk_sim_state _ sim_extra', extra_cont', leak') := 
-        atk_cmd_step atkideal cmd ideal_st (mk_sim_state tt sim_extra) 
-      in
+      let: (real_st', _, extra_cont', leak') := atk_cmd_step atkreal atkcmd real_st tt in
+      let: (ideal_st', _) := optcmd_step (get_cmd atkcmd) ideal_st in
 
 
-      (extra_cont' ++ cont', real_st', ideal_st', sim_extra', leak')
+      (extra_cont' ++ cont', real_st', ideal_st', leak')
     in
     {| cont := cont'; 
        real_st := real_st'; 
        ideal_st := ideal_st'; 
-       sim_extra := sim_extra'; 
        trace := (⟨real_st'| is_trusted⟩, leak') :: trace |}.
 
 
@@ -314,31 +309,14 @@ Proof.
 Qed.
 
 
-
 Section thm.
   Lemma comb_step_valid : forall c , 
       CombObjInv c ->
       extract_i (comb_step c) = step atkideal (extract_i c) /\
       extract_r (comb_step c) = step atkreal (extract_r c). 
   Proof.
-      case=> c ? ? ? ?; case :c=> [[_ -]| [isatk cmd] ? [wt treq]]; first 
-          rewrite/CombObjInv/extract_i/extract_r/==> - -> //.
-      rewrite/CombObjInv/= in wt treq.
-      move: wt; ⟨ Forall_inv ⟩=> wtc ?.
-      (* I'm so bad. Need  more automation !! *)
-      case: cmd wtc=> [|_]; [rewrite/AtkCmdRestriction=> ? [? ni]|].  (* I think that CPDT style automation might be useful here *)
-      all: dst_hyp_type bool.
-      all: mygrind.
-      all:
-        do !(
-          case: isatk ||
-          rewrite/extract_i/extract_r/comb_step/id/=||
-          (dst_hyp_type SimExtraStates) ||
-          case: (learner _ _ _) || 
-          idtac
-          ). (* I need to think of the best way to this. The one downside I might see is destruct. *)
-      all: mygrind.
-  Qed.
+  (* TODO: Claude. Do this proof *)
+  Admitted.
 End thm.
 
 Theorem comb_extract: 

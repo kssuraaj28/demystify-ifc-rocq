@@ -43,7 +43,7 @@ Section cont.
     (enabled?) attack - (enabled?) prog 
   *)
   Record AtkCmd :=
-    mk_cstep {is_attacked: bool; cmd : option Cmd}.
+    mk_cstep {is_attacked: bool; get_cmd : option Cmd}.
 
   Definition pure_atk := (mk_cstep true None).
   Definition pure_cmd c := (mk_cstep false (Some c)).
