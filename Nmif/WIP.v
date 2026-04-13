@@ -39,7 +39,8 @@ Ltac stp_abstract_units_gl :=
   do !(let f := fresh in 
   set (f := _ :> unit); 
   move: [elaborate f]);
-  assert_goal 1.
+  idtac.
+  (*assert_goal 1. The issue is that there needs to be some focusing done. all: things stress this out. TODO: How to fix?*)
 
 Section test.
   Goal `(forall P (x : unit),  P tt x).
@@ -264,14 +265,23 @@ Ltac stp_dst_atkcmd :=
 Ltac stp_ni :=
     lazymatch goal with
     H : Noninterfering (store_to_view ?p) ?comp (store_to_view ?p) |-⟨ ?comp _ | is_trusted ⟩ =⟨ ?comp _ | is_trusted ⟩ => apply:H
-    end.
+    end; assert_goal 1.
 
 (* TODO: Need to think about the right way to structure proofs and so on 
 finisher backtracking proofs?
 *)
 
-(* TODO: Make this better *)
-Ltac grind := 
+(* TODO: Make this better. 
+This should ideally take a tactic
+
+*)
+
+
+Ltac grind_step engine finisher := engine; try finisher.
+
+Ltac grind engine finisher :=  do ! [grind_step engine finisher].
+    
+Ltac engine := 
   (
   stp_Forall_app_gl ||
   stp_cnt_dst_gl ||
@@ -283,9 +293,15 @@ Ltac grind :=
   split ||
   unfold id in * ||
   ⟨⟨ Forall_inv ⟩⟩ ||
+  congr (_, _) ||
+  congr (_::_) ||
   intros ||
   idtac
-  )=> //.
+  ).
+
+Ltac finisher := do ! progress(simpl; auto). (* (simpl + auto + done); fail does not work. Why? *)
+
+Ltac mygrind := grind engine finisher.
 
 
 Lemma comb_step_inv: forall c, 
@@ -293,9 +309,9 @@ Lemma comb_step_inv: forall c,
                         CombObjInv (comb_step c).
 Proof.
     case; rewrite /CombObjInv=> cnt >  /= [cr treq].
-    do !grind=> //=; auto.
+    mygrind.
     all: (dst_hyp_type SimExtraStates).
-    all: do !grind=> //=; auto.
+    all: (mygrind).
 Qed.
 
 
@@ -312,6 +328,9 @@ Section thm.
       move: wt; ⟨ Forall_inv ⟩=> wtc ?.
       (* I'm so bad. Need  more automation !! *)
       case: cmd wtc=> [|_]; [rewrite/AtkCmdRestriction=> ? [? ni]|].  (* I think that CPDT style automation might be useful here *)
+      all: dst_hyp_type bool.
+      all: mygrind.
+      all: stp_abstract_units_gl; case.
       all:
         do !(
           case: isatk ||
@@ -320,7 +339,8 @@ Section thm.
           case: (learner _ _ _) || 
           split || 
           apply: ni ||
-          congr (_, (_,_) :: _) ||
+          congr (_, _) ||
+          congr (_::_) ||
           rewrite -{}treq  ||
           stp_corr_wf_gl
           ). (* I need to think of the best way to this. The one downside I might see is destruct. *)
