@@ -338,7 +338,10 @@ Section thm.
     move=> [] > [cnt treq]; rewrite /= in cnt treq. (* TODO: Need to have this be good *)
     do !(mygrind; auto=> //=).
       {
-          f_equal.
+          f_equal. (* There is something. This can be automated as well. 
+          a ++ b = c ++ b
+
+          *)
           move: (substeps _ _); clear=> n. 
           rewrite forallb_filter_id; first  elim: n=> //. (* There is elim here. Would be good to lemma this out. Both *)
           elim: n=> //= > -> //.
