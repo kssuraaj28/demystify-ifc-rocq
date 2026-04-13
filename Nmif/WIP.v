@@ -35,16 +35,6 @@ Section test.
 End test.
 
 
-    Ltac2 Eval 
-
-    let count :int ref := {contents := 0} in 
-    repeat (
-      count.(contents) := Int.add (count.(contents)) 1;
-      ltac1:(split)); 
-    do (count.(contents)) 
-        ltac1:(idtac "x").
-
-
 
 
 
@@ -52,7 +42,7 @@ Ltac2 stp_abstract_units_gl () :=
   repeat (
     let count :int ref := {contents := 0} in 
     repeat (
-      ltac1:(let f := fresh in   set (f := _ : unit); move: f);
+      ltac1:(let f := fresh in   set (f := _ : unit) at 1; move: f);
       count.(contents) := Int.add (count.(contents)) 1);
     do (count.(contents))  ltac1:(case)).
         
@@ -335,6 +325,9 @@ Proof.
 Qed.
 
 
+Lemma  all_tt: forall x, x = tt.
+Proof. move=> [] //. Qed.
+
 
 Section thm.
   Lemma comb_step_valid : forall c , 
@@ -343,29 +336,20 @@ Section thm.
       extract_r (comb_step c) = step atkreal (extract_r c). 
   Proof.
     move=> [] > [cnt treq]; rewrite /= in cnt treq. (* TODO: Need to have this be good *)
-    mygrind; auto=> //=.
-    {
-        all: mygrind; auto=> //=. (* TODO: This should go elsewhere *)
-        all: mygrind; auto=> //=. (* TODO: This should go elsewhere *)
-        {
-            f_equal.
-            move: (substeps _ _); clear=> n. 
-            rewrite forallb_filter_id; first  elim: n=> //. (* There is elim here. Would be good to lemma this out. Both *)
-            elim: n=> //= > -> //.
-        }
-        {
-            f_equal.
-            move: (substeps _ _); clear=> n. 
-            rewrite forallb_filter_id; first  elim: n=> //. (* There is elim here. Would be good to lemma this out. Both *)
-            elim: n=> //= > -> //.
-        }
-    }
+    do !(mygrind; auto=> //=).
+      {
+          f_equal.
+          move: (substeps _ _); clear=> n. 
+          rewrite forallb_filter_id; first  elim: n=> //. (* There is elim here. Would be good to lemma this out. Both *)
+          elim: n=> //= > -> //.
+      }
+      {
+          f_equal.
+          move: (substeps _ _); clear=> n. 
+          rewrite forallb_filter_id; first  elim: n=> //. (* There is elim here. Would be good to lemma this out. Both *)
+          elim: n=> //= > -> //.
+      }
 
-    {
-        rewrite/=.
-        mygrind; auto.
-        all: case: (learner _ _)=> //. (* TODO: This should be done in grind also *)
-    }
   Qed.
 
 End thm.
