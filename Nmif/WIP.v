@@ -53,10 +53,9 @@ Ltac stp_destruct_units_gl :=
 
 Section test.
   Goal `(forall P (x : unit),  P tt x).
-  Proof.
-  move=> *.
-  stp_destruct_units_gl.  
-  Abort.
+  Proof.  move=> ? x.  stp_destruct_units_gl. clear x.  Abort.
+  Goal `(forall P (f : unit -> unit),  P (f tt)).
+  Proof. move=> ? f.  stp_destruct_units_gl. clear f. Abort.
 End test.
 
 
@@ -269,6 +268,12 @@ Ltac stp_dst_atkcmd :=
       destruct H
     end.
 
+Ltac stp_lst_app :=
+  match goal with
+  | |- _ ++ ?l = _ ++ ?l => congr (_ ++ _)
+  | |- ?l ++ _ = ?l ++ _ => congr (_ ++ _)
+  end.
+
 Ltac stp_ni :=
     lazymatch goal with
     H : Noninterfering (store_to_view ?p) ?comp (store_to_view ?p) |-⟨ ?comp _ | is_trusted ⟩ =⟨ ?comp _ | is_trusted ⟩ => apply:H
@@ -296,6 +301,7 @@ Ltac engine :=
   stp_corr_wf_gl ||
   stp_ni ||
   stp_destruct_units_gl ||
+  stp_lst_app ||
   cnstrct_eq_gl || (* TODO: Naming convention *)
   apply/ pure_atklst_wt ||
   hnf ||
@@ -303,9 +309,7 @@ Ltac engine :=
   unfold id in * ||
   ⟨⟨ Forall_inv ⟩⟩ ||
   rewrite filter_app ||
-  rewrite map_app ||
-  congr (_, _) ||
-  congr (_::_)
+  rewrite map_app
   ).
 
 (* TODO; This is actually quite sad *)
@@ -328,6 +332,31 @@ Qed.
 Lemma  all_tt: forall x, x = tt.
 Proof. move=> [] //. Qed.
 
+Lemma nlist_filter_true : 
+  forall n {A} (v: A) f,
+    f v = true ->
+    filter f (nlist v n) = nlist v n.
+Proof.
+  elim=> > ? //= => > /[dup] + ->=> *.
+  congr (_::_);  auto.
+Qed.
+
+Lemma nlist_filter_false : 
+  forall n {A} (v: A) f,
+    f v = false ->
+    filter f (nlist v n) = [].
+Proof.
+  elim=> > ? //= => > /[dup] + ->; auto.
+Qed.
+   
+
+Lemma nlist_forallb_true: forall n {V} (tst : V -> bool) (v : V),
+    tst v -> 
+    forallb tst (nlist v n).
+Proof.    elim=> * //=. apply/andP; auto. (* TODO: I don't know how this works *)Qed.
+
+Lemma map_nlist: forall n {A B} (v: A) (f: A -> B), map f (nlist v n) = nlist (f v) n.
+Proof.  elim=> * //=; congr (_ :: _); auto. Qed.
 
 Section thm.
   Lemma comb_step_valid : forall c , 
@@ -337,25 +366,12 @@ Section thm.
   Proof.
     move=> [] > [cnt treq]; rewrite /= in cnt treq. (* TODO: Need to have this be good *)
     do !(mygrind; auto=> //=).
-      {
-          f_equal. (* There is something. This can be automated as well. 
-          a ++ b = c ++ b
-
-          *)
-          move: (substeps _ _); clear=> n. 
-          rewrite forallb_filter_id; first  elim: n=> //. (* There is elim here. Would be good to lemma this out. Both *)
-          elim: n=> //= > -> //.
-      }
-      {
-          f_equal.
-          move: (substeps _ _); clear=> n. 
-          rewrite forallb_filter_id; first  elim: n=> //. (* There is elim here. Would be good to lemma this out. Both *)
-          elim: n=> //= > -> //.
-      }
-
+    all: (rewrite/extract_i/extract_r//=); do !(mygrind; auto=> //=).
+    all: rewrite nlist_filter_true=> //; apply/map_nlist.
   Qed.
 
 End thm.
+
 
 Theorem comb_extract: 
     forall c, extract_trace (extract_i c) = extract_trace (extract_r c). 
