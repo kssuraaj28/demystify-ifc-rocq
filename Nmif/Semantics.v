@@ -116,7 +116,7 @@ Section atk_cmd_step.
           if is_atk is false then
             (0, None)
           else
-            (substeps atksm atkst, Some (leaker atksm atkst))
+            (substeps atksm atkst, leaker atksm atkst)
         in
 
         (s, atkst, prog_zip pcont substeps, optleak).

@@ -62,7 +62,7 @@ Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
         let: pub_view := store_to_view is_public in
         Noninterfering pub_view ast_lrn id;
 
-    leaker : AtkStates -> LeakVals;
+    leaker : AtkStates -> option LeakVals;
     substeps : AtkStates -> nat;
   }.
 

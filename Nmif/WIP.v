@@ -7,13 +7,10 @@ From Ltac2 Require Import Ltac2.
 Require Import Util VarValStore Syntax Semantics Attacker Util Noninterference Tacs. 
 Import Util.DecEq Util.List. 
 
-
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
-
-
 
 Import VarValStore.Notations. 
 
@@ -289,7 +286,7 @@ This should ideally take a tactic
 *)
 
 
-Ltac grind_step engine finisher := (engine || idtac); intros ; try finisher.
+Ltac grind_step engine finisher := (engine || idtac); intros ; hnf; try finisher.
 
 Ltac grind engine finisher :=  do ! [grind_step engine finisher].
     
@@ -304,7 +301,6 @@ Ltac engine :=
   stp_lst_app ||
   cnstrct_eq_gl || (* TODO: Naming convention *)
   apply/ pure_atklst_wt ||
-  hnf ||
   split ||
   unfold id in * ||
   ⟨⟨ Forall_inv ⟩⟩ ||
@@ -327,10 +323,6 @@ Proof.
     mygrind=> /=.
     all: (mygrind)=> //=.
 Qed.
-
-
-Lemma  all_tt: forall x, x = tt.
-Proof. move=> [] //. Qed.
 
 Lemma nlist_filter_true : 
   forall n {A} (v: A) f,
