@@ -119,11 +119,10 @@ Definition AtkRealStates := unit.
 Parameter atkreal : AdvStateMachine AtkRealStates.
  
 
-(* TODO: Goes elsewhere *)
-Notation only_atk_steps c := (map get_cmd (filter is_attacked c)) (only parsing).
 Section idealatk.
+
   Record SimExtraStates := mk_sim_extra {
-      sim_cont : list (option Cmd) ; 
+      sim_cont : Continuation;
   }.
    
 
@@ -150,10 +149,11 @@ Section idealatk.
 
       (* These  things are fixed. Things probably can be refactored better, but I don't care *)
 
-      init_substeps st := init_substeps atkreal (real_sim st);
+      (* TODO: I don't know what is happening. Is this correct?*)
+      init_substeps st := length (sim_cont(extra st));
       corruptor _ := id; (* TODO: We need to show a stronger property, which we don't.. But which is obvious.. We need to say that simulator only does things at x or y*)
       leaker st := leaker atkreal (real_sim st);
-      substeps st := substeps atkreal (real_sim st)
+      substeps st :=  length (sim_cont(extra st))
       |}.
   
 

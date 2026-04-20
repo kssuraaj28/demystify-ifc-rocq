@@ -11,14 +11,21 @@ Set Mangle Names. Set Mangle Names Light.
 Section syntax.
   Context `{!VarPrm, !ValPrm}.
 
+
+  Definition ValExp : Type := 
+    Vars * Vars * (Vals -> Vals -> Vals).
+
+  Definition BoolExp : Type := 
+    Vars * (Vals -> bool).
+
   Section cmd.
     Notation Prog' Cmd := (list Cmd) (only parsing).
 
     Unset Elimination Schemes. 
     Inductive Cmd :=
-      | assign (comp : Store -> Store)
-      | cond (tst: Store -> bool) (b1 b2: Prog' Cmd)
-      | while (tst: Store -> bool) (b: Prog' Cmd). 
+      | assign (dst : Vars) (exp: ValExp)
+      | cond (exp: BoolExp) (b1 b2: Prog' Cmd)
+      | while (exp: BoolExp) (b: Prog' Cmd). 
     Set Elimination Schemes.
 
     Definition Prog := Prog' Cmd.
@@ -28,28 +35,25 @@ Section syntax.
     Generalizable All Variables.
     Variable P : Cmd -> Prop.
 
-    Hypothesis hyp_skip : 
-      `(P (skip)).
-
     Hypothesis hyp_assign : 
-      `(P (assign comp)).
+      `(P (assign dst exp)).
 
     Hypothesis hyp_cond : 
       `(Forall P b1 ->
         Forall P b2 ->
-        P (cond tst b1 b2)).
+        P (cond exp b1 b2)).
 
     Hypothesis hyp_while : 
       `(Forall P b ->
-        P (while tst b)).
+        P (while exp b)).
 
 
     Fixpoint Cmd_ind : forall c, P c. 
     Proof.
-      case=> >;
-        apply: hyp_skip + apply: hyp_assign + apply: hyp_cond + apply: hyp_while;
-        lazymatch goal with |- Forall _ ?l => elim: l end;
-        auto.
+      case=> >.
+      all:  apply: hyp_assign + apply: hyp_cond + apply: hyp_while;
+            lazymatch goal with |- Forall _ ?l => elim: l end;
+            auto.
     Qed.
   End cmd_ind.
 End syntax.
