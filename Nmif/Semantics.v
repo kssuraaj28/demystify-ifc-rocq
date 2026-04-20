@@ -5,34 +5,54 @@ Require Tacs Util VarValStore Attacker Syntax.
 Import Tacs Util VarValStore Attacker Syntax. 
 (* TODO: Order seems to matter. Syntax before fails *)
 
-Section cleanstep.
+Section exp.
   Context `{!VarPrm, !ValPrm}.
+  Definition eval_val_exp (st: Store) (e: ValExp) : Vals :=
+    let: (v1, v2, comp) := e in 
+    let: vl1 := st v1 in
+    let: vl2 := st v2 in
+    comp vl1 vl2.
+
+  Definition eval_bool_exp (st: Store) (e: BoolExp) : bool :=
+    let: (v, comp) := e in 
+    let: vl := st v in
+    comp vl.
+End exp.
+
+Section cleanstep.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
 
   Notation Continuation := Syntax.Prog.
 
-  Definition clean_cmd_step (c: Cmd) (s: Store) : (Store * Continuation) := 
+  (* The option is epsilon  *)
+  Definition CmdEvent := option (Vars * Vals).
+
+  Definition clean_cmd_step (c: Cmd) (s: Store) : (Store * Continuation * CmdEvent) := 
     match c with
-    | assign comp => ( comp s, [])
-    | cond tst b1 b2 => 
-        (s, if (tst s) is true then 
-              b1
-            else 
-              b2)
-    | while tst b =>
-        (s, if (tst s) is true then 
-              (b ++ [while tst b]) 
-            else 
-              [])
+    | assign dst exp => 
+      let: vl := eval_val_exp s exp in
+      let: evnt := 
+        if (is_trusted dst) is false then None else
+        Some (dst, vl) 
+      in
+      (update_to_store s dst vl, [], evnt)
+
+    | cond exp b1 b2 => 
+      let: tst := eval_bool_exp s exp in 
+      let: b_cont := if tst is true then b1 else b2 in
+      (s, b_cont, None)
+
+    | while exp b =>
+      let: tst := eval_bool_exp s exp in 
+      let: b_cont := if tst is true then (b ++ [c]) else [] in
+      (s, b_cont, None)
     end.
 
-  Lemma clean_assign_nocont: forall comp s s' c,
-    clean_cmd_step (assign comp) s = (s', c) ->
-    c = [].
-  Proof.
-    move=> > /= [] //.
-  Qed.
-
 End cleanstep.
+
+Search (nat -> list ?A).
+About repeat.
+Print repeat. (* There is repeat *)
 
 Section cont.
   Import Util.List. (* When to import? TODO *)
@@ -50,6 +70,8 @@ Section cont.
 
   Definition Continuation := list AtkCmd.
 
+
+
   (*  *)
   Fixpoint prog_zip (p: Prog) (atk_steps: nat) : Continuation :=
     match p, atk_steps with
@@ -57,7 +79,7 @@ Section cont.
           (mk_cstep true (Some cmd)) :: (prog_zip p' atk_steps')
 
     | [], _ => 
-        nlist pure_atk atk_steps
+        repeat pure_atk atk_steps
 
     | _ , 0 =>  
         map pure_cmd p
@@ -88,6 +110,7 @@ Section atk_cmd_step.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
   Context  {AtkStates : Type} (atksm: AdvStateMachine AtkStates).
+    init_substeps: AtkStates -> nat; (* We allow atkstates because this can depend on the public store. You could force adv to run  cou *)
 
   Definition optcmd_step c s :=
         if c isn't (Some c) then (s, []) else

@@ -56,4 +56,5 @@ Section syntax.
             auto.
     Qed.
   End cmd_ind.
+  Check Cmd_ind.
 End syntax.

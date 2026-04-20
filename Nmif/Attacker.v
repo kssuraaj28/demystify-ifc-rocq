@@ -39,10 +39,11 @@ End opposite.
   Prm naming scheme? TODO
 *)
 
+Definition AdvEvent `{!AdvLeakPrm} := option LeakVals.
+
 Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} 
     {AtkStates : Type} := {
     init_state: StoreView -> AtkStates; (* You only get untrusted*)
-    init_substeps: AtkStates -> nat; (* We allow atkstates because this can depend on the public store *)
     corruptor: AtkStates -> Store -> Store;
 
     corruptor_wf: 
@@ -62,7 +63,7 @@ Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
         let: pub_view := store_to_view is_public in
         Noninterfering pub_view ast_lrn id;
 
-    leaker : AtkStates -> option LeakVals;
+    curr_event : AtkStates -> AdvEvent;
     substeps : AtkStates -> nat;
   }.
 

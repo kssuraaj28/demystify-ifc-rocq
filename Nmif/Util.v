@@ -31,28 +31,20 @@ Module DecEq.
 End DecEq.
 
 Module List.
-  Section nlist.
-    Context {A: Type}.
-    Fixpoint nlist (a:A) (n : nat) : list A :=
-      match n with
-      | 0 => []
-      | S n' => a :: (nlist a n')
+  Fixpoint combine_extend {A B} 
+    (la : list A) (lb : list B)
+    (da : A) (db : B) : list (A * B) :=
+      match la, lb with
+      | ha :: la' , hb :: lb' => (ha , hb) :: combine_extend la' lb' da db
+      | [] , lb => map (fun b => (da, b)) lb
+      | la , [] => map (fun a => (a, db)) la
       end.
+  
+  Goal combine_extend [1; 3] [true] 10 false = [(1, true); (3, false)].  
+  Proof. done. Qed.
 
-    (* TODO: Learn ssr rewrite. Also, f_equal? *)
-    Lemma nlist_len: 
-      forall n (a:A), length (nlist a n) = n. 
-    Proof.
-      elim=> /=; auto.
-    Qed.
-
-    Lemma nlist_content: 
-      forall n (a:A), 
-        Forall (fun a' => a' = a) (nlist a n). 
-    Proof.
-      elim=> /=; auto.
-    Qed.
-  End nlist.
+  Goal combine_extend [1; 3] [true; false; false] 10 false = [(1, true); (3, false); (10, false)].
+  Proof. done. Qed.
 
   (* TODO: What naming conventions am I using? *)
   Ltac stp_Forall_app_gl := lazymatch goal with |- Forall _ (_ ++ _) => apply/Forall_app end.
@@ -63,8 +55,7 @@ Module List.
     Proof.  move=> *; stp_Forall_app_gl.  Abort.
   End test.
   
-  (* A high good tactic consumes 'low grade' hypotheses (in context), 
-    and produces high grade hypotheses *)
+  (* A high good tactic consumes 'low grade' hypotheses (in context), and produces high grade hypotheses (intros) *)
   Ltac Forall_inv H :=   move: H=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
   (* TODO: Test for these also *)
 End List.
