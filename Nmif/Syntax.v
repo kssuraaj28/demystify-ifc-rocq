@@ -11,7 +11,6 @@ Set Mangle Names. Set Mangle Names Light.
 Section syntax.
   Context `{!VarPrm, !ValPrm}.
 
-
   Definition ValExp : Type := 
     Vars * Vars * (Vals -> Vals -> Vals).
 
@@ -21,7 +20,7 @@ Section syntax.
   Section cmd.
     Notation Prog' Cmd := (list Cmd) (only parsing).
 
-    Unset Elimination Schemes. 
+    Unset Elimination Schemes.
     Inductive Cmd :=
       | assign (dst : Vars) (exp: ValExp)
       | cond (exp: BoolExp) (b1 b2: Prog' Cmd)
@@ -51,10 +50,12 @@ Section syntax.
     Fixpoint Cmd_ind : forall c, P c. 
     Proof.
       case=> >.
-      all:  apply: hyp_assign + apply: hyp_cond + apply: hyp_while;
+      all:  (apply: hyp_assign ||
+            apply: hyp_while ||
+            apply: hyp_cond || 
+            fail);
             lazymatch goal with |- Forall _ ?l => elim: l end;
             auto.
     Qed.
   End cmd_ind.
-  Check Cmd_ind.
 End syntax.

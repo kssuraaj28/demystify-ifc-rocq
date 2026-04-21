@@ -1,5 +1,5 @@
-From Stdlib Require List ssreflect.
-Import List ListNotations ssreflect.
+From Stdlib Require List ssreflect ssrfun.
+Import List ListNotations ssreflect ssrfun.
 
 Require Tacs Util VarValStore Attacker Syntax. 
 Import Tacs Util VarValStore Attacker Syntax. 
@@ -27,32 +27,126 @@ Section cleanstep.
   (* The option is epsilon  *)
   Definition CmdEvent := option (Vars * Vals).
 
-  Definition clean_cmd_step (c: Cmd) (s: Store) : (Store * Continuation * CmdEvent) := 
+  Definition clean_cmd_stp_store (c: Cmd) (s: Store) : Store :=
+    match c with
+    | assign dst exp => 
+      let: vl := eval_val_exp s exp in update_to_store s dst vl
+    | _ =>  s
+    end.
+  
+  (* TODO: Have examples below this *)
+  Definition optcmd_stp_store := oapp clean_cmd_stp_store id.
+
+  Definition clean_cmd_stp_cnt (c: Cmd) (s: Store) : Continuation :=
+    match c with
+    | cond exp b1 b2 => 
+      let: tst := eval_bool_exp s exp in 
+      if tst is true then b1 else b2
+    | while exp b =>
+      let: tst := eval_bool_exp s exp in 
+      if tst is true then (b ++ [c]) else []
+    | _ =>  []
+    end.
+
+  (* TODO: Have examples below this *)
+  Definition optcmd_stp_cnt := oapp clean_cmd_stp_cnt (fun _ => []).
+
+  Definition clean_cmd_evnt (c: Cmd) (s: Store) : CmdEvent :=
     match c with
     | assign dst exp => 
       let: vl := eval_val_exp s exp in
-      let: evnt := 
-        if (is_trusted dst) is false then None else
-        Some (dst, vl) 
-      in
-      (update_to_store s dst vl, [], evnt)
-
-    | cond exp b1 b2 => 
-      let: tst := eval_bool_exp s exp in 
-      let: b_cont := if tst is true then b1 else b2 in
-      (s, b_cont, None)
-
-    | while exp b =>
-      let: tst := eval_bool_exp s exp in 
-      let: b_cont := if tst is true then (b ++ [c]) else [] in
-      (s, b_cont, None)
+      if (is_trusted dst) is false then None else
+      Some (dst, vl) 
+    | _ => None
     end.
+
+  (* TODO: Have examples below this *)
+  Definition optcmd_evnt := oapp clean_cmd_evnt (fun _ => None).
 
 End cleanstep.
 
-Search (nat -> list ?A).
-About repeat.
-Print repeat. (* There is repeat *)
+
+
+Section cmb_cmd.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
+  (* The simulator state will not be here. I'm doing some big brain intuition*)
+
+  #[local] Set Primitive Projections. (* TODO: All records need to have this? Maybe in prelude? *)
+
+  Record CmbCmd : Type := mk_cmbcmd {
+    real_cmd : option Cmd ;
+    real_atk_bit : bool ;
+    ideal_cmd : option Cmd ;
+    pc_public : bool; (* Is the pc secret? *)
+    pc_trusted : bool; (* Is the pc trusted? *)
+  }.
+
+  Notation State := (
+    Store *      (* real store *)
+    Store *      (* ideal store *)
+    Store *      (* simulator store *)
+    AtkStates  (* attacker state *)
+  )%type.
+
+  Definition zip 
+              (real_cont: list Cmd)
+              (ideal_cont: list Cmd)
+              (atk_steps: nat)
+              (is_trusted: bool)
+              (is_public: bool)
+              : list CmbCmd :=
+    let: real_cont := map Some real_cont in
+    let: ideal_cont := map Some ideal_cont in
+    let: atk_steps := repeat true atk_steps in
+    let: comb := List.combine_extend3 real_cont ideal_cont atk_steps None None false in
+    map (fun '(rc, ic, abit) => mk_cmbcmd rc abit ic is_public is_trusted) comb.
+
+  Section cmb_step.
+    Variable (adv: AdvStateMachine AtkStates). (* TODO: Not holemode *)
+  
+    Notation corruptor := (corruptor adv).
+    Notation learner := (learner adv).
+    Notation atk_substeps := (substeps adv).
+  
+    Definition cmbcmd_step (c: CmbCmd) (s: State) : (State * list CmbCmd) := 
+      let: mk_cmbcmd real_cmd real_atk_bit ideal_cmd pc_secret pc_public := c in
+      let: (real_st, ideal_st, sim_st, atk_st) := s in
+  
+      (* Corruption first. TODO: When there is endorsement, there will need to be an update to the ideal store as well *)
+      let: real_st := if real_atk_bit is true then corruptor atk_st real_st else real_st in 
+      let: sim_st := if real_atk_bit is true then corruptor atk_st sim_st else sim_st in  
+  
+      let: real_cnt :=  optcmd_stp_cnt real_cmd real_st in (* TODO: Does the order matter? It shouldn't. *)
+      let: real_st := optcmd_stp_store real_cmd real_st in
+  
+      (* If pc is secret, then there will not be any change to public vars, so this is okay! 
+         The simulator will not have access to real_cmd in a secret branch
+      *)
+      let: sim_st := if pc_secret is true then sim_st else optcmd_stp_store real_cmd sim_st in  
+  
+      (* Why is there no untrusted? Untrusted will show up when you have the invariant involved?? *)
+  
+      let: ideal_cnt :=  optcmd_stp_cnt ideal_cmd ideal_st in (* TODO: Does the order matter? *)
+      (* I think that this will change if there is downgrading.. TODO *)
+      let: ideal_st := optcmd_stp_store ideal_cmd ideal_st in
+  
+      let: atk_st := if real_atk_bit is true then learner atk_st real_st else atk_st in (* This could be sim_st as well, right? TODO: You need to think about whether the attacker is active, right? *)
+      let: atk_substeps := atk_substeps atk_st in
+      (* For zip, you have the following 
+      pc_secret, ?? maybe you should just check for the real? Why don't you check for the ideal? 
+      pc_public ??
+      *)
+      ((real_st, ideal_st, sim_st, atk_st), zip real_cnt ideal_cnt atk_substeps true true). (* TODO: This true true thing is hardcoded..*)
+  End cmb_step.
+  (* TODO: Prove invariant? and show things? *)
+  
+End cmb_cmd.
+
+(*  The step should consume this, and give you a new list of this. It should also *)
+
+(* The idea now is going to be that we define step for something 
+combined.
+*)
 
 Section cont.
   Import Util.List. (* When to import? TODO *)
@@ -112,9 +206,6 @@ Section atk_cmd_step.
   Context  {AtkStates : Type} (atksm: AdvStateMachine AtkStates).
     init_substeps: AtkStates -> nat; (* We allow atkstates because this can depend on the public store. You could force adv to run  cou *)
 
-  Definition optcmd_step c s :=
-        if c isn't (Some c) then (s, []) else
-        clean_cmd_step c s.
 
   (* I think that eventually, you'd want to put the observations here also.. *)
   Definition atk_cmd_step 

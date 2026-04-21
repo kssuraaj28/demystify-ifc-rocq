@@ -31,20 +31,26 @@ Module DecEq.
 End DecEq.
 
 Module List.
-  Fixpoint combine_extend {A B} 
+  Fixpoint combine_extend2 {A B} 
     (la : list A) (lb : list B)
     (da : A) (db : B) : list (A * B) :=
       match la, lb with
-      | ha :: la' , hb :: lb' => (ha , hb) :: combine_extend la' lb' da db
+      | ha :: la' , hb :: lb' => (ha , hb) :: combine_extend2 la' lb' da db
       | [] , lb => map (fun b => (da, b)) lb
       | la , [] => map (fun a => (a, db)) la
       end.
   
-  Goal combine_extend [1; 3] [true] 10 false = [(1, true); (3, false)].  
+  Goal combine_extend2 [1; 3] [true] 10 false = [(1, true); (3, false)].  
   Proof. done. Qed.
 
-  Goal combine_extend [1; 3] [true; false; false] 10 false = [(1, true); (3, false); (10, false)].
+  Goal combine_extend2 [1; 3] [true; false; false] 10 false = [(1, true); (3, false); (10, false)].
   Proof. done. Qed.
+
+  (* Maybe use Ltac2 to define this.. *)
+  Definition combine_extend3 {A B C}
+    (la : list A) (lb : list B) (lc : list C)
+    (da : A) (db : B) (dc : C) : list (A * B * C) :=
+      combine_extend2 (combine_extend2 la lb da db) lc (da,db) dc.
 
   (* TODO: What naming conventions am I using? *)
   Ltac stp_Forall_app_gl := lazymatch goal with |- Forall _ (_ ++ _) => apply/Forall_app end.

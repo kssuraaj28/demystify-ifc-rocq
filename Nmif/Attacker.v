@@ -45,7 +45,7 @@ Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
     {AtkStates : Type} := {
     init_state: StoreView -> AtkStates; (* You only get untrusted*)
     corruptor: AtkStates -> Store -> Store;
-
+ 
     corruptor_wf: 
       forall ast, 
         let: ast_corr := corruptor ast in
