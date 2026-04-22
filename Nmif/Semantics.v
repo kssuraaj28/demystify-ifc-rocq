@@ -91,17 +91,16 @@ Section sa.
   | wf_cond: 
      forall gvar comp pclbl b1 b2, 
        let: gvarlbl := var_lbl gvar in
-       WellFormedProg' WellFormedCmd gvarlbl b1 ->
-       WellFormedProg' WellFormedCmd pclbl b1 ->
-       WellFormedProg' WellFormedCmd gvarlbl b2 ->
-       WellFormedProg' WellFormedCmd pclbl b2 -> (* This bad? *)
+       let: newpc := gvarlbl ⊔ pclbl in
+       WellFormedProg' WellFormedCmd newpc b1 -> (* TODO: How might things look without ⊔ *)
+       WellFormedProg' WellFormedCmd newpc b2 ->
        _ pclbl (cond (gvar,comp) b1 b2)
 
   | wf_while: 
      forall gvar comp pclbl wbody,
        let: gvarlbl := var_lbl gvar in
-       WellFormedProg' WellFormedCmd gvarlbl wbody ->
-       WellFormedProg' WellFormedCmd pclbl wbody -> (* Forall_and might be useful *)
+       let: newpc := gvarlbl ⊔ pclbl in
+       WellFormedProg' WellFormedCmd newpc wbody ->
        _ pclbl (while (gvar,comp) wbody).
   Set Elimination Schemes.
 
@@ -119,26 +118,25 @@ Section sa.
           s1lbl ⊑ dstlbl -> s2lbl ⊑ dstlbl -> pclbl ⊑ dstlbl ->
           P pclbl (assign dst (src1, src2, comp)).
 
+    (* I have no idea whether this is the right thing *)
     Hypothesis hyp_cond : 
         forall gvar comp pclbl b1 b2,
          let: gvarlbl := var_lbl gvar in
-         Forall (WellFormedCmd gvarlbl) b1 -> Forall (P gvarlbl) b1 ->
-         Forall (WellFormedCmd pclbl) b1 -> Forall (P pclbl) b1 ->
-         Forall (WellFormedCmd gvarlbl) b2 -> Forall (P gvarlbl) b2 ->
-         Forall (WellFormedCmd pclbl) b2 -> Forall (P pclbl) b2 ->
+         let: newpc := gvarlbl ⊔ pclbl in
+         Forall (WellFormedCmd newpc) b1 -> Forall (P newpc) b1 ->
+         Forall (WellFormedCmd newpc) b2 -> Forall (P newpc) b2 ->
          P pclbl (cond (gvar, comp) b1 b2).
 
     Hypothesis hyp_while : 
         forall gvar comp pclbl wbody,
          let: gvarlbl := var_lbl gvar in
-         Forall (WellFormedCmd gvarlbl) wbody -> Forall (P gvarlbl) wbody ->
-         Forall (WellFormedCmd pclbl) wbody -> Forall (P pclbl) wbody ->
+         let: newpc := gvarlbl ⊔ pclbl in
+         Forall (WellFormedCmd newpc) wbody -> Forall (P newpc) wbody ->
          P pclbl (while (gvar, comp) wbody).
 
     Fixpoint WellFormedCmd_ind :
       forall p c, WellFormedCmd p c -> P p c. 
     Proof.  Abort.
-
 
   End ind.
 End sa.
