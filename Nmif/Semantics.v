@@ -111,10 +111,12 @@ Section sa.
 
   Section ind.
     Variable P : PcLbl -> Cmd -> Prop.
-    (* TODO: I have no idea what I did.  Is this the right IH? *)
-    (* TODO Define the induction principle.. Do we even need this? 
-      I suspect that  we might be able to do this without induction also.. 
+    (* This is the right IH, I think because I made another toy example without nested inductive types *)
+    (* 
+       However, do we even need induction? Maybe we don't need it at all.. 
+       So, can we do something weaker than inductively defining this then?
     *)
+
     Hypothesis hyp_assign : 
         forall dst src1 src2  comp pclbl,
           let: dstlbl := var_lbl dst in
@@ -141,14 +143,13 @@ Section sa.
 
     Fixpoint WellFormedCmd_ind :
       forall p c, WellFormedCmd p c -> P p c. 
-    Proof.  
-      move=> > []; [apply:hyp_assign|..].
-      all: move=> *.
+    Proof.
+      move=> > []; [apply:hyp_assign|..]=> *.
       all: (apply: hyp_cond; clear hyp_cond) || (apply: hyp_while; clear hyp_while)=>//.
       all: lazymatch goal with
-             H: Forall _ ?b |- Forall _ ?b => elim: H=> //
+             H: Forall _ ?b |- Forall _ ?b => elim: H=> // *
             end.
-      all: move=> *; constructor 2=> //; auto.
+      all: constructor 2=> //; auto.
     Qed.
   End ind.
 End sa.
