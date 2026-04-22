@@ -154,6 +154,12 @@ Section sa.
   End ind.
 End sa.
 
+(* TODO: 
+  Compute the correct pc
+  Write the invariant
+  Prove that the invariant holds
+  Win
+*)
 
 Fail.
 
