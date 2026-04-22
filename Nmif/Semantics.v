@@ -1,7 +1,7 @@
-From Stdlib Require List ssreflect ssrfun.
-Import List ListNotations ssreflect ssrfun.
+From Stdlib Require List ssreflect ssrfun ssrbool.
+Import List ListNotations ssreflect ssrfun ssrbool.
 
-Require Tacs Util VarValStore Attacker Syntax. 
+Require Tacs Util VarValStore Attacker Syntax Lattice4pt.
 Import Tacs Util VarValStore Attacker Syntax. 
 (* TODO: Order seems to matter. Syntax before fails *)
 
@@ -65,7 +65,29 @@ Section cleanstep.
 
 End cleanstep.
 
+(* TODO: Maybe elsewere *)
+Definition PcLbl := Lattice4pt.Label.
 
+(* TODO: Static Analysis. *)
+Section sa.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
+  Import Lattice4pt.Notations.
+  (* WellTyped? *)
+
+  (* TODO: How would a parameterized thing look like, as opposed to indexed? *)
+  Inductive WellFormed : Cmd -> PcLbl -> Prop := 
+  | wf_assign: 
+     forall dst src1 src2 comp pclbl, 
+       let: dstlbl := var_lbl dst in
+       let: s1lbl := var_lbl src1 in
+       let: s2lbl := var_lbl src2 in
+       s1lbl ⊑ dstlbl -> s2lbl ⊑ dstlbl -> pclbl ⊑ dstlbl -> (* Using ssrbool coercion *)
+       WellFormed (assign dst (src1, src2, comp)) pclbl 
+  .
+End sa.
+
+
+Fail.
 
 Section cmb_cmd.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
@@ -77,8 +99,7 @@ Section cmb_cmd.
     real_cmd : option Cmd ;
     real_atk_bit : bool ;
     ideal_cmd : option Cmd ;
-    pc_public : bool; (* Is the pc secret? *)
-    pc_trusted : bool; (* Is the pc trusted? *)
+    pc_lbl : PcLbl ;
   }.
 
   Notation State := (
@@ -138,7 +159,11 @@ Section cmb_cmd.
       *)
       ((real_st, ideal_st, sim_st, atk_st), zip real_cnt ideal_cnt atk_substeps true true). (* TODO: This true true thing is hardcoded..*)
   End cmb_step.
-  (* TODO: Prove invariant? and show things? *)
+  (* TODO: Prove invariant? and show things? 
+    Need to have type system.
+    First, have Cmd Invariant.
+    Then, show other things 
+  *)
   
 End cmb_cmd.
 

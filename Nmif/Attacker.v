@@ -1,7 +1,7 @@
 From Stdlib Require Program ssreflect ssrbool.
 Import ssreflect ssrbool.
 
-Require VarValStore Util Noninterference. 
+Require VarValStore Util Noninterference Lattice4pt. 
 Import VarValStore Noninterference.
 
 Set Default Proof Mode "Classic".
@@ -11,16 +11,16 @@ Set Mangle Names. Set Mangle Names Light.
 
 Class AdvLeakPrm := LeakVals : Type.
 
-Class AdvLvlPrm  `{!VarPrm} := {
-  is_untrusted : pred Vars ;
-  is_public : pred Vars
-}.
+Class AdvLvlPrm `{!VarPrm} :=  var_lbl : Vars -> Lattice4pt.Label.
 
-Section opposite.
+Section defs.
+  Import Lattice4pt.
   Context `{!VarPrm, !AdvLvlPrm}.
+  Definition is_public v := public (var_lbl v).
+  Definition is_untrusted v := untrusted (var_lbl v).
   Definition is_secret v := ~~ is_public v.
   Definition is_trusted v := ~~ is_untrusted v.
-End opposite.
+End defs.
 
 
 
