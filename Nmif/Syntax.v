@@ -50,12 +50,9 @@ Section syntax.
     Fixpoint Cmd_ind : forall c, P c. 
     Proof.
       case=> >.
-      all:  (apply: hyp_assign ||
-            apply: hyp_while ||
-            apply: hyp_cond || 
-            fail);
-            lazymatch goal with |- Forall _ ?l => elim: l end;
-            auto.
+      all:  apply: hyp_assign || apply: hyp_while || apply: hyp_cond.
+      all:  lazymatch goal with |- Forall _ ?l => elim: l end.
+      all:  auto.
     Qed.
   End cmd_ind.
 End syntax.

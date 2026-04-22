@@ -3,6 +3,11 @@ Import List ListNotations ssreflect ssrfun ssrbool.
 
 Require Tacs Util VarValStore Attacker Syntax Lattice4pt.
 Import Tacs Util VarValStore Attacker Syntax. 
+
+Set Default Proof Mode "Classic".
+Set Default Goal Selector "!".
+Set Bullet Behavior "Strict Subproofs".
+Set Mangle Names. Set Mangle Names Light.
 (* TODO: Order seems to matter. Syntax before fails *)
 
 Section exp.
@@ -136,8 +141,15 @@ Section sa.
 
     Fixpoint WellFormedCmd_ind :
       forall p c, WellFormedCmd p c -> P p c. 
-    Proof.  Abort.
-
+    Proof.  
+      move=> > []; [apply:hyp_assign|..].
+      all: move=> *.
+      all: (apply: hyp_cond; clear hyp_cond) || (apply: hyp_while; clear hyp_while)=>//.
+      all: lazymatch goal with
+             H: Forall _ ?b |- Forall _ ?b => elim: H=> //
+            end.
+      all: move=> *; constructor 2=> //; auto.
+    Qed.
   End ind.
 End sa.
 
