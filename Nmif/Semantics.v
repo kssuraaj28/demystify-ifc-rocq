@@ -72,18 +72,75 @@ Definition PcLbl := Lattice4pt.Label.
 Section sa.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
   Import Lattice4pt.Notations.
-  (* WellTyped? *)
+
+  Notation WellFormedProg' WellFormedCmd pclbl prog :=
+    (Forall (WellFormedCmd pclbl) prog) (only parsing).
 
   (* TODO: How would a parameterized thing look like, as opposed to indexed? *)
-  Inductive WellFormed : Cmd -> PcLbl -> Prop := 
+  (* WellTyped? *)
+  Unset Elimination Schemes.
+  Inductive WellFormedCmd : PcLbl -> Cmd -> Prop := 
   | wf_assign: 
      forall dst src1 src2 comp pclbl, 
        let: dstlbl := var_lbl dst in
        let: s1lbl := var_lbl src1 in
        let: s2lbl := var_lbl src2 in
        s1lbl ⊑ dstlbl -> s2lbl ⊑ dstlbl -> pclbl ⊑ dstlbl -> (* Using ssrbool coercion *)
-       WellFormed (assign dst (src1, src2, comp)) pclbl 
-  .
+       _ pclbl (assign dst (src1, src2, comp))
+
+  | wf_cond: 
+     forall gvar comp pclbl b1 b2, 
+       let: gvarlbl := var_lbl gvar in
+       WellFormedProg' WellFormedCmd gvarlbl b1 ->
+       WellFormedProg' WellFormedCmd pclbl b1 ->
+       WellFormedProg' WellFormedCmd gvarlbl b2 ->
+       WellFormedProg' WellFormedCmd pclbl b2 -> (* This bad? *)
+       _ pclbl (cond (gvar,comp) b1 b2)
+
+  | wf_while: 
+     forall gvar comp pclbl wbody,
+       let: gvarlbl := var_lbl gvar in
+       WellFormedProg' WellFormedCmd gvarlbl wbody ->
+       WellFormedProg' WellFormedCmd pclbl wbody -> (* Forall_and might be useful *)
+       _ pclbl (while (gvar,comp) wbody).
+  Set Elimination Schemes.
+
+  Section ind.
+    Variable P : PcLbl -> Cmd -> Prop.
+    (* TODO: I have no idea what I did.  Is this the right IH? *)
+    (* TODO Define the induction principle.. Do we even need this? 
+      I suspect that  we might be able to do this without induction also.. 
+    *)
+    Hypothesis hyp_assign : 
+        forall dst src1 src2  comp pclbl,
+          let: dstlbl := var_lbl dst in
+          let: s1lbl := var_lbl src1 in
+          let: s2lbl := var_lbl src2 in
+          s1lbl ⊑ dstlbl -> s2lbl ⊑ dstlbl -> pclbl ⊑ dstlbl ->
+          P pclbl (assign dst (src1, src2, comp)).
+
+    Hypothesis hyp_cond : 
+        forall gvar comp pclbl b1 b2,
+         let: gvarlbl := var_lbl gvar in
+         Forall (WellFormedCmd gvarlbl) b1 -> Forall (P gvarlbl) b1 ->
+         Forall (WellFormedCmd pclbl) b1 -> Forall (P pclbl) b1 ->
+         Forall (WellFormedCmd gvarlbl) b2 -> Forall (P gvarlbl) b2 ->
+         Forall (WellFormedCmd pclbl) b2 -> Forall (P pclbl) b2 ->
+         P pclbl (cond (gvar, comp) b1 b2).
+
+    Hypothesis hyp_while : 
+        forall gvar comp pclbl wbody,
+         let: gvarlbl := var_lbl gvar in
+         Forall (WellFormedCmd gvarlbl) wbody -> Forall (P gvarlbl) wbody ->
+         Forall (WellFormedCmd pclbl) wbody -> Forall (P pclbl) wbody ->
+         P pclbl (while (gvar, comp) wbody).
+
+    Fixpoint WellFormedCmd_ind :
+      forall p c, WellFormedCmd p c -> P p c. 
+    Proof.  Abort.
+
+
+  End ind.
 End sa.
 
 
