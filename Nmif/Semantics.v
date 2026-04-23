@@ -154,15 +154,6 @@ Section sa.
   End ind.
 End sa.
 
-(* TODO: 
-  Compute the correct pc
-  Write the invariant
-  Prove that the invariant holds
-  Win
-*)
-
-Fail.
-
 Section cmb_cmd.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
   (* The simulator state will not be here. I'm doing some big brain intuition*)
@@ -175,78 +166,103 @@ Section cmb_cmd.
     ideal_cmd : option Cmd ;
     pc_lbl : PcLbl ;
   }.
+End cmb_cmd.
 
-  Notation State := (
-    Store *      (* real store *)
-    Store *      (* ideal store *)
-    Store *      (* simulator store *)
-    AtkStates  (* attacker state *)
-  )%type.
+Section cmb_step.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
-  Definition zip 
-              (real_cont: list Cmd)
-              (ideal_cont: list Cmd)
-              (atk_steps: nat)
-              (is_trusted: bool)
-              (is_public: bool)
-              : list CmbCmd :=
+  Definition zip (real_cont: list Cmd) (ideal_cont: list Cmd) (atk_steps: nat) (pc_lbl: PcLbl): list CmbCmd :=
     let: real_cont := map Some real_cont in
     let: ideal_cont := map Some ideal_cont in
     let: atk_steps := repeat true atk_steps in
     let: comb := List.combine_extend3 real_cont ideal_cont atk_steps None None false in
-    map (fun '(rc, ic, abit) => mk_cmbcmd rc abit ic is_public is_trusted) comb.
+    map (fun '(rc, ic, abit) => mk_cmbcmd rc abit ic pc_lbl) comb.
 
-  Section cmb_step.
-    Variable (adv: AdvStateMachine AtkStates). (* TODO: Not holemode *)
-  
+  Section new_pc.
+    Import Lattice4pt.Notations.
+    Definition compute_new_pc (old_pc : PcLbl) (cmd: option Cmd): PcLbl :=
+      if cmd isn't Some cmd then old_pc else
+      match cmd with
+      | cond (gvar,_) _ _ => var_lbl gvar ⊔ old_pc (* Can this be refactored w/ static analysis? *)
+      | while (gvar,_) _ => var_lbl gvar ⊔ old_pc
+      | _ => old_pc
+      end.
+  End new_pc.
+
+
+  Context {AtkStates : Type}.
+
+  Section comb_state. 
+    #[local] Set Primitive Projections. (* TODO: All records need to have this? Maybe in prelude? *)
+
+    Record CmbState : Type := mk_cmbstate {
+      real_store : Store;
+      ideal_store : Store;
+      sim_store : Store;
+      atk_st : AtkStates
+    }.
+  End comb_state.
+
+  Section step.
+    Variable (adv: AdvStateMachine AtkStates). 
     Notation corruptor := (corruptor adv).
     Notation learner := (learner adv).
     Notation atk_substeps := (substeps adv).
-  
-    Definition cmbcmd_step (c: CmbCmd) (s: State) : (State * list CmbCmd) := 
-      let: mk_cmbcmd real_cmd real_atk_bit ideal_cmd pc_secret pc_public := c in
-      let: (real_st, ideal_st, sim_st, atk_st) := s in
-  
+
+    Notation Cfg := (CmbState * list CmbCmd)%type.
+
+    Definition cmbcmd_step (c: CmbCmd) (s: CmbState) : Cfg :=
+      let: mk_cmbcmd real_cmd real_atk_bit ideal_cmd pc_lbl := c in
+      let: mk_cmbstate real_st ideal_st sim_st atk_st := s in
+    
       (* Corruption first. TODO: When there is endorsement, there will need to be an update to the ideal store as well *)
       let: real_st := if real_atk_bit is true then corruptor atk_st real_st else real_st in 
       let: sim_st := if real_atk_bit is true then corruptor atk_st sim_st else sim_st in  
-  
+    
       let: real_cnt :=  optcmd_stp_cnt real_cmd real_st in (* TODO: Does the order matter? It shouldn't. *)
       let: real_st := optcmd_stp_store real_cmd real_st in
-  
+    
       (* If pc is secret, then there will not be any change to public vars, so this is okay! 
          The simulator will not have access to real_cmd in a secret branch
       *)
-      let: sim_st := if pc_secret is true then sim_st else optcmd_stp_store real_cmd sim_st in  
-  
+      let: sim_st := if (Lattice4pt.public pc_lbl) is true then sim_st else optcmd_stp_store real_cmd sim_st in   (* TODO: This Lattice4pt is stupid *)
+    
       (* Why is there no untrusted? Untrusted will show up when you have the invariant involved?? *)
-  
+    
       let: ideal_cnt :=  optcmd_stp_cnt ideal_cmd ideal_st in (* TODO: Does the order matter? *)
       (* I think that this will change if there is downgrading.. TODO *)
       let: ideal_st := optcmd_stp_store ideal_cmd ideal_st in
-  
+    
       let: atk_st := if real_atk_bit is true then learner atk_st real_st else atk_st in (* This could be sim_st as well, right? TODO: You need to think about whether the attacker is active, right? *)
       let: atk_substeps := atk_substeps atk_st in
-      (* For zip, you have the following 
-      pc_secret, ?? maybe you should just check for the real? Why don't you check for the ideal? 
-      pc_public ??
-      *)
-      ((real_st, ideal_st, sim_st, atk_st), zip real_cnt ideal_cnt atk_substeps true true). (* TODO: This true true thing is hardcoded..*)
-  End cmb_step.
-  (* TODO: Prove invariant? and show things? 
-    Need to have type system.
-    First, have Cmd Invariant.
-    Then, show other things 
-  *)
-  
-End cmb_cmd.
 
-(*  The step should consume this, and give you a new list of this. It should also *)
+      let: new_pc := compute_new_pc pc_lbl real_cmd in
+      (mk_cmbstate real_st ideal_st sim_st atk_st, zip real_cnt ideal_cnt atk_substeps new_pc). 
 
-(* The idea now is going to be that we define step for something 
-combined.
-*)
+    (* mstep == multistep *)
+    Definition cmbcmd_mstep (cfg: Cfg) : Cfg := 
+      let: (st, cmdlst) := cfg in
+      if cmdlst isn't (cmd :: cmdlst') then cfg else
+      let: (st', cmdlst'') := cmbcmd_step cmd st in
+      (st', cmdlst'' ++ cmdlst').
+  End step.
+End cmb_step.
 
+
+Section inv.
+  Context `{!VarPrm, !ValPrm}.
+
+  Parameter Cfg : Type.
+  Parameter mstep : Cfg -> Cfg.
+  Parameter Inv : Cfg -> Prop.
+
+
+  Goal forall c, Inv c ->  Inv (mstep c).
+  Abort.
+End inv.
+
+
+(*
 Section cont.
   Import Util.List. (* When to import? TODO *)
   Context `{!VarPrm, !ValPrm}.
@@ -408,3 +424,4 @@ End program_sem.
 Module Notations.
   Notation "⟦ p ☠︎︎ a ⟧" := (prog_behavior p a).
 End Notations.
+*)
