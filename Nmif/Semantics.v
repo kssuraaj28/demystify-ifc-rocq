@@ -390,9 +390,14 @@ Section inv.
          clear _b. 
          destruct _pc_lbl_ as [? []]=> /=.
          + case: _real_atk_bit_; move=> /=.
-           ++ admit.
-           ++ rewrite -{}_H5. 
-      -- admit.
+           ++ admit. (* This is composition of NI. TODO *)
+           ++ (* This is also ni *) admit.
+         + (* You are in secret context here, you can say that there is no modification to trusted vars *)
+           admit.
+
+      -- apply/zip_erase_substeps.  (* TODO: The trickiest case? *) 
+         (* This requires a lot of thought *)
+         admit. 
 
   Admitted.
   Import Util.List.
