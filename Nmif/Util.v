@@ -52,6 +52,14 @@ Module List.
     (da : A) (db : B) (dc : C) : list (A * B * C) :=
       combine_extend2 (combine_extend2 la lb da db) lc (da,db) dc.
 
+  Lemma combine_extend3_empty:
+    forall {A B C} l2 l3 (d1 :A) (d2: B) (d3: C),
+      combine_extend3 [] l2 l3 d1 d2 d3 =
+      map (fun '(e2, e3) => (d1,e2,e3))(combine_extend2 l2 l3 d2 d3). 
+  Proof.
+  Admitted.
+
+
   (* TODO: What naming conventions am I using? *)
   Ltac stp_Forall_app_gl := lazymatch goal with |- Forall _ (_ ++ _) => apply/Forall_app end.
   

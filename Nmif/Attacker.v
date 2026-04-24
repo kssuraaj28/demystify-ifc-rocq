@@ -69,3 +69,22 @@ Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
 
 Arguments AdvStateMachine: clear implicits.
 Arguments AdvStateMachine {_ _ _ _} AtkStates.
+
+(* Stepping tactics will not take any arguments.  *)
+(* TODO: This is stupid *)
+Import VarValStore.Notations.
+Import Tacs.
+Ltac stp_corr_wf_gl :=
+  lazymatch goal with
+  |- context [ ⟨ corruptor ?atk ?ast ?st | is_trusted ⟩] => 
+    let t := constr:(⟨ corruptor atk ast st | is_trusted ⟩) in
+    have: t = ⟨ st | is_trusted ⟩=> [| ->]; [ 
+    move: (corruptor_wf atk);  ⟨ evar_spec ⟩=> - [] + _; intros ->;done|]
+  end.
+
+Section test.
+  Context `{!VarPrm,!ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Generalizable All Variables.
+  Goal `(forall P, P ⟨ corruptor (AtkStates := A) adv ast st  | is_trusted ⟩).
+  Proof. move=> *. stp_corr_wf_gl. Abort.
+End test.

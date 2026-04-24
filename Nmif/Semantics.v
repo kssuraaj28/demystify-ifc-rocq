@@ -154,6 +154,7 @@ Section sa.
   End ind.
 End sa.
 
+
 Section cmb_cmd.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
   (* The simulator state will not be here. I'm doing some big brain intuition*)
@@ -201,6 +202,8 @@ Section cmb_step.
       sim_store : Store;
       atk_st : AtkStates
     }.
+
+    Definition Cfg := (CmbState * list CmbCmd)%type.
   End comb_state.
 
   Section step.
@@ -208,8 +211,6 @@ Section cmb_step.
     Notation corruptor := (corruptor adv).
     Notation learner := (learner adv).
     Notation atk_substeps := (substeps adv).
-
-    Notation Cfg := (CmbState * list CmbCmd)%type.
 
     Definition cmbcmd_step (c: CmbCmd) (s: CmbState) : Cfg :=
       let: mk_cmbcmd real_cmd real_atk_bit ideal_cmd pc_lbl := c in
@@ -225,7 +226,7 @@ Section cmb_step.
       (* If pc is secret, then there will not be any change to public vars, so this is okay! 
          The simulator will not have access to real_cmd in a secret branch
       *)
-      let: sim_st := if (Lattice4pt.public pc_lbl) is true then sim_st else optcmd_stp_store real_cmd sim_st in   (* TODO: This Lattice4pt is stupid *)
+      let: sim_st := if (Lattice4pt.public pc_lbl) is false then sim_st else optcmd_stp_store real_cmd sim_st in   (* TODO: This Lattice4pt is stupid *)
     
       (* Why is there no untrusted? Untrusted will show up when you have the invariant involved?? *)
     
@@ -240,7 +241,7 @@ Section cmb_step.
       (mk_cmbstate real_st ideal_st sim_st atk_st, zip real_cnt ideal_cnt atk_substeps new_pc). 
 
     (* mstep == multistep *)
-    Definition cmbcmd_mstep (cfg: Cfg) : Cfg := 
+    Definition cfg_step (cfg: Cfg) : Cfg := 
       let: (st, cmdlst) := cfg in
       if cmdlst isn't (cmd :: cmdlst') then cfg else
       let: (st', cmdlst'') := cmbcmd_step cmd st in
@@ -250,15 +251,160 @@ End cmb_step.
 
 
 Section inv.
-  Context `{!VarPrm, !ValPrm}.
+  Import Lattice4pt.
+  Import VarValStore.Notations.
 
-  Parameter Cfg : Type.
-  Parameter mstep : Cfg -> Cfg.
-  Parameter Inv : Cfg -> Prop.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
+  Variable (adv: AdvStateMachine AtkStates). 
+  Notation CmbState := (CmbState (AtkStates := AtkStates)).
+  Notation Cfg := (Cfg (AtkStates := AtkStates)).
+  Notation cfg_step := (cfg_step adv).
+  Notation cmbcmd_step := (cmbcmd_step adv).
+
+  Definition WellFormedOptCmd (pc: PcLbl) (ocmd : option Cmd): Prop :=
+    if ocmd isn't Some cmd then True else WellFormedCmd pc cmd.
+
+  (* TODO: Notation location *)
+  Notation "pc ⊢ ocmd" := (WellFormedOptCmd pc ocmd) (at level 20).
+
+  Definition CmbCmdCoreInv '(rcmd,icmd,pclbl) : Prop :=
+    pclbl ⊢ rcmd /\ 
+    (if (untrusted pclbl) is true 
+      then (mk_lbl true true) ⊢ icmd  (* icmd is still a good public untrusted *)
+      else rcmd = icmd). (* The rcmd is still well typed *)
+
+  Definition CmbCmdInv (cmb_cmd: CmbCmd) : Prop :=
+    let: mk_cmbcmd rcmd _ icmd pclbl := cmb_cmd in (* TODO: is_atk does not make an appearance... *)
+    CmbCmdCoreInv (rcmd, icmd, pclbl).
+
+  Lemma tr_cmd_st:
+    forall c p st1 st2, 
+      WellFormedCmd (mk_lbl false p) c ->
+      ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
+      ⟨ clean_cmd_stp_store c st1 | is_trusted ⟩ = ⟨ clean_cmd_stp_store c st2 | is_trusted ⟩.
+  Proof. Admitted.
+
+  Lemma untr_cmd_st:
+    forall p c st, WellFormedCmd (mk_lbl true p) c ->
+    ⟨ clean_cmd_stp_store c st | is_trusted ⟩ =
+    ⟨ st | is_trusted ⟩.
+  Proof. Admitted.
+
+(* This duplication is stupid *)
+  Lemma untr_ocmd_st:
+    forall p c st, mk_lbl true p ⊢ c ->
+    ⟨ optcmd_stp_store c st | is_trusted ⟩ =
+    ⟨ st | is_trusted ⟩.
+  Proof. Admitted.
 
 
-  Goal forall c, Inv c ->  Inv (mstep c).
-  Abort.
+  
+   Import List(combine_extend2).
+   Lemma zip_erase_substeps:
+     forall l1 l2 substeps pc_lbl,
+       Forall (fun '(icmd, rcmd)=> CmbCmdCoreInv (icmd, rcmd, pc_lbl))  (combine_extend2 (map Some l1) (map Some l2) None None) ->
+       Forall CmbCmdInv (zip l1 l2 substeps pc_lbl).
+   Proof.
+   Admitted.
+
+
+  Lemma cmbcmdinv_empty: 
+    forall n lbl,
+    Forall CmbCmdInv (zip [] [] n lbl).
+  Proof.  Admitted.
+
+  Lemma pubuntr_wf_cont: (* TODO: What happens when secret untrusted??? TODO TODO *)
+    forall c p st, 
+      WellFormedCmd (mk_lbl true true) c -> 
+      Forall (WellFormedCmd (mk_lbl true p)) (clean_cmd_stp_cnt c st).
+  Proof. Admitted.
+
+  Definition StateInv (s: CmbState): Prop :=
+    let: mk_cmbstate real_st ideal_st sim_st _ := s in
+    ⟨ real_st | is_trusted ⟩ = ⟨ ideal_st | is_trusted ⟩ /\
+    ⟨ real_st | is_public ⟩ = ⟨ sim_st | is_public ⟩.
+
+  Definition Invariant (c : Cfg): Prop :=
+    let: (cmbst, cmdlst) := c in
+    Forall CmbCmdInv cmdlst /\
+    StateInv cmbst.
+
+  Unset SsrIdents.
+  
+        Import Lattice4pt.Notations.
+  Check cmbcmd_step.
+  Lemma cmbcmd_step_inv: 
+    forall c st, 
+      CmbCmdInv c ->
+      StateInv st ->
+      let: (st', clst') := cmbcmd_step c st in
+      StateInv st' /\ Forall CmbCmdInv clst'.
+  Proof. 
+    case; rewrite {1}/CmbCmdInv=> rc. 
+    case erc: rc; last first.
+    - move=>>[]_; rewrite/StateInv=> + [].
+      case pce: (untrusted _); last first.
+      -- move=> <- /= *; repeat split.
+        --- rewrite -{}_a_.
+            case: (X in if X then _ else _)=> //.
+            stp_corr_wf_gl=>//.
+        --- case: _real_atk_bit_; case: (X in if X then _ else _)=> //. (* TODO: This should be automated  *)
+            all: admit. (* Pub NI of corruptor*)
+        --- apply/cmbcmdinv_empty. (* Should be finisher also *)
+      -- move=> * /=; repeat split.
+        --- erewrite untr_ocmd_st; [|eassumption].
+            case: (X in if X then _ else _)=> //.
+            stp_corr_wf_gl=>//.
+        --- case: _real_atk_bit_.
+          + case: (X in if X then _ else _).
+            all: admit. (* Pub NI of corruptor *)
+          + case: (X in if X then _ else _)=>//.
+        --- 
+          apply/zip_erase_substeps=>  /=. (* Should be step *)
+          rewrite map_map Forall_map. (* Should be automated? *)
+          rewrite {}pce.
+          destruct _ideal_cmd_=> //=.
+          rewrite /(_⊢_)/= in _b_. (* Forall_impl *)
+          move: _b_=>/(pubuntr_wf_cont _ true (ideal_store _st_))=> x. (* This is very very bad. How to fix? *)
+          apply/Forall_impl;[|eapply x]=> //.
+    - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv;intuition. (* Maybe not very good *)
+      -- case: _real_atk_bit_. (* Case is pretty safe? A lot of these can be automated *)
+        + rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
+          destruct _pc_lbl_ as [[] ?]; rewrite /= in _b.
+          ++ erewrite untr_cmd_st;[|eassumption].
+             stp_corr_wf_gl.
+             erewrite untr_ocmd_st;[|eassumption].
+             done.
+          ++ rewrite -{}_b.
+             rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
+             move r: RHS=>  x; (* Another automation step*)
+             do [erewrite tr_cmd_st] in r;[|eassumption|symmetry;eassumption];
+             rewrite -{}r {x}.
+             have: ⟨(corruptor adv (atk_st _st_) (real_store _st_)) | is_trusted  ⟩ = 
+             ⟨ real_store _st_ | is_trusted ⟩ by stp_corr_wf_gl.
+             move=> ?; (* TODO: Make this sooo much better *)
+             erewrite tr_cmd_st;[|eassumption|eassumption]; done.
+        + rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
+          admit. (* Very similar to previous case *)
+      -- rewrite ![optcmd_stp_store (Some _) _]/=.
+         clear _b. 
+         destruct _pc_lbl_ as [? []]=> /=.
+         + case: _real_atk_bit_; move=> /=.
+           ++ admit.
+           ++ rewrite -{}_H5. 
+      -- admit.
+
+  Admitted.
+  Import Util.List.
+  Theorem cfg_step_inv: forall c, Invariant c ->  Invariant (cfg_step c).
+  Proof.
+    case=> + [] //.
+    rewrite/Invariant/cfg_step=> > []; ⟨ Forall_inv ⟩.
+    case e: (cmbcmd_step _ _)=> h1 ? h2. 
+    move: (cmbcmd_step_inv _ _ h1 h2); rewrite {}e=> - [] *.
+    split=> //; apply/Forall_app=> //.
+  Qed.
+
 End inv.
 
 
