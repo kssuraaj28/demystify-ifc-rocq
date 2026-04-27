@@ -347,16 +347,44 @@ Section inv.
         have  {x} ->: x = b1; [destruct b; subst; auto|]
       end.
 
+  Import Util.List.
   Lemma cmbcmdinv_empty: 
     forall n lbl,
     Forall CmbCmdInv (zip [] [] n lbl).
-  Proof.  Admitted.
+  Proof.  
+    move=> >; rewrite /zip /= combine_extend3_empty. 
+    do 3 apply/Forall_map;apply /Forall_forall=> *.
+    cbn; repeat split; case: (untrusted _)=> //. (* TODO: Finisher!! *)
+  Qed.
 
-  Lemma pubuntr_wf_cont: (* TODO: What happens when secret untrusted??? TODO TODO *)
-    forall c p st, 
+  Import Lattice4pt.Notations.
+  Lemma flows_to_subtype :
+    forall c l1 l2,
+      l2 ⊑ l1 -> (* TODO: I don't know whether this is true *)
+      WellFormedCmd l1 c ->
+      WellFormedCmd l2 c.
+  Proof. Admitted. (* TODO: I have no idea whether this is the right thing!! *)  (* TODO: Generalize, flow *)
+
+  Lemma pubuntr_wf_cont: 
+    forall c st, 
       WellFormedCmd (mk_lbl true true) c -> 
-      Forall (WellFormedCmd (mk_lbl true p)) (clean_cmd_stp_cnt c st).
-  Proof. Admitted.
+      Forall (WellFormedCmd (mk_lbl true true)) (clean_cmd_stp_cnt c st).
+  Proof. 
+    move=> >;  move l: (mk_lbl _ _)=> ?; move: l=> /[swap].
+    case=> //=; rewrite -/(WellFormedProg _ _)=>>. 
+    - move=> ++ e; rewrite -{}e=> *.
+      case: (X in if X then _ else _).
+      all: apply:Forall_impl; [|eassumption]=> *.
+      all: apply/flows_to_subtype;[|eassumption].
+      all: case: (var_lbl)=> [[] []]=> //. (* TODO: This should be lemma *)
+    - move=> + e; rewrite -{}e=> *.
+      case: (X in if X then _ else _)=> //.
+      apply/Forall_app; split;[|repeat constructor=>//].
+      apply/Forall_impl; [|eassumption]=> *.
+      apply/flows_to_subtype;[|eassumption].
+      case: (var_lbl)=> [[] []]=> //. (* TODO: This should be lemma *)
+  Qed.
+
 
   Definition StateInv (s: CmbState): Prop :=
     let: mk_cmbstate real_st ideal_st sim_st _ := s in
@@ -380,17 +408,24 @@ Section inv.
       let: (st', clst') := cmbcmd_step c st in
       StateInv st' /\ Forall CmbCmdInv clst'.
   Proof. 
+            Ltac if_easy_goals:=
+            match goal with
+            |- context [if ?b then _ else _] => 
+              destruct b=> //
+              (* Then assert that it there was no branching. TODO *)
+            end.
     case; rewrite {1}/CmbCmdInv=> rc. 
     case erc: rc; last first.
     - move=>>[]_; rewrite/StateInv=> + [].
       case pce: (untrusted _); last first.
       -- move=> <- /= treq pubeq; repeat split.
         --- rewrite -{}treq.
-            case: (X in if X then _ else _)=> //. 
-            stp_corr_wf_gl=>//.
+            if_easy_goals.
+            stp_corr_wf_gl=>//. (* apply corruptor_wf_int: TODO*)
 
-        --- if_same. case: _real_atk_bit_=> //.
-             admit. (* Pub NI of corruptor*)
+        --- if_same. 
+            if_easy_goals.
+            apply: corruptor_wf_conf=> //.
         --- apply/cmbcmdinv_empty. (* Should be finisher also *)
       -- move=> * /=; repeat split.
         --- erewrite untr_ocmd_st; [|eassumption]. (* This can be automated as well *)
@@ -399,7 +434,7 @@ Section inv.
             stp_corr_wf_gl=>//.
         --- if_same. 
             case: _real_atk_bit_=> //.
-            admit. (* Pub NI of corruptor *)
+            apply: corruptor_wf_conf=> //.
 
         --- apply/zip_erase_substeps=>  /=. (* Should be step *)
             rewrite map_map Forall_map. (* Should be automated? *)
@@ -408,25 +443,30 @@ Section inv.
             rewrite /(_⊢_)/= in _b_. (* Forall_impl *)
             apply/Forall_and; [apply/Forall_forall=> //|].
             rewrite-/(WellFormedProg _ _).
+            admit.
+            (*
             move: _b_=>/(pubuntr_wf_cont _ true (ideal_store _st_))=> x. (* This is very very bad. How to fix? *)
             apply/Forall_impl;[|eapply x]=> //.
+            *)
     - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv;intuition. (* Maybe not very good *)
       -- case: _real_atk_bit_. (* Case is pretty safe? A lot of these can be automated *)
         + rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
           destruct _pc_lbl_ as [[] ?]; rewrite /= in _b.
           ++ erewrite untr_cmd_st;[|eassumption].
-             stp_corr_wf_gl.
-             erewrite untr_ocmd_st;[|eassumption].
-             done.
+             rewrite corruptor_wf_int.
+             erewrite untr_ocmd_st;[|eassumption]=> //.
+
           ++ rewrite -{}_b.
              rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
              move r: RHS=>  x; (* Another automation step*)
              do [erewrite tr_cmd_st] in r;[|eassumption|symmetry;eassumption];
              rewrite -{}r {x}.
+
              have: ⟨(corruptor adv (atk_st _st_) (real_store _st_)) | is_trusted  ⟩ = 
              ⟨ real_store _st_ | is_trusted ⟩ by stp_corr_wf_gl.
              move=> ?; (* TODO: Make this sooo much better *)
              erewrite tr_cmd_st;[|eassumption|eassumption]; done.
+
         + rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
           admit. (* Very similar to previous case *)
       -- rewrite ![optcmd_stp_store (Some _) _]/=.
@@ -471,12 +511,15 @@ Section inv.
                 +++ apply/Forall_combine2_ind2; [move=> ?; apply|..]; [..| done].
                    admit. (* Just follows by soundness? *)
 
-                +++ erewrite tr_cmd_cnt. 
+                +++ 
 
+(*
+erewrite tr_cmd_cnt. 
                     untrusted (compute_new_pc lbl
                     clean_cmd_stp_cnt c st1 = clean_cmd_stp_cnt st2
  
                     set x := (corruptor _ _).
+                    *)
 
             have <-: clean_cmd_stp_cnt _a_ (ideal_store _st_) = (clean_cmd_stp_cnt _a_ (if _real_atk_bit_
             then corruptor adv (atk_st _st_) (real_store _st_)

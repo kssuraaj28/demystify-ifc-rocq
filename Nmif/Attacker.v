@@ -46,12 +46,16 @@ Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
     init_state: StoreView -> AtkStates; (* You only get untrusted*)
     corruptor: AtkStates -> Store -> Store;
  
-    corruptor_wf: 
+    corruptor_wf_int: 
       forall ast, 
         let: ast_corr := corruptor ast in
         let: tr_view := (store_to_view is_trusted) in
+        (forall st, tr_view (ast_corr st) = (tr_view st));  (* The adversary does not touch trusted computation. This is a little bit ugly *)
+
+    corruptor_wf_conf: 
+      forall ast, 
+        let: ast_corr := corruptor ast in
         let: pub_view := (store_to_view is_public) in 
-        (forall st, tr_view (ast_corr st) = (tr_view st)) /\  (* The adversary does not touch trusted computation. This is a little bit ugly *)
         Noninterfering pub_view ast_corr pub_view; (* public outputs don't chnage if public inputs don't *)
 
 
@@ -74,12 +78,13 @@ Arguments AdvStateMachine {_ _ _ _} AtkStates.
 (* TODO: This is stupid *)
 Import VarValStore.Notations.
 Import Tacs.
+
 Ltac stp_corr_wf_gl :=
   lazymatch goal with
   |- context [ ⟨ corruptor ?atk ?ast ?st | is_trusted ⟩] => 
     let t := constr:(⟨ corruptor atk ast st | is_trusted ⟩) in
-    have: t = ⟨ st | is_trusted ⟩=> [| ->]; [ 
-    move: (corruptor_wf atk);  ⟨ evar_spec ⟩=> - [] + _; intros ->;done|]
+    have: t = ⟨ st | is_trusted ⟩=> [| ->];
+    [rewrite (corruptor_wf_int atk)=>//|]
   end.
 
 Section test.
