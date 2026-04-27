@@ -108,6 +108,8 @@ Section sa.
        WellFormedProg' WellFormedCmd newpc wbody ->
        _ pclbl (while (gvar,comp) wbody).
   Set Elimination Schemes.
+  
+  Definition WellFormedProg pclbl prog := WellFormedProg' WellFormedCmd pclbl prog.
 
   Section ind.
     Variable P : PcLbl -> Cmd -> Prop.
@@ -172,6 +174,7 @@ End cmb_cmd.
 Section cmb_step.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
+
   Definition zip (real_cont: list Cmd) (ideal_cont: list Cmd) (atk_steps: nat) (pc_lbl: PcLbl): list CmbCmd :=
     let: real_cont := map Some real_cont in
     let: ideal_cont := map Some ideal_cont in
@@ -181,15 +184,30 @@ Section cmb_step.
 
   Section new_pc.
     Import Lattice4pt.Notations.
-    Definition compute_new_pc (old_pc : PcLbl) (cmd: option Cmd): PcLbl :=
-      if cmd isn't Some cmd then old_pc else
+    Definition compute_new_pc (old_pc : PcLbl) (cmd: Cmd): PcLbl :=
       match cmd with
       | cond (gvar,_) _ _ => var_lbl gvar ⊔ old_pc (* Can this be refactored w/ static analysis? *)
       | while (gvar,_) _ => var_lbl gvar ⊔ old_pc
       | _ => old_pc
       end.
+
+    Definition compute_new_pc_opt (old_pc : PcLbl) (cmd: option Cmd): PcLbl :=
+      if cmd isn't Some cmd then old_pc else
+      compute_new_pc old_pc cmd.
   End new_pc.
 
+  Import Lattice4pt.
+  Lemma compute_new_pc_untr:
+    forall p c, exists p',
+      compute_new_pc (mk_lbl true p) c = (mk_lbl true p').
+  Admitted.
+
+  (* TODO: Actively disgusting *)
+  Lemma step_soundness:
+    forall c pc,WellFormedCmd pc c ->
+      forall st,
+        WellFormedProg (compute_new_pc pc c) (clean_cmd_stp_cnt c st).
+  Proof. Admitted.
 
   Context {AtkStates : Type}.
 
@@ -237,7 +255,7 @@ Section cmb_step.
       let: atk_st := if real_atk_bit is true then learner atk_st real_st else atk_st in (* This could be sim_st as well, right? TODO: You need to think about whether the attacker is active, right? *)
       let: atk_substeps := atk_substeps atk_st in
 
-      let: new_pc := compute_new_pc pc_lbl real_cmd in
+      let: new_pc := compute_new_pc_opt pc_lbl real_cmd in
       (mk_cmbstate real_st ideal_st sim_st atk_st, zip real_cnt ideal_cnt atk_substeps new_pc). 
 
     (* mstep == multistep *)
@@ -302,11 +320,20 @@ Section inv.
    Import List(combine_extend2).
    Lemma zip_erase_substeps:
      forall l1 l2 substeps pc_lbl,
-       Forall (fun '(icmd, rcmd)=> CmbCmdCoreInv (icmd, rcmd, pc_lbl))  (combine_extend2 (map Some l1) (map Some l2) None None) ->
+       (* TODO: I didn't have fst and snd before, and that wait painful. How to solve? *)
+       Forall (fun p => CmbCmdCoreInv (p.1, p.2, pc_lbl))  (combine_extend2 (map Some l1) (map Some l2) None None) ->
        Forall CmbCmdInv (zip l1 l2 substeps pc_lbl).
    Proof.
    Admitted.
 
+    Ltac if_same :=
+      let x := fresh in 
+      set x := if _ then ?[B] else ?B;
+      let t := eval cbv delta [x] in x in 
+      lazymatch t with
+      | if ?b then ?b1 else _ => 
+        have  {x} ->: x = b1; [destruct b; subst; auto|]
+      end.
 
   Lemma cmbcmdinv_empty: 
     forall n lbl,
@@ -331,7 +358,8 @@ Section inv.
 
   Unset SsrIdents.
   
-        Import Lattice4pt.Notations.
+  Import Lattice4pt.Notations.
+  Import Util.List.
   Check cmbcmd_step.
   Lemma cmbcmd_step_inv: 
     forall c st, 
@@ -348,17 +376,16 @@ Section inv.
         --- rewrite -{}_a_.
             case: (X in if X then _ else _)=> //.
             stp_corr_wf_gl=>//.
-        --- case: _real_atk_bit_; case: (X in if X then _ else _)=> //. (* TODO: This should be automated  *)
-            all: admit. (* Pub NI of corruptor*)
+        --- if_same. case: _real_atk_bit_=> //.
+             admit. (* Pub NI of corruptor*)
         --- apply/cmbcmdinv_empty. (* Should be finisher also *)
       -- move=> * /=; repeat split.
-        --- erewrite untr_ocmd_st; [|eassumption].
+        --- erewrite untr_ocmd_st; [|eassumption]. (* This can be automated as well *)
             case: (X in if X then _ else _)=> //.
             stp_corr_wf_gl=>//.
         --- case: _real_atk_bit_.
-          + case: (X in if X then _ else _).
-            all: admit. (* Pub NI of corruptor *)
-          + case: (X in if X then _ else _)=>//.
+          + if_same. admit. (* Pub NI of corruptor *)
+          + if_same=> //.
         --- 
           apply/zip_erase_substeps=>  /=. (* Should be step *)
           rewrite map_map Forall_map. (* Should be automated? *)
@@ -396,10 +423,47 @@ Section inv.
            admit.
 
       -- apply/zip_erase_substeps.  (* TODO: The trickiest case? *) 
-         (* This requires a lot of thought *)
-         admit. 
+         cbn; apply/Forall_and.
+         + set x := (X in combine_extend2 _ X _ _); move:x => ?.
+           apply/Forall_combine2_ind1; [move=> ?; apply|..]; [..| done]. (* Is this a reasonable forward reasoning step? *)
+           apply/Forall_map/step_soundness=> //.
+         + destruct _pc_lbl_ as [[] ?] ; rewrite /= in _b.
+           ++ set (untrusted _) as x; have {x} ->: x = true by admit. (* Should be rewrite *)
+              apply/Forall_combine2_ind2; [move=> ?; apply|..]; [..| done].
+              apply/Forall_map. (* This should be automated *)
 
-  Admitted.
+              move: _b.
+              destruct _ideal_cmd_=> //; cbn.
+              move=> /step_soundness /(_ (ideal_store _st_)). (* TODO: Can I make this better? *)
+              apply/Forall_impl=> >.
+
+              Ltac compute_new_pc_untr :=
+                  lazymatch goal with (* This you can fire wherever there is compute_new_pc?
+                  You do lose information though*)
+                  |- context [compute_new_pc (mk_lbl true ?p) ?c] => 
+                     let f := fresh in 
+                     specialize (compute_new_pc_untr p c)=> - [? ->]
+                  end. (* You have to do  finisher automation!! *)
+              compute_new_pc_untr.
+
+              admit. (* This is some flows_to lemma *)
+           ++  subst; cbn. (* Current pc is trusted *)
+             (* This requires maximum brain.. *)
+
+                remember ((compute_new_pc _ _)) as newpc eqn: newpce. (* dogshit ssr *)
+                destruct newpc as [[] ?]; cbn.
+                +++ apply/Forall_combine2_ind2; [move=> ?; apply|..]; [..| done].
+                   admit. (* Just follows by soundness? *)
+
+                +++ 
+                    set x := (corruptor _ _).
+
+            have <-: clean_cmd_stp_cnt _a_ (ideal_store _st_) = (clean_cmd_stp_cnt _a_ (if _real_atk_bit_
+            then corruptor adv (atk_st _st_) (real_store _st_)
+            else real_store _st_));[admit|]. (* I don't know why. But very very important *)
+            apply/Forall_combine2_same/Forall_forall=> //.
+
+            Admitted.
   Import Util.List.
   Theorem cfg_step_inv: forall c, Invariant c ->  Invariant (cfg_step c).
   Proof.
