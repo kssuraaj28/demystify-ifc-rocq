@@ -202,6 +202,18 @@ Section cmb_step.
       compute_new_pc (mk_lbl true p) c = (mk_lbl true p').
   Admitted.
 
+  Import VarValStore.Notations.
+  Lemma tr_cmd_cnt:
+    forall p c,
+      let: lbl := mk_lbl false p in
+      let: new_lbl := (compute_new_pc lbl c) in
+      WellFormedCmd lbl c ->
+      untrusted new_lbl = false ->
+      forall st1 st2,
+        ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
+        clean_cmd_stp_cnt c st1 = clean_cmd_stp_cnt c st2.
+    Admitted.
+  
   (* TODO: Actively disgusting *)
   Lemma step_soundness:
     forall c pc,WellFormedCmd pc c ->
@@ -288,7 +300,7 @@ Section inv.
   Definition CmbCmdCoreInv '(rcmd,icmd,pclbl) : Prop :=
     pclbl ⊢ rcmd /\ 
     (if (untrusted pclbl) is true 
-      then (mk_lbl true true) ⊢ icmd  (* icmd is still a good public untrusted *)
+      then (mk_lbl true false) ⊢ icmd  (* icmd is still a good secret untrusted *)
       else rcmd = icmd). (* The rcmd is still well typed *)
 
   Definition CmbCmdInv (cmb_cmd: CmbCmd) : Prop :=
@@ -372,28 +384,35 @@ Section inv.
     case erc: rc; last first.
     - move=>>[]_; rewrite/StateInv=> + [].
       case pce: (untrusted _); last first.
-      -- move=> <- /= *; repeat split.
-        --- rewrite -{}_a_.
-            case: (X in if X then _ else _)=> //.
+      -- move=> <- /= treq pubeq; repeat split.
+        --- rewrite -{}treq.
+            case: (X in if X then _ else _)=> //. 
             stp_corr_wf_gl=>//.
+
         --- if_same. case: _real_atk_bit_=> //.
              admit. (* Pub NI of corruptor*)
         --- apply/cmbcmdinv_empty. (* Should be finisher also *)
       -- move=> * /=; repeat split.
         --- erewrite untr_ocmd_st; [|eassumption]. (* This can be automated as well *)
-            case: (X in if X then _ else _)=> //.
+
+            case: (X in if X then _ else _)=> //. (* This pattern repeats for sure *)
             stp_corr_wf_gl=>//.
-        --- case: _real_atk_bit_.
-          + if_same. admit. (* Pub NI of corruptor *)
-          + if_same=> //.
-        --- 
-          apply/zip_erase_substeps=>  /=. (* Should be step *)
-          rewrite map_map Forall_map. (* Should be automated? *)
-          rewrite {}pce.
-          destruct _ideal_cmd_=> //=.
-          rewrite /(_⊢_)/= in _b_. (* Forall_impl *)
-          move: _b_=>/(pubuntr_wf_cont _ true (ideal_store _st_))=> x. (* This is very very bad. How to fix? *)
-          apply/Forall_impl;[|eapply x]=> //.
+        --- if_same. 
+            case: _real_atk_bit_=> //.
+            admit. (* Pub NI of corruptor *)
+
+        --- apply/zip_erase_substeps=>  /=. (* Should be step *)
+            rewrite map_map Forall_map. (* Should be automated? *)
+            rewrite {}pce.
+            destruct _ideal_cmd_=> //=.
+            rewrite /(_⊢_)/= in _b_. (* Forall_impl *)
+            apply/Forall_and; [apply/Forall_forall=> //|].
+            rewrite-/(WellFormedProg _ _).
+            admit.
+            (*
+            move: _b_=>/(pubuntr_wf_cont _ true (ideal_store _st_))=> x. (* This is very very bad. How to fix? *)
+            apply/Forall_impl;[|eapply x]=> //.
+            *)
     - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv;intuition. (* Maybe not very good *)
       -- case: _real_atk_bit_. (* Case is pretty safe? A lot of these can be automated *)
         + rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
@@ -455,8 +474,13 @@ Section inv.
                 +++ apply/Forall_combine2_ind2; [move=> ?; apply|..]; [..| done].
                    admit. (* Just follows by soundness? *)
 
-                +++ 
+                +++ (*erewrite tr_cmd_cnt. 
+
+                    untrusted (compute_new_pc lbl
+                    clean_cmd_stp_cnt c st1 = clean_cmd_stp_cnt st2
+ 
                     set x := (corruptor _ _).
+                    *)
 
             have <-: clean_cmd_stp_cnt _a_ (ideal_store _st_) = (clean_cmd_stp_cnt _a_ (if _real_atk_bit_
             then corruptor adv (atk_st _st_) (real_store _st_)
