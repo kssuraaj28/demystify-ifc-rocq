@@ -300,7 +300,7 @@ Section inv.
   Definition CmbCmdCoreInv '(rcmd,icmd,pclbl) : Prop :=
     pclbl ⊢ rcmd /\ 
     (if (untrusted pclbl) is true 
-      then (mk_lbl true false) ⊢ icmd  (* icmd is still a good secret untrusted *)
+      then (mk_lbl true true) ⊢ icmd  (* icmd is still a good public untrusted *)
       else rcmd = icmd). (* The rcmd is still well typed *)
 
   Definition CmbCmdInv (cmb_cmd: CmbCmd) : Prop :=
@@ -408,11 +408,8 @@ Section inv.
             rewrite /(_⊢_)/= in _b_. (* Forall_impl *)
             apply/Forall_and; [apply/Forall_forall=> //|].
             rewrite-/(WellFormedProg _ _).
-            admit.
-            (*
             move: _b_=>/(pubuntr_wf_cont _ true (ideal_store _st_))=> x. (* This is very very bad. How to fix? *)
             apply/Forall_impl;[|eapply x]=> //.
-            *)
     - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv;intuition. (* Maybe not very good *)
       -- case: _real_atk_bit_. (* Case is pretty safe? A lot of these can be automated *)
         + rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
@@ -474,13 +471,12 @@ Section inv.
                 +++ apply/Forall_combine2_ind2; [move=> ?; apply|..]; [..| done].
                    admit. (* Just follows by soundness? *)
 
-                +++ (*erewrite tr_cmd_cnt. 
+                +++ erewrite tr_cmd_cnt. 
 
                     untrusted (compute_new_pc lbl
                     clean_cmd_stp_cnt c st1 = clean_cmd_stp_cnt st2
  
                     set x := (corruptor _ _).
-                    *)
 
             have <-: clean_cmd_stp_cnt _a_ (ideal_store _st_) = (clean_cmd_stp_cnt _a_ (if _real_atk_bit_
             then corruptor adv (atk_st _st_) (real_store _st_)
