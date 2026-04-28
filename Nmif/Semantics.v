@@ -73,8 +73,8 @@ End cleanstep.
 Ltac if_easy_goals:=
   match goal with
   |- context [if ?b then _ else _] => 
-    destruct b=> //
-    (* Then assert that it there was no branching. TODO *)
+    move: b; case; try easy
+    (* Then assert that it there was no branching. TODO: Maybe in Ltac2*)
   end.
 
 (* TODO: Maybe elsewere *)
@@ -242,7 +242,7 @@ Section cmb_step.
       forall st,
         WellFormedProg (compute_new_pc pc c) (clean_cmd_stp_cnt c st).
   Proof. 
-    move=> > + > => - []=> * //=; if_easy_goals.
+    move=> > + > => - []=> * //=; if_easy_goals=> //.
     apply/Forall_app. split=> //.
     constructor 2=> //.
     constructor 3. apply/Forall_impl; [| eassumption]; clear=> *.
@@ -263,6 +263,7 @@ Section cmb_step.
 
     Definition Cfg := (CmbState * list CmbCmd)%type.
   End comb_state.
+
 
   Section step.
     Variable (adv: AdvStateMachine AtkStates). 
@@ -364,17 +365,16 @@ Section inv.
     ⟨ st | is_trusted ⟩.
   Proof. Admitted.
 
-(* This duplication is stupid *)
+(* This duplication is stupid. TODO: Awesome automation *)
   Lemma wt_ocmd_st_int_untr:
     forall p c st, mk_lbl true p ⊢ c ->
     ⟨ optcmd_stp_store c st | is_trusted ⟩ =
     ⟨ st | is_trusted ⟩.
   Proof. Admitted.
 
-
   
    Import List(combine_extend2).
-   Lemma zip_erase_substeps:
+   Lemma Forall_zip:
      forall l1 l2 substeps pc_lbl,
        (* TODO: I didn't have fst and snd before, and that wait painful. How to solve? *)
        Forall (fun p => CmbCmdCoreInv (p.1, p.2, pc_lbl))  (combine_extend2 (map Some l1) (map Some l2) None None) ->
@@ -463,7 +463,7 @@ Section inv.
     - move=>>[]_; rewrite/StateInv=> + [].
       (case pce: (untrusted _))=> [* /= | <- /= <- *]; last first; repeat split.
 
-       --- if_easy_goals. (* TODO: Need to make sure that it does not appear anywhere else *)
+       --- if_easy_goals.
            rewrite corruptor_wf_int=> //. (* apply corruptor_wf_int: TODO*)
 
        --- if_same. 
@@ -472,15 +472,15 @@ Section inv.
 
        --- apply/cmbcmdinv_empty. (* Should be finisher also *)
 
-       --- erewrite wt_ocmd_st_int_untr; [|eassumption]. (* This can be automated as well *)
+       --- erewrite wt_ocmd_st_int_untr; [|eassumption]. (* This can be automated as well. This is a little sus *)
            if_easy_goals.
            rewrite corruptor_wf_int=> //.
 
        --- if_same. 
-           if_easy_goals.
+           if_easy_goals. (* TODO: if_easy_goals should check that nothing too bad is happening. It should also check that *)
            apply: corruptor_wf_conf=> //.
 
-       --- apply/zip_erase_substeps=>  /=. (* Should be step *)
+       --- apply/Forall_zip=>  /=. (* Should be step *)
            rewrite map_map Forall_map. (* Should be automated? *)
            rewrite {}pce.
            apply/Forall_and; [apply/Forall_forall=> //|].
@@ -520,7 +520,7 @@ Section inv.
            if_easy_goals.
            apply/corruptor_wf_conf=> //. (* TODO: apply vs erewrite *)
 
-      -- apply/zip_erase_substeps=> /=.  (* TODO: The trickiest case? *) 
+      -- apply/Forall_zip=> /=.  (* TODO: The trickiest case? *) 
          apply/Forall_and.
          + apply/Forall_combine2_ind1; [move=> ?; apply|..]; [..| done]. (* Is this a reasonable forward reasoning step? *)
            apply/Forall_map/step_soundness=> //.
