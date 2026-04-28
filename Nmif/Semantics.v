@@ -461,34 +461,32 @@ Section inv.
     case; rewrite {1}/CmbCmdInv=> rc. 
     case erc: rc; last first.
     - move=>>[]_; rewrite/StateInv=> + [].
-      case pce: (untrusted _); last first.
-      -- move=> <- /= treq pubeq; repeat split.
-        --- rewrite -{}treq.
-            if_easy_goals. (* TODO: Need to make sure that it does not appear anywhere else *)
-            rewrite corruptor_wf_int=> //. (* apply corruptor_wf_int: TODO*)
+      (case pce: (untrusted _))=> [* /= | <- /= <- *]; last first; repeat split.
 
-        --- if_same. 
-            if_easy_goals.
-            apply: corruptor_wf_conf=> //.
+       --- if_easy_goals. (* TODO: Need to make sure that it does not appear anywhere else *)
+           rewrite corruptor_wf_int=> //. (* apply corruptor_wf_int: TODO*)
 
-        --- apply/cmbcmdinv_empty. (* Should be finisher also *)
-      -- move=> * /=; repeat split.
-        --- erewrite wt_ocmd_st_int_untr; [|eassumption]. (* This can be automated as well *)
-            if_easy_goals.
-            rewrite corruptor_wf_int=> //.
+       --- if_same. 
+           if_easy_goals.
+           apply: corruptor_wf_conf=> //.
 
-        --- if_same. 
-            if_easy_goals.
-            apply: corruptor_wf_conf=> //.
+       --- apply/cmbcmdinv_empty. (* Should be finisher also *)
 
-        --- apply/zip_erase_substeps=>  /=. (* Should be step *)
-            rewrite map_map Forall_map. (* Should be automated? *)
-            rewrite {}pce.
-            destruct _ideal_cmd_=> //=.
-            rewrite /(_⊢_)/= in _b_. (* Forall_impl *)
-            apply/Forall_and; [apply/Forall_forall=> //|].
-            rewrite-/(WellFormedProg _ _).
-            apply/pubuntr_wf_cont=> //.
+       --- erewrite wt_ocmd_st_int_untr; [|eassumption]. (* This can be automated as well *)
+           if_easy_goals.
+           rewrite corruptor_wf_int=> //.
+
+       --- if_same. 
+           if_easy_goals.
+           apply: corruptor_wf_conf=> //.
+
+       --- apply/zip_erase_substeps=>  /=. (* Should be step *)
+           rewrite map_map Forall_map. (* Should be automated? *)
+           rewrite {}pce.
+           apply/Forall_and; [apply/Forall_forall=> //|].
+           rewrite-/(WellFormedProg _ _).
+           destruct _ideal_cmd_=> //=. (* How to have automation here? Should be easy. Add a theorem? *)
+           apply/pubuntr_wf_cont=> //.
 
     - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> wt idwt [tr pu]; repeat split.
       -- case: _real_atk_bit_. (* Case is pretty safe? A lot of these can be automated *)
@@ -545,23 +543,22 @@ Section inv.
               apply/flows_to_subtype_prog;[|apply/snd].
               compute_new_pc_untr=> //.
               
-           ++  subst; cbn. (* Current pc is trusted *)
+           ++ subst=> /=.
              (* This requires maximum brain.. *)
-
-               remember ((compute_new_pc _ _)) as newpc eqn: newpce. (* dogshit ssr *)
+               move newpce:  (compute_new_pc _ _)=> newpc.
                destruct newpc as [[] ?]; cbn.
-               +++ apply/Forall_combine2_ind2; [move=> ?; apply|..]; [..| done].
+               +++ apply/Forall_combine2_ind2; [move=> ?; apply|..]=> //.
                    apply/Forall_map=> /=.
                    rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
                    move:wt=> /step_soundness /(_ (ideal_store _st_)).
                    apply/flows_to_subtype_prog.
-                   rewrite -newpce=> //.
+                   rewrite newpce=> //.
 
 
                +++ erewrite tr_cmd_cnt;
                      [apply/Forall_combine2_same/Forall_map/Forall_forall => //
                       | eassumption 
-                      | rewrite -newpce // |].
+                      | rewrite newpce // |].
                    if_easy_goals.
                    rewrite corruptor_wf_int=> //.
         Qed.
