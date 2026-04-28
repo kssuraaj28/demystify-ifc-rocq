@@ -1,5 +1,5 @@
-Require ssreflect.
-Import ssreflect.
+Require ssreflect ssrbool.
+Import ssreflect ssrbool.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
@@ -15,6 +15,8 @@ Section var_lbl.
     untrusted : bool;  (* The variable is maulable *)
     public: bool
   }.
+  Definition secret l := ~~ public l.
+  Definition trusted l := ~~ untrusted l.
 End var_lbl.
 
 Definition flows_to_conf (pubfrom pubto: bool) : bool :=
@@ -65,4 +67,17 @@ Proof. case=> - [] [] //. Qed.
 Lemma join_sym:
   forall l1 l2,  
     (l1 ⊔ l2)  =  (l2 ⊔ l1).
+Proof. do 2 (case=> - [] [])=> //. Qed.
+
+
+Lemma flows_to_untr:
+  forall l1 l2,
+    untrusted l1 -> l1 ⊑ l2 ->
+    untrusted l2.
+Proof. do 2 (case=> - [] [])=> //. Qed.
+
+Lemma flows_to_sec:
+  forall l1 l2,
+    secret l1 -> l1 ⊑ l2 ->
+    secret l2.
 Proof. do 2 (case=> - [] [])=> //. Qed.

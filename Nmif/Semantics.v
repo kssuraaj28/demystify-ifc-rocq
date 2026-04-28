@@ -154,11 +154,11 @@ Section sa.
       forall p c, WellFormedCmd p c -> P p c. 
     Proof.
       move=> > []; [apply:hyp_assign|..]=> *.
-      all: (apply: hyp_cond; clear hyp_cond) || (apply: hyp_while; clear hyp_while)=>//.
-      all: lazymatch goal with
+      1-2: (apply: hyp_cond; clear hyp_cond) || (apply: hyp_while; clear hyp_while)=>//.
+      1-3: lazymatch goal with
              H: Forall _ ?b |- Forall _ ?b => elim: H=> // *
             end.
-      all: constructor 2=> //; auto.
+      1-3: constructor 2=> //; auto.
     Qed.
   End ind.
 End sa.
@@ -209,8 +209,8 @@ Section cmb_step.
       compute_new_pc (mk_lbl true p) c = (mk_lbl true p').
   Proof.
     move=> p [dst exp| [g cmp] b1 b2 | [g cmp] b]; cbn; eauto.
-    all: case: (var_lbl g) => u pg. (* TODO: This could be a lemma *)
-    all: exists (pg && p); case: u; done.
+    1-2: case: (var_lbl g) => u pg. (* TODO: This could be a lemma *)
+    1-2: exists (pg && p); case: u; done.
   Qed.
 
   Import VarValStore.Notations.
@@ -226,11 +226,11 @@ Section cmb_step.
   Proof.
     move=> >. move e: (mk_lbl _ _)=> l; move: e=> /[swap].
     case=> //= > => [_ _| _] <- untrg *.
-    all: set lhs := LHS; set gr := (X in if X then _ else _); subst lhs.
-    all: set rhs := RHS; set gl := (X in if X then _ else _); subst rhs.
-    all: suff: gl = gr; [move=> -> //|subst gl gr]; congr (_ _).
-    all: apply/storeview_eq; [eassumption|].
-    all: move: untrg; rewrite Bool.orb_false_r /is_trusted/is_untrusted=> -> //.
+    1-2: set lhs := LHS; set gr := (X in if X then _ else _); subst lhs.
+    1-2: set rhs := RHS; set gl := (X in if X then _ else _); subst rhs.
+    1-2: suff: gl = gr; [move=> -> //|subst gl gr]; congr (_ _).
+    1-2: apply/storeview_eq; [eassumption|].
+    1-2: move: untrg; rewrite Bool.orb_false_r /is_trusted/is_untrusted=> -> //.
   Qed.
 
 

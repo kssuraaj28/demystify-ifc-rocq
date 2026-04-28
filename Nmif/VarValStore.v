@@ -47,13 +47,34 @@ Section thms.
   Import Notations.
   Context `{!VarPrm, !ValPrm}.
 
-  Theorem storeview_eq: 
-    forall s1 s2 p inp,
+  Theorem storeview_eq s1 s2 p inp:
       ⟨ s1 | p ⟩ = ⟨ s2 | p ⟩ -> p inp -> 
       s1 inp = s2 inp.
   Proof.
-    move=>??? inp; rewrite/⟨_|_⟩.
+    rewrite/⟨_|_⟩.
     move=> /equal_f/(_ inp)/[swap]->[] //.
   Qed.
 
+  Lemma update_storeview_nochange p st var val:
+      p var = false ->
+      ⟨ update_to_store st var val | p⟩ = ⟨ st | p ⟩.
+  Proof.
+    move=>h; apply/functional_extensionality=> ?.
+    rewrite/⟨_|_⟩. case pe: (p _)=> //.
+    congr (_ _). rewrite /update_to_store.
+    case (dec_eq _ _)=> //.
+    congruence.
+  Qed.
+
+  Lemma update_same_varval s1 s2 vr vl p:
+    ⟨ s1 | p ⟩ = ⟨ s2 | p ⟩ ->
+    ⟨update_to_store s1 vr vl | p⟩ = ⟨update_to_store s2 vr vl | p⟩.
+  Proof.
+    move=> h; apply/functional_extensionality=> inp.
+    rewrite/⟨_|_⟩. case pe: (p _)=> //.
+    congr (_ _). rewrite /update_to_store.
+    case (dec_eq _ _)=> //=> _.
+    move: h=> /equal_f/(_ inp).
+    rewrite/⟨_|_⟩ pe=> - [] //.
+  Qed.
 End thms.
