@@ -52,3 +52,17 @@ Lemma join_flow:
   forall l1 l2 l3,
     l1 ⊔ l2  ⊑  l3 = l1 ⊑ l3 && l2 ⊑ l3.
 Proof. do 3 (case=> - [] [])=> //=. Qed.
+
+Lemma join_assoc:
+  forall l1 l2 l3,
+    (l1 ⊔ l2) ⊔ l3  =  l1 ⊔ (l2 ⊔ l3).
+Proof.   case=> - [] [] //. Qed.
+
+Lemma join_idem:
+  forall l,  (l ⊔ l) = l.
+Proof. case=> - [] [] //. Qed.
+
+Lemma join_sym:
+  forall l1 l2,  
+    (l1 ⊔ l2)  =  (l2 ⊔ l1).
+Proof. do 2 (case=> - [] [])=> //. Qed.

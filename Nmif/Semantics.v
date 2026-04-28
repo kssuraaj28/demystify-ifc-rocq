@@ -1,5 +1,5 @@
-From Stdlib Require List ssreflect ssrfun ssrbool.
-Import List ListNotations ssreflect ssrfun ssrbool.
+From Stdlib Require List ssreflect ssrfun ssrbool FunctionalExtensionality.
+Import List ListNotations ssreflect ssrfun ssrbool FunctionalExtensionality.
 
 Require Tacs Util VarValStore Attacker Syntax Lattice4pt.
 Import Tacs Util VarValStore Attacker Syntax. 
@@ -200,7 +200,11 @@ Section cmb_step.
   Lemma compute_new_pc_untr:
     forall p c, exists p',
       compute_new_pc (mk_lbl true p) c = (mk_lbl true p').
-  Admitted.
+  Proof.
+    move=> p [dst exp| [g cmp] b1 b2 | [g cmp] b]; cbn; eauto.
+    all: case: (var_lbl g) => u pg. (* TODO: This could be a lemma *)
+    all: exists (pg && p); case: u; done.
+  Qed.
 
   Import VarValStore.Notations.
   Lemma tr_cmd_cnt:
@@ -212,14 +216,35 @@ Section cmb_step.
       forall st1 st2,
         ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
         clean_cmd_stp_cnt c st1 = clean_cmd_stp_cnt c st2.
-    Admitted.
+  Proof.
+    move=> >. move e: (mk_lbl _ _)=> l; move: e=> /[swap].
+    case=> //= > => [_ _| _] <- untrg *.
+    all: set lhs := LHS; set gr := (X in if X then _ else _); subst lhs.
+    all: set rhs := RHS; set gl := (X in if X then _ else _); subst rhs.
+    all: suff: gl = gr; [move=> -> //|subst gl gr]; congr (_ _).
+    all: apply/storeview_eq; [eassumption|].
+    all: move: untrg; rewrite Bool.orb_false_r /is_trusted/is_untrusted=> -> //.
+  Qed.
   
+  Ltac if_easy_goals:=
+    match goal with
+    |- context [if ?b then _ else _] => 
+      destruct b=> //
+      (* Then assert that it there was no branching. TODO *)
+    end.
+
   (* TODO: Actively disgusting *)
   Lemma step_soundness:
     forall c pc,WellFormedCmd pc c ->
       forall st,
         WellFormedProg (compute_new_pc pc c) (clean_cmd_stp_cnt c st).
-  Proof. Admitted.
+  Proof. 
+    move=> > + > => - []=> * //=; if_easy_goals.
+    apply/Forall_app. split=> //.
+    constructor 2=> //.
+    constructor 3. apply/Forall_impl; [| eassumption]; clear=> *.
+    rewrite -join_assoc join_idem=> //.
+  Qed.
 
   Context {AtkStates : Type}.
 
@@ -312,7 +337,7 @@ Section inv.
       WellFormedCmd (mk_lbl false p) c ->
       ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
       ⟨ clean_cmd_stp_store c st1 | is_trusted ⟩ = ⟨ clean_cmd_stp_store c st2 | is_trusted ⟩.
-  Proof. Admitted.
+  Proof.  Admitted.
 
   Lemma untr_cmd_st:
     forall p c st, WellFormedCmd (mk_lbl true p) c ->
@@ -335,8 +360,7 @@ Section inv.
        (* TODO: I didn't have fst and snd before, and that wait painful. How to solve? *)
        Forall (fun p => CmbCmdCoreInv (p.1, p.2, pc_lbl))  (combine_extend2 (map Some l1) (map Some l2) None None) ->
        Forall CmbCmdInv (zip l1 l2 substeps pc_lbl).
-   Proof.
-   Admitted.
+   Proof.    Admitted.
 
     Ltac if_same :=
       let x := fresh in 
@@ -368,9 +392,9 @@ Section inv.
   Lemma pubuntr_wf_cont: 
     forall c st, 
       WellFormedCmd (mk_lbl true true) c -> 
-      Forall (WellFormedCmd (mk_lbl true true)) (clean_cmd_stp_cnt c st).
+      WellFormedProg (mk_lbl true true) (clean_cmd_stp_cnt c st).
   Proof. 
-    move=> >;  move l: (mk_lbl _ _)=> ?; move: l=> /[swap].
+    rewrite/WellFormedProg=> >;  move l: (mk_lbl _ _)=> ?; move: l=> /[swap].
     case=> //=; rewrite -/(WellFormedProg _ _)=>>. 
     - move=> ++ e; rewrite -{}e=> *.
       case: (X in if X then _ else _).
@@ -408,12 +432,6 @@ Section inv.
       let: (st', clst') := cmbcmd_step c st in
       StateInv st' /\ Forall CmbCmdInv clst'.
   Proof. 
-            Ltac if_easy_goals:=
-            match goal with
-            |- context [if ?b then _ else _] => 
-              destruct b=> //
-              (* Then assert that it there was no branching. TODO *)
-            end.
     case; rewrite {1}/CmbCmdInv=> rc. 
     case erc: rc; last first.
     - move=>>[]_; rewrite/StateInv=> + [].
@@ -429,11 +447,11 @@ Section inv.
         --- apply/cmbcmdinv_empty. (* Should be finisher also *)
       -- move=> * /=; repeat split.
         --- erewrite untr_ocmd_st; [|eassumption]. (* This can be automated as well *)
+            if_easy_goals.
+            rewrite corruptor_wf_int=> //.
 
-            case: (X in if X then _ else _)=> //. (* This pattern repeats for sure *)
-            stp_corr_wf_gl=>//.
         --- if_same. 
-            case: _real_atk_bit_=> //.
+            if_easy_goals.
             apply: corruptor_wf_conf=> //.
 
         --- apply/zip_erase_substeps=>  /=. (* Should be step *)
@@ -443,11 +461,8 @@ Section inv.
             rewrite /(_⊢_)/= in _b_. (* Forall_impl *)
             apply/Forall_and; [apply/Forall_forall=> //|].
             rewrite-/(WellFormedProg _ _).
-            admit.
-            (*
-            move: _b_=>/(pubuntr_wf_cont _ true (ideal_store _st_))=> x. (* This is very very bad. How to fix? *)
-            apply/Forall_impl;[|eapply x]=> //.
-            *)
+            apply/pubuntr_wf_cont=> //.
+
     - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv;intuition. (* Maybe not very good *)
       -- case: _real_atk_bit_. (* Case is pretty safe? A lot of these can be automated *)
         + rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
@@ -501,17 +516,17 @@ Section inv.
                      specialize (compute_new_pc_untr p c)=> - [? ->]
                   end. (* You have to do  finisher automation!! *)
               compute_new_pc_untr.
-
-              admit. (* This is some flows_to lemma *)
+              apply/flows_to_subtype=> //.
+              
            ++  subst; cbn. (* Current pc is trusted *)
              (* This requires maximum brain.. *)
 
-                remember ((compute_new_pc _ _)) as newpc eqn: newpce. (* dogshit ssr *)
-                destruct newpc as [[] ?]; cbn.
-                +++ apply/Forall_combine2_ind2; [move=> ?; apply|..]; [..| done].
+               remember ((compute_new_pc _ _)) as newpc eqn: newpce. (* dogshit ssr *)
+               destruct newpc as [[] ?]; cbn.
+               +++ apply/Forall_combine2_ind2; [move=> ?; apply|..]; [..| done].
                    admit. (* Just follows by soundness? *)
 
-                +++ 
+               +++ 
 
 (*
 erewrite tr_cmd_cnt. 
