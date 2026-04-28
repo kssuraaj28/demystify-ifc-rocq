@@ -70,6 +70,13 @@ Section cleanstep.
 
 End cleanstep.
 
+Ltac if_easy_goals:=
+  match goal with
+  |- context [if ?b then _ else _] => 
+    destruct b=> //
+    (* Then assert that it there was no branching. TODO *)
+  end.
+
 (* TODO: Maybe elsewere *)
 Definition PcLbl := Lattice4pt.Label.
 
@@ -226,12 +233,6 @@ Section cmb_step.
     all: move: untrg; rewrite Bool.orb_false_r /is_trusted/is_untrusted=> -> //.
   Qed.
   
-  Ltac if_easy_goals:=
-    match goal with
-    |- context [if ?b then _ else _] => 
-      destruct b=> //
-      (* Then assert that it there was no branching. TODO *)
-    end.
 
   (* TODO: Actively disgusting *)
   Lemma step_soundness:
@@ -382,12 +383,23 @@ Section inv.
   Qed.
 
   Import Lattice4pt.Notations.
-  Lemma flows_to_subtype :
+  Lemma flows_to_subtype_cmd :
     forall c l1 l2,
       l2 ⊑ l1 -> (* TODO: I don't know whether this is true *)
       WellFormedCmd l1 c ->
       WellFormedCmd l2 c.
   Proof. Admitted. (* TODO: I have no idea whether this is the right thing!! *)  (* TODO: Generalize, flow *)
+
+  Lemma flows_to_subtype_prog :
+    forall p l1 l2,
+      l2 ⊑ l1 -> (* TODO: I don't know whether this is true *)
+      WellFormedProg l1 p ->
+      WellFormedProg l2 p.
+  Proof. 
+    rewrite/WellFormedProg=> *.
+    apply/Forall_impl;[|eassumption].
+    eauto using flows_to_subtype_cmd.
+  Qed.
 
   Lemma pubuntr_wf_cont: 
     forall c st, 
@@ -395,18 +407,14 @@ Section inv.
       WellFormedProg (mk_lbl true true) (clean_cmd_stp_cnt c st).
   Proof. 
     rewrite/WellFormedProg=> >;  move l: (mk_lbl _ _)=> ?; move: l=> /[swap].
-    case=> //=; rewrite -/(WellFormedProg _ _)=>>. 
-    - move=> ++ e; rewrite -{}e=> *.
-      case: (X in if X then _ else _).
-      all: apply:Forall_impl; [|eassumption]=> *.
-      all: apply/flows_to_subtype;[|eassumption].
-      all: case: (var_lbl)=> [[] []]=> //. (* TODO: This should be lemma *)
-    - move=> + e; rewrite -{}e=> *.
-      case: (X in if X then _ else _)=> //.
-      apply/Forall_app; split;[|repeat constructor=>//].
-      apply/Forall_impl; [|eassumption]=> *.
-      apply/flows_to_subtype;[|eassumption].
-      case: (var_lbl)=> [[] []]=> //. (* TODO: This should be lemma *)
+    case=> //= >; rewrite  -!/(WellFormedProg _ _)=>>. 
+    1: move=> ++ e; rewrite -{}e => *.
+    2: move=> + e; rewrite -{}e => *.
+    1-2: case: (X in if X then _ else _) => //. (* all is antipattern *)
+    3: apply/Forall_app; split;[|repeat constructor=>//]; 
+        rewrite -/(WellFormedProg _ _).
+    1-3: apply/flows_to_subtype_prog;[|eassumption].
+    1-3: case: (var_lbl)=> [[] []]=> //. (* TODO: This should be lemma *)
   Qed.
 
 
@@ -438,12 +446,13 @@ Section inv.
       case pce: (untrusted _); last first.
       -- move=> <- /= treq pubeq; repeat split.
         --- rewrite -{}treq.
-            if_easy_goals.
-            stp_corr_wf_gl=>//. (* apply corruptor_wf_int: TODO*)
+            if_easy_goals. (* TODO: Need to make sure that it does not appear anywhere else *)
+            rewrite corruptor_wf_int=> //. (* apply corruptor_wf_int: TODO*)
 
         --- if_same. 
             if_easy_goals.
             apply: corruptor_wf_conf=> //.
+
         --- apply/cmbcmdinv_empty. (* Should be finisher also *)
       -- move=> * /=; repeat split.
         --- erewrite untr_ocmd_st; [|eassumption]. (* This can be automated as well *)
@@ -477,10 +486,8 @@ Section inv.
              do [erewrite tr_cmd_st] in r;[|eassumption|symmetry;eassumption];
              rewrite -{}r {x}.
 
-             have: ⟨(corruptor adv (atk_st _st_) (real_store _st_)) | is_trusted  ⟩ = 
-             ⟨ real_store _st_ | is_trusted ⟩ by stp_corr_wf_gl.
-             move=> ?; (* TODO: Make this sooo much better *)
-             erewrite tr_cmd_st;[|eassumption|eassumption]; done.
+             erewrite tr_cmd_st; [reflexivity|eassumption|].
+             rewrite corruptor_wf_int=> //.
 
         + rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
           admit. (* Very similar to previous case *)
@@ -506,8 +513,8 @@ Section inv.
               move: _b.
               destruct _ideal_cmd_=> //; cbn.
               move=> /step_soundness /(_ (ideal_store _st_)). (* TODO: Can I make this better? *)
-              apply/Forall_impl=> >.
-
+              apply/flows_to_subtype_prog.
+              (* What even is this nonsense *)
               Ltac compute_new_pc_untr :=
                   lazymatch goal with (* This you can fire wherever there is compute_new_pc?
                   You do lose information though*)
@@ -515,8 +522,7 @@ Section inv.
                      let f := fresh in 
                      specialize (compute_new_pc_untr p c)=> - [? ->]
                   end. (* You have to do  finisher automation!! *)
-              compute_new_pc_untr.
-              apply/flows_to_subtype=> //.
+              compute_new_pc_untr=> //.
               
            ++  subst; cbn. (* Current pc is trusted *)
              (* This requires maximum brain.. *)
@@ -524,24 +530,20 @@ Section inv.
                remember ((compute_new_pc _ _)) as newpc eqn: newpce. (* dogshit ssr *)
                destruct newpc as [[] ?]; cbn.
                +++ apply/Forall_combine2_ind2; [move=> ?; apply|..]; [..| done].
-                   admit. (* Just follows by soundness? *)
+                   apply/Forall_map=> /=.
+                   rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
+                   move: _a=> /step_soundness /(_ (ideal_store _st_)).
+                   apply/flows_to_subtype_prog.
+                   rewrite -newpce=> //.
 
-               +++ 
 
-(*
-erewrite tr_cmd_cnt. 
-                    untrusted (compute_new_pc lbl
-                    clean_cmd_stp_cnt c st1 = clean_cmd_stp_cnt st2
- 
-                    set x := (corruptor _ _).
-                    *)
-
-            have <-: clean_cmd_stp_cnt _a_ (ideal_store _st_) = (clean_cmd_stp_cnt _a_ (if _real_atk_bit_
-            then corruptor adv (atk_st _st_) (real_store _st_)
-            else real_store _st_));[admit|]. (* I don't know why. But very very important *)
-            apply/Forall_combine2_same/Forall_forall=> //.
-
-            Admitted.
+               +++ erewrite tr_cmd_cnt;
+                     [apply/Forall_combine2_same/Forall_map/Forall_forall => //
+                      | eassumption 
+                      | rewrite -newpce // |].
+                   if_easy_goals.
+                   rewrite corruptor_wf_int=> //.
+        Admitted.
   Import Util.List.
   Theorem cfg_step_inv: forall c, Invariant c ->  Invariant (cfg_step c).
   Proof.
