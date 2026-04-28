@@ -232,6 +232,8 @@ Section cmb_step.
     all: apply/storeview_eq; [eassumption|].
     all: move: untrg; rewrite Bool.orb_false_r /is_trusted/is_untrusted=> -> //.
   Qed.
+
+
   
 
   (* TODO: Actively disgusting *)
@@ -333,21 +335,37 @@ Section inv.
     let: mk_cmbcmd rcmd _ icmd pclbl := cmb_cmd in (* TODO: is_atk does not make an appearance... *)
     CmbCmdCoreInv (rcmd, icmd, pclbl).
 
-  Lemma tr_cmd_st:
-    forall c p st1 st2, 
-      WellFormedCmd (mk_lbl false p) c ->
+  Lemma wt_cmd_st_conf:
+    forall c l st1 st2,
+      WellFormedCmd l c ->
+      ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
+      ⟨ clean_cmd_stp_store c st1 | is_public ⟩ = ⟨ clean_cmd_stp_store c st2 | is_public ⟩.
+  Proof. Admitted.
+
+  (* In a secret context, the public view is constant *)
+  Lemma wt_cmd_st_conf_sec:
+    forall c i st, 
+      WellFormedCmd (mk_lbl i false) c ->
+      ⟨ clean_cmd_stp_store c st | is_public ⟩ =
+      ⟨ st | is_public ⟩.
+  Proof. Admitted.
+
+  Lemma wt_cmd_st_int:
+    forall c l st1 st2, 
+      WellFormedCmd l c ->
       ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
       ⟨ clean_cmd_stp_store c st1 | is_trusted ⟩ = ⟨ clean_cmd_stp_store c st2 | is_trusted ⟩.
   Proof.  Admitted.
 
-  Lemma untr_cmd_st:
-    forall p c st, WellFormedCmd (mk_lbl true p) c ->
+  Lemma wt_cmd_st_int_untr:
+    forall p c st, 
+    WellFormedCmd (mk_lbl true p) c ->
     ⟨ clean_cmd_stp_store c st | is_trusted ⟩ =
     ⟨ st | is_trusted ⟩.
   Proof. Admitted.
 
 (* This duplication is stupid *)
-  Lemma untr_ocmd_st:
+  Lemma wt_ocmd_st_int_untr:
     forall p c st, mk_lbl true p ⊢ c ->
     ⟨ optcmd_stp_store c st | is_trusted ⟩ =
     ⟨ st | is_trusted ⟩.
@@ -455,7 +473,7 @@ Section inv.
 
         --- apply/cmbcmdinv_empty. (* Should be finisher also *)
       -- move=> * /=; repeat split.
-        --- erewrite untr_ocmd_st; [|eassumption]. (* This can be automated as well *)
+        --- erewrite wt_ocmd_st_int_untr; [|eassumption]. (* This can be automated as well *)
             if_easy_goals.
             rewrite corruptor_wf_int=> //.
 
@@ -472,49 +490,43 @@ Section inv.
             rewrite-/(WellFormedProg _ _).
             apply/pubuntr_wf_cont=> //.
 
-    - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv;intuition. (* Maybe not very good *)
+    - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> wt idwt [tr pu]; repeat split.
       -- case: _real_atk_bit_. (* Case is pretty safe? A lot of these can be automated *)
-        + rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
-          destruct _pc_lbl_ as [[] ?]; rewrite /= in _b.
-          ++ erewrite untr_cmd_st;[|eassumption].
-             rewrite corruptor_wf_int.
-             erewrite untr_ocmd_st;[|eassumption]=> //.
+         1-2: rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
+         1-2: destruct _pc_lbl_ as [[] ?]; rewrite /= in idwt; subst.
 
-          ++ rewrite -{}_b.
-             rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
-             move r: RHS=>  x; (* Another automation step*)
-             do [erewrite tr_cmd_st] in r;[|eassumption|symmetry;eassumption];
-             rewrite -{}r {x}.
-
-             erewrite tr_cmd_st; [reflexivity|eassumption|].
+          (* Seems very automatable *)
+          ++ erewrite wt_cmd_st_int_untr;[|eassumption].
              rewrite corruptor_wf_int=> //.
+             destruct _ideal_cmd_=> //=. (* Should be automatable *)
+             erewrite wt_cmd_st_int_untr;[|eassumption]=> //.
 
-        + rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
-          admit. (* Very similar to previous case *)
+          ++ rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
+             erewrite wt_cmd_st_int; [reflexivity|eassumption|]. (* Probably can be automated *) 
+             rewrite corruptor_wf_int=> //. (* Should definited be automated *)
+
+          ++ erewrite wt_cmd_st_int_untr;[|eassumption].
+             destruct _ideal_cmd_=> //=. (* Should be automatable *)
+             erewrite wt_cmd_st_int_untr;[|eassumption]=> //.
+
+          ++ rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
+             erewrite wt_cmd_st_int; [reflexivity|eassumption|]=> //. (* Probably can be automated *) 
+
       -- rewrite ![optcmd_stp_store (Some _) _]/=.
-         clear _b. 
          destruct _pc_lbl_ as [? []]=> /=.
          + case: _real_atk_bit_; move=> /=.
-           ++ admit. (* This is composition of NI. TODO *)
-           ++ (* This is also ni *) admit.
-         + (* You are in secret context here, you can say that there is no modification to trusted vars *)
-           admit.
+           ++ erewrite wt_cmd_st_conf; [reflexivity |eassumption| ].
+              erewrite corruptor_wf_conf; [reflexivity | ]=> //.
+           ++ erewrite wt_cmd_st_conf; [reflexivity |eassumption| ]=> //.
+         + erewrite wt_cmd_st_conf_sec;[|eassumption].
+           if_easy_goals.
+           apply/corruptor_wf_conf=> //. (* TODO: apply vs erewrite *)
 
-      -- apply/zip_erase_substeps.  (* TODO: The trickiest case? *) 
-         cbn; apply/Forall_and.
-         + set x := (X in combine_extend2 _ X _ _); move:x => ?.
-           apply/Forall_combine2_ind1; [move=> ?; apply|..]; [..| done]. (* Is this a reasonable forward reasoning step? *)
+      -- apply/zip_erase_substeps=> /=.  (* TODO: The trickiest case? *) 
+         apply/Forall_and.
+         + apply/Forall_combine2_ind1; [move=> ?; apply|..]; [..| done]. (* Is this a reasonable forward reasoning step? *)
            apply/Forall_map/step_soundness=> //.
-         + destruct _pc_lbl_ as [[] ?] ; rewrite /= in _b.
-           ++ set (untrusted _) as x; have {x} ->: x = true by admit. (* Should be rewrite *)
-              apply/Forall_combine2_ind2; [move=> ?; apply|..]; [..| done].
-              apply/Forall_map. (* This should be automated *)
-
-              move: _b.
-              destruct _ideal_cmd_=> //; cbn.
-              move=> /step_soundness /(_ (ideal_store _st_)). (* TODO: Can I make this better? *)
-              apply/flows_to_subtype_prog.
-              (* What even is this nonsense *)
+         + destruct _pc_lbl_ as [[] ?] ; rewrite /= in idwt.
               Ltac compute_new_pc_untr :=
                   lazymatch goal with (* This you can fire wherever there is compute_new_pc?
                   You do lose information though*)
@@ -522,6 +534,15 @@ Section inv.
                      let f := fresh in 
                      specialize (compute_new_pc_untr p c)=> - [? ->]
                   end. (* You have to do  finisher automation!! *)
+           ++ compute_new_pc_untr=> /=.
+              apply/Forall_combine2_ind2; [move=> ?; apply|..]; [..| done]. (* This is a reasonable forward step *)
+              apply/Forall_map. (* This should be automated *)
+
+              move: idwt.
+              destruct _ideal_cmd_=> //; cbn.
+              rewrite -/(WellFormedProg _ _).
+              move=> /step_soundness=> snd.
+              apply/flows_to_subtype_prog;[|apply/snd].
               compute_new_pc_untr=> //.
               
            ++  subst; cbn. (* Current pc is trusted *)
@@ -532,7 +553,7 @@ Section inv.
                +++ apply/Forall_combine2_ind2; [move=> ?; apply|..]; [..| done].
                    apply/Forall_map=> /=.
                    rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
-                   move: _a=> /step_soundness /(_ (ideal_store _st_)).
+                   move:wt=> /step_soundness /(_ (ideal_store _st_)).
                    apply/flows_to_subtype_prog.
                    rewrite -newpce=> //.
 
@@ -543,7 +564,7 @@ Section inv.
                       | rewrite -newpce // |].
                    if_easy_goals.
                    rewrite corruptor_wf_int=> //.
-        Admitted.
+        Qed.
   Import Util.List.
   Theorem cfg_step_inv: forall c, Invariant c ->  Invariant (cfg_step c).
   Proof.
