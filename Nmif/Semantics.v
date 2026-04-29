@@ -263,6 +263,7 @@ Section cmb_step.
 
   Context {AtkStates : Type}.
 
+
   Section comb_state. 
     #[local] Set Primitive Projections. (* TODO: All records need to have this? Maybe in prelude? *)
 

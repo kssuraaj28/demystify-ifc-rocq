@@ -60,19 +60,34 @@ Ltac dst_hyp_type ty :=
 Goal nat -> False. Proof. move=> *.  dst_hyp_type nat. Abort.
 Goal nat -> nat -> False. Proof. move=> *.  Fail dst_hyp_type nat. Abort.
 
-Ltac cnstrct_eq_gl :=
-  let t f := is_constructor f; congr f in
-  match goal with
-  | |- ?f _ = ?f _ => t f
-  | |- ?f _ _ = ?f _ _ => t f
-  | |- ?f _ _ _ = ?f _ _ _ => t f
-  | |- ?f _ _ _ _ = ?f _ _ _ _ => t f
-  | |- ?f _ _ _ _ _ = ?f _ _ _ _ _ => t f 
-  | |- ?f _ _ _ _ _ _ = ?f _ _ _ _ _ _ => t f (* TODO: Better way? *)
+Ltac2 head (t : constr) : constr :=
+  match Constr.Unsafe.kind t with
+  | Constr.Unsafe.App h _ => h
+  | _ => t
   end.
+
+Ltac2 cnstrct_eq_gl0 () :=
+  lazy_match! goal with
+  | [ |- ?a = ?b ] =>
+    let hl := head a in
+    let hr := head b in
+    if Constr.equal hl hr then
+      match Constr.Unsafe.kind hl with
+      | Constr.Unsafe.Constructor _ _ =>
+        ltac1:(f |- congr f) (Ltac1.of_constr hl)
+      | _ => Control.zero (Tactic_failure (Some (fprintf "head %t is not a constructor" hl)))
+      end
+    else Control.zero (Tactic_failure (Some (fprintf "heads differ: %t vs %t" hl hr)))
+  | [ |- _ ] => Control.zero (Tactic_failure (Some (fprintf "goal is not an equality")))
+  end.
+
+Ltac cnstrct_eq_gl := ltac2:(cnstrct_eq_gl0 ()).
 
 Section test.
     Goal forall n m, S n = S m.
+    Proof. move=> *. cnstrct_eq_gl. Abort.
+
+    Goal forall (n1 n2 m1 m2: nat), (n1, n2) = (m1, m2).
     Proof. move=> *. cnstrct_eq_gl. Abort.
 End test.
 
