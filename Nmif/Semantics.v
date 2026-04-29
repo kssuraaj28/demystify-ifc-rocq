@@ -72,10 +72,20 @@ End cleanstep.
 
 Ltac if_easy_goals:=
   match goal with
-  |- context [if ?b then _ else _] => 
-    move: b; case; try easy
-    (* Then assert that it there was no branching. TODO: Maybe in Ltac2*)
+  |- context [if ?b then _ else _] =>  
+       let t := (move: b; case=> //) in
+       assert_goals_soft t 1 || assert_goals_soft t 0
   end.
+
+Ltac if_same :=
+  assert_goals_hard
+    (let x := fresh in 
+    set x := if _ then ?[B] else ?B;
+    let t := eval cbv delta [x] in x in 
+    lazymatch t with
+    | if ?b then ?b1 else _ => 
+      have  {x} ->: x = b1; [destruct b; subst; auto|]
+    end) 1.
 
 (* TODO: Maybe elsewere *)
 Definition PcLbl := Lattice4pt.Label.
@@ -259,7 +269,7 @@ Section cmb_step.
       forall st,
         WellFormedProg (compute_new_pc pc c) (clean_cmd_stp_cnt c st).
   Proof. 
-    move=> + > => - []=> * //=; if_easy_goals=> //.
+    move=> + > => - []=> * //=; if_easy_goals.
     apply/Forall_app. split=> //.
     constructor 2=> //.
     constructor 3. apply/Forall_impl; [| eassumption]; clear=> *.
@@ -436,14 +446,6 @@ Section inv.
      if_easy_goals.
    Qed.
 
-    Ltac if_same :=
-      let x := fresh in 
-      set x := if _ then ?[B] else ?B;
-      let t := eval cbv delta [x] in x in 
-      lazymatch t with
-      | if ?b then ?b1 else _ => 
-        have  {x} ->: x = b1; [destruct b; subst; auto|]
-      end.
 
   Import Util.List.
   Lemma cmbcmdinv_empty: 
