@@ -163,28 +163,15 @@ Section sa.
   End ind.
 
   Import Lattice4pt.
-  Lemma flows_to_subtype_cmd :
-    forall c l1 l2,
+  (* TODO: Is this more complicated than necessary? *)
+  Lemma flows_to_subtype_cmd c l1 l2:
       l2 ⊑ l1 -> (* TODO: I don't know whether this is true *)
       WellFormedCmd l1 c ->
       WellFormedCmd l2 c.
   Proof. 
-    suff H: forall p c, WellFormedCmd p c ->
-              forall l2, l2 ⊑ p -> WellFormedCmd l2 c.
-    { move=> > Hf Hwf; apply: H; eassumption. }
-    apply: WellFormedCmd_ind.
-    - move=> dst src1 src2 comp pclbl Hs1 Hs2 Hpc l2 Hl.
-      apply: wf_assign=> //; apply: flows_to_trans; eassumption.
-    - move=> gvar comp pclbl b1 b2 _ IH1 _ IH2 l2 Hl.
-      apply: wf_cond.
-      + apply/Forall_impl; [|exact: IH1].
-        move=> c' /= IHc; apply: IHc; apply: join_mono_r=> //.
-      + apply/Forall_impl; [|exact: IH2].
-        move=> c' /= IHc; apply: IHc; apply: join_mono_r=> //.
-    - move=> gvar comp pclbl wbody _ IH l2 Hl.
-      apply: wf_while.
-      apply/Forall_impl; [|exact: IH].
-      move=> c' /= IHc; apply: IHc; apply: join_mono_r=> //.
+    (* TODO: What does elim do? Is it just apply? *)  
+    move: l2=> ++ h; elim: h=> *; [constructor=> //; eauto using flows_to_trans|..].
+    1-2: constructor; (apply/Forall_impl;[ |eassumption])=> /= >; auto using join_mono_r.
   Qed.
 End sa.
 
@@ -432,20 +419,16 @@ Section inv.
   Qed.
 
   
-   Import List(combine_extend2).
+   Import Util.List.
    Lemma Forall_zip:
      forall l1 l2 substeps pc_lbl,
        (* TODO: I didn't have fst and snd before, and that wait painful. How to solve? *)
        Forall (fun p => CmbCmdCoreInv (p.1, p.2, pc_lbl))  (combine_extend2 (map Some l1) (map Some l2) None None) ->
        Forall CmbCmdInv (zip l1 l2 substeps pc_lbl).
-   Proof.    
-     move=> l1 l2 substeps pc_lbl Hf.
-     rewrite /zip /Util.List.combine_extend3.
-     apply/Forall_map.
-     apply: (Util.List.Forall_combine2_ind1 _ _ _ _ _
-             (fun p => CmbCmdCoreInv (p.1, p.2, pc_lbl)) _ Hf).
-     - move=> [[rc ic] a] /=. done.
-     - cbn; split=> //; case: (untrusted pc_lbl)=> //.
+   Proof.
+     move=> *; rewrite /zip.
+     apply/Forall_map/Forall_combine2_ind1;[|eassumption|]=> //= => [[] [] > //|].
+     if_easy_goals.
    Qed.
 
     Ltac if_same :=
@@ -633,6 +616,14 @@ Section inv.
     move: (cmbcmd_step_inv _ _ h1 h2); rewrite {}e=> - [] *.
     split=> //; apply/Forall_app=> //.
   Qed.
+
+  Print Assumptions cfg_step_inv.
+(*
+Axioms:
+functional_extensionality_dep :
+  forall (_A : Type) (_B : _A -> Type) (_f _g : forall _x : _A, _B _x),
+  (forall _x : _A, _f _x = _g _x) -> _f = _g
+*)
 
 
 End inv.
