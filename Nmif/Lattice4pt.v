@@ -77,14 +77,52 @@ Lemma join_mono_r:
   forall l a b, a ⊑ b -> (l ⊔ a) ⊑ (l ⊔ b).
 Proof. do 3 (case=> - [] [])=> //. Qed.
 
-Lemma flows_to_untr:
+(* TODO: This must be automated! *)
+Lemma untrusted_false:
+  forall l,
+   untrusted l = false ->
+   trusted l.
+Proof.  case=> - [] [] //. Qed.
+
+Lemma secret_false:
+  forall l,
+   secret l = false ->
+   public l.
+Proof.  case=> - [] [] //. Qed.
+
+Lemma public_false:
+  forall l,
+   public l = false ->
+   secret l.
+Proof.  case=> - [] [] //. Qed.
+
+Lemma trusted_false:
+  forall l,
+   trusted l = false ->
+   untrusted l.
+Proof.  case=> - [] [] //. Qed.
+
+Lemma flows_from_untr:
   forall l1 l2,
     untrusted l1 -> l1 ⊑ l2 ->
     untrusted l2.
 Proof. do 2 (case=> - [] [])=> //. Qed.
 
-Lemma flows_to_sec:
+Lemma flows_from_sec:
   forall l1 l2,
     secret l1 -> l1 ⊑ l2 ->
     secret l2.
 Proof. do 2 (case=> - [] [])=> //. Qed.
+
+Lemma flows_to_tr:
+  forall l1 l2,
+    trusted l2 -> l1 ⊑ l2 ->
+    trusted l1.
+Proof. do 2 (case=> - [] [])=> //. Qed.
+
+Lemma flows_to_pub:
+  forall l1 l2,
+    public l2 -> l1 ⊑ l2 ->
+    public l1.
+Proof. do 2 (case=> - [] [])=> //. Qed.
+
