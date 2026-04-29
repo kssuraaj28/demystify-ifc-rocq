@@ -407,7 +407,7 @@ Section inv.
     set v1 := (X in ⟨update_to_store _ _ X | _ ⟩ = _ ).
     set v2 := (X in _ = ⟨update_to_store _ _ X | _ ⟩).
     suff: v1 = v2; [move=> ->; apply/update_same_varval=> //|subst v1 v2].
-    f_equal; eauto using storeview_eq. 
+    f_equal; eauto using storeview_eq.
   Qed.
 
   Lemma wt_cmd_st_int_untr:
