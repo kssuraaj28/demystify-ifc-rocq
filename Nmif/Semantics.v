@@ -80,7 +80,6 @@ Ltac if_easy_goals:=
 (* TODO: Maybe elsewere *)
 Definition PcLbl := Lattice4pt.Label.
 
-(* TODO: Static Analysis. *)
 Section sa.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
   Import Lattice4pt.Notations.
@@ -162,8 +161,8 @@ Section sa.
     Qed.
   End ind.
 
+  (* TODO: Importing Lattice4pt.Notations breaks. Why? *)
   Import Lattice4pt.
-  (* TODO: Is this more complicated than necessary? *)
   Lemma flows_to_subtype_cmd c l1 l2:
       l2 ⊑ l1 -> (* TODO: I don't know whether this is true *)
       WellFormedCmd l1 c ->
@@ -173,13 +172,22 @@ Section sa.
     move: l2=> ++ h; elim: h=> *; [constructor=> //; eauto using flows_to_trans|..].
     1-2: constructor; (apply/Forall_impl;[ |eassumption])=> /= >; auto using join_mono_r.
   Qed.
-End sa.
 
+  Lemma flows_to_subtype_prog :
+    forall p l1 l2,
+      l2 ⊑ l1 -> (* TODO: I don't know whether this is true *)
+      WellFormedProg l1 p ->
+      WellFormedProg l2 p.
+  Proof. 
+    rewrite/WellFormedProg=> *.
+    apply/Forall_impl;[|eassumption].
+    eauto using flows_to_subtype_cmd.
+  Qed.
+End sa.
 
 Section cmb_cmd.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
   (* The simulator state will not be here. I'm doing some big brain intuition*)
-
   #[local] Set Primitive Projections. (* TODO: All records need to have this? Maybe in prelude? *)
 
   Record CmbCmd : Type := mk_cmbcmd {
@@ -192,7 +200,6 @@ End cmb_cmd.
 
 Section cmb_step.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
-
 
   Definition zip (real_cont: list Cmd) (ideal_cont: list Cmd) (atk_steps: nat) (pc_lbl: PcLbl): list CmbCmd :=
     let: real_cont := map Some real_cont in
@@ -238,23 +245,21 @@ Section cmb_step.
   Proof.
     move=> >. move e: (mk_lbl _ _)=> l; move: e=> /[swap].
     case=> //= > => [_ _| _] <- untrg *.
-    1-2: set lhs := LHS; set gr := (X in if X then _ else _); subst lhs.
-    1-2: set rhs := RHS; set gl := (X in if X then _ else _); subst rhs.
+    1-2: set gr := (X in _ = (if X then _ else _)); set gl := (X in (if X then _ else _) = _).
     1-2: suff: gl = gr; [move=> -> //|subst gl gr]; congr (_ _).
     1-2: apply/storeview_eq; [eassumption|].
     1-2: move: untrg; rewrite Bool.orb_false_r /is_trusted/is_untrusted=> -> //.
   Qed.
 
 
-  
 
-  (* TODO: Actively disgusting *)
-  Lemma step_soundness:
-    forall c pc,WellFormedCmd pc c ->
+  (* The theorems should be separate! *)
+  Lemma step_soundness c pc:
+      WellFormedCmd pc c ->
       forall st,
         WellFormedProg (compute_new_pc pc c) (clean_cmd_stp_cnt c st).
   Proof. 
-    move=> > + > => - []=> * //=; if_easy_goals=> //.
+    move=> + > => - []=> * //=; if_easy_goals=> //.
     apply/Forall_app. split=> //.
     constructor 2=> //.
     constructor 3. apply/Forall_impl; [| eassumption]; clear=> *.
@@ -262,7 +267,6 @@ Section cmb_step.
   Qed.
 
   Context {AtkStates : Type}.
-
 
   Section comb_state. 
     #[local] Set Primitive Projections. (* TODO: All records need to have this? Maybe in prelude? *)
@@ -451,19 +455,6 @@ Section inv.
     cbn; repeat split; case: (untrusted _)=> //. (* TODO: Finisher!! *)
   Qed.
 
-  Import Lattice4pt.Notations.
-
-
-  Lemma flows_to_subtype_prog :
-    forall p l1 l2,
-      l2 ⊑ l1 -> (* TODO: I don't know whether this is true *)
-      WellFormedProg l1 p ->
-      WellFormedProg l2 p.
-  Proof. 
-    rewrite/WellFormedProg=> *.
-    apply/Forall_impl;[|eassumption].
-    eauto using flows_to_subtype_cmd.
-  Qed.
 
   Lemma pubuntr_wf_cont: 
     forall c st, 
@@ -620,13 +611,6 @@ Section inv.
   Qed.
 
   Print Assumptions cfg_step_inv.
-(*
-Axioms:
-functional_extensionality_dep :
-  forall (_A : Type) (_B : _A -> Type) (_f _g : forall _x : _A, _B _x),
-  (forall _x : _A, _f _x = _g _x) -> _f = _g
-*)
-
 
 End inv.
 
