@@ -513,7 +513,8 @@ Section inv.
 
        --- if_same. 
            if_easy_goals.
-           apply: corruptor_wf_conf=> //.
+           rewrite ->corruptor_wf_conf; [reflexivity | ]=> //. (* Normal rewrite *)
+(*           apply: corruptor_wf_conf=> //. *)
 
        --- apply/cmbcmdinv_empty. (* Should be finisher also *)
 
@@ -582,12 +583,12 @@ Section inv.
               apply/Forall_map. (* This should be automated *)
 
               move: idwt.
-              destruct _ideal_cmd_=> //; cbn.
+              move: _ideal_cmd_; case=> //= >. (* All destructs can be made into this? This is a reasonalbe forward reasoning step.. Assert that only one thing is left? Assert that it is a variable, whose sort is fine*)
               rewrite -/(WellFormedProg _ _).
               move=> /step_soundness=> snd.
               apply/flows_to_subtype_prog;[|apply/snd].
-              compute_new_pc_untr=> //.
-              
+              compute_new_pc_untr=> //. (* This is a good forward step *)
+
            ++ subst=> /=.
              (* This requires maximum brain.. *)
                move newpce:  (compute_new_pc _ _)=> newpc.
