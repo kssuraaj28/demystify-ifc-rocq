@@ -161,6 +161,31 @@ Section sa.
       1-3: constructor 2=> //; auto.
     Qed.
   End ind.
+
+  Import Lattice4pt.
+  Lemma flows_to_subtype_cmd :
+    forall c l1 l2,
+      l2 ⊑ l1 -> (* TODO: I don't know whether this is true *)
+      WellFormedCmd l1 c ->
+      WellFormedCmd l2 c.
+  Proof. 
+    suff H: forall p c, WellFormedCmd p c ->
+              forall l2, l2 ⊑ p -> WellFormedCmd l2 c.
+    { move=> > Hf Hwf; apply: H; eassumption. }
+    apply: WellFormedCmd_ind.
+    - move=> dst src1 src2 comp pclbl Hs1 Hs2 Hpc l2 Hl.
+      apply: wf_assign=> //; apply: flows_to_trans; eassumption.
+    - move=> gvar comp pclbl b1 b2 _ IH1 _ IH2 l2 Hl.
+      apply: wf_cond.
+      + apply/Forall_impl; [|exact: IH1].
+        move=> c' /= IHc; apply: IHc; apply: join_mono_r=> //.
+      + apply/Forall_impl; [|exact: IH2].
+        move=> c' /= IHc; apply: IHc; apply: join_mono_r=> //.
+    - move=> gvar comp pclbl wbody _ IH l2 Hl.
+      apply: wf_while.
+      apply/Forall_impl; [|exact: IH].
+      move=> c' /= IHc; apply: IHc; apply: join_mono_r=> //.
+  Qed.
 End sa.
 
 
@@ -349,28 +374,51 @@ Section inv.
       WellFormedCmd (mk_lbl i false) c ->
       ⟨ clean_cmd_stp_store c st | is_public ⟩ =
       ⟨ st | is_public ⟩.
-  Proof. Admitted.
+  Proof. 
+    move=> >; move e: (mk_lbl _ _)=> ?; move:e=> /[swap]. 
+    case=> //= > +++e; rewrite -{}e=> _ _ flw.
+    rewrite update_storeview_nochange=> //.
+    rewrite/is_public. 
+    apply/negbTE/flows_to_sec; rewrite/secret; eauto; done.
+  Qed.
 
-  Lemma wt_cmd_st_int:
-    forall c l st1 st2, 
+  Lemma wt_cmd_st_int c l st1 st2: 
       WellFormedCmd l c ->
       ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
       ⟨ clean_cmd_stp_store c st1 | is_trusted ⟩ = ⟨ clean_cmd_stp_store c st2 | is_trusted ⟩.
-  Proof.  Admitted.
+  Proof.  
+    move=> [] // d s1 s2 ? ?. 
+    case de: (is_untrusted d)=> fs1d fs2d _ treq /=;
+      [do 2 (rewrite update_storeview_nochange{1}/is_trusted; [rewrite de //|])=> //|].  
+    rewrite/is_trusted/is_untrusted/= in de.
+    -
+      set v1 := (X in ⟨update_to_store _ _ X | _ ⟩ = _ ).
+    set v2 := (X in _ = ⟨update_to_store _ _ X | _ ⟩).
+    suff: v1 = v2; [move=> ->; apply/update_same_varval=> //|subst v1 v2].
+  Admitted.
 
   Lemma wt_cmd_st_int_untr:
     forall p c st, 
     WellFormedCmd (mk_lbl true p) c ->
     ⟨ clean_cmd_stp_store c st | is_trusted ⟩ =
     ⟨ st | is_trusted ⟩.
-  Proof. Admitted.
+  Proof. 
+    move=> >; move e: (mk_lbl _ _)=> ?; move:e=> /[swap]. 
+    case=> //= > +++e; rewrite -{}e=> _ _ flw.
+    rewrite update_storeview_nochange=> //.
+    rewrite/is_trusted/is_untrusted negbF //.
+    apply/flows_to_untr; eauto; done.
+  Qed.
 
 (* This duplication is stupid. TODO: Awesome automation *)
   Lemma wt_ocmd_st_int_untr:
     forall p c st, mk_lbl true p ⊢ c ->
     ⟨ optcmd_stp_store c st | is_trusted ⟩ =
     ⟨ st | is_trusted ⟩.
-  Proof. Admitted.
+  Proof. 
+    move=> p [c'|] st Hwf //.
+    apply/wt_cmd_st_int_untr; eauto.
+  Qed.
 
   
    Import List(combine_extend2).
@@ -379,7 +427,15 @@ Section inv.
        (* TODO: I didn't have fst and snd before, and that wait painful. How to solve? *)
        Forall (fun p => CmbCmdCoreInv (p.1, p.2, pc_lbl))  (combine_extend2 (map Some l1) (map Some l2) None None) ->
        Forall CmbCmdInv (zip l1 l2 substeps pc_lbl).
-   Proof.    Admitted.
+   Proof.    
+     move=> l1 l2 substeps pc_lbl Hf.
+     rewrite /zip /Util.List.combine_extend3.
+     apply/Forall_map.
+     apply: (Util.List.Forall_combine2_ind1 _ _ _ _ _
+             (fun p => CmbCmdCoreInv (p.1, p.2, pc_lbl)) _ Hf).
+     - move=> [[rc ic] a] /=. done.
+     - cbn; split=> //; case: (untrusted pc_lbl)=> //.
+   Qed.
 
     Ltac if_same :=
       let x := fresh in 
@@ -401,12 +457,7 @@ Section inv.
   Qed.
 
   Import Lattice4pt.Notations.
-  Lemma flows_to_subtype_cmd :
-    forall c l1 l2,
-      l2 ⊑ l1 -> (* TODO: I don't know whether this is true *)
-      WellFormedCmd l1 c ->
-      WellFormedCmd l2 c.
-  Proof. Admitted. (* TODO: I have no idea whether this is the right thing!! *)  (* TODO: Generalize, flow *)
+
 
   Lemma flows_to_subtype_prog :
     forall p l1 l2,

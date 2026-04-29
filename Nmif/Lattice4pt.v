@@ -69,6 +69,13 @@ Lemma join_sym:
     (l1 ⊔ l2)  =  (l2 ⊔ l1).
 Proof. do 2 (case=> - [] [])=> //. Qed.
 
+Lemma flows_to_trans:
+  forall l1 l2 l3, l1 ⊑ l2 -> l2 ⊑ l3 -> l1 ⊑ l3.
+Proof. do 3 (case=> - [] [])=> //. Qed.
+
+Lemma join_mono_r:
+  forall l a b, a ⊑ b -> (l ⊔ a) ⊑ (l ⊔ b).
+Proof. do 3 (case=> - [] [])=> //. Qed.
 
 Lemma flows_to_untr:
   forall l1 l2,
