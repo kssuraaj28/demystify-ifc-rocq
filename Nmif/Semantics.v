@@ -613,7 +613,7 @@ Section inv.
   Theorem cfg_step_inv: forall c, Invariant c ->  Invariant (cfg_step c).
   Proof.
     case=> + [] //.
-    rewrite/Invariant/cfg_step=> > []; ⟨ Forall_inv ⟩.
+    rewrite/Invariant/cfg_step=> > []; toph Forall_inv.
     case e: (cmbcmd_step _ _)=> h1 ? h2. 
     move: (cmbcmd_step_inv _ _ h1 h2); rewrite {}e=> - [] *.
     split=> //; apply/Forall_app=> //.

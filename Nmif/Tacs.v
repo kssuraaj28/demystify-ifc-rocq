@@ -59,20 +59,18 @@ End test_goals.
     this tactic will apply the top hypothesis on it
     The top hypothesis might go away
 *)
-(* TODO: Can I make this part of ssr => *)
-(* TODO: I use ⟨  ⟩ too much *)
-Tactic Notation "⟨" tactic(t)  "⟩" := let f := fresh in (move=> f); t f. (* Tactic Notation vs Ltac Notation *)
+Tactic Notation "toph" tactic(t) := let f := fresh in (move=> f); t f. (* Tactic Notation vs Ltac Notation *)
 
 (* This is a little hacky because you don't you are doing trial and error.. 
    Maybe better to specialize *)
-Tactic Notation "⟨⟨" tactic(t) "⟩⟩" :=
+Tactic Notation "someh" tactic(t) :=
     match goal with
     H : _ |- _ => t H
     end.
 Section test.
   Ltac t H := idtac H.
-  Goal False -> False.  Proof.  ⟨ t ⟩. Abort.
-  Goal False -> False.  Proof.  move=> *. ⟨⟨ t ⟩⟩. Abort.
+  Goal False -> False.  Proof.  toph t. Abort.
+  Goal False -> False.  Proof.  move=> *. someh t . Abort.
 End test.
 
 Ltac evar_spec H :=  
