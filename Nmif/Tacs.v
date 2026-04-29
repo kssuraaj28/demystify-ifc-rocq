@@ -14,6 +14,44 @@ Ltac2 goals l :=
   let name_goal x := ltac1:(x |- refine ?[x]) (Ltac1.of_ident x) in
   Control.dispatch (List.map (fun x () => name_goal x) l).
 
+Section fail.
+  (* If it does not tac arguments, then this works fine! *)
+  #[local] Tactic Notation "goals" ne_ident_list(l) :=
+    let f := ltac2:(ll |-
+      printf "numgoals = %i" (Control.numgoals ());
+      goals (List.map (fun x => Option.get (Ltac1.to_ident x))
+                      (Option.get (Ltac1.to_list ll)))) in
+    f l.
+
+  #[local] Tactic Notation "goals_hc" :=
+    let f := ltac2:(
+      printf "numgoals = %i" (Control.numgoals ());
+      goals [@x; @y]) in
+    f.
+
+  Variable P : Prop.
+  Goal P /\ P.
+  Proof.
+    Fail (split; goals a b).
+    Fail (split; goals a).
+    split; goals_hc.
+  Abort.
+End fail.
+
+
+Tactic Notation "NAME_GOALS_AFTER" tactic0(t) ne_ident_list(l) :=
+  let f := ltac2:(tt ll |-
+    Ltac1.run tt;
+    goals (List.map (fun x => Option.get (Ltac1.to_ident x))
+                    (Option.get (Ltac1.to_list ll)))) in
+  f t l.
+
+Section test_goals.
+  Variable P : Prop.
+  Goal P /\ P.
+  Proof. NAME_GOALS_AFTER split a b. Abort.
+End test_goals.
+
 
 
 (*  
@@ -60,23 +98,24 @@ Ltac dst_hyp_type ty :=
 Goal nat -> False. Proof. move=> *.  dst_hyp_type nat. Abort.
 Goal nat -> nat -> False. Proof. move=> *.  Fail dst_hyp_type nat. Abort.
 
+(* Using Constr.Unsafe.kind: the App node exposes the full n-ary application
+   (head + all args) in one step. With `match!` and `?f _` we'd have to recurse,
+   since that pattern peels off one argument at a time. TODO: verify *)
 Ltac2 head (t : constr) : constr :=
   match Constr.Unsafe.kind t with
   | Constr.Unsafe.App h _ => h
   | _ => t
   end.
 
+(* The is_constructor check below is delegated to Ltac1; it could equivalently
+   be written in Ltac2 by inspecting Constr.Unsafe.kind for a Constructor node. *)
 Ltac2 cnstrct_eq_gl0 () :=
   lazy_match! goal with
   | [ |- ?a = ?b ] =>
     let hl := head a in
     let hr := head b in
     if Constr.equal hl hr then
-      match Constr.Unsafe.kind hl with
-      | Constr.Unsafe.Constructor _ _ =>
-        ltac1:(f |- congr f) (Ltac1.of_constr hl)
-      | _ => Control.zero (Tactic_failure (Some (fprintf "head %t is not a constructor" hl)))
-      end
+      ltac1:(f |- is_constructor f; congr f) (Ltac1.of_constr hl)
     else Control.zero (Tactic_failure (Some (fprintf "heads differ: %t vs %t" hl hr)))
   | [ |- _ ] => Control.zero (Tactic_failure (Some (fprintf "goal is not an equality")))
   end.
@@ -91,7 +130,46 @@ Section test.
     Proof. move=> *. cnstrct_eq_gl. Abort.
 End test.
 
-Module GallinaUtil.
+(* assert_goals: run [t], then check that exactly [n] goals remain.
+   [hard = true] uses Control.throw   [hard = false] uses Control.zero *)
+(* TODO: Is Ltac1.run tt the same as ltac1:(x |- x) tt ?*)
+Ltac2 assert_goals (hard : bool) (t : unit -> unit) (n : int) : unit :=
+  Control.enter (fun () =>
+    t ();
+    let m := Control.numgoals () in
+    if Int.equal m n then () else
+    let e := Tactic_failure (Some (fprintf "assert_goals: expected %i goal(s), got %i" n m)) in
+    if hard then Control.throw e else Control.zero e).
+
+(* Ltac1 wrappers. Use parens for compound tactics: `assert_goals_hard (a; b) 3`.
+   tactic0 has tightest precedence is required so the tactic argument doesn't
+   greedily consume the trailing integer. TODO: Check
+*)
+Tactic Notation "assert_goals_hard" tactic0(t) integer(n) :=
+  let f := ltac2:(tt nn |- assert_goals true (fun () => Ltac1.run tt) (Option.get (Ltac1.to_int nn))) in
+  f t n.
+
+Tactic Notation "assert_goals_soft" tactic0(t) integer(n) :=
+  let f := ltac2:(tt nn |-
+    assert_goals false (fun () => Ltac1.run tt) (Option.get (Ltac1.to_int nn))) in
+  f t n.
+
+Section test_assert_goals.
+  Variable P : Prop.
+  Goal P /\ P.
+  Proof. assert_goals_hard split 2. Abort.
+
+  Goal P /\ P.
+  Proof. Fail assert_goals_hard split 3. Abort.
+
+  Goal P /\ P.
+  Proof. first [ idtac "Trying 3"; assert_goals_soft split 3 | idtac "Trying 2"; assert_goals_soft split 2 ]. Abort.
+
+  Goal (P /\ P) /\ (P /\ P).
+  Proof.  split. all: assert_goals_soft split 2. Abort.
+End test_assert_goals.
+
+Module GallinaHole.
   Import Ltac2 Bool Control Printf.
   (* Holes *)
   #[local] Ltac2 admit_tac () := 
@@ -128,23 +206,4 @@ Module GallinaUtil.
   End usage.
 
   Section test. Variable hole : bool.   Fail Check ??.  End test.
-
-  (* TODO: Inspection is a little stupd.. *)
-  (* Inspection  *)
-  #[local] Ltac2 inspect value tactic :=
-    tactic value (Constr.type value);
-    exact value. (* Why does $value also work? *)
-
-  Ltac2 Notation "⟦" v(constr) t(tactic) " ⟧"  := inspect v t.
-
-  Check ltac2:( ⟦ 5 (fun v t => printf "%t %t" v t)  ⟧).
-
-  Notation "⟦ v ⟧"  := 
-    ltac2:(
-    inspect (Constr.pretype v) (fun v t => printf "%t : %t" v t )) (only parsing).
-
-  Check ⟦ 4 ⟧.
-  (* Having arbitrary ltac2 functions in gallina does not seem very easy.. *)
-
-End GallinaUtil.
-
+End GallinaHole.
