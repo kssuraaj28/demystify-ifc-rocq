@@ -525,18 +525,20 @@ Section inv.
            rewrite {}pce.
            apply/Forall_and; [apply/Forall_forall=> //|].
            rewrite-/(WellFormedProg _ _).
-           destruct _ideal_cmd_=> //=. (* How to have automation here? Should be easy. Add a theorem? *)
+(*           (do ! match goal with H: _ |- _ => revert H end); move=> *.  TODO: Hygiene for grind!! *)
+           subst. 
+           revert_hyp_type_dep (option Cmd); case=> * //=.
            apply/pubuntr_wf_cont=> //.
 
     - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> wt idwt [tr pu]; repeat split.
-      -- case: _real_atk_bit_. (* Case is pretty safe? A lot of these can be automated *)
+      -- revert_hyp_type bool; case. (* Case is pretty safe? A lot of these can be automated *)
          1-2: rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
-         1-2: destruct _pc_lbl_ as [[] ?]; rewrite /= in idwt; subst.
+         1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /= *; subst. (* TODO: Is this okay? *)
 
           (* Seems very automatable *)
           ++ erewrite wt_cmd_st_int_untr;[|eassumption].
              rewrite corruptor_wf_int=> //.
-             destruct _ideal_cmd_=> //=. (* Should be automatable *)
+             revert_hyp_type_dep (option Cmd); case=> //= *.
              erewrite wt_cmd_st_int_untr;[|eassumption]=> //.
 
           ++ rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
@@ -544,54 +546,56 @@ Section inv.
              rewrite corruptor_wf_int=> //. (* Should definited be automated *)
 
           ++ erewrite wt_cmd_st_int_untr;[|eassumption].
-             destruct _ideal_cmd_=> //=. (* Should be automatable *)
+             revert_hyp_type_dep (option Cmd); case=> //= *.
              erewrite wt_cmd_st_int_untr;[|eassumption]=> //.
 
           ++ rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
              erewrite wt_cmd_st_int; [reflexivity|eassumption|]=> //. (* Probably can be automated *) 
 
-      -- rewrite ![optcmd_stp_store (Some _) _]/=.
-         destruct _pc_lbl_ as [? []]=> /=.
-         + case: _real_atk_bit_; move=> /=.
-           ++ erewrite wt_cmd_st_conf; [reflexivity |eassumption| ].
-              erewrite corruptor_wf_conf; [reflexivity | ]=> //.
-           ++ erewrite wt_cmd_st_conf; [reflexivity |eassumption| ]=> //.
-         + erewrite wt_cmd_st_conf_sec;[|eassumption].
+      -- rewrite ![optcmd_stp_store (Some _) _]/=. (* This is automatable *)
+         (* subst *)
+         revert_hyp_type_dep PcLbl; case=> [+ []] /=.
+         + revert_hyp_type bool; case=> * /=.
+           ++ erewrite wt_cmd_st_conf; [reflexivity |eassumption|]. (* Not fwreasoning *)
+              rewrite -> corruptor_wf_conf; [reflexivity | ]=> //. (* This is automated *)
+           ++ erewrite wt_cmd_st_conf; [|eassumption|eassumption]; done. (* This is fwreasoning. *)
+         + move=> *. 
+           erewrite wt_cmd_st_conf_sec;[|eassumption].
            if_easy_goals.
-           apply/corruptor_wf_conf=> //. (* TODO: apply vs erewrite *)
+           rewrite -> corruptor_wf_conf=> //. (* TODO: apply vs erewrite *)
 
       -- apply/Forall_zip=> /=.  (* TODO: The trickiest case? *) 
-         apply/Forall_and.
+         apply/Forall_and; subst.
          + apply/Forall_combine2_ind1; [move=> ?; apply|..]; [..| done]. (* Is this a reasonable forward reasoning step? *)
            apply/Forall_map/step_soundness=> //.
-         + destruct _pc_lbl_ as [[] ?] ; rewrite /= in idwt.
               Ltac compute_new_pc_untr :=
                   lazymatch goal with (* This you can fire wherever there is compute_new_pc?
                   You do lose information though*)
                   |- context [compute_new_pc (mk_lbl true ?p) ?c] => 
                      let f := fresh in 
-                     specialize (compute_new_pc_untr p c)=> - [? ->]
+                     specialize (compute_new_pc_untr p c)=> - [? ->] (* Why no ssr? *)
                   end. (* You have to do  finisher automation!! *)
-           ++ compute_new_pc_untr=> /=.
+         + revert_hyp_type_dep PcLbl;case=> [[] ?] /=.
+           ++ compute_new_pc_untr=> /= _ idwt.
               apply/Forall_combine2_ind2; [move=> ?; apply|..]; [..| done]. (* This is a reasonable forward step *)
               apply/Forall_map. (* This should be automated *)
 
               move: idwt.
-              move: _ideal_cmd_; case=> //= >. (* All destructs can be made into this? This is a reasonalbe forward reasoning step.. Assert that only one thing is left? Assert that it is a variable, whose sort is fine*)
+              revert_hyp_type (option Cmd); case=> //= >. (* TODO: Fw reasoning with case and one goal? *)
               rewrite -/(WellFormedProg _ _).
               move=> /step_soundness=> snd.
               apply/flows_to_subtype_prog;[|apply/snd].
               compute_new_pc_untr=> //. (* This is a good forward step *)
 
-           ++ subst=> /=.
+           ++ move=> /= wt <- /=.
              (* This requires maximum brain.. *)
                move newpce:  (compute_new_pc _ _)=> newpc.
                destruct newpc as [[] ?]; cbn.
                +++ apply/Forall_combine2_ind2; [move=> ?; apply|..]=> //.
                    apply/Forall_map=> /=.
                    rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
-                   move:wt=> /step_soundness /(_ (ideal_store _st_)).
-                   apply/flows_to_subtype_prog.
+                   move:wt=> /step_soundness=> snd.
+                   apply/flows_to_subtype_prog; [|apply/snd].
                    rewrite newpce=> //.
 
 

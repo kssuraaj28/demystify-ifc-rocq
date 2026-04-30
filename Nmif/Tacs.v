@@ -1,4 +1,4 @@
-From Ltac2 Require Import Ltac2 Bool Control Printf. (* TODO: Hygiene *)
+From Ltac2 Require Import Ltac2 Printf. (* TODO: Hygiene *)
 Require Import ssreflect.
 
 Set Default Proof Mode "Classic".
@@ -74,12 +74,13 @@ Section test.
   Goal False -> False.  Proof.  move=> *. someh t . Abort.
 End test.
 
-(* assert_goals: run [t], then check that exactly [n] goals remain.
-   [hard = true] uses Control.throw   [hard = false] uses Control.zero *)
+(* assert_goals: run `t`, which should not fail. TODO: Can it backtrack?
+   then check that exactly `n` goals remain.
+   `hard` controls whether the error is a backtracking error or no *)
 (* TODO: Is Ltac1.run tt the same as ltac1:(x |- x) tt ?*)
 Ltac2 assert_goals (hard : bool) (t : unit -> unit) (n : int) : unit :=
   Control.enter (fun () =>
-    t ();
+    match Control.case t with | Err e => Control.throw e | _ => () end;
     let m := Control.numgoals () in
     if Int.equal m n then () else
     let e := Tactic_failure (Some (fprintf "assert_goals: expected %i goal(s), got %i" n m)) in
@@ -98,10 +99,13 @@ Tactic Notation "assert_goals_soft" tactic0(t) integer(n) :=
     assert_goals false (fun () => Ltac1.run tt) (Option.get (Ltac1.to_int nn))) in
   f t n.
 
+
 Section test.
   Goal True. Proof. assert_goals_hard easy 0. Abort.
   Goal True. Proof. Fail assert_goals_hard easy 1. Abort.
   Goal True. Proof. Fail assert_goals_soft easy 1. Abort.
+  Goal True. Proof. Fail (assert_goals_hard fail 2) || idtac. Abort.
+  Goal True. Proof. Fail (assert_goals_hard fail 10) || idtac. Abort.
 
   Variable P : Prop.
   Goal P /\ P.  Proof. assert_goals_hard split 2. Abort.
@@ -111,8 +115,26 @@ Section test.
   Goal (P /\ P) /\ (P /\ P).  Proof.  split; assert_goals_soft split 2. Abort.
 End test.
 
+(* TODO: Why does wrapping this with assert_goals true 1 not work? *)
+Ltac2 bt_guard () : unit :=
+  Control.plus (fun () => ())
+       (fun e =>
+         Message.print (Message.of_exn e);
+         Control.throw (Tactic_failure (Some (fprintf "once_hard: unexpected backtracking")))).
 
-Ltac evar_spec H :=  assert_goals_hard 
+Tactic Notation "bt_guard" := ltac2:(bt_guard ()).
+
+Section test.
+  Variable P Q : Prop.
+
+  Goal True. Proof. bt_guard. exact I. Abort.
+  Goal True. Proof. Fail (bt_guard; fail) || idtac. Abort.
+  Goal True. Proof. (idtac "a" + idtac "b"); bt_guard; exact I. Abort.
+  Goal True. Proof. Fail ((idtac "a" + idtac "b"); bt_guard; fail). Abort.
+End test.
+
+
+Ltac evar_spec H :=  assert_goals_hard
                        (move: H; let t := open_constr:(_) in let f := fresh in  pose f := t=> /(_ f); subst f)
                        1.
 
@@ -123,21 +145,32 @@ Section test.
 End test.
 
 
-Ltac2 dst_hyp_type (ty : constr) :=
+Ltac2 revert_hyp_type (dependent: bool) (ty : constr) :=
   let hyps := List.filter (fun h => let (_, _, t) := h in Constr.equal t ty) (Control.hyps ()) in
   match hyps with
-  | [(h, _, _)] => let hcnstr := hyp h in destruct $hcnstr
+  (* If others depend on it, we fail*)
+  | [(h, _, _)] => 
+    let revert_t := if dependent 
+                      then ltac1:(x |- generalize dependent x) 
+                      else ltac1:(x |- move: x)  in
+    let hcnstr := Control.hyp h in revert_t (Ltac1.of_constr hcnstr)
   | [] => Control.zero (Tactic_failure (Some (fprintf "No hypothesis of type %t" ty)))
   | _ => Control.zero (Tactic_failure (Some (fprintf "Multiple hypotheses of type %t" ty)))
   end.
 
-Ltac dst_hyp_type ty :=
-  let f := ltac2:(ty |- dst_hyp_type (Option.get (Ltac1.to_constr ty))) in
+Tactic Notation "revert_hyp_type" constr(ty) :=
+  let f := ltac2:(ty |- revert_hyp_type false (Option.get (Ltac1.to_constr ty))) in
+  f ty.
+
+Tactic Notation "revert_hyp_type_dep" constr(ty) :=
+  let f := ltac2:(ty |- revert_hyp_type true (Option.get (Ltac1.to_constr ty))) in
   f ty.
 
 Section test.
-  Goal nat -> False. Proof. move=> *.  dst_hyp_type nat. Abort.
-  Goal nat -> nat -> False. Proof. move=> *.  Fail dst_hyp_type nat. Abort.
+  Goal nat -> False. Proof. move=> *.  revert_hyp_type nat. Abort.
+  Goal nat -> nat -> False. Proof. move=> *.  Fail revert_hyp_type nat. Abort.
+  Variable P : nat -> Prop.
+  Goal forall n, P n -> False. Proof. move=> *. revert_hyp_type_dep nat. Abort.
 End test.
 
 (* Using Constr.Unsafe.kind: the App node exposes the full n-ary application
@@ -173,11 +206,10 @@ Section test.
 End test.
 
 Module GallinaHole.
-  Import Ltac2 Bool Control Printf.
   (* Holes *)
   #[local] Ltac2 admit_tac () := 
     let hole_constr := Control.hyp @hole in
-    refine (fun () => '($hole_constr _)).
+    Control.refine (fun () => '($hole_constr _)).
 
     (* TODO: I wish that this was exact. 
     I also wish that I could check the type of hole,
