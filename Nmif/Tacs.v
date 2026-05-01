@@ -136,8 +136,8 @@ Section test.
   Goal P /\ P.  Proof. assert_goals_hard split 2. Abort.
   Goal P /\ P.  Proof. Fail assert_goals_hard split 3. Abort.
   Goal P /\ P.  Proof. first [ idtac "Trying 3"; assert_goals_soft split 3 | idtac "Trying 2"; assert_goals_soft split 2 ]. Abort.
-  Goal (P /\ P) /\ (P /\ P).  Proof.  split. all: assert_goals_soft split 2. Abort.
-  Goal (P /\ P) /\ (P /\ P).  Proof.  split; assert_goals_soft split 2. Abort.
+  Goal (P /\ P) /\ (P /\ P).  Proof.  split. all: assert_goals_hard split 2. Abort.
+  Goal (P /\ P) /\ (P /\ P).  Proof.  split; assert_goals_hard split 2. Abort.
 End test.
 
 
@@ -149,9 +149,12 @@ Ltac evar_spec H :=  assert_goals_hard
 Section test.
   Variable P : nat -> Prop.
   Variable Q : Prop.
-  Goal (forall n, P n) -> Q.  Proof. toph evar_spec. Abort.
+  Goal (P 5 -> Q) -> (forall n, P n) -> Q.  
+  Proof. 
+    move=> x. toph evar_spec. exact x. Restart.
+    move=> x. unshelve toph evar_spec. 2: exact x. (* Applying to second goal solves the first goal *)
+  Qed.
 End test.
-
 
 Ltac2 revert_hyp_type (dependent: bool) (ty : constr) :=
   let hyps := List.filter (fun h => let (_, _, t) := h in Constr.equal t ty) (Control.hyps ()) in
@@ -159,11 +162,12 @@ Ltac2 revert_hyp_type (dependent: bool) (ty : constr) :=
   (* If others depend on it, we fail*)
   | [(h, _, _)] => 
     let revert_t := if dependent 
-                      then ltac1:(x |- generalize dependent x) 
+                      then ltac1:(x |- generalize dependent x)  (* TODO: It seems like it would be good to assert the number of goals *)
                       else ltac1:(x |- revert x)  in
     let hcnstr := Control.hyp h in revert_t (Ltac1.of_constr hcnstr)
-  | [] => Control.zero (Tactic_failure (Some (fprintf "No hypothesis of type %t" ty)))
-  | _ => Control.zero (Tactic_failure (Some (fprintf "Multiple hypotheses of type %t" ty)))
+  (* Unless you absolutely require zero, don't use zero *)
+  | [] => Control.throw (Tactic_failure (Some (fprintf "No hypothesis of type %t" ty))) 
+  | _ => Control.throw (Tactic_failure (Some (fprintf "Multiple hypotheses of type %t" ty)))
   end.
 
 Tactic Notation "revert_hyp_type" constr(ty) :=
