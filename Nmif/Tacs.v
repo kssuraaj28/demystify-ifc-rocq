@@ -98,7 +98,7 @@ End test.
   halt soft backtracking in goals
 *)
 (* TODO: Is Ltac1.run tt the same as ltac1:(x |- x) tt ?*)
-Ltac2 assert_goals (hard : bool) (t : unit -> unit) (n : int) : unit :=
+Ltac2 assert_goals (hard : bool) (t : unit -> unit) (n: int) : unit :=
   Control.enter (fun () =>
     t ();
     let m := Control.numgoals () in
@@ -110,11 +110,11 @@ Ltac2 assert_goals (hard : bool) (t : unit -> unit) (n : int) : unit :=
    tactic0 has tightest precedence is required so the tactic argument doesn't
    greedily consume the trailing integer. TODO: Check
 *)
-Tactic Notation "assert_goals_hard" tactic0(t) integer(n) :=
+Tactic Notation "assert_goals_hard" integer(n) tactic0(t):=
   let f := ltac2:(tt nn |- assert_goals true (fun () => Ltac1.run tt) (Option.get (Ltac1.to_int nn))) in
   f t n.
 
-Tactic Notation "assert_goals_soft" tactic0(t) integer(n) :=
+Tactic Notation "assert_goals_soft" integer(n) tactic0(t):=
   let f := ltac2:(tt nn |-
     assert_goals false (fun () => Ltac1.run tt) (Option.get (Ltac1.to_int nn))) in
   f t n.
@@ -123,35 +123,34 @@ Tactic Notation "assert_goals_soft" tactic0(t) integer(n) :=
 Section test.
   Goal True.
   Proof.
-    Succeed assert_goals_hard easy 0.
-    Fail assert_goals_hard easy 1. 
-    Fail assert_goals_soft easy 1. 
-    Succeed (assert_goals_hard fail 2) || idtac. 
-    Fail (bt_guard; assert_goals_hard fail 2) || idtac. 
-    Succeed bt_guard; (assert_goals_hard fail 2) || idtac. 
-    Fail (bt_guard; assert_goals_hard fail 10) || idtac. 
+    Succeed assert_goals_hard 0 easy.
+    Fail assert_goals_hard 1 easy. 
+    Fail assert_goals_soft 1 easy. 
+    Succeed (assert_goals_hard 2 fail) || idtac. 
+    Fail (bt_guard; assert_goals_hard 2 fail) || idtac. 
+    Succeed bt_guard; (assert_goals_hard 2 fail) || idtac. 
+    Fail (bt_guard; assert_goals_hard 10 fail) || idtac. 
   Abort.
 
   Variable P : Prop.
-  Goal P /\ P.  Proof. assert_goals_hard split 2. Abort.
-  Goal P /\ P.  Proof. Fail assert_goals_hard split 3. Abort.
-  Goal P /\ P.  Proof. first [ idtac "Trying 3"; assert_goals_soft split 3 | idtac "Trying 2"; assert_goals_soft split 2 ]. Abort.
-  Goal (P /\ P) /\ (P /\ P).  Proof.  split. all: assert_goals_hard split 2. Abort.
-  Goal (P /\ P) /\ (P /\ P).  Proof.  split; assert_goals_hard split 2. Abort.
+  Goal P /\ P.  Proof. assert_goals_hard 2 split. Abort.
+  Goal P /\ P.  Proof. Fail assert_goals_hard 3 split. Abort.
+  Goal P /\ P.  Proof. first [ idtac "Trying 3"; assert_goals_soft 3 split | idtac "Trying 2"; assert_goals_soft 2 split  ]. Abort.
+  Goal (P /\ P) /\ (P /\ P).  Proof.  split. all: assert_goals_hard 2 split. Abort.
+  Goal (P /\ P) /\ (P /\ P).  Proof.  split; assert_goals_hard 2 split. Abort.
 End test.
 
 
 
-Ltac evar_spec H :=  assert_goals_hard
-                       (move: H; let t := open_constr:(_) in let f := fresh in  pose f := t=> /(_ f); subst f)
-                       1.
+Ltac evar_spec H :=  assert_goals_hard 1
+                       (move: H; let t := open_constr:(_) in let f := fresh in  pose f := t=> /(_ f); subst f).
 
 Section test.
   Variable P : nat -> Prop.
   Variable Q : Prop.
   Goal (P 5 -> Q) -> (forall n, P n) -> Q.  
   Proof. 
-    move=> x. toph evar_spec. exact x. Restart.
+    Succeed move=> x; (toph evar_spec); exact x.
     move=> x. unshelve toph evar_spec. 2: exact x. (* Applying to second goal solves the first goal. *)
   Qed.
 End test.

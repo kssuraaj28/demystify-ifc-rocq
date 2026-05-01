@@ -79,17 +79,15 @@ Arguments AdvStateMachine {_ _ _ _} AtkStates.
 Import VarValStore.Notations.
 Import Tacs.
 
-Ltac stp_corr_wf_gl :=
-  lazymatch goal with
-  |- context [ ⟨ corruptor ?atk ?ast ?st | is_trusted ⟩] => 
-    let t := constr:(⟨ corruptor atk ast st | is_trusted ⟩) in
-    have: t = ⟨ st | is_trusted ⟩=> [| ->];
-    [rewrite (corruptor_wf_int atk)=>//|]
-  end.
+Ltac stp_corr_int_gl := assert_goals_hard 1 (rewrite corruptor_wf_int).
+Ltac stp_corr_conf_gl :=
+  assert_goals_hard 1 (unshelve erewrite corruptor_wf_conf;[|reflexivity|]).
+(* TODO: Add test for this *)
+
 
 Section test.
   Context `{!VarPrm,!ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
   Generalizable All Variables.
   Goal `(forall P, P ⟨ corruptor (AtkStates := A) adv ast st  | is_trusted ⟩).
-  Proof. move=> *. stp_corr_wf_gl. Abort.
+  Proof. move=> *. stp_corr_int_gl. Abort.
 End test.

@@ -79,18 +79,18 @@ Ltac if_easy_goals:=
         let e := fresh in let v := fresh in 
         move e: b=> v; move: v e; 
         case=> ?; try done) in(* TODO parameterize? *)
-       assert_goals_soft t 1 || assert_goals_soft t 0
+       assert_goals_soft 1 t || assert_goals_soft 0 t 
   end.
 
 Ltac if_same :=
-  assert_goals_hard
+  assert_goals_hard 1
     (let x := fresh in 
     set x := if _ then ?[B] else ?B;
     let t := eval cbv delta [x] in x in 
     lazymatch t with
     | if ?b then ?b1 else _ => 
       have  {x} ->: x = b1; [destruct b; subst; auto|]
-    end) 1.
+    end).
 
 (* TODO: Maybe elsewere *)
 Definition PcLbl := Lattice4pt.Label.
@@ -437,16 +437,9 @@ Section inv.
     apply/flows_from_untr; eauto; done.
   Qed.
 
-(* This duplication is stupid. TODO: Awesome automation *)
-  Lemma wt_ocmd_st_int_untr:
-    forall p c st, mk_lbl true p ⊢ c ->
-    ⟨ optcmd_stp_store c st | is_trusted ⟩ =
-    ⟨ st | is_trusted ⟩.
-  Proof. 
-    move=> p [c'|] st Hwf //.
-    apply/wt_cmd_st_int_untr; eauto.
-  Qed.
-
+  Ltac stp_wt_cmd_st_int_untr := 
+    assert_goals_hard 1
+    (unshelve erewrite wt_cmd_st_int_untr;[..|eassumption]).
   
    Import Util.List.
    Lemma Forall_zip:
@@ -513,25 +506,28 @@ Section inv.
     case; rewrite {1}/CmbCmdInv=> rc. 
     case erc: rc; last first.
     - move=>>[]_; rewrite/StateInv=> + [].
-      (case pce: (untrusted _))=> [* /= | <- /= <- *]; last first; repeat split.
+      (case pce: (untrusted _))=> [* /= | <- /= <- *]; last first; repeat split. (* Grind here!! *)
 
        --- if_easy_goals.
-           rewrite corruptor_wf_int=> //. (* apply corruptor_wf_int: TODO*)
+           stp_corr_int_gl=> //. (* TODO: Naming scheme *)
 
        --- if_same.
            if_easy_goals.
-           rewrite ->corruptor_wf_conf; [reflexivity | ]=> //. (* Normal rewrite *)
-(*           apply: corruptor_wf_conf=> //. *)
+           stp_corr_conf_gl. 
+           done.
 
        --- apply/cmbcmdinv_empty. (* Should be finisher also *)
 
-       --- erewrite wt_ocmd_st_int_untr; [|eassumption]. (* This can be automated as well. This is a little sus *)
-           if_easy_goals.
-           rewrite corruptor_wf_int=> //.
+       --- subst. 
+           revert_hyp_type_dep (option Cmd); case=> /= *. 
+           + stp_wt_cmd_st_int_untr. if_easy_goals. stp_corr_int_gl. done.
+           + if_easy_goals. stp_corr_int_gl. done.
+
 
        --- if_same. 
            if_easy_goals. (* TODO: if_easy_goals should check that nothing too bad is happening. It should also check that *)
-           apply: corruptor_wf_conf=> //.
+           stp_corr_conf_gl. 
+           done.
 
        --- apply/Forall_zip=>  /=. (* Should be step *)
            rewrite map_map Forall_map. (* Should be automated? *)
@@ -549,18 +545,21 @@ Section inv.
          1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /= *; subst. (* TODO: Is this okay? *)
 
           (* Seems very automatable *)
-          ++ erewrite wt_cmd_st_int_untr;[|eassumption].
-             rewrite corruptor_wf_int=> //.
+          ++ stp_wt_cmd_st_int_untr.
+             stp_corr_int_gl.
              revert_hyp_type_dep (option Cmd); case=> //= *.
-             erewrite wt_cmd_st_int_untr;[|eassumption]=> //.
+             stp_wt_cmd_st_int_untr.
+             done.
 
           ++ rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
              erewrite wt_cmd_st_int; [reflexivity|eassumption|]. (* Probably can be automated *) 
-             rewrite corruptor_wf_int=> //. (* Should definited be automated *)
+             stp_corr_int_gl. 
+             done.
 
-          ++ erewrite wt_cmd_st_int_untr;[|eassumption].
+          ++ stp_wt_cmd_st_int_untr.
              revert_hyp_type_dep (option Cmd); case=> //= *.
-             erewrite wt_cmd_st_int_untr;[|eassumption]=> //.
+             stp_wt_cmd_st_int_untr.
+             done.
 
           ++ rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
              erewrite wt_cmd_st_int; [reflexivity|eassumption|]=> //. (* Probably can be automated *) 
@@ -570,18 +569,20 @@ Section inv.
          revert_hyp_type_dep PcLbl; case=> [+ []] /=.
          + revert_hyp_type bool; case=> * /=.
            ++ erewrite wt_cmd_st_conf; [reflexivity |eassumption|]. (* Not fwreasoning *)
-              rewrite -> corruptor_wf_conf; [reflexivity | ]=> //. (* This is automated *)
+              stp_corr_conf_gl.
+              done.
            ++ erewrite wt_cmd_st_conf; [|eassumption|eassumption]; done. (* This is fwreasoning. *)
          + move=> *. 
            erewrite wt_cmd_st_conf_sec;[|eassumption].
            if_easy_goals.
-           rewrite -> corruptor_wf_conf=> //. (* TODO: apply vs erewrite *)
+           stp_corr_conf_gl.
+           done.
 
       -- apply/Forall_zip=> /=.  (* TODO: The trickiest case? *) 
          apply/Forall_and; subst.
          + apply/Forall_combine2_ind1; [move=> ?; apply|..]; [..| done]. (* Is this a reasonable forward reasoning step? *)
            apply/Forall_map/step_soundness=> //.
-         + revert_hyp_type_dep PcLbl;case=> [[] ?] /=.
+         + revert_hyp_type_dep PcLbl; case=> [[] ?] /=.
            ++ compute_new_pc_untr=> /= _ *.
               apply/Forall_combine2_ind2; [move=> ?; apply|..]; [..| done]. (* This is a reasonable forward step *)
               apply/Forall_map. (* This should be automated *)
@@ -606,7 +607,8 @@ Section inv.
                       | eassumption 
                       | rewrite newpce // |].
                    if_easy_goals.
-                   rewrite corruptor_wf_int=> //.
+                   stp_corr_int_gl.
+                   done.
         Qed.
   Import Util.List.
   Theorem cfg_step_inv: forall c, Invariant c ->  Invariant (cfg_step c).
