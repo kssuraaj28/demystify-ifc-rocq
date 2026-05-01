@@ -74,55 +74,33 @@ Section test.
   Goal False -> False.  Proof.  move=> *. someh t . Abort.
 End test.
 
-(* For `t`, if it fails, it is made to throw. 
-   This is true for every backtracking point
-*)
-Ltac2 rec hard_fail (t : unit -> 'a) : 'a :=
-  match Control.case t with
-  | Err e => Control.throw e
-  | Val (v, k) =>
-      Control.plus (fun () => v)
-        (fun e =>
-          match Control.case (fun () => k e) with
-          | Err _ => Control.zero e
-          | Val (v', k') =>
-              hard_fail (fun () => Control.plus (fun () => v') k')
-          end)
-  end.
+(* TODO: Why does wrapping this with assert_goals true 1 not work? *)
+Ltac2 bt_guard () : unit :=
+  Control.plus (fun () => ())
+       (fun e =>
+         Message.print (Message.of_exn e); (* TODO: Put this in the exception *)
+         Control.throw (Tactic_failure (Some (fprintf "bt_guard: caught backtracking")))).
 
-Tactic Notation "hard_fail" tactic0(t) :=  let f := ltac2:(tt |- hard_fail (fun () => Ltac1.run tt)) in  f t.
-
+Tactic Notation "bt_guard" := ltac2:(bt_guard ()).
 Section test.
-  Goal False. 
-  Proof. 
-    hard_fail (idtac). 
-    Fail hard_fail fail. 
-    Fail try (hard_fail fail). 
-    first [ fail | idtac ].
-    Fail first [ hard_fail fail | idtac ].
-    first [((idtac "a" + idtac "b")); fail| idtac].
+  Variable P Q : Prop.
 
-    let t:= idtac "a" in
-    first [(hard_fail t); fail| idtac].
-
-    let t:= (idtac "a" + idtac "b") in
-    first [(hard_fail t); fail| idtac].
-
-    let t:= (idtac "a" + fail ) in
-    first [(hard_fail t); fail| idtac].
-
-
-  Abort.
+  Goal True. Proof. bt_guard. exact I. Abort.
+  Goal True. Proof. Fail (bt_guard; fail) || idtac. Abort.
+  Goal True. Proof. (idtac "a" + idtac "b"); bt_guard; exact I. Abort.
+  Goal True. Proof. Fail ((idtac "a" + idtac "b"); bt_guard; fail). Abort.
 End test.
 
-
-(* assert_goals: run `t`, which should not fail.
-   then check that exactly `n` goals remain.
-   `hard` controls whether the error is a backtracking error or no *)
+(* 
+  assert_goals:  run `t`, if it succeeds, then check that exactly n goals remain. 
+  Use `bt_guard` to stop backtracking. 
+  In general, it seems impossible to have a tactic that can seletively
+  halt soft backtracking in goals
+*)
 (* TODO: Is Ltac1.run tt the same as ltac1:(x |- x) tt ?*)
 Ltac2 assert_goals (hard : bool) (t : unit -> unit) (n : int) : unit :=
   Control.enter (fun () =>
-    match Control.case t with | Err e => Control.throw e | _ => () end; (* We prevent backtracking also *)
+    t ();
     let m := Control.numgoals () in
     if Int.equal m n then () else
     let e := Tactic_failure (Some (fprintf "assert_goals: expected %i goal(s), got %i" n m)) in
@@ -143,11 +121,16 @@ Tactic Notation "assert_goals_soft" tactic0(t) integer(n) :=
 
 
 Section test.
-  Goal True. Proof. assert_goals_hard easy 0. Abort.
-  Goal True. Proof. Fail assert_goals_hard easy 1. Abort.
-  Goal True. Proof. Fail assert_goals_soft easy 1. Abort.
-  Goal True. Proof. Fail (assert_goals_hard fail 2) || idtac. Abort.
-  Goal True. Proof. Fail (assert_goals_hard fail 10) || idtac. Abort.
+  Goal True.
+  Proof.
+    Succeed assert_goals_hard easy 0.
+    Fail assert_goals_hard easy 1. 
+    Fail assert_goals_soft easy 1. 
+    Succeed (assert_goals_hard fail 2) || idtac. 
+    Fail (bt_guard; assert_goals_hard fail 2) || idtac. 
+    Succeed bt_guard; (assert_goals_hard fail 2) || idtac. 
+    Fail (bt_guard; assert_goals_hard fail 10) || idtac. 
+  Abort.
 
   Variable P : Prop.
   Goal P /\ P.  Proof. assert_goals_hard split 2. Abort.
@@ -156,24 +139,6 @@ Section test.
   Goal (P /\ P) /\ (P /\ P).  Proof.  split. all: assert_goals_soft split 2. Abort.
   Goal (P /\ P) /\ (P /\ P).  Proof.  split; assert_goals_soft split 2. Abort.
 End test.
-
-(* TODO: Why does wrapping this with assert_goals true 1 not work? *)
-Ltac2 bt_guard () : unit :=
-  Control.plus (fun () => ())
-       (fun e =>
-         Message.print (Message.of_exn e);
-         Control.throw (Tactic_failure (Some (fprintf "once_hard: unexpected backtracking")))).
-
-Tactic Notation "bt_guard" := ltac2:(bt_guard ()).
-Section test.
-  Variable P Q : Prop.
-
-  Goal True. Proof. bt_guard. exact I. Abort.
-  Goal True. Proof. Fail (bt_guard; fail) || idtac. Abort.
-  Goal True. Proof. (idtac "a" + idtac "b"); bt_guard; exact I. Abort.
-  Goal True. Proof. Fail ((idtac "a" + idtac "b"); bt_guard; fail). Abort.
-End test.
-
 
 
 
