@@ -74,13 +74,55 @@ Section test.
   Goal False -> False.  Proof.  move=> *. someh t . Abort.
 End test.
 
-(* assert_goals: run `t`, which should not fail. TODO: Can it backtrack?
+(* For `t`, if it fails, it is made to throw. 
+   This is true for every backtracking point
+*)
+Ltac2 rec hard_fail (t : unit -> 'a) : 'a :=
+  match Control.case t with
+  | Err e => Control.throw e
+  | Val (v, k) =>
+      Control.plus (fun () => v)
+        (fun e =>
+          match Control.case (fun () => k e) with
+          | Err _ => Control.zero e
+          | Val (v', k') =>
+              hard_fail (fun () => Control.plus (fun () => v') k')
+          end)
+  end.
+
+Tactic Notation "hard_fail" tactic0(t) :=  let f := ltac2:(tt |- hard_fail (fun () => Ltac1.run tt)) in  f t.
+
+Section test.
+  Goal False. 
+  Proof. 
+    hard_fail (idtac). 
+    Fail hard_fail fail. 
+    Fail try (hard_fail fail). 
+    first [ fail | idtac ].
+    Fail first [ hard_fail fail | idtac ].
+    first [((idtac "a" + idtac "b")); fail| idtac].
+
+    let t:= idtac "a" in
+    first [(hard_fail t); fail| idtac].
+
+    let t:= (idtac "a" + idtac "b") in
+    first [(hard_fail t); fail| idtac].
+
+    let t:= (idtac "a" + fail ) in
+    first [(hard_fail t); fail| idtac].
+
+
+  Abort.
+End test.
+
+
+(* assert_goals: run `t`, which should not fail.
    then check that exactly `n` goals remain.
    `hard` controls whether the error is a backtracking error or no *)
 (* TODO: Is Ltac1.run tt the same as ltac1:(x |- x) tt ?*)
 Ltac2 assert_goals (hard : bool) (t : unit -> unit) (n : int) : unit :=
   Control.enter (fun () =>
-    match Control.case t with | Err e => Control.throw e | _ => () end;
+    match Control.case t with | Err e => Control.throw e | _ => () end; (* We prevent backtracking also *)
     let m := Control.numgoals () in
     if Int.equal m n then () else
     let e := Tactic_failure (Some (fprintf "assert_goals: expected %i goal(s), got %i" n m)) in
@@ -123,7 +165,6 @@ Ltac2 bt_guard () : unit :=
          Control.throw (Tactic_failure (Some (fprintf "once_hard: unexpected backtracking")))).
 
 Tactic Notation "bt_guard" := ltac2:(bt_guard ()).
-
 Section test.
   Variable P Q : Prop.
 
@@ -132,6 +173,8 @@ Section test.
   Goal True. Proof. (idtac "a" + idtac "b"); bt_guard; exact I. Abort.
   Goal True. Proof. Fail ((idtac "a" + idtac "b"); bt_guard; fail). Abort.
 End test.
+
+
 
 
 Ltac evar_spec H :=  assert_goals_hard
@@ -152,7 +195,7 @@ Ltac2 revert_hyp_type (dependent: bool) (ty : constr) :=
   | [(h, _, _)] => 
     let revert_t := if dependent 
                       then ltac1:(x |- generalize dependent x) 
-                      else ltac1:(x |- move: x)  in
+                      else ltac1:(x |- revert x)  in
     let hcnstr := Control.hyp h in revert_t (Ltac1.of_constr hcnstr)
   | [] => Control.zero (Tactic_failure (Some (fprintf "No hypothesis of type %t" ty)))
   | _ => Control.zero (Tactic_failure (Some (fprintf "Multiple hypotheses of type %t" ty)))
