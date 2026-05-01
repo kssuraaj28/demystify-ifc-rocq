@@ -152,7 +152,7 @@ Section test.
   Goal (P 5 -> Q) -> (forall n, P n) -> Q.  
   Proof. 
     move=> x. toph evar_spec. exact x. Restart.
-    move=> x. unshelve toph evar_spec. 2: exact x. (* Applying to second goal solves the first goal *)
+    move=> x. unshelve toph evar_spec. 2: exact x. (* Applying to second goal solves the first goal. *)
   Qed.
 End test.
 

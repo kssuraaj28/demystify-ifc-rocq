@@ -2,7 +2,7 @@ From Stdlib Require List ssreflect ssrfun ssrbool FunctionalExtensionality.
 Import List ListNotations ssreflect ssrfun ssrbool FunctionalExtensionality.
 
 Require Tacs Util VarValStore Attacker Syntax Lattice4pt.
-Import Tacs Util VarValStore Attacker Syntax. 
+Import Tacs Util VarValStore Attacker Syntax Lattice4pt. 
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
@@ -70,10 +70,15 @@ Section cleanstep.
 
 End cleanstep.
 
+(* This is a decent forward reasoning tactic *)
 Ltac if_easy_goals:=
+  (* In Ltac, doing match goals will do focus *)
   match goal with
   |- context [if ?b then _ else _] =>  
-       let t := (move: b; case=> //) in
+       let t := (
+        let e := fresh in let v := fresh in 
+        move e: b=> v; move: v e; 
+        case=> ?; try done) in(* TODO parameterize? *)
        assert_goals_soft t 1 || assert_goals_soft t 0
   end.
 
@@ -208,6 +213,38 @@ Section cmb_cmd.
   }.
 End cmb_cmd.
 
+Section new_pc.
+  Import Lattice4pt.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+
+  Definition compute_new_pc (old_pc : PcLbl) (cmd: Cmd): PcLbl :=
+    match cmd with
+    | cond (gvar,_) _ _ => var_lbl gvar ⊔ old_pc (* Can this be refactored w/ static analysis? *)
+    | while (gvar,_) _ => var_lbl gvar ⊔ old_pc
+    | _ => old_pc
+    end.
+
+  Definition compute_new_pc_opt (old_pc : PcLbl) (cmd: option Cmd): PcLbl :=
+    if cmd isn't Some cmd then old_pc else
+    compute_new_pc old_pc cmd.
+
+  Lemma compute_new_pc_untr:
+    forall p c, exists p',
+      compute_new_pc (mk_lbl true p) c = (mk_lbl true p').
+  Proof.
+    move=> p [dst exp| [g cmp] b1 b2 | [g cmp] b]; cbn; eauto.
+    1-2: case: (var_lbl g) => u pg. (* TODO: This could be a lemma *)
+    1-2: exists (pg && p); case: u; done.
+  Qed.
+End new_pc.
+
+Ltac compute_new_pc_untr :=
+    lazymatch goal with 
+    |- context [compute_new_pc (mk_lbl true ?p) ?c] => 
+       move: ([elaborate compute_new_pc_untr p c])=> [] ? /[dup] ? ->
+    end. 
+(* TODO: Test.. *)
+
 Section cmb_step.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
@@ -218,29 +255,6 @@ Section cmb_step.
     let: comb := List.combine_extend3 real_cont ideal_cont atk_steps None None false in
     map (fun '(rc, ic, abit) => mk_cmbcmd rc abit ic pc_lbl) comb.
 
-  Section new_pc.
-    Import Lattice4pt.Notations.
-    Definition compute_new_pc (old_pc : PcLbl) (cmd: Cmd): PcLbl :=
-      match cmd with
-      | cond (gvar,_) _ _ => var_lbl gvar ⊔ old_pc (* Can this be refactored w/ static analysis? *)
-      | while (gvar,_) _ => var_lbl gvar ⊔ old_pc
-      | _ => old_pc
-      end.
-
-    Definition compute_new_pc_opt (old_pc : PcLbl) (cmd: option Cmd): PcLbl :=
-      if cmd isn't Some cmd then old_pc else
-      compute_new_pc old_pc cmd.
-  End new_pc.
-
-  Import Lattice4pt.
-  Lemma compute_new_pc_untr:
-    forall p c, exists p',
-      compute_new_pc (mk_lbl true p) c = (mk_lbl true p').
-  Proof.
-    move=> p [dst exp| [g cmp] b1 b2 | [g cmp] b]; cbn; eauto.
-    1-2: case: (var_lbl g) => u pg. (* TODO: This could be a lemma *)
-    1-2: exists (pg && p); case: u; done.
-  Qed.
 
   Import VarValStore.Notations.
   Lemma tr_cmd_cnt:
@@ -485,7 +499,6 @@ Section inv.
     Forall CmbCmdInv cmdlst /\
     StateInv cmbst.
 
-  Unset SsrIdents.
   
   Import Lattice4pt.Notations.
   Import Util.List.
@@ -505,7 +518,7 @@ Section inv.
        --- if_easy_goals.
            rewrite corruptor_wf_int=> //. (* apply corruptor_wf_int: TODO*)
 
-       --- if_same. 
+       --- if_same.
            if_easy_goals.
            rewrite ->corruptor_wf_conf; [reflexivity | ]=> //. (* Normal rewrite *)
 (*           apply: corruptor_wf_conf=> //. *)
@@ -568,20 +581,11 @@ Section inv.
          apply/Forall_and; subst.
          + apply/Forall_combine2_ind1; [move=> ?; apply|..]; [..| done]. (* Is this a reasonable forward reasoning step? *)
            apply/Forall_map/step_soundness=> //.
-              Ltac compute_new_pc_untr :=
-                  lazymatch goal with (* This you can fire wherever there is compute_new_pc?
-                  You do lose information though*)
-                  |- context [compute_new_pc (mk_lbl true ?p) ?c] => 
-                     let f := fresh in 
-                     specialize (compute_new_pc_untr p c)=> - [? ->] (* Why no ssr? *)
-                  end. (* You have to do  finisher automation!! *)
          + revert_hyp_type_dep PcLbl;case=> [[] ?] /=.
-           ++ compute_new_pc_untr=> /= _ idwt.
+           ++ compute_new_pc_untr=> /= _ *.
               apply/Forall_combine2_ind2; [move=> ?; apply|..]; [..| done]. (* This is a reasonable forward step *)
               apply/Forall_map. (* This should be automated *)
-
-              move: idwt.
-              revert_hyp_type (option Cmd); case=> //= >. (* TODO: Fw reasoning with case and one goal? *)
+              revert_hyp_type_dep (option Cmd); case=> //= >.
               rewrite -/(WellFormedProg _ _).
               move=> /step_soundness=> snd.
               apply/flows_to_subtype_prog;[|apply/snd].
@@ -589,15 +593,13 @@ Section inv.
 
            ++ move=> /= wt <- /=.
              (* This requires maximum brain.. *)
-               move newpce:  (compute_new_pc _ _)=> newpc.
-               destruct newpc as [[] ?]; cbn.
-               +++ apply/Forall_combine2_ind2; [move=> ?; apply|..]=> //.
+               move newpce: (compute_new_pc _ _)=> [[] ?] /=.
+               +++ apply/Forall_combine2_ind2; [move=> ?; apply| |done].
                    apply/Forall_map=> /=.
                    rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
                    move:wt=> /step_soundness=> snd.
                    apply/flows_to_subtype_prog; [|apply/snd].
                    rewrite newpce=> //.
-
 
                +++ erewrite tr_cmd_cnt;
                      [apply/Forall_combine2_same/Forall_map/Forall_forall => //
