@@ -157,6 +157,24 @@ Ltac2 hs_from_ltac1 (l : Ltac1.t) : hardened_step :=
   | _ => Control.throw (Tactic_failure (Some (fprintf "hs_from_ltac1: expected 3-element list")))
   end.
 
+Tactic Notation "mk_hardened_step" tactic0(t) integer(g) := 
+  let ret := ltac2val:(tt gg |- 
+    let tac := fun () => Ltac1.run tt in 
+    let gls := Option.get (Ltac1.to_int gg) in
+    let hs := mk_hardened_step tac gls false in
+    hs_to_ltac1 hs
+  ) in 
+  ret t g.
+
+Tactic Notation "mk_hardened_step" tactic0(t) "<=" int(g) := 
+  let ret := ltac2val:(tt gg |- 
+    let tac := fun () => Ltac1.run tt in 
+    let gls := Option.get (Ltac1.to_int gg) in
+    let hs := mk_hardened_step tac gls true in
+    hs_to_ltac1 hs
+  ) in 
+  ret t g.
+
 
 (* When you create a hardened_step, you really want to do: 
  - once
@@ -171,6 +189,32 @@ Ltac2 run_hardened_step hs :=
         Control.throw (Tactic_failure (Some (fprintf "Should be run with 1 goal focused"))) else
     goals_chck (unshelve (once (hs.(tac)))) (hs.(goals)) (hs.(is_lt)) true.
 
+Ltac run_hardened_step hs :=
+  let f := 
+    ltac2:(hsenc |- 
+      let hsdec := hs_from_ltac1 hsenc in
+      run_hardened_step hsdec) in
+  f hs.
+
+Ltac evar_spec_step h :=
+  let t := (move: h; let t := open_constr:(_) in let f := fresh in pose f := t=> /(_ f); subst f) in
+  mk_hardened_step t 1.
+
+Section test.
+  Variable P : nat -> Prop.
+  Variable Q : Prop.
+  Goal (P 5 -> Q) -> (forall n, P n) -> Q.  
+  Proof. 
+    move=> x i.
+    (* TODO: Claude should debug this *)
+    let t := (evar_spec_step i) in 
+    run_hardened_step t.
+  Qed.
+End test.
+
+
+
+
 
 (* Should I stepify this? *)
 Ltac2 evar_spec_step (h : ident): hardened_step :=
@@ -178,22 +222,6 @@ Ltac2 evar_spec_step (h : ident): hardened_step :=
     fun () => (ltac1:(h |- move: h; let t := open_constr:(_) in let f := fresh in pose f := t=> /(_ f); subst f) (Ltac1.of_ident h)) in
   mk_hardened_step t 1 false.
 
-Ltac print_inp_dyntype inp :=
-  let f := ltac2:(inp |- printf "%s" (Ltac1.tag_name inp)) in
-  f inp.
-
-Goal False.
-Proof.
- print_inp_dyntype ltac:(5).
- let t:= ltac:(5) in print_inp_dyntype t.
- print_inp_dyntype id.
- print_inp_dyntype idtac.
- print_inp_dyntype ltac2:(()).
- print_inp_dyntype ltac2val:(Ltac1.lambda (fun x => x)).
- print_inp_dyntype ltac2val:(Ltac1.of_int 5).
- print_inp_dyntype ltac2val:(Ltac1.of_int 5).
- print_inp_dyntype ltac2val:(Ltac1.of_list []).
- let t := 5 in print_inp_dyntype 5.
     
 (* 
   Claude used Ltac1.tag_name. TODO: What does it do? 
