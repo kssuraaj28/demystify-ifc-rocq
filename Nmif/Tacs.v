@@ -74,76 +74,140 @@ Section test.
   Goal False -> False.  Proof.  move=> *. someh t . Abort.
 End test.
 
-(* TODO: Why does wrapping this with assert_goals true 1 not work? *)
-Ltac2 bt_guard () : unit :=
-  Control.plus (fun () => ())
-       (fun e =>
-         Message.print (Message.of_exn e); (* TODO: Put this in the exception *)
-         Control.throw (Tactic_failure (Some (fprintf "bt_guard: caught backtracking")))).
-
-Tactic Notation "bt_guard" := ltac2:(bt_guard ()).
-Section test.
-  Variable P Q : Prop.
-
-  Goal True. Proof. bt_guard. exact I. Abort.
-  Goal True. Proof. Fail (bt_guard; fail) || idtac. Abort.
-  Goal True. Proof. (idtac "a" + idtac "b"); bt_guard; exact I. Abort.
-  Goal True. Proof. Fail ((idtac "a" + idtac "b"); bt_guard; fail). Abort.
-End test.
-
 (* 
-  assert_goals:  run `t`, if it succeeds, then check that exactly n goals remain. 
-  Use `bt_guard` to stop backtracking. 
+  - run `t`. 
+  - if it succeeds, then check that exactly n goals remain. 
+  - is_hard either throws or zeroes. You can't just first[once_assert_goals* t ?? | throw] because
+    you'd want to control whether you throw for this assert or not..
   In general, it seems impossible to have a tactic that can seletively
   halt soft backtracking in goals
 *)
 (* TODO: Is Ltac1.run tt the same as ltac1:(x |- x) tt ?*)
-Ltac2 assert_goals (hard : bool) (t : unit -> unit) (n: int) : unit :=
+Ltac2 goals_chck (t : unit -> unit) (n: int) (is_le: bool) (is_hard: bool) : unit :=
   Control.enter (fun () =>
     t ();
     let m := Control.numgoals () in
-    if Int.equal m n then () else
-    let e := Tactic_failure (Some (fprintf "assert_goals: expected %i goal(s), got %i" n m)) in
-    if hard then Control.throw e else Control.zero e).
+    let tst := if is_le then (Int.le m n) else (Int.equal m n) in
+    if tst then () else
+    let e_str := if is_le 
+                    then fprintf "assert_goals: got %i goal(s), not less than %i" m n
+                    else fprintf "assert_goals: got %i goal(s), not equal to %i" m n in
+    let err := if is_hard then Control.throw else Control.zero in 
+    err (Tactic_failure (Some e_str))).
+
 
 (* Ltac1 wrappers. Use parens for compound tactics: `assert_goals_hard (a; b) 3`.
    tactic0 has tightest precedence is required so the tactic argument doesn't
    greedily consume the trailing integer. TODO: Check
 *)
-Tactic Notation "assert_goals_hard" integer(n) tactic0(t):=
-  let f := ltac2:(tt nn |- assert_goals true (fun () => Ltac1.run tt) (Option.get (Ltac1.to_int nn))) in
-  f t n.
-
-Tactic Notation "assert_goals_soft" integer(n) tactic0(t):=
+(* For now, we only use the hard assert in our automation engine. Use the soft assert in tactics *)
+Tactic Notation "once_ensure_goals" integer(n) tactic0(t):=
   let f := ltac2:(tt nn |-
-    assert_goals false (fun () => Ltac1.run tt) (Option.get (Ltac1.to_int nn))) in
+    goals_chck (fun () => Ltac1.run tt) (Option.get (Ltac1.to_int nn)) false false) in
   f t n.
 
+Tactic Notation "once_ensure_goals" "<=" integer(n) tactic0(t):=
+  let f := ltac2:(tt nn |-
+    goals_chck (fun () => Ltac1.run tt) (Option.get (Ltac1.to_int nn)) true false) in
+  f t n.
 
 Section test.
   Goal True.
   Proof.
-    Succeed assert_goals_hard 0 easy.
-    Fail assert_goals_hard 1 easy. 
-    Fail assert_goals_soft 1 easy. 
-    Succeed (assert_goals_hard 2 fail) || idtac. 
-    Fail (bt_guard; assert_goals_hard 2 fail) || idtac. 
-    Succeed bt_guard; (assert_goals_hard 2 fail) || idtac. 
-    Fail (bt_guard; assert_goals_hard 10 fail) || idtac. 
+    Succeed once_ensure_goals 0 easy.
+    Fail once_ensure_goals 1 easy. 
+    try (once_ensure_goals 1 easy). 
+    Fail try (first [once_ensure_goals 1 easy | fail_hard]). 
+    Succeed once_ensure_goals <=1 easy.
+    Succeed (once_ensure_goals 102 fail) || idtac. (* The tactic can fail itself *) 
   Abort.
 
   Variable P : Prop.
-  Goal P /\ P.  Proof. assert_goals_hard 2 split. Abort.
-  Goal P /\ P.  Proof. Fail assert_goals_hard 3 split. Abort.
-  Goal P /\ P.  Proof. first [ idtac "Trying 3"; assert_goals_soft 3 split | idtac "Trying 2"; assert_goals_soft 2 split  ]. Abort.
-  Goal (P /\ P) /\ (P /\ P).  Proof.  split. all: assert_goals_hard 2 split. Abort.
-  Goal (P /\ P) /\ (P /\ P).  Proof.  split; assert_goals_hard 2 split. Abort.
+  Goal P /\ P.  Proof. once_ensure_goals 2 split. Abort.
+  Goal P /\ P.  Proof. Fail once_ensure_goals 3 split. Abort.
+  Goal P /\ P.  Proof. first [ idtac "Trying 3"; once_ensure_goals 3 split | idtac "Trying 2"; once_ensure_goals 2 split ]. Abort.
+  Goal (P /\ P) /\ (P /\ P).  Proof.  split. all: once_ensure_goals 2 split. Abort.
+  Goal (P /\ P) /\ (P /\ P).  Proof.  split; once_ensure_goals 2 split. Abort.
 End test.
 
+Ltac2 Type hardened_step := 
+  { tac : unit -> unit; goals : int; is_lt : bool }.   
+  (* true: remaining goals < goals; false: = goals *)
+
+Ltac2 mk_hardened_step t g is_lt :=
+  { tac := t; goals := g; is_lt := is_lt }.
+
+(* Convert a hardened_step to/from an Ltac1.t value (so it can flow through
+   Ltac1 contexts). Encoded as a 3-element Ltac1 list:
+   [thunk-as-Ltac1-closure; goals as Ltac1 int; is_lt as 0/1 Ltac1 int]. *)
+Ltac2 hs_to_ltac1 (hs : hardened_step) : Ltac1.t :=
+  Ltac1.of_list [
+    Ltac1.lambda (fun _ => hs.(tac) (); Ltac1.of_constr constr:(I));
+    Ltac1.of_int (hs.(goals));
+    Ltac1.of_int (if hs.(is_lt) then 1 else 0)
+  ].
+
+Ltac2 hs_from_ltac1 (l : Ltac1.t) : hardened_step :=
+  match Ltac1.to_list l with
+  | Some [t_l1; n_l1; is_lt_l1] =>
+      let n := Option.get (Ltac1.to_int n_l1) in
+      let is_lt := Int.equal (Option.get (Ltac1.to_int is_lt_l1)) 1 in
+      let tac := fun () => Ltac1.apply t_l1 [Ltac1.of_constr constr:(I)] (fun _ => ()) in
+      mk_hardened_step tac n is_lt
+  | _ => Control.throw (Tactic_failure (Some (fprintf "hs_from_ltac1: expected 3-element list")))
+  end.
 
 
-Ltac evar_spec H :=  assert_goals_hard 1
-                       (move: H; let t := open_constr:(_) in let f := fresh in  pose f := t=> /(_ f); subst f).
+(* When you create a hardened_step, you really want to do: 
+ - once
+ - unshelve
+ - assert_goals
+ - TODO: progress - Ideally progress hard. The idea is that once the goal completes, we'd want to check whether there was some progress. It's okay if the goal fails though
+*)
+(* TODO: Control.enter? *)
+Ltac2 run_hardened_step hs :=
+    let m := Control.numgoals () in
+    if Bool.neg (Int.equal m 1) then
+        Control.throw (Tactic_failure (Some (fprintf "Should be run with 1 goal focused"))) else
+    goals_chck (unshelve (once (hs.(tac)))) (hs.(goals)) (hs.(is_lt)) true.
+
+
+(* Should I stepify this? *)
+Ltac2 evar_spec_step (h : ident): hardened_step :=
+  let t := 
+    fun () => (ltac1:(h |- move: h; let t := open_constr:(_) in let f := fresh in pose f := t=> /(_ f); subst f) (Ltac1.of_ident h)) in
+  mk_hardened_step t 1 false.
+
+Ltac print_inp_dyntype inp :=
+  let f := ltac2:(inp |- printf "%s" (Ltac1.tag_name inp)) in
+  f inp.
+
+Goal False.
+Proof.
+ print_inp_dyntype ltac:(5).
+ let t:= ltac:(5) in print_inp_dyntype t.
+ print_inp_dyntype id.
+ print_inp_dyntype idtac.
+ print_inp_dyntype ltac2:(()).
+ print_inp_dyntype ltac2val:(Ltac1.lambda (fun x => x)).
+ print_inp_dyntype ltac2val:(Ltac1.of_int 5).
+ print_inp_dyntype ltac2val:(Ltac1.of_int 5).
+ print_inp_dyntype ltac2val:(Ltac1.of_list []).
+ let t := 5 in print_inp_dyntype 5.
+    
+(* 
+  Claude used Ltac1.tag_name. TODO: What does it do? 
+*)
+Ltac evar_spec h :=
+  let f := ltac2:(h |-
+    let id := match Option.get (Ltac1.to_intro_pattern h) with
+              | Std.IntroNaming (Std.IntroIdentifier i) => i
+              | _ => Control.throw (Tactic_failure (Some (fprintf "evar_spec: expected ident hypothesis")))
+              end in
+    let step := evar_spec_step id in
+    run_hardened_step step) in
+  f h.
+
 
 Section test.
   Variable P : nat -> Prop.

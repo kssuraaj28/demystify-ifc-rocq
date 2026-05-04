@@ -509,7 +509,8 @@ Section inv.
       (case pce: (untrusted _))=> [* /= | <- /= <- *]; last first; repeat split. (* Grind here!! *)
 
        --- if_easy_goals.
-           stp_corr_int_gl=> //. (* TODO: Naming scheme *)
+           stp_corr_int_gl.
+           done. (* TODO: Naming scheme *)
 
        --- if_same.
            if_easy_goals.
