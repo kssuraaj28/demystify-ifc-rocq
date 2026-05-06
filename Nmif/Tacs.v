@@ -313,3 +313,77 @@ Module GallinaHole.
 
   Section test. Variable hole : bool.   Fail Check ??.  End test.
 End GallinaHole.
+
+
+Module Dominate.
+
+  (* A tactic + a description of the tactic *)
+  Ltac2 Type dominate_tac := ((unit -> unit) * (string)).
+  Ltac2 Type dominate_taclist := dominate_tac list.
+
+  Ltac2 mutable curr_dom_list () : dominate_taclist := [].
+  Ltac2 mutable dom_debug : bool := false.
+
+  (* TODO: This desc() is sus *)
+  Ltac2 Notation "append_tac" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
+    fun () => (t, desc ()) :: (l ()).
+
+  Ltac2 Notation "join_tacs" l1(tactic(0)) l2(tactic(0)) :=
+    fun () => List.append (l1 ()) (l2 ()).
+
+  (* TODO: After every involation, maybe run an auto-based finisher? Maybe clean up with intros? *)
+  Ltac2 dominate_step () : unit :=
+    let gls := Control.numgoals() in
+    if Bool.neg (Int.equal gls 1) then
+        Control.throw (Tactic_failure (Some (fprintf "dominate_step: Needs to run with one focused goal"))) else
+
+    let rec go ts :=
+      match ts with
+      | [] => Control.zero (Tactic_failure (Some (fprintf "dominate_step: all tactics failed")))
+      | (t, desc) :: rest =>
+          match Control.case t with
+          (* It is the client's responsibility to put harden. If the client does not put it, then the thing will spin forever! *)
+          | Val ((),_) =>
+              if dom_debug then printf "dominate_step: %s success" desc else ()
+          | Err _ => go rest
+          end
+      end in
+
+    go (curr_dom_list ()). (* TODO: Run a finisher tactic after every step? some kind of auto? *)
+
+
+
+  (* For every focued goal, it runs dominate_step one by one. (dfs strategy)  *)
+  Ltac2 dominate (gas : int option) : unit :=
+    let rec go (gas : int option) : unit :=
+      (* Gas check *)
+      if match gas with Some n => Int.equal n 0 | None => false end then () else
+
+      let gls := Control.numgoals () in
+      if dom_debug then printf "dominate: numgoals = %i" gls else ();
+      (* Goals check: TODO: What happens if we throw or assert? *)
+      if Int.equal gls 0 then () else
+
+
+      (* Run the first goal *)
+      (Control.focus 1 1 (fun () =>
+        match Control.case (fun () => dominate_step ()) with
+        | Val ((), _) => ()
+        | Err _ => Control.shelve ()
+        end);
+       let next_gas := match gas with | Some n => Some (Int.sub n 1) | None => None end in
+       go next_gas) in
+    unshelve (go gas).
+  
+
+  Ltac goal_hygiene := (do ! match goal with H: _ |- _ => revert H end); move=> *.  
+
+  (* After these tactics are done, you need to shuffle goals.. *)
+  (* TODO: What are the user facing tactics? *)
+  Tactic Notation "dominate" := ltac2:(dominate None); goal_hygiene.
+  Tactic Notation "dominate" integer(n) :=
+    let f := ltac2:(nn |- dominate (Some (Option.get (Ltac1.to_int nn)))) in
+    f n; goal_hygiene.
+  Tactic Notation "dominate_step" := ltac2:(dominate_step ()); goal_hygiene.
+
+End Dominate.

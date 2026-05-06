@@ -1,7 +1,6 @@
 From Stdlib Require List ssreflect ssrfun ssrbool FunctionalExtensionality.
 Import List ListNotations ssreflect ssrfun ssrbool FunctionalExtensionality.
 
-From Ltac2 Require Import Ltac2 Printf.
 
 Require Tacs Util VarValStore Attacker Syntax Lattice4pt.
 Import Tacs Util VarValStore Attacker Syntax Lattice4pt.
@@ -497,71 +496,18 @@ Section inv.
     Forall CmbCmdInv cmdlst /\
     StateInv cmbst.
 
-  Ltac2 mutable dominate_list : (unit -> unit) list := [].
+  Ltac2 Set curr_dom_list as old := append_tac ltac1:(assert_goals 0 done) "done finisher" old.
+  Ltac2 Set curr_dom_list as old := append_tac ltac1:(assert_goals 1 (progress subst)) "subst" old.
+  Ltac2 Set curr_dom_list as old := append_tac ltac1:(if_easy_goals) "if_easy_goals" old.
+  Ltac2 Set curr_dom_list as old := append_tac ltac1:(if_same) "if_same" old.
+  Ltac2 Set curr_dom_list as old := append_tac ltac1:(compute_new_pc_untr) "compute_new_pc_untr" old.
+  Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_wt_cmd_st_int_untr) "stp_wt_cmd_st_int_untr" old.
+  Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_corr_conf_gl) "corruptor confidentiality" old.
+  Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_corr_int_gl) "corruptor integrity" old.
 
-  Ltac2 Notation "append_tac" t(thunk(tactic(0))) l(tactic(0)) := t :: l.
+  Ltac2 Set dom_debug := true.
 
-  (* The issue is that you are running after you are done also *)
-  Ltac2 dominate_step () : unit :=
-    let gls := Control.numgoals() in 
-    if Bool.neg (Int.equal gls 1) then 
-        Control.throw (Tactic_failure (Some (fprintf "dominate_step: Needs to run with one focused goal"))) else 
-    (* TODO: Assert that this is run with one focusec goal *)
-    let rec go ts :=
-      match ts with
-      | [] => Control.zero (Tactic_failure (Some (fprintf "dominate_step: all tactics failed")))
-      | t :: rest =>
-          match Control.case t with 
-          (* It is the client's responsibility to put harden. If the client does not put it, then the thing will spin forever! *)
-          | Val ((),_) => ()
-          | Err _ => go rest
-          end
-      end in
-    go dominate_list. (* TODO: Run a finisher tactic after every step? some kind of auto? *)
-
-  Ltac2 dominate (gas : int option) : unit :=
-    let rec go (gas : int option) : unit :=
-      (* Gas check *)
-      if match gas with Some n => Int.equal n 0 | None => false end then () else
-
-      (* Goals check: TODO: What happens if we throw or assert? *)
-      if Int.equal (Control.numgoals ()) 0 then () else
-
-      (* Run the first goal *)
-      (Control.focus 1 1 (fun () =>
-        match Control.case (fun () => dominate_step ()) with
-        | Val ((), _) => ()
-        | Err _ => Control.shelve ()
-        end);
-       let next_gas := match gas with | Some n => Some (Int.sub n 1) | None => None end in
-       go next_gas) in
-    unshelve (go gas).
-
-  Tactic Notation "dominate" := ltac2:(dominate None).
-  Tactic Notation "dominate" integer(n) :=
-    let f := ltac2:(nn |- dominate (Some (Option.get (Ltac1.to_int nn)))) in
-    f n.
-  Tactic Notation "dominate_step" := ltac2:(dominate_step ()).
-
-  (* 
-    Need a guideline, add tactics added to dominate list must be hardened. 
-    How to enforce?
-    - Programmers responsibility?
-    - harden everytime you run?
-  *)
-
-  Ltac2 Set dominate_list as old := append_tac ltac1:(if_easy_goals) old.
-  Ltac2 Set dominate_list as old := append_tac ltac1:(if_same) old.
-  Ltac2 Set dominate_list as old := append_tac ltac1:(compute_new_pc_untr) old.
-  Ltac2 Set dominate_list as old := append_tac ltac1:(stp_wt_cmd_st_int_untr) old.
-  Ltac2 Set dominate_list as old := append_tac ltac1:(stp_corr_conf_gl) old.
-  Ltac2 Set dominate_list as old := append_tac ltac1:(stp_corr_int_gl) old.
-  Ltac2 Set dominate_list as old := append_tac ltac1:(assert_goals 0 done) old.
-  (*
-  Ltac2 Set dominate_list as old := append_tac ltac1:(done) old.
-  *)
   (* TODO: 
-    - Why can I not add done? 
     - Need debugging info
     - subst. Cleanup
 
@@ -579,12 +525,12 @@ Section inv.
       let: (st', clst') := cmbcmd_step c st in
       StateInv st' /\ Forall CmbCmdInv clst'.
   Proof. 
-    case; rewrite {1}/CmbCmdInv=> rc. 
+    case; rewrite {}/CmbCmdInv=> rc. 
     case erc: rc; last first.
     - move=>>[]_; rewrite/StateInv=> + [].
       (case pce: (untrusted _))=> [* /= | <- /= <- *]; last first; repeat split. (* Grind here!! *)
 
-       --- dominate.
+       --- dominate. 
        --- dominate.
 
        --- apply/cmbcmdinv_empty. (* Should be finisher also *)
