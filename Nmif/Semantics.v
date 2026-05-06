@@ -82,7 +82,8 @@ Ltac if_easy_goals:=
   match goal with
   |- context [if ?b then _ else _] =>  
       let e := fresh in let v := fresh in 
-      move e: b=> v; move: v e; 
+      move e: b=> v; revert e; revert v;  (* TODO: No ssr in tactics.  *)
+      (* TODO: Goal hygiene after every step *)
       case=> ?; try done (* TODO parameterize? *)
   end).
 
@@ -527,28 +528,36 @@ Section inv.
       case; rewrite {}/CmbCmdInv=> rc. 
       case erc: rc; last first.
       - move=>>[]_; rewrite/StateInv=> + [].
-        (case pce: (untrusted _))=> [* /= | <- /= <- *]; last first; repeat split. (* Grind here!! *)
+        (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split. (* Grind here!! *)
+        all: dominate.
 
-         --- dominate. 
-         --- dominate.
+        + do ! match goal with H: _ |- _ => revert H end.
+          move=> *.
+revert_hyp_type_dep (option Cmd). 
+        Check _H.
+          move=> x; case x.
+          Set Printing All.
+          destruct 1.
+          case.
 
-         --- apply/cmbcmdinv_empty. (* Should be finisher also *)
+        case=> /= *; dominate.
+        + apply/Forall_zip. (* Should be step *)
+          cbn.
+          Unset SsrIdents.
+          rename _H into _H0.
+          match goal with
+          H: ?x = ?v |-
+          end
+          rewrite map_map Forall_map. (* Should be automated? *)
+          rewrite {}pce.
+          apply/Forall_and; [apply/Forall_forall=> //|].
+          rewrite-/(WellFormedProg _ _).
+(*          (do ! match goal with H: _ |- _ => revert H end); move=> *.  TODO: Hygiene for grind!! *)
+          subst. 
+          revert_hyp_type_dep (option Cmd); case=> * //=.
+          apply/pubuntr_wf_cont=> //.
 
-         --- dominate. 
-             revert_hyp_type_dep (option Cmd). 
-             case=> /= *. 
-             {
-             1: 
-                stp_wt_cmd_st_int_untr.
-                match goal with
-                |- context [if ?b then _ else _] =>  
-                    let e := fresh in let v := fresh in 
-                    move e: b=> v; revert e; revert v;
-                    case=> ?; try done (* TODO parameterize? *)
-                end.
-                if_easy_goals.
-    Fail Check 5.
-             
+        + apply/cmbcmdinv_empty. (* Should be finisher also *)
 
 
          --- dominate.

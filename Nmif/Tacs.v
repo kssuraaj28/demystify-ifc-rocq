@@ -65,7 +65,7 @@ Ltac2 harden0 (t: unit -> unit) : unit :=
     with
     | Err (ProgressWrap e) => Control.zero e
     | Err e =>
-        printf "Warning: harden progress failure";
+        printf "Error: harden progress failure";
         Control.throw e
     | _ => ()
     end.
@@ -379,11 +379,175 @@ Module Dominate.
     unshelve (go gas).
   
 
-  Ltac goal_hygiene := (do ! match goal with H: _ |- _ => revert H end); move=> *.  
+  Ltac2 Type exn ::= [ MoveTestResult (bool) ].
+
+  Ltac2 is_section_hyp (id : ident) : bool :=
+    let n := Control.numgoals () in
+    if Bool.neg (Int.equal n 1) then
+      Control.throw (Tactic_failure (Some (fprintf "is_section_hyp: needs exactly 1 focused goal, got %i" n))) else
+    match Control.case (fun () =>
+      ltac1:(h |- move: h) (Ltac1.of_ident id);
+      let still_exists := List.exist
+        (fun h => let (i, _, _) := h in Ident.equal i id)
+        (Control.hyps ()) in
+      Control.zero (MoveTestResult still_exists))
+    with
+    | Err (MoveTestResult b) => b
+    | _ => Control.throw (Tactic_failure (Some (fprintf "is_section_hyp: %I is not a hypothesis" id)))
+    end.
+
+  Section test.
+    Variables A B : Prop.
+    Goal A -> B -> True.
+    Proof.
+      move=> ha hb.
+      Ltac2 Eval is_section_hyp @A.
+      Ltac2 Eval is_section_hyp @B.
+      Ltac2 Eval is_section_hyp @ha.
+      done.
+    Abort.
+  End test.
+
+
+  (* TODO: You could do some preprocessing. Check if id's are really in hypotheses *)
+  #[local] Ltac2 rec exfalso_move_some_hack (ids : ident list) : ident * bool :=
+    printf "move_some: inp";
+    List.iter (fun id => printf "%s" (Ident.to_string id)) ids;
+    printf "move_some: inp_done";
+    exfalso;
+    match ids with
+    | [] => Control.throw (Tactic_failure (Some (fprintf "move_some: nothing movable")))
+    | id :: rest =>
+        match Control.case (fun () =>
+          ltac1:(h |- move: h) (Ltac1.of_ident id)) with
+        | Val ((), _) =>
+            printf "moving: %I" id;
+            let still_there := List.exist
+              (fun h => let (i, _, _) := h in Ident.equal i id)
+              (Control.hyps ()) in
+            (id, still_there)
+        | Err _ => exfalso_move_some_hack rest
+        end
+    end.
+
+  Section test.
+    Variables A B : Prop.
+    Let x := 5.
+    Goal A -> B -> True.
+    Proof.
+      move=> ha hb.
+      ltac2:(
+        let (id, sv) := exfalso_move_some_hack [@ha; @hb] in 
+        if sv then printf "secvar" else ();
+        printf "id: %I" id).
+
+      ltac2:(
+        let (id, sv) := exfalso_move_some_hack [@ha; @hb] in 
+        if sv then printf "secvar" else ();
+        printf "id: %I" id).
+
+      ltac2:(
+        let (id, sv) := exfalso_move_some_hack [@A; @hb] in 
+        if sv then printf "secvar" else ();
+        printf "id: %I" id).
+
+      Fail ltac2:(let (id, _) := move_some [@ha; @hb] in printf "id: %I" id).
+
+      ltac2:(
+        let (id, sv) := exfalso_move_some_hack [@x] in 
+        if sv then printf "secvar" else ();
+        printf "id: %I" id).
+    Abort.
+
+  End test.
+
+  #[local] Ltac2 Type exn ::= [ SectionVarsResult (ident list) ].
+
+  (* TODO: This can be somewhere else. *)
+  #[local] Ltac2 section_vars () : ident list :=
+    match Control.case (fun () =>
+      let remaining := List.map (fun h => let (i, _, _) := h in i) (Control.hyps ()) in
+      let rec loop (remaining : ident list) (section : ident list) : ident list :=
+        if Int.equal (List.length remaining) 0 then section else
+        match Control.case (fun () => move_some remaining) with
+        | Val ((moved_h, is_secvar), _) =>
+            let new_section := if is_secvar then (moved_h :: section) else section in
+            loop (List.filter (fun i => Bool.neg (Ident.equal i moved_h)) remaining) new_section
+        | _ => Control.throw (Tactic_failure (Some (fprintf "section_vars: move_some failed unexpectedly")))
+        end in
+      let result := loop remaining [] in
+      Control.zero (SectionVarsResult result))
+    with
+    | Err (SectionVarsResult l) => l
+    | _ => Control.throw (Tactic_failure (Some (fprintf "section_vars: unexpected control flow")))
+    end.
+
+  Section test.
+    Variables A B : Prop.
+    Goal False.
+    Proof.
+      ltac2:(let svs := section_vars () in 
+        if Int.equal (List.length svs) 2 then ()
+        else Control.throw (Tactic_failure (Some (fprintf "expected 2 section vars, got %i" (List.length svs))))).
+    Abort.
+
+    Variables C : Prop.
+
+    Goal False.
+    Proof.
+      ltac2:(let svs := section_vars () in
+        if Int.equal (List.length svs) 3 then ()
+        else Control.throw (Tactic_failure (Some (fprintf "expected 2 section vars, got %i" (List.length svs))))).
+    Abort.
+  End test.
+
+  #[local] Ltac2 wrap_underscore_id (id : ident) : ident option :=
+    let s := Ident.to_string id in
+    let n := String.length s in
+    if Int.equal n 0 then
+      Control.throw (Tactic_failure (Some (fprintf "wrap_underscore_id: empty identifier"))) else
+    let starts := Char.equal (String.get s 0) (Char.of_int 95) in
+    let ends := Char.equal (String.get s (Int.sub n 1)) (Char.of_int 95) in
+    if Bool.and starts ends then None
+    else Ident.of_string (String.app "_" (String.app s "_")).
+
+  #[local] Ltac2 collect_renames (hyps : ident list) : (ident * ident) list :=
+    List.fold_right (fun id acc =>
+      match wrap_underscore_id id with
+      | Some new_id => (id, new_id) :: acc
+      | None => acc
+      end) hyps [].
+
+  Ltac2 goal_hygiene0 () : unit :=
+    Control.enter (fun () =>
+      let hyps := List.map (fun h => let (i, _, _) := h in i) (Control.hyps ()) in
+      let sec := section_vars () in
+      let hyps := List.filter (fun id => Bool.neg (List.exist (fun s => Ident.equal s id) sec)) hyps in
+      let renames := collect_renames hyps in
+      match Control.case (fun () => Std.rename renames) with
+      | Val ((),_) => ()
+      | Err e => 
+        printf "Error: goal_hygiene failure";
+        Control.throw e
+      end).
+
+  Ltac goal_hygiene := ltac2:(goal_hygiene0 ()).
+
+  Section test.
+    Variables A B C : Prop.
+    Goal A -> B -> C -> A. Proof. 
+    move=> *. goal_hygiene. assumption. Abort.
+    Goal A -> B -> C -> A. Proof. move=> > _ha_ ha *. Fail goal_hygiene. Abort.
+    Goal A /\ B. Proof. split; goal_hygiene. Abort.
+
+    Variables P : nat -> Prop.
+    Goal forall n, P n. Proof. move=> i. goal_hygiene. Abort.
+    
+  End test.
 
   (* After these tactics are done, you need to shuffle goals.. *)
   (* TODO: What are the user facing tactics? *)
-  Tactic Notation "dominate" := ltac2:(dominate None); goal_hygiene.
+  Tactic Notation "dominate" := ltac2:(dominate None). (*goal_hygiene. *)
   Tactic Notation "dominate" integer(n) :=
     let f := ltac2:(nn |- dominate (Some (Option.get (Ltac1.to_int nn)))) in
     f n; goal_hygiene.
