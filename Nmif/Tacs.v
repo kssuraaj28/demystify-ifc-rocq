@@ -321,8 +321,11 @@ Module Dominate.
   Ltac2 Type dominate_tac := ((unit -> unit) * (string)).
   Ltac2 Type dominate_taclist := dominate_tac list.
 
-  Ltac2 mutable curr_dom_list () : dominate_taclist := [].
+  Ltac2 mutable curr_dom_list () : dominate_taclist := []. (* TODO notation that wraps () *)
   Ltac2 mutable dom_debug : bool := false.
+
+  Ltac2 print_domlist (l : unit -> dominate_taclist) : unit :=
+    List.iteri (fun i p => let (_, desc) := p in printf "%i: %s" i desc) (l ()).
 
   (* TODO: This desc() is sus *)
   Ltac2 Notation "append_tac" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=

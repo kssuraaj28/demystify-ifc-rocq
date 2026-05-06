@@ -496,14 +496,26 @@ Section inv.
     Forall CmbCmdInv cmdlst /\
     StateInv cmbst.
 
-  Ltac2 Set curr_dom_list as old := append_tac ltac1:(assert_goals 0 done) "done finisher" old.
-  Ltac2 Set curr_dom_list as old := append_tac ltac1:(assert_goals 1 (progress subst)) "subst" old.
-  Ltac2 Set curr_dom_list as old := append_tac ltac1:(if_easy_goals) "if_easy_goals" old.
-  Ltac2 Set curr_dom_list as old := append_tac ltac1:(if_same) "if_same" old.
-  Ltac2 Set curr_dom_list as old := append_tac ltac1:(compute_new_pc_untr) "compute_new_pc_untr" old.
-  Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_wt_cmd_st_int_untr) "stp_wt_cmd_st_int_untr" old.
-  Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_corr_conf_gl) "corruptor confidentiality" old.
-  Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_corr_int_gl) "corruptor integrity" old.
+
+  Section dom.
+    Import Tacs.Dominate.
+    (* TODO: Eventually this should go elsewhere. 
+        - You should also have best practices on where these things should go, and how they should be defined.
+        - Attacker.v has something
+        - There are Util things (if_same, etc.)
+        - There should also be list things
+    *)
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(assert_goals 0 done) "done finisher" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(assert_goals 1 (progress subst)) "subst" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(if_easy_goals) "if_easy_goals" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(if_same) "if_same" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(compute_new_pc_untr) "compute_new_pc_untr" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_wt_cmd_st_int_untr) "stp_wt_cmd_st_int_untr" old.
+    Ltac2 Set curr_dom_list as old := join_tacs Attacker.Dominate.dom_list old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_corr_conf_gl) "corruptor confidentiality" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_corr_int_gl) "corruptor integrity" old.
+  End dom.
+
 
   Ltac2 Set dom_debug := true.
 
