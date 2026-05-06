@@ -79,10 +79,11 @@ Arguments AdvStateMachine {_ _ _ _} AtkStates.
 Import VarValStore.Notations.
 Import Tacs.
 
-Ltac stp_corr_int_gl := assert_goals 1 (rewrite corruptor_wf_int).
+Ltac stp_corr_int_gl := assert_goals 1 (idtac; rewrite corruptor_wf_int).
 Ltac stp_corr_conf_gl :=
-  assert_goals 1 (unshelve erewrite corruptor_wf_conf;[|reflexivity|]).
+  assert_goals 1 (idtac; unshelve erewrite corruptor_wf_conf;[|reflexivity|]).
 (* TODO: Add test for this *)
+(* TODO: I think that this should be `ensure_goals` *)
 
 
 Section test.
