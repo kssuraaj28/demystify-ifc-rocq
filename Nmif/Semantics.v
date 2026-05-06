@@ -74,7 +74,7 @@ End cleanstep.
 
 (* This is a decent forward reasoning tactic *)
 Ltac if_easy_goals:=
-  harden
+  ensure_goals <= 1
   (
   idtac;
   (* In Ltac, doing match goals will do focus *)
@@ -243,10 +243,13 @@ Section new_pc.
 End new_pc.
 
 Ltac compute_new_pc_untr :=
+  assert_goals 1
+    (
+    idtac;
     lazymatch goal with 
     |- context [compute_new_pc (mk_lbl true ?p) ?c] => 
        move: ([elaborate compute_new_pc_untr p c])=> [] ? /[dup] ? ->
-    end. 
+    end). 
 (* TODO: Test.. *)
 
 Section cmb_step.
@@ -569,7 +572,8 @@ Section inv.
 
        --- dominate. done.
 
-       --- apply/Forall_zip=>  /=. (* Should be step *)
+       --- apply/Forall_zip. (* Should be step *)
+           cbn.
            rewrite map_map Forall_map. (* Should be automated? *)
            rewrite {}pce.
            apply/Forall_and; [apply/Forall_forall=> //|].
@@ -579,7 +583,7 @@ Section inv.
            revert_hyp_type_dep (option Cmd); case=> * //=.
            apply/pubuntr_wf_cont=> //.
 
-    - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> wt idwt [tr pu]; repeat split.
+    - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split.
       -- revert_hyp_type bool; case. (* Case is pretty safe? A lot of these can be automated *)
          1-2: rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
          1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /= *; subst. (* TODO: Is this okay? *)
@@ -592,7 +596,7 @@ Section inv.
 
           ++ rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
              erewrite wt_cmd_st_int; [reflexivity|eassumption|]. (* Probably can be automated *) 
-             stp_corr_int_gl. 
+             dominate.
              done.
 
           ++ dominate.
@@ -627,7 +631,7 @@ Section inv.
               rewrite -/(WellFormedProg _ _).
               move=> /step_soundness=> snd.
               apply/flows_to_subtype_prog;[|apply/snd].
-              compute_new_pc_untr=> //. (* This is a good forward step *)
+              dominate. done.
 
            ++ move=> /= wt <- /=.
              (* This requires maximum brain.. *)
