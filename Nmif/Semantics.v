@@ -503,27 +503,52 @@ Section inv.
 
   (* The issue is that you are running after you are done also *)
   Ltac2 dominate_step () : unit :=
-    Control.enter (fun () =>
-      let rec go ts :=
-        match ts with
-        | [] => Control.zero (Tactic_failure (Some (fprintf "dominate_step: no tactic made progress")))
-        | t :: rest =>
-            match Control.case t with (* It is the client's responsibility to put harden *)
-            | Val ((),_) => ()
-            | Err _ => go rest
-            end
-        end in
-      go dominate_list). (* TODO: Run a finisher tactic after every step? some kind of auto? *)
+    let gls := Control.numgoals() in 
+    if Bool.neg (Int.equal gls 1) then 
+        Control.throw (Tactic_failure (Some (fprintf "dominate_step: Needs to run with one focused goal"))) else 
+    (* TODO: Assert that this is run with one focusec goal *)
+    let rec go ts :=
+      match ts with
+      | [] => Control.zero (Tactic_failure (Some (fprintf "dominate_step: all tactics failed")))
+      | t :: rest =>
+          match Control.case t with 
+          (* It is the client's responsibility to put harden. If the client does not put it, then the thing will spin forever! *)
+          | Val ((),_) => ()
+          | Err _ => go rest
+          end
+      end in
+    go dominate_list. (* TODO: Run a finisher tactic after every step? some kind of auto? *)
 
-  Ltac2 rec dominate () : unit :=
-    match Control.case dominate_step with
-    | Val ((),_) => dominate () (* TODO: See if there are no goals? *)
-    | Err _ => ()
-    end.
+  Ltac2 dominate (gas : int option) : unit :=
+    let rec go (gas : int option) : unit :=
+      (* Gas check *)
+      if match gas with Some n => Int.equal n 0 | None => false end then () else
 
-  Tactic Notation "dominate" := ltac2:(dominate ()).
+      (* Goals check: TODO: What happens if we throw or assert? *)
+      if Int.equal (Control.numgoals ()) 0 then () else
+
+      (* Run the first goal *)
+      (Control.focus 1 1 (fun () =>
+        match Control.case (fun () => dominate_step ()) with
+        | Val ((), _) => ()
+        | Err _ => Control.shelve ()
+        end);
+       let next_gas := match gas with | Some n => Some (Int.sub n 1) | None => None end in
+       go next_gas) in
+    unshelve (go gas).
+
+  Tactic Notation "dominate" := ltac2:(dominate None).
+  Tactic Notation "dominate" integer(n) :=
+    let f := ltac2:(nn |- dominate (Some (Option.get (Ltac1.to_int nn)))) in
+    f n.
   Tactic Notation "dominate_step" := ltac2:(dominate_step ()).
 
+  (* 
+    Need a guideline, add tactics added to dominate list must be hardened. 
+    How to enforce?
+    - Programmers responsibility?
+    - harden everytime you run?
+  *)
 
   Ltac2 Set dominate_list as old := append_tac ltac1:(if_easy_goals) old.
   Ltac2 Set dominate_list as old := append_tac ltac1:(if_same) old.
@@ -531,6 +556,7 @@ Section inv.
   Ltac2 Set dominate_list as old := append_tac ltac1:(stp_wt_cmd_st_int_untr) old.
   Ltac2 Set dominate_list as old := append_tac ltac1:(stp_corr_conf_gl) old.
   Ltac2 Set dominate_list as old := append_tac ltac1:(stp_corr_int_gl) old.
+  Ltac2 Set dominate_list as old := append_tac ltac1:(assert_goals 0 done) old.
   (*
   Ltac2 Set dominate_list as old := append_tac ltac1:(done) old.
   *)
@@ -558,19 +584,16 @@ Section inv.
     - move=>>[]_; rewrite/StateInv=> + [].
       (case pce: (untrusted _))=> [* /= | <- /= <- *]; last first; repeat split. (* Grind here!! *)
 
-       --- dominate. done.
-
-       --- dominate. done.
+       --- dominate.
+       --- dominate.
 
        --- apply/cmbcmdinv_empty. (* Should be finisher also *)
 
        --- subst. 
-           revert_hyp_type_dep (option Cmd); case=> /= *. 
-           + dominate. done.
-           + dominate. done.
+           revert_hyp_type_dep (option Cmd); case=> /= *; dominate.
 
 
-       --- dominate. done.
+       --- dominate.
 
        --- apply/Forall_zip. (* Should be step *)
            cbn.
@@ -592,17 +615,14 @@ Section inv.
           ++ dominate. 
              revert_hyp_type_dep (option Cmd); case=> //= *.
              dominate. 
-             done.
 
           ++ rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
              erewrite wt_cmd_st_int; [reflexivity|eassumption|]. (* Probably can be automated *) 
              dominate.
-             done.
 
           ++ dominate.
              revert_hyp_type_dep (option Cmd); case=> //= *.
              dominate.
-             done.
 
           ++ rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
              erewrite wt_cmd_st_int; [reflexivity|eassumption|]=> //. (* Probably can be automated *) 
@@ -613,11 +633,10 @@ Section inv.
          + revert_hyp_type bool; case=> * /=.
            ++ erewrite wt_cmd_st_conf; [reflexivity |eassumption|]. (* Not fwreasoning *)
               dominate.
-              done.
            ++ erewrite wt_cmd_st_conf; [|eassumption|eassumption]; done. (* This is fwreasoning. *)
          + move=> *. 
            erewrite wt_cmd_st_conf_sec;[|eassumption].
-           dominate. done.
+           dominate.
 
       -- apply/Forall_zip=> /=.  (* TODO: The trickiest case? *) 
          apply/Forall_and; subst.
@@ -631,7 +650,7 @@ Section inv.
               rewrite -/(WellFormedProg _ _).
               move=> /step_soundness=> snd.
               apply/flows_to_subtype_prog;[|apply/snd].
-              dominate. done.
+              dominate.
 
            ++ move=> /= wt <- /=.
              (* This requires maximum brain.. *)
@@ -647,7 +666,7 @@ Section inv.
                      [apply/Forall_combine2_same/Forall_map/Forall_forall => //
                       | eassumption 
                       | rewrite newpce // |].
-                   dominate. done.
+                   dominate.
         Qed.
   Import Util.List.
   Theorem cfg_step_inv: forall c, Invariant c ->  Invariant (cfg_step c).
