@@ -1,8 +1,10 @@
 From Stdlib Require List ssreflect ssrfun ssrbool FunctionalExtensionality.
 Import List ListNotations ssreflect ssrfun ssrbool FunctionalExtensionality.
 
+From Ltac2 Require Import Ltac2 Printf.
+
 Require Tacs Util VarValStore Attacker Syntax Lattice4pt.
-Import Tacs Util VarValStore Attacker Syntax Lattice4pt. 
+Import Tacs Util VarValStore Attacker Syntax Lattice4pt.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
@@ -277,6 +279,7 @@ Section cmb_step.
     1-2: move: untrg; rewrite Bool.orb_false_r /is_trusted/is_untrusted=> -> //.
   Qed.
 
+
   Lemma step_soundness c pc:
       WellFormedCmd pc c ->
       forall st,
@@ -491,6 +494,51 @@ Section inv.
     Forall CmbCmdInv cmdlst /\
     StateInv cmbst.
 
+  Ltac2 mutable dominate_list : (unit -> unit) list := [].
+
+  Ltac2 Notation "append_tac" t(thunk(tactic(0))) l(tactic(0)) := t :: l.
+
+  (* The issue is that you are running after you are done also *)
+  Ltac2 dominate_step () : unit :=
+    Control.enter (fun () =>
+      let rec go ts :=
+        match ts with
+        | [] => Control.zero (Tactic_failure (Some (fprintf "dominate_step: no tactic made progress")))
+        | t :: rest =>
+            match Control.case t with (* It is the client's responsibility to put harden *)
+            | Val ((),_) => ()
+            | Err _ => go rest
+            end
+        end in
+      go dominate_list). (* TODO: Run a finisher tactic after every step? some kind of auto? *)
+
+  Ltac2 rec dominate () : unit :=
+    match Control.case dominate_step with
+    | Val ((),_) => dominate () (* TODO: See if there are no goals? *)
+    | Err _ => ()
+    end.
+
+  Tactic Notation "dominate" := ltac2:(dominate ()).
+  Tactic Notation "dominate_step" := ltac2:(dominate_step ()).
+
+
+  Ltac2 Set dominate_list as old := append_tac ltac1:(if_easy_goals) old.
+  Ltac2 Set dominate_list as old := append_tac ltac1:(if_same) old.
+  Ltac2 Set dominate_list as old := append_tac ltac1:(compute_new_pc_untr) old.
+  Ltac2 Set dominate_list as old := append_tac ltac1:(stp_wt_cmd_st_int_untr) old.
+  Ltac2 Set dominate_list as old := append_tac ltac1:(stp_corr_conf_gl) old.
+  Ltac2 Set dominate_list as old := append_tac ltac1:(stp_corr_int_gl) old.
+  (*
+  Ltac2 Set dominate_list as old := append_tac ltac1:(done) old.
+  *)
+  (* TODO: 
+    - Why can I not add done? 
+    - Need debugging info
+    - subst. Cleanup
+
+  *)
+
+
   
   Import Lattice4pt.Notations.
   Import Util.List.
@@ -507,27 +555,19 @@ Section inv.
     - move=>>[]_; rewrite/StateInv=> + [].
       (case pce: (untrusted _))=> [* /= | <- /= <- *]; last first; repeat split. (* Grind here!! *)
 
-       --- if_easy_goals.
-           stp_corr_int_gl.
-           done. (* TODO: Naming scheme *)
+       --- dominate. done.
 
-       --- if_same.
-           if_easy_goals.
-           stp_corr_conf_gl. 
-           done.
+       --- dominate. done.
 
        --- apply/cmbcmdinv_empty. (* Should be finisher also *)
 
        --- subst. 
            revert_hyp_type_dep (option Cmd); case=> /= *. 
-           + stp_wt_cmd_st_int_untr. if_easy_goals. stp_corr_int_gl. done.
-           + if_easy_goals. stp_corr_int_gl. done.
+           + dominate. done.
+           + dominate. done.
 
 
-       --- if_same. 
-           if_easy_goals. (* TODO: if_easy_goals should check that nothing too bad is happening. It should also check that *)
-           stp_corr_conf_gl. 
-           done.
+       --- dominate. done.
 
        --- apply/Forall_zip=>  /=. (* Should be step *)
            rewrite map_map Forall_map. (* Should be automated? *)
