@@ -74,21 +74,41 @@ Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
 Arguments AdvStateMachine: clear implicits.
 Arguments AdvStateMachine {_ _ _ _} AtkStates.
 
-(* Stepping tactics will not take any arguments.  *)
-(* TODO: This is stupid *)
-Import VarValStore.Notations.
-Import Tacs.
+Module DomList.
+  (* Stepping tactics will not take any arguments.  *)
+  (* TODO: This is stupid *)
+  Import VarValStore.Notations.
+  Import Tacs Tacs.Dominate.
+  
+  (* TODO: local? *)
+  Ltac corr_int_gl := assert_goals 1 (idtac; rewrite corruptor_wf_int).
 
-Ltac stp_corr_int_gl := assert_goals 1 (idtac; rewrite corruptor_wf_int).
-Ltac stp_corr_conf_gl :=
-  assert_goals 1 (idtac; unshelve erewrite corruptor_wf_conf;[|reflexivity|]).
-(* TODO: Add test for this *)
-(* TODO: I think that this should be `ensure_goals` *)
+  Ltac corr_conf_gl :=
+    assert_goals 1 (idtac; unshelve erewrite corruptor_wf_conf;[|reflexivity|]).
+  (* TODO: Add test for this *)
+  (* TODO: I think that this should be `ensure_goals` *)
+  
 
+  #[local] Ltac2 mutable dom_list_ () : dominate_taclist := [].
 
-Section test.
-  Context `{!VarPrm,!ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
-  Generalizable All Variables.
-  Goal `(forall P, P ⟨ corruptor (AtkStates := A) adv ast st  | is_trusted ⟩).
-  Proof. move=> *. stp_corr_int_gl. Abort.
-End test.
+  Ltac2 Set dom_list_ as old := 
+    append_tac ltac1:(corr_conf_gl) "corruptor confidentiality" old.
+
+  Ltac2 Set dom_list_ as old := 
+    append_tac ltac1:(corr_int_gl) "corruptor integrity" old.
+
+  Ltac2 dom_list () := dom_list_ ().
+  
+  Section test.
+    Context `{!VarPrm,!ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+    Generalizable All Variables.
+    Ltac2 Set curr_dom_list := dom_list. 
+
+    Goal `(forall P, P ⟨ corruptor (AtkStates := A) adv ast st  | is_trusted ⟩).
+    Proof. move=> *. dominate. Abort.
+
+  End test.
+End DomList.
+
+Import DomList.
+Fail Ltac2 Check dom_list_.
