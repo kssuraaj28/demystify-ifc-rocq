@@ -411,9 +411,6 @@ Module Dominate.
 
   (* TODO: You could do some preprocessing. Check if id's are really in hypotheses *)
   #[local] Ltac2 rec exfalso_move_some_hack (ids : ident list) : ident * bool :=
-    printf "move_some: inp";
-    List.iter (fun id => printf "%s" (Ident.to_string id)) ids;
-    printf "move_some: inp_done";
     exfalso;
     match ids with
     | [] => Control.throw (Tactic_failure (Some (fprintf "move_some: nothing movable")))
@@ -421,7 +418,6 @@ Module Dominate.
         match Control.case (fun () =>
           ltac1:(h |- move: h) (Ltac1.of_ident id)) with
         | Val ((), _) =>
-            printf "moving: %I" id;
             let still_there := List.exist
               (fun h => let (i, _, _) := h in Ident.equal i id)
               (Control.hyps ()) in
@@ -469,7 +465,7 @@ Module Dominate.
       let remaining := List.map (fun h => let (i, _, _) := h in i) (Control.hyps ()) in
       let rec loop (remaining : ident list) (section : ident list) : ident list :=
         if Int.equal (List.length remaining) 0 then section else
-        match Control.case (fun () => move_some remaining) with
+        match Control.case (fun () => exfalso_move_some_hack remaining) with
         | Val ((moved_h, is_secvar), _) =>
             let new_section := if is_secvar then (moved_h :: section) else section in
             loop (List.filter (fun i => Bool.neg (Ident.equal i moved_h)) remaining) new_section
@@ -547,7 +543,7 @@ Module Dominate.
 
   (* After these tactics are done, you need to shuffle goals.. *)
   (* TODO: What are the user facing tactics? *)
-  Tactic Notation "dominate" := ltac2:(dominate None). (*goal_hygiene. *)
+  Tactic Notation "dominate" := ltac2:(dominate None); goal_hygiene.
   Tactic Notation "dominate" integer(n) :=
     let f := ltac2:(nn |- dominate (Some (Option.get (Ltac1.to_int nn)))) in
     f n; goal_hygiene.

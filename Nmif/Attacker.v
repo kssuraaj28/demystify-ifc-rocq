@@ -96,21 +96,7 @@ Section test.
   Goal `(forall P, P ⟨ corruptor (AtkStates := A) adv ast st  | is_trusted ⟩).
   Proof. 
   Set Printing All.
-  move=> *.
-  dominate.
-  move: _H1.
-  move: _H2.
-  Unset SsrIdents.
-  move: _adv_.
-  move: _ast_.
-  move: _A_.
-  move: _st_.
-  move: _P_.
-  move: _H0.
-  Fail move: _H.
-  Fail revert _H.
-  Succeed exfalso; move: _H.
-  Succeed move: _H1; move: _H.
+  move=> *.  dominate.
   Abort.
 
 

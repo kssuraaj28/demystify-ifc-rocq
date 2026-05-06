@@ -531,47 +531,18 @@ Section inv.
         (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split. (* Grind here!! *)
         all: dominate.
 
-        + do ! match goal with H: _ |- _ => revert H end.
-          move=> *.
-revert_hyp_type_dep (option Cmd). 
-        Check _H.
-          move=> x; case x.
-          Set Printing All.
-          destruct 1.
-          case.
-
-        case=> /= *; dominate.
-        + apply/Forall_zip. (* Should be step *)
-          cbn.
-          Unset SsrIdents.
-          rename _H into _H0.
-          match goal with
-          H: ?x = ?v |-
-          end
+        + revert_hyp_type_dep (option Cmd); case => /= *; dominate.
+        + apply/Forall_zip=> /=. (* Should be step *)
           rewrite map_map Forall_map. (* Should be automated? *)
-          rewrite {}pce.
+          match goal with (* TODO: Should be step *)
+          H: ?x = true |- _ => rewrite H
+          end.
           apply/Forall_and; [apply/Forall_forall=> //|].
           rewrite-/(WellFormedProg _ _).
-(*          (do ! match goal with H: _ |- _ => revert H end); move=> *.  TODO: Hygiene for grind!! *)
-          subst. 
           revert_hyp_type_dep (option Cmd); case=> * //=.
           apply/pubuntr_wf_cont=> //.
 
         + apply/cmbcmdinv_empty. (* Should be finisher also *)
-
-
-         --- dominate.
-
-         --- apply/Forall_zip. (* Should be step *)
-             cbn.
-             rewrite map_map Forall_map. (* Should be automated? *)
-             rewrite {}pce.
-             apply/Forall_and; [apply/Forall_forall=> //|].
-             rewrite-/(WellFormedProg _ _).
-(*             (do ! match goal with H: _ |- _ => revert H end); move=> *.  TODO: Hygiene for grind!! *)
-             subst. 
-             revert_hyp_type_dep (option Cmd); case=> * //=.
-             apply/pubuntr_wf_cont=> //.
 
       - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split.
         -- revert_hyp_type bool; case. (* Case is pretty safe? A lot of these can be automated *)
