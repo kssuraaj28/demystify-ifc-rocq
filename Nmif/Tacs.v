@@ -53,7 +53,6 @@ Section test.
 End test.
 
 
-
 Ltac2 Type exn ::= [ ProgressWrap (exn) ].
 
 Ltac2 harden0 (t: unit -> unit) : unit :=
@@ -74,7 +73,7 @@ Ltac2 harden0 (t: unit -> unit) : unit :=
 Ltac2 Notation "harden" t(thunk(self)) := harden0 t.
 
 Tactic Notation "harden" tactic0(t) :=
-  let f := ltac2:(tt |- harden (Ltac1.run tt)) in
+  let f := ltac2:(tt |- harden (ltac1:(t |- t) tt)) in
   f t.
 
 Section test.
@@ -196,7 +195,8 @@ End test.
 
 Ltac evar_spec h :=
   assert_goals 2
-  (unshelve (move: h; let t := open_constr:(_) in let f := fresh in pose f := t=> /(_ f); subst f); cycle 1).
+  (idtac;
+  unshelve (move: h; let t := open_constr:(_) in let f := fresh in pose f := t=> /(_ f); subst f); cycle 1).
 
 
 Section test.

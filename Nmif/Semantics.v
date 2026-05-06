@@ -72,19 +72,21 @@ End cleanstep.
 
 (* This is a decent forward reasoning tactic *)
 Ltac if_easy_goals:=
+  harden
+  (
+  idtac;
   (* In Ltac, doing match goals will do focus *)
   match goal with
   |- context [if ?b then _ else _] =>  
-       let t := (
-        let e := fresh in let v := fresh in 
-        move e: b=> v; move: v e; 
-        case=> ?; try done) in(* TODO parameterize? *)
-       assert_goals_soft 1 t || assert_goals_soft 0 t 
-  end.
+      let e := fresh in let v := fresh in 
+      move e: b=> v; move: v e; 
+      case=> ?; try done (* TODO parameterize? *)
+  end).
 
 Ltac if_same :=
-  assert_goals_hard 1
-    (let x := fresh in 
+  assert_goals 1
+    (idtac;
+    let x := fresh in 
     set x := if _ then ?[B] else ?B;
     let t := eval cbv delta [x] in x in 
     lazymatch t with
@@ -275,14 +277,11 @@ Section cmb_step.
     1-2: move: untrg; rewrite Bool.orb_false_r /is_trusted/is_untrusted=> -> //.
   Qed.
 
-
-
-  (* The theorems should be separate! *)
   Lemma step_soundness c pc:
       WellFormedCmd pc c ->
       forall st,
         WellFormedProg (compute_new_pc pc c) (clean_cmd_stp_cnt c st).
-  Proof. 
+  Proof.
     move=> + > => - []=> * //=; if_easy_goals.
     apply/Forall_app. split=> //.
     constructor 2=> //.
@@ -438,8 +437,8 @@ Section inv.
   Qed.
 
   Ltac stp_wt_cmd_st_int_untr := 
-    assert_goals_hard 1
-    (unshelve erewrite wt_cmd_st_int_untr;[..|eassumption]).
+    assert_goals 1
+    (idtac; unshelve erewrite wt_cmd_st_int_untr;[..|eassumption]).
   
    Import Util.List.
    Lemma Forall_zip:
