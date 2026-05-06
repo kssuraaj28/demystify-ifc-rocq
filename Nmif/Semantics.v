@@ -585,10 +585,9 @@ Section inv.
          1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /= *; subst. (* TODO: Is this okay? *)
 
           (* Seems very automatable *)
-          ++ stp_wt_cmd_st_int_untr.
-             stp_corr_int_gl.
+          ++ dominate. 
              revert_hyp_type_dep (option Cmd); case=> //= *.
-             stp_wt_cmd_st_int_untr.
+             dominate. 
              done.
 
           ++ rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
@@ -596,9 +595,9 @@ Section inv.
              stp_corr_int_gl. 
              done.
 
-          ++ stp_wt_cmd_st_int_untr.
+          ++ dominate.
              revert_hyp_type_dep (option Cmd); case=> //= *.
-             stp_wt_cmd_st_int_untr.
+             dominate.
              done.
 
           ++ rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
@@ -609,14 +608,12 @@ Section inv.
          revert_hyp_type_dep PcLbl; case=> [+ []] /=.
          + revert_hyp_type bool; case=> * /=.
            ++ erewrite wt_cmd_st_conf; [reflexivity |eassumption|]. (* Not fwreasoning *)
-              stp_corr_conf_gl.
+              dominate.
               done.
            ++ erewrite wt_cmd_st_conf; [|eassumption|eassumption]; done. (* This is fwreasoning. *)
          + move=> *. 
            erewrite wt_cmd_st_conf_sec;[|eassumption].
-           if_easy_goals.
-           stp_corr_conf_gl.
-           done.
+           dominate. done.
 
       -- apply/Forall_zip=> /=.  (* TODO: The trickiest case? *) 
          apply/Forall_and; subst.
@@ -646,9 +643,7 @@ Section inv.
                      [apply/Forall_combine2_same/Forall_map/Forall_forall => //
                       | eassumption 
                       | rewrite newpce // |].
-                   if_easy_goals.
-                   stp_corr_int_gl.
-                   done.
+                   dominate. done.
         Qed.
   Import Util.List.
   Theorem cfg_step_inv: forall c, Invariant c ->  Invariant (cfg_step c).
