@@ -9,7 +9,7 @@ Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
-#[local] Ltac2 mutable dom_list_ () : dominate_taclist := [].
+#[local] Ltac2 mutable dom_list_ () : dominate_taclist := []. (* TODO: Create empty dom_list function*)
 
 Class AdvLeakPrm := LeakVals : Type.
 
@@ -85,8 +85,8 @@ Ltac corr_conf_gl := (* TODO: ensure_goals? *)
 Ltac2 Set dom_list_ as old := 
   append_tac ltac1:(corr_conf_gl) "corruptor confidentiality" old.
 
-Ltac2 Eval print_domlist dom_list_.
 Ltac2 dom_list () := dom_list_ ().
+Ltac2 Eval print_domlist dom_list.
 
 Section test.
   Context `{!VarPrm,!ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
