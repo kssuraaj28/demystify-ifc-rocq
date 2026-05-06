@@ -501,6 +501,13 @@ Section inv.
 
 
   Section dom.
+    Ltac rewrite_if_hyp_eq :=
+      assert_goals 1
+      (idtac;
+      match goal with  (* rewriting obviously *)
+      | H: ?x = (?b :> bool) |- context [if ?x then _ else _] =>
+        is_constructor b; rewrite H
+      end).
     Import Tacs.Dominate.
     (* TODO: Eventually this should go elsewhere. 
         - You should also have best practices on where these things should go, and how they should be defined.
@@ -514,6 +521,7 @@ Section inv.
     Ltac2 Set curr_dom_list as old := append_tac ltac1:(if_same) "if_same" old.
     Ltac2 Set curr_dom_list as old := append_tac ltac1:(compute_new_pc_untr) "compute_new_pc_untr" old.
     Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_wt_cmd_st_int_untr) "stp_wt_cmd_st_int_untr" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(rewrite_if_hyp_eq) "rewrite_if_hyp_eq" old.
     Ltac2 Set curr_dom_list as old := join_tacs Attacker.dom_list old.
     Ltac2 Eval print_domlist curr_dom_list.
     Ltac2 Set dom_debug := true. (* TODO: Why can't I access this? *)
@@ -534,15 +542,14 @@ Section inv.
         + revert_hyp_type_dep (option Cmd); case => /= *; dominate.
         + apply/Forall_zip=> /=. (* Should be step *)
           rewrite map_map Forall_map. (* Should be automated? *)
-          match goal with (* TODO: Should be step *)
-          H: ?x = true |- _ => rewrite H
-          end.
+          dominate.
+(* TODO: Should be step *)
           apply/Forall_and; [apply/Forall_forall=> //|].
           rewrite-/(WellFormedProg _ _).
           revert_hyp_type_dep (option Cmd); case=> * //=.
           apply/pubuntr_wf_cont=> //.
 
-        + apply/cmbcmdinv_empty. (* Should be finisher also *)
+        + apply/cmbcmdinv_empty. (* Should be finisher also. Add to auto? *)
 
       - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split.
         -- revert_hyp_type bool; case. (* Case is pretty safe? A lot of these can be automated *)
@@ -550,7 +557,7 @@ Section inv.
            1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /= *; subst. (* TODO: Is this okay? *)
 
             (* Seems very automatable *)
-            ++ dominate. 
+            ++ dominate.  (* TODO: Cleanup ssr hyps also *)
                revert_hyp_type_dep (option Cmd); case=> //= *.
                dominate. 
 
