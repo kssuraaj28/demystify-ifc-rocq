@@ -575,7 +575,7 @@ Section inv.
         (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split. (* Grind here!! *)
         all: dominate.
         
-        + revert_hyp_type_dep (option Cmd); case => /= *; dominate.
+        + revert_hyp_type_dep (option Cmd); case => /=; dominate.
         + move=> /=; dominate.
           apply/Forall_and;[apply/Forall_forall=> //|]. 
           (* TODO: This is very easy forward reasonong*)
@@ -587,15 +587,15 @@ Section inv.
       - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split; dominate.
 
         -- revert_hyp_type bool; case; dominate.
-           1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /= *; dominate. (* TODO: Is this okay? *)
-           1-2: revert_hyp_type_dep (option Cmd); case=> /= *; dominate.
+           1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /=; dominate. (* TODO: Is this okay? *)
+           1-2: revert_hyp_type_dep (option Cmd); case=> /=; dominate.
 
         -- revert_hyp_type_dep PcLbl; case=> [+ []] /==> *; dominate.
 
         -- move=> /=.  (* TODO: The trickiest case? *)
            apply/Forall_and; dominate; [apply/step_soundness; dominate | ].
            revert_hyp_type_dep PcLbl; case=> [[] ?] /=.
-           ++ move=> *. dominate=> *.
+           ++ dominate.
               revert_hyp_type_dep (option Cmd); case=> //= >.
               rewrite -/(WellFormedProg _ _).
               move=> /step_soundness=> snd.
@@ -615,7 +615,6 @@ Section inv.
                apply/flows_to_subtype_prog; [|apply/snd].
                rewrite newpce => //.
           Qed.
-
 
   End dom.
 
