@@ -338,6 +338,10 @@ Module Dominate.
      chain, and again on every produced subgoal after a successful tactic.
      Contract for chain-step authors: you can assume `move=> *` was just run on
      the goal you receive, and `move=> *` will run on every goal you produce. *)
+  (* TODO: Finishers. Two options: (1) run `auto with dom_db` after every
+     dominate_step, where dom_db is a hint database whose hints can call
+     dominate; (2) register the finisher itself as a dominate step (hardened so
+     it only succeeds on progress). *)
   Ltac2 dominate_step () : unit :=
     let gls := Control.numgoals() in
     if Bool.neg (Int.equal gls 1) then

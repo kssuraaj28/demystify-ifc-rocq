@@ -569,51 +569,43 @@ Section inv.
         let: (st', clst') := cmbcmd_step c st in
         StateInv st' /\ Forall CmbCmdInv clst'.
     Proof. 
-      case; rewrite {}/CmbCmdInv=> rc. 
-      case erc: rc; last first.
-      - move=>>[]_; rewrite/StateInv=> + [].
-        (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split. (* Grind here!! *)
-        all: dominate.
-        
-        + revert_hyp_type_dep (option Cmd); case => /=; dominate.
-        + move=> /=; dominate.
-          apply/Forall_and;[apply/Forall_forall=> //|]. 
-          (* TODO: This is very easy forward reasonong*)
-          rewrite-/(WellFormedProg _ _).
-          revert_hyp_type_dep (option Cmd); case=> * //=.
-          apply/pubuntr_wf_cont=> //.
+      case; rewrite {}/CmbCmdInv=> - []; cycle 1. 
 
+      - move=>>[]_; rewrite/StateInv=> + [].
+        (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split; dominate. (* Grind here!! *)
+          { revert_hyp_type_dep (option Cmd); case => /=; dominate. }
+        move=> /=; dominate.
+        apply/Forall_and;[apply/Forall_forall=> //|]. 
+        (* TODO: This is very easy forward reasonong*)
+        rewrite-/(WellFormedProg _ _).
+        revert_hyp_type_dep (option Cmd); case=> * //=.
+        apply/pubuntr_wf_cont=> //.
 
       - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split; dominate.
-
-        -- revert_hyp_type bool; case; dominate.
-           1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /=; dominate. (* TODO: Is this okay? *)
-           1-2: revert_hyp_type_dep (option Cmd); case=> /=; dominate.
-
-        -- revert_hyp_type_dep PcLbl; case=> [+ []] /==> *; dominate.
-
-        -- move=> /=.  (* TODO: The trickiest case? *)
-           apply/Forall_and; dominate; [apply/step_soundness; dominate | ].
-           revert_hyp_type_dep PcLbl; case=> [[] ?] /=.
-           ++ dominate.
-              revert_hyp_type_dep (option Cmd); case=> //= >.
-              rewrite -/(WellFormedProg _ _).
-              move=> /step_soundness=> snd.
-              apply/flows_to_subtype_prog;[|apply/snd].
-              dominate.
-
-           ++ move=> /= ? <- /=.
-             (* This requires maximum brain.. *)
-               move newpce: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. {
-                  erewrite tr_cmd_cnt;
-                     [apply/Forall_combine2_same/Forall_map/Forall_forall => //
-                      | eassumption 
-                      | rewrite newpce // |]. dominate. }
-               dominate.
-               rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
-               revert_hyp_type_dep Cmd=> ? /step_soundness snd newpce.
-               apply/flows_to_subtype_prog; [|apply/snd].
-               rewrite newpce => //.
+          { revert_hyp_type bool; case; dominate.
+          1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /=; dominate. 
+          1-2: revert_hyp_type_dep (option Cmd); case=> /=; dominate. } 
+          { revert_hyp_type_dep PcLbl; case=> [+ []] /==> *; dominate. }
+        move=> /=.  (* TODO: The trickiest case? *)
+        apply/Forall_and; dominate; [apply/step_soundness; dominate | ].
+        revert_hyp_type_dep PcLbl; case=> [[] ?] /=.
+          { dominate.
+           revert_hyp_type_dep (option Cmd); case=> //= >.
+           rewrite -/(WellFormedProg _ _).
+           move=> /step_soundness=> snd.
+           apply/flows_to_subtype_prog;[|apply/snd].
+           dominate. }
+        move=> /= ? <- /=.
+         move newpce: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. {
+            erewrite tr_cmd_cnt;
+               [apply/Forall_combine2_same/Forall_map/Forall_forall => //
+                | eassumption 
+                | rewrite newpce // |]. dominate. }
+         dominate.
+         rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
+         revert_hyp_type_dep Cmd=> ? /step_soundness snd newpce.
+         apply/flows_to_subtype_prog; [|apply/snd].
+         rewrite newpce => //.
           Qed.
 
   End dom.
