@@ -387,6 +387,21 @@ Module Dominate.
 
     go (curr_dom_list ()).
 
+  (* 
+    - Singleton hintdatabase with dominate_step. 
+    Maybe in the future, the full dominate tactic can run finisher.
+    Clients are not allowed to touch this database
+  *)
+  Create HintDb __dom_step. (* TODO: Does #[local] help *)
+  Hint Extern 100  => ltac2:(dominate_step ()) : __dom_step. 
+
+  Ltac2 mutable dom_auto_dbs : ident list := [].
+  Ltac2 mutable dom_auto_depth : int := 5.
+
+  Ltac2 dominate_auto () : unit :=
+    let dbs := List.append dom_auto_dbs [@__dom_step] in
+    let dbg := if dom_debug then Std.Info else Std.Off in
+    Std.auto dbg (Some dom_auto_depth) [] (Some dbs).
 
 
   (* For every focued goal, it runs dominate_step one by one. (dfs strategy)  *)
@@ -400,7 +415,6 @@ Module Dominate.
       (* Goals check: TODO: What happens if we throw or assert? *)
       if Int.equal gls 0 then () else
 
-
       (* Run the first goal *)
       (Control.focus 1 1 (fun () =>
         match Control.case (fun () => dominate_step ()) with
@@ -412,34 +426,6 @@ Module Dominate.
     unshelve (go gas).
   
 
-  Ltac2 Type exn ::= [ MoveTestResult (bool) ].
-
-  Ltac2 is_section_hyp (id : ident) : bool :=
-    let n := Control.numgoals () in
-    if Bool.neg (Int.equal n 1) then
-      Control.throw (Tactic_failure (Some (fprintf "is_section_hyp: needs exactly 1 focused goal, got %i" n))) else
-    match Control.case (fun () =>
-      ltac1:(h |- move: h) (Ltac1.of_ident id);
-      let still_exists := List.exist
-        (fun h => let (i, _, _) := h in Ident.equal i id)
-        (Control.hyps ()) in
-      Control.zero (MoveTestResult still_exists))
-    with
-    | Err (MoveTestResult b) => b
-    | _ => Control.throw (Tactic_failure (Some (fprintf "is_section_hyp: %I is not a hypothesis" id)))
-    end.
-
-  Section test.
-    Variables A B : Prop.
-    Goal A -> B -> True.
-    Proof.
-      move=> ha hb.
-      Ltac2 Eval is_section_hyp @A.
-      Ltac2 Eval is_section_hyp @B.
-      Ltac2 Eval is_section_hyp @ha.
-      done.
-    Abort.
-  End test.
 
 
   (* TODO: You could do some preprocessing. Check if id's are really in hypotheses *)
@@ -603,13 +589,7 @@ Module Dominate.
     let f := ltac2:(nn |- dominate (Some (Option.get (Ltac1.to_int nn)))) in
     f n; goal_hygiene.
   Tactic Notation "dominate_step" := ltac2:(dominate_step ()); goal_hygiene.
+  Tactic Notation "dominate_auto" := ltac2:(dominate_auto ()); goal_hygiene.
 
-  (* 
-    - Singleton hintdatabase with dominate_step. 
-    Maybe in the future, the full dominate tactic can run finisher.
-    Clients are not allowed to touch this database
-  *)
-  Create HintDb __dom_step. (* TODO: Does #[local] help *)
-  Hint Extern 100  => dominate_step : __dom_step. (* TODO: Why 100 *)
 
 End Dominate.

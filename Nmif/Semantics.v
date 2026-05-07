@@ -567,7 +567,7 @@ Section inv.
     Ltac2 Eval print_domlist (keep_only curr_dom_list [1;3]).
     Ltac2 Eval print_domlist (delete curr_dom_list [1;3]).
     Ltac2 Eval print_domlist curr_dom_list.
-    Ltac2 Set dom_debug := false. (* TODO: Why can't I access this? *)
+    Ltac2 Set dom_debug := true. (* TODO: Why can't I access this? *)
 
     Lemma cmbcmd_step_inv: 
       forall c st, 
@@ -601,7 +601,7 @@ Section inv.
            rewrite -/(WellFormedProg _ _).
            move=> /step_soundness=> snd.
            apply/flows_to_subtype_prog;[|apply/snd].
-           auto with __dom_step. }
+           dominate_auto. }
         move=> /= ? <- /=.
          move newpce: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. {
             erewrite tr_cmd_cnt;
