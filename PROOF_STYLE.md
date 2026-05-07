@@ -47,3 +47,19 @@ produce.
 
 After running, all `dominate*` notations apply `goal_hygiene` (revert +
 reintroduce) to give clean, fresh hypothesis names.
+
+### Conventions for tactics registered in the chain
+
+- **`_dstep` suffix**: every tactic that is registered into a `dominate_taclist`
+  ends in `_dstep`. There is no `_dstep` tactic that isn't registered, and no
+  registered tactic without the suffix.
+- **Register inline**: each `_dstep` tactic is registered into its file's
+  `dom_list_` immediately after its definition, in the same scope. Don't batch
+  registrations in a separate block.
+- **Description matches name**: `append_tac ltac1:(foo_dstep) "foo_dstep" old` —
+  the description string is the tactic's name verbatim.
+
+> Open: where the registered list lives. The current pattern is a per-file
+> `#[local] Ltac2 mutable dom_list_ () : dominate_taclist := [].` near the top,
+> with theorem-specific sections assembling `curr_dom_list` via `join_tacs`.
+> Not yet a settled convention.
