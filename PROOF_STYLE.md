@@ -39,5 +39,11 @@ forever! It is the client's responsibility to harden their tactics using
   before each iteration, and the description of each tactic that succeeds
   inside `dominate_step`.
 
+`dominate_step` normalizes the goal with `move=> *` before dispatching the
+registered chain, and again on every produced subgoal after a successful
+tactic. Contract for chain-step authors: you can assume `move=> *` was just
+run on the goal you receive, and `move=> *` will run on every goal you
+produce.
+
 After running, all `dominate*` notations apply `goal_hygiene` (revert +
 reintroduce) to give clean, fresh hypothesis names.

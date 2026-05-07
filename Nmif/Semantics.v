@@ -103,7 +103,7 @@ Ltac if_same :=
     let t := eval cbv delta [x] in x in
     lazymatch t with
     | if ?b then ?b1 else _ =>
-      have  {x} ->: x = b1; [destruct b; subst; auto|]
+      have  {x} ->: x = b1; [destruct b; subst; done|]
     end).
 
 Ltac forall_map_step := assert_goals 1  (idtac; rewrite Forall_map).
@@ -490,7 +490,13 @@ Section inv.
      | |- Forall _ (zip _ _ _ _) => apply/Forall_zip
      end).
 
-
+   Ltac forall_combine2_ind_step :=
+     assert_goals 2
+     (idtac;
+     match goal with
+     | |- Forall _ (combine_extend2 _ _ _ _) => apply/Forall_combine2_ind1; [move=> ?; apply|..]
+     | |- Forall _ (combine_extend2 _ _ _ _) => apply/Forall_combine2_ind2; [move=> ?; apply|..]
+     end).
 
 
   Lemma pubuntr_wf_cont: 
@@ -549,6 +555,7 @@ Section inv.
     Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_wt_cmd_st_int) "stp_wt_cmd_st_int" old.
     Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_wt_cmd_st_conf) "stp_wt_cmd_st_conf" old.
     Ltac2 Set curr_dom_list as old := append_tac ltac1:(forall_map_step) "forall_map_step" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(forall_combine2_ind_step) "forall_combine2_ind1_step" old.
     Ltac2 Set curr_dom_list as old := append_tac ltac1:(forall_zip_step) "forall_zip_step" old.
     Ltac2 Set curr_dom_list as old := append_tac ltac1:(rewrite_if_hyp_eq) "rewrite_if_hyp_eq" old.
     Ltac2 Set curr_dom_list as old := join_tacs Attacker.dom_list old.
@@ -578,44 +585,35 @@ Section inv.
 
 
       - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split; dominate.
+
         -- revert_hyp_type bool; case; dominate.
            1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /= *; dominate. (* TODO: Is this okay? *)
            1-2: revert_hyp_type_dep (option Cmd); case=> /= *; dominate.
 
-        -- revert_hyp_type_dep PcLbl; case=> [+ []] /=.
-           + revert_hyp_type bool; case=> * /=; dominate.
-           + move=> *. (* TODO: Dominate steps should start and finish with this? How to document? *)
-             dominate.
+        -- revert_hyp_type_dep PcLbl; case=> [+ []] /==> *; dominate.
 
-        -- move=> /=.  (* TODO: The trickiest case? *) 
-           apply/Forall_and.
-           + apply/Forall_combine2_ind1; [move=> ?; apply|..]; [..| done]. (* Is this a reasonable forward reasoning step? *)
-             apply/Forall_map/step_soundness=> //.
-           + revert_hyp_type_dep PcLbl; case=> [[] ?] /=.
-             ++ compute_new_pc_untr=> /= _ *.
-                apply/Forall_combine2_ind2; [move=> ?; apply|..]; [..| done]. (* This is a reasonable forward step *)
-                dominate.
-                revert_hyp_type_dep (option Cmd); case=> //= >.
-                rewrite -/(WellFormedProg _ _).
-                move=> /step_soundness=> snd.
-                apply/flows_to_subtype_prog;[|apply/snd].
-                dominate.
+        -- move=> /=.  (* TODO: The trickiest case? *)
+           apply/Forall_and; dominate; [apply/step_soundness; dominate | ].
+           revert_hyp_type_dep PcLbl; case=> [[] ?] /=.
+           ++ move=> *. dominate=> *.
+              revert_hyp_type_dep (option Cmd); case=> //= >.
+              rewrite -/(WellFormedProg _ _).
+              move=> /step_soundness=> snd.
+              apply/flows_to_subtype_prog;[|apply/snd].
+              dominate.
 
-             ++ move=> /= wt <- /=.
-               (* This requires maximum brain.. *)
-                 move newpce: (compute_new_pc _ _)=> [[] ?] /=.
-                 +++ apply/Forall_combine2_ind2; [move=> ?; apply| |done].
-                     apply/Forall_map=> /=.
-                     rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
-                     move:wt=> /step_soundness=> snd.
-                     apply/flows_to_subtype_prog; [|apply/snd].
-                     rewrite newpce=> //.
-
-                 +++ erewrite tr_cmd_cnt;
-                       [apply/Forall_combine2_same/Forall_map/Forall_forall => //
-                        | eassumption 
-                        | rewrite newpce // |].
-                     dominate.
+           ++ move=> /= ? <- /=.
+             (* This requires maximum brain.. *)
+               move newpce: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. {
+                  erewrite tr_cmd_cnt;
+                     [apply/Forall_combine2_same/Forall_map/Forall_forall => //
+                      | eassumption 
+                      | rewrite newpce // |]. dominate. }
+               dominate.
+               rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
+               revert_hyp_type_dep Cmd=> ? /step_soundness snd newpce.
+               apply/flows_to_subtype_prog; [|apply/snd].
+               rewrite newpce => //.
           Qed.
 
 

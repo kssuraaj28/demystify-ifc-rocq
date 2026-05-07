@@ -334,11 +334,16 @@ Module Dominate.
   Ltac2 Notation "join_tacs" l1(tactic(0)) l2(tactic(0)) :=
     fun () => List.append (l1 ()) (l2 ()).
 
-  (* TODO: After every involation, maybe run an auto-based finisher? Maybe clean up with intros? *)
+  (* `dominate_step` normalizes goals with `move=> *` before dispatching the
+     chain, and again on every produced subgoal after a successful tactic.
+     Contract for chain-step authors: you can assume `move=> *` was just run on
+     the goal you receive, and `move=> *` will run on every goal you produce. *)
   Ltac2 dominate_step () : unit :=
     let gls := Control.numgoals() in
     if Bool.neg (Int.equal gls 1) then
         Control.throw (Tactic_failure (Some (fprintf "dominate_step: Needs to run with one focused goal"))) else
+
+    ltac1:(move => * );
 
     let rec go ts :=
       match ts with
@@ -347,12 +352,13 @@ Module Dominate.
           match Control.case t with
           (* It is the client's responsibility to put harden. If the client does not put it, then the thing will spin forever! *)
           | Val ((),_) =>
-              if dom_debug then printf "dominate_step: %s success" desc else ()
+              (if dom_debug then printf "dominate_step: %s success" desc else ());
+              Control.enter (fun () => ltac1:(move => * ))
           | Err _ => go rest
           end
       end in
 
-    go (curr_dom_list ()). (* TODO: Run a finisher tactic after every step? some kind of auto? *)
+    go (curr_dom_list ()).
 
 
 
