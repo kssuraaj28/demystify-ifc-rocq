@@ -45,6 +45,7 @@ Section cleanstep.
   (* TODO: Have examples below this *)
   Definition optcmd_stp_store := oapp clean_cmd_stp_store id.
 
+
   Definition clean_cmd_stp_cnt (c: Cmd) (s: Store) : Continuation :=
     match c with
     | cond exp b1 b2 => 
@@ -73,6 +74,13 @@ Section cleanstep.
 
 End cleanstep.
 
+Ltac optcmd_stp_store_simpl :=
+   assert_goals 1
+   (idtac;
+   let e := fresh in let v := fresh in 
+   move e: (optcmd_stp_store (Some _) _)=> v;
+   rewrite/optcmd_stp_store/oapp/id in e; rewrite -{}e {v}).
+
 (* This is a decent forward reasoning tactic *)
 Ltac if_easy_goals:=
   ensure_goals <= 1
@@ -90,13 +98,16 @@ Ltac if_easy_goals:=
 Ltac if_same :=
   assert_goals 1
     (idtac;
-    let x := fresh in 
+    let x := fresh in
     set x := if _ then ?[B] else ?B;
-    let t := eval cbv delta [x] in x in 
+    let t := eval cbv delta [x] in x in
     lazymatch t with
-    | if ?b then ?b1 else _ => 
+    | if ?b then ?b1 else _ =>
       have  {x} ->: x = b1; [destruct b; subst; auto|]
     end).
+
+Ltac forall_map_step := assert_goals 1  (idtac; rewrite Forall_map).
+
 
 (* TODO: Maybe elsewere *)
 Definition PcLbl := Lattice4pt.Label.
@@ -444,10 +455,22 @@ Section inv.
     apply/flows_from_untr; eauto; done.
   Qed.
 
-  Ltac stp_wt_cmd_st_int_untr := 
+  Ltac stp_wt_cmd_st_int_untr :=
     assert_goals 1
     (idtac; unshelve erewrite wt_cmd_st_int_untr;[..|eassumption]).
-  
+
+  Ltac stp_wt_cmd_st_conf_sec :=
+    assert_goals 1
+    (idtac; unshelve erewrite wt_cmd_st_conf_sec;[..|eassumption]).
+
+  Ltac stp_wt_cmd_st_int :=
+    assert_goals 1
+    (idtac; apply/wt_cmd_st_int; [eassumption|]).
+
+  Ltac stp_wt_cmd_st_conf :=
+    assert_goals 1
+    (idtac; apply/wt_cmd_st_conf; [eassumption|]).
+
    Import Util.List.
    Lemma Forall_zip:
      forall l1 l2 substeps pc_lbl,
@@ -460,16 +483,14 @@ Section inv.
      if_easy_goals.
    Qed.
 
+   Ltac forall_zip_step :=
+     assert_goals 1
+     (idtac;
+     match goal with
+     | |- Forall _ (zip _ _ _ _) => apply/Forall_zip
+     end).
 
-  Import Util.List.
-  Lemma cmbcmdinv_empty: 
-    forall n lbl,
-    Forall CmbCmdInv (zip [] [] n lbl).
-  Proof.  
-    move=> >; rewrite /zip /= combine_extend3_empty. 
-    do 3 apply/Forall_map;apply /Forall_forall=> *.
-    cbn; repeat split; case: (untrusted _)=> //. (* TODO: Finisher!! *)
-  Qed.
+
 
 
   Lemma pubuntr_wf_cont: 
@@ -517,10 +538,18 @@ Section inv.
     *)
     Ltac2 Set curr_dom_list as old := append_tac ltac1:(assert_goals 0 done) "done finisher" old.
     Ltac2 Set curr_dom_list as old := append_tac ltac1:(assert_goals 1 (progress subst)) "subst" old.
+
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(optcmd_stp_store_simpl) "optcmd_stp_store_simpl" old.
+
     Ltac2 Set curr_dom_list as old := append_tac ltac1:(if_easy_goals) "if_easy_goals" old.
     Ltac2 Set curr_dom_list as old := append_tac ltac1:(if_same) "if_same" old.
     Ltac2 Set curr_dom_list as old := append_tac ltac1:(compute_new_pc_untr) "compute_new_pc_untr" old.
     Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_wt_cmd_st_int_untr) "stp_wt_cmd_st_int_untr" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_wt_cmd_st_conf_sec) "stp_wt_cmd_st_conf_sec" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_wt_cmd_st_int) "stp_wt_cmd_st_int" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_wt_cmd_st_conf) "stp_wt_cmd_st_conf" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(forall_map_step) "forall_map_step" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(forall_zip_step) "forall_zip_step" old.
     Ltac2 Set curr_dom_list as old := append_tac ltac1:(rewrite_if_hyp_eq) "rewrite_if_hyp_eq" old.
     Ltac2 Set curr_dom_list as old := join_tacs Attacker.dom_list old.
     Ltac2 Eval print_domlist curr_dom_list.
@@ -538,57 +567,34 @@ Section inv.
       - move=>>[]_; rewrite/StateInv=> + [].
         (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split. (* Grind here!! *)
         all: dominate.
-
+        
         + revert_hyp_type_dep (option Cmd); case => /= *; dominate.
-        + apply/Forall_zip=> /=. (* Should be step *)
-          rewrite map_map Forall_map. (* Should be automated? *)
-          dominate.
-(* TODO: Should be step *)
-          apply/Forall_and; [apply/Forall_forall=> //|].
+        + move=> /=; dominate.
+          apply/Forall_and;[apply/Forall_forall=> //|]. 
+          (* TODO: This is very easy forward reasonong*)
           rewrite-/(WellFormedProg _ _).
           revert_hyp_type_dep (option Cmd); case=> * //=.
           apply/pubuntr_wf_cont=> //.
 
-        + apply/cmbcmdinv_empty. (* Should be finisher also. Add to auto? *)
 
-      - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split.
-        -- revert_hyp_type bool; case. (* Case is pretty safe? A lot of these can be automated *)
-           1-2: rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
+      - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split; dominate.
+        -- revert_hyp_type bool; case; dominate.
            1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /= *; dominate. (* TODO: Is this okay? *)
+           1-2: revert_hyp_type_dep (option Cmd); case=> /= *; dominate.
 
-            (* Seems very automatable *)
-            ++ revert_hyp_type_dep (option Cmd); case=> //= *.
-               dominate. 
-
-            ++ rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
-               erewrite wt_cmd_st_int; [reflexivity|eassumption|]. (* Probably can be automated *) 
-               dominate.
-
-            ++ revert_hyp_type_dep (option Cmd); case=> //= *.
-               dominate.
-
-            ++ rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
-               erewrite wt_cmd_st_int; [reflexivity|eassumption|]=> //. (* Probably can be automated *) 
-
-        -- rewrite ![optcmd_stp_store (Some _) _]/=. (* This is automatable *)
-           (* subst *)
-           revert_hyp_type_dep PcLbl; case=> [+ []] /=.
-           + revert_hyp_type bool; case=> * /=.
-             ++ erewrite wt_cmd_st_conf; [reflexivity |eassumption|]. (* Not fwreasoning *)
-                dominate.
-             ++ erewrite wt_cmd_st_conf; [|eassumption|eassumption]; done. (* This is fwreasoning. *)
-           + move=> *. 
-             erewrite wt_cmd_st_conf_sec;[|eassumption].
+        -- revert_hyp_type_dep PcLbl; case=> [+ []] /=.
+           + revert_hyp_type bool; case=> * /=; dominate.
+           + move=> *. (* TODO: Dominate steps should start and finish with this? How to document? *)
              dominate.
 
-        -- apply/Forall_zip=> /=.  (* TODO: The trickiest case? *) 
-           apply/Forall_and; subst.
+        -- move=> /=.  (* TODO: The trickiest case? *) 
+           apply/Forall_and.
            + apply/Forall_combine2_ind1; [move=> ?; apply|..]; [..| done]. (* Is this a reasonable forward reasoning step? *)
              apply/Forall_map/step_soundness=> //.
            + revert_hyp_type_dep PcLbl; case=> [[] ?] /=.
              ++ compute_new_pc_untr=> /= _ *.
                 apply/Forall_combine2_ind2; [move=> ?; apply|..]; [..| done]. (* This is a reasonable forward step *)
-                apply/Forall_map. (* This should be automated *)
+                dominate.
                 revert_hyp_type_dep (option Cmd); case=> //= >.
                 rewrite -/(WellFormedProg _ _).
                 move=> /step_soundness=> snd.
