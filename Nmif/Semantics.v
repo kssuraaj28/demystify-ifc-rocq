@@ -106,6 +106,16 @@ Ltac if_easy_goals_dstep:=
 
 Ltac2 Set dom_list_ as old := append_tac ltac1:(if_easy_goals_dstep) "if_easy_goals_dstep" old.
 
+Ltac rewrite_if_hyp_eq_dstep :=
+  assert_goals 1
+  (idtac;
+  match goal with  (* rewriting obviously *)
+  | H: ?x = (?b :> bool) |- context [if ?x then _ else _] =>
+    is_constructor b; rewrite H
+  end).
+
+Ltac2 Set dom_list_ as old := append_tac ltac1:(rewrite_if_hyp_eq_dstep) "rewrite_if_hyp_eq_dstep" old.
+
 Ltac if_same_dstep :=
   assert_goals 1
     (idtac;
@@ -551,29 +561,13 @@ Section inv.
 
 
   Section dom.
-    Ltac rewrite_if_hyp_eq_dstep :=
-      assert_goals 1
-      (idtac;
-      match goal with  (* rewriting obviously *)
-      | H: ?x = (?b :> bool) |- context [if ?x then _ else _] =>
-        is_constructor b; rewrite H
-      end).
-    Ltac2 Set dom_list_ as old := append_tac ltac1:(rewrite_if_hyp_eq_dstep) "rewrite_if_hyp_eq_dstep" old.
-    Import Tacs.Dominate.
-    (* TODO: Eventually this should go elsewhere. 
-        - You should also have best practices on where these things should go, and how they should be defined.
-        - Attacker.v has something
-        - There are Util things (if_same_dstep, etc.)
-        - There should also be list things
-        - There should be a good naming scheme as well
-    *)
-    Ltac2 Set curr_dom_list := fun () => dom_list_ (). 
-
+    Ltac2 Set curr_dom_list := (fun () => dom_list_ ()).
     Ltac2 Set curr_dom_list as old := join_tacs Attacker.dom_list old.
+
     Ltac2 Eval print_domlist (keep_only curr_dom_list [1;3]).
     Ltac2 Eval print_domlist (delete curr_dom_list [1;3]).
     Ltac2 Eval print_domlist curr_dom_list.
-    Ltac2 Set dom_debug := true. (* TODO: Why can't I access this? *)
+    Ltac2 Set dom_debug := false. (* TODO: Why can't I access this? *)
 
     Lemma cmbcmd_step_inv: 
       forall c st, 
@@ -585,7 +579,7 @@ Section inv.
       case; rewrite {}/CmbCmdInv=> - []; cycle 1. 
 
       - move=>>[]_; rewrite/StateInv=> + [].
-        (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split; dominate. (* Grind here!! *)
+        (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split; dominate. 
           { revert_hyp_type_dep (option Cmd); case => /=; dominate. }
         move=> /=; dominate.
         apply/Forall_and;[apply/Forall_forall=> //|]. 
@@ -619,7 +613,7 @@ Section inv.
          revert_hyp_type_dep Cmd=> ? /step_soundness snd newpce.
          apply/flows_to_subtype_prog; [|apply/snd].
          rewrite newpce => //.
-          Qed.
+    Qed. 
 
   End dom.
 
