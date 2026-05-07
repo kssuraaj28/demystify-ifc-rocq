@@ -569,6 +569,7 @@ Section inv.
     Ltac2 Eval print_domlist curr_dom_list.
     Ltac2 Set dom_debug := true. (* TODO: Why can't I access this? *)
 
+    Hint Extern 10 => match goal with H : _ = _ |- _ => rewrite H end : core.
     Lemma cmbcmd_step_inv: 
       forall c st, 
         CmbCmdInv c ->
@@ -601,7 +602,7 @@ Section inv.
            rewrite -/(WellFormedProg _ _).
            move=> /step_soundness=> snd.
            apply/flows_to_subtype_prog;[|apply/snd].
-           dominate_auto. }
+           dominate. }
         move=> /= ? <- /=.
          move newpce: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. {
             erewrite tr_cmd_cnt;
@@ -612,7 +613,8 @@ Section inv.
          rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
          revert_hyp_type_dep Cmd=> ? /step_soundness snd newpce.
          apply/flows_to_subtype_prog; [|apply/snd].
-         rewrite newpce => //.
+         dominate.
+        (* rewrite newpce => //. *)
     Qed. 
 
   End dom.

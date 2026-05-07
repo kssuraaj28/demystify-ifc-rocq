@@ -419,7 +419,12 @@ Module Dominate.
       (Control.focus 1 1 (fun () =>
         match Control.case (fun () => dominate_step ()) with
         | Val ((), _) => ()
-        | Err _ => Control.shelve ()
+        | Err _ => 
+              (if dom_debug then printf "dominate: FW reasoning failed, trying BW reasoning" else ());
+              dominate_auto (); 
+              if Int.equal (Control.numgoals () ) 0 then () else
+              (if dom_debug then printf "dominate: BW reasoning failed, Can't solve goal " else ());
+              Control.shelve ()
         end);
        let next_gas := match gas with | Some n => Some (Int.sub n 1) | None => None end in
        go next_gas) in
