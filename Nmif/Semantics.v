@@ -82,7 +82,7 @@ Ltac if_easy_goals:=
   match goal with
   |- context [if ?b then _ else _] =>  
       let e := fresh in let v := fresh in 
-      move e: b=> v; revert e; revert v;  (* TODO: No ssr in tactics.  *)
+      move e: b=> v; move: v e;
       (* TODO: Goal hygiene after every step *)
       case=> ?; try done (* TODO parameterize? *)
   end).
@@ -554,19 +554,17 @@ Section inv.
       - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split.
         -- revert_hyp_type bool; case. (* Case is pretty safe? A lot of these can be automated *)
            1-2: rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
-           1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /= *; subst. (* TODO: Is this okay? *)
+           1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /= *; dominate. (* TODO: Is this okay? *)
 
             (* Seems very automatable *)
-            ++ dominate.  (* TODO: Cleanup ssr hyps also *)
-               revert_hyp_type_dep (option Cmd); case=> //= *.
+            ++ revert_hyp_type_dep (option Cmd); case=> //= *.
                dominate. 
 
             ++ rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)
                erewrite wt_cmd_st_int; [reflexivity|eassumption|]. (* Probably can be automated *) 
                dominate.
 
-            ++ dominate.
-               revert_hyp_type_dep (option Cmd); case=> //= *.
+            ++ revert_hyp_type_dep (option Cmd); case=> //= *.
                dominate.
 
             ++ rewrite {1}/optcmd_stp_store/oapp. (* Can be automated *)

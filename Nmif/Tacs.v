@@ -497,22 +497,42 @@ Module Dominate.
     Abort.
   End test.
 
-  #[local] Ltac2 wrap_underscore_id (id : ident) : ident option :=
-    let s := Ident.to_string id in
+  (* These two funtions are AI generated. I don't care *)
+  #[local] Ltac2 strip_underscores (s : string) : string :=
     let n := String.length s in
-    if Int.equal n 0 then
-      Control.throw (Tactic_failure (Some (fprintf "wrap_underscore_id: empty identifier"))) else
-    let starts := Char.equal (String.get s 0) (Char.of_int 95) in
-    let ends := Char.equal (String.get s (Int.sub n 1)) (Char.of_int 95) in
-    if Bool.and starts ends then None
-    else Ident.of_string (String.app "_" (String.app s "_")).
+    let underscore := Char.of_int 95 in
+    let rec drop_leading i :=
+      if Int.equal i n then i
+      else if Char.equal (String.get s i) underscore then drop_leading (Int.add i 1)
+      else i in
+    let rec drop_trailing j :=
+      if Int.equal j 0 then 0
+      else if Char.equal (String.get s (Int.sub j 1)) underscore then drop_trailing (Int.sub j 1)
+      else j in
+    let lo := drop_leading 0 in
+    let hi := drop_trailing n in
+    if Int.le hi lo then "" else String.sub s lo (Int.sub hi lo).
+
+  #[local] Ltac2 cleanup_id (id : ident) : string :=
+    let s := Ident.to_string id in
+    if Int.equal (String.length s) 0 then
+      Control.throw (Tactic_failure (Some (fprintf "cleanup_id: empty identifier"))) else
+    strip_underscores s.
 
   #[local] Ltac2 collect_renames (hyps : ident list) : (ident * ident) list :=
-    List.fold_right (fun id acc =>
-      match wrap_underscore_id id with
-      | Some new_id => (id, new_id) :: acc
-      | None => acc
-      end) hyps [].
+    let rec go hyps used :=
+      match hyps with
+      | [] => []
+      | id :: rest =>
+          let core := cleanup_id id in
+          let core_id := Option.get (Ident.of_string core) in
+          let fresh_core := Fresh.fresh used core_id in
+          let used' := Fresh.Free.union used (Fresh.Free.of_ids [fresh_core]) in
+          let wrapped_str := String.app "_" (String.app (Ident.to_string fresh_core) "_") in
+          let wrapped := Option.get (Ident.of_string wrapped_str) in
+          (id, wrapped) :: go rest used'
+      end in
+    go hyps (Fresh.Free.of_goal ()).
 
   Ltac2 goal_hygiene0 () : unit :=
     Control.enter (fun () =>
@@ -533,7 +553,7 @@ Module Dominate.
     Variables A B C : Prop.
     Goal A -> B -> C -> A. Proof. 
     move=> *. goal_hygiene. assumption. Abort.
-    Goal A -> B -> C -> A. Proof. move=> > _ha_ ha *. Fail goal_hygiene. Abort.
+    Goal A -> B -> C -> A. Proof. move=> > _ha_ ha *. goal_hygiene. Abort.
     Goal A /\ B. Proof. split; goal_hygiene. Abort.
 
     Variables P : nat -> Prop.
