@@ -74,7 +74,7 @@ Section cleanstep.
 
 End cleanstep.
 
-Ltac optcmd_stp_store_simpl :=
+Ltac optcmd_stp_store_simpl_dstep :=
    assert_goals 1
    (idtac;
    let e := fresh in let v := fresh in 
@@ -82,7 +82,7 @@ Ltac optcmd_stp_store_simpl :=
    rewrite/optcmd_stp_store/oapp/id in e; rewrite -{}e {v}).
 
 (* This is a decent forward reasoning tactic *)
-Ltac if_easy_goals:=
+Ltac if_easy_goals_dstep:=
   ensure_goals <= 1
   (
   idtac;
@@ -95,7 +95,7 @@ Ltac if_easy_goals:=
       case=> ?; try done (* TODO parameterize? *)
   end).
 
-Ltac if_same :=
+Ltac if_same_dstep :=
   assert_goals 1
     (idtac;
     let x := fresh in
@@ -106,7 +106,7 @@ Ltac if_same :=
       have  {x} ->: x = b1; [destruct b; subst; done|]
     end).
 
-Ltac forall_map_step := assert_goals 1  (idtac; rewrite Forall_map).
+Ltac forall_map_dstep := assert_goals 1  (idtac; rewrite Forall_map).
 
 
 (* TODO: Maybe elsewere *)
@@ -255,7 +255,7 @@ Section new_pc.
   Qed.
 End new_pc.
 
-Ltac compute_new_pc_untr :=
+Ltac compute_new_pc_untr_dstep :=
   assert_goals 1
     (
     idtac;
@@ -301,7 +301,7 @@ Section cmb_step.
       forall st,
         WellFormedProg (compute_new_pc pc c) (clean_cmd_stp_cnt c st).
   Proof.
-    move=> + > => - []=> * //=; if_easy_goals.
+    move=> + > => - []=> * //=; if_easy_goals_dstep.
     apply/Forall_app. split=> //.
     constructor 2=> //.
     constructor 3. apply/Forall_impl; [| eassumption]; clear=> *.
@@ -455,19 +455,19 @@ Section inv.
     apply/flows_from_untr; eauto; done.
   Qed.
 
-  Ltac stp_wt_cmd_st_int_untr :=
+  Ltac wt_cmd_st_int_untr_dstep :=
     assert_goals 1
     (idtac; unshelve erewrite wt_cmd_st_int_untr;[..|eassumption]).
 
-  Ltac stp_wt_cmd_st_conf_sec :=
+  Ltac wt_cmd_st_conf_sec_dstep :=
     assert_goals 1
     (idtac; unshelve erewrite wt_cmd_st_conf_sec;[..|eassumption]).
 
-  Ltac stp_wt_cmd_st_int :=
+  Ltac wt_cmd_st_int_dstep :=
     assert_goals 1
     (idtac; apply/wt_cmd_st_int; [eassumption|]).
 
-  Ltac stp_wt_cmd_st_conf :=
+  Ltac wt_cmd_st_conf_dstep :=
     assert_goals 1
     (idtac; apply/wt_cmd_st_conf; [eassumption|]).
 
@@ -480,17 +480,17 @@ Section inv.
    Proof.
      move=> *; rewrite /zip.
      apply/Forall_map/Forall_combine2_ind1;[|eassumption|]=> //= => [[] [] > //|].
-     if_easy_goals.
+     if_easy_goals_dstep.
    Qed.
 
-   Ltac forall_zip_step :=
+   Ltac forall_zip_dstep :=
      assert_goals 1
      (idtac;
      match goal with
      | |- Forall _ (zip _ _ _ _) => apply/Forall_zip
      end).
 
-   Ltac forall_combine2_ind_step :=
+   Ltac forall_combine2_ind_dstep :=
      assert_goals 2
      (idtac;
      match goal with
@@ -528,7 +528,7 @@ Section inv.
 
 
   Section dom.
-    Ltac rewrite_if_hyp_eq :=
+    Ltac rewrite_if_hyp_eq_dstep :=
       assert_goals 1
       (idtac;
       match goal with  (* rewriting obviously *)
@@ -539,26 +539,27 @@ Section inv.
     (* TODO: Eventually this should go elsewhere. 
         - You should also have best practices on where these things should go, and how they should be defined.
         - Attacker.v has something
-        - There are Util things (if_same, etc.)
+        - There are Util things (if_same_dstep, etc.)
         - There should also be list things
+        - There should be a good naming scheme as well
     *)
     Ltac2 Set curr_dom_list as old := append_tac ltac1:(assert_goals 0 done) "done finisher" old.
     Ltac2 Set curr_dom_list as old := append_tac ltac1:(assert_goals 1 (progress subst)) "subst" old.
-
-    Ltac2 Set curr_dom_list as old := append_tac ltac1:(optcmd_stp_store_simpl) "optcmd_stp_store_simpl" old.
-
-    Ltac2 Set curr_dom_list as old := append_tac ltac1:(if_easy_goals) "if_easy_goals" old.
-    Ltac2 Set curr_dom_list as old := append_tac ltac1:(if_same) "if_same" old.
-    Ltac2 Set curr_dom_list as old := append_tac ltac1:(compute_new_pc_untr) "compute_new_pc_untr" old.
-    Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_wt_cmd_st_int_untr) "stp_wt_cmd_st_int_untr" old.
-    Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_wt_cmd_st_conf_sec) "stp_wt_cmd_st_conf_sec" old.
-    Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_wt_cmd_st_int) "stp_wt_cmd_st_int" old.
-    Ltac2 Set curr_dom_list as old := append_tac ltac1:(stp_wt_cmd_st_conf) "stp_wt_cmd_st_conf" old.
-    Ltac2 Set curr_dom_list as old := append_tac ltac1:(forall_map_step) "forall_map_step" old.
-    Ltac2 Set curr_dom_list as old := append_tac ltac1:(forall_combine2_ind_step) "forall_combine2_ind1_step" old.
-    Ltac2 Set curr_dom_list as old := append_tac ltac1:(forall_zip_step) "forall_zip_step" old.
-    Ltac2 Set curr_dom_list as old := append_tac ltac1:(rewrite_if_hyp_eq) "rewrite_if_hyp_eq" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(optcmd_stp_store_simpl_dstep) "optcmd_stp_store_simpl_dstep" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(if_easy_goals_dstep) "if_easy_goals_dstep" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(if_same_dstep) "if_same_dstep" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(compute_new_pc_untr_dstep) "compute_new_pc_untr_dstep" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(wt_cmd_st_int_untr_dstep) "wt_cmd_st_int_untr_dstep" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(wt_cmd_st_conf_sec_dstep) "wt_cmd_st_conf_sec_dstep" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(wt_cmd_st_int_dstep) "wt_cmd_st_int_dstep" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(wt_cmd_st_conf_dstep) "wt_cmd_st_conf_dstep" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(forall_map_dstep) "forall_map_dstep" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(forall_combine2_ind_dstep) "forall_combine2_ind_dstep" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(forall_zip_dstep) "forall_zip_dstep" old.
+    Ltac2 Set curr_dom_list as old := append_tac ltac1:(rewrite_if_hyp_eq_dstep) "rewrite_if_hyp_eq_dstep" old.
     Ltac2 Set curr_dom_list as old := join_tacs Attacker.dom_list old.
+    Ltac2 Eval print_domlist (keep_only curr_dom_list [1;3]).
+    Ltac2 Eval print_domlist (delete curr_dom_list [1;3]).
     Ltac2 Eval print_domlist curr_dom_list.
     Ltac2 Set dom_debug := true. (* TODO: Why can't I access this? *)
 

@@ -324,8 +324,29 @@ Module Dominate.
   Ltac2 mutable curr_dom_list () : dominate_taclist := []. (* TODO notation that wraps () *)
   Ltac2 mutable dom_debug : bool := false.
 
-  Ltac2 print_domlist (l : unit -> dominate_taclist) : unit :=
-    List.iteri (fun i p => let (_, desc) := p in printf "%i: %s" i desc) (l ()).
+  Ltac2 print_domlist0 (l : dominate_taclist) : unit :=
+    List.iteri (fun i p => let (_, desc) := p in printf "%i: %s" i desc) (l).
+
+  Ltac2 keep_only0 (l : dominate_taclist) (idxs : int list) : dominate_taclist :=
+    let mem i := List.exist (fun n => Int.equal n i) idxs in
+    List.map (fun p => let (_, x) := p in x)
+      (List.filter (fun p => let (i, _) := p in mem i)
+        (List.mapi (fun i x => (i, x)) l)).
+
+  Ltac2 delete0 (l : dominate_taclist) (idxs : int list) : dominate_taclist :=
+    let mem i := List.exist (fun n => Int.equal n i) idxs in
+    List.map (fun p => let (_, x) := p in x)
+      (List.filter (fun p => let (i, _) := p in Bool.neg (mem i))
+        (List.mapi (fun i x => (i, x)) l)).
+
+  Ltac2 Notation "print_domlist" l(tactic(0)) :=
+    print_domlist0 (l ()).
+
+  Ltac2 Notation "keep_only" l(tactic(0)) idxs(tactic(0)) :=
+    fun () => keep_only0 (l ()) idxs.
+
+  Ltac2 Notation "delete" l(tactic(0)) idxs(tactic(0)) :=
+    fun () => delete0 (l ()) idxs.
 
   (* TODO: This desc() is sus *)
   Ltac2 Notation "append_tac" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
@@ -333,6 +354,7 @@ Module Dominate.
 
   Ltac2 Notation "join_tacs" l1(tactic(0)) l2(tactic(0)) :=
     fun () => List.append (l1 ()) (l2 ()).
+
 
   (* `dominate_step` normalizes goals with `move=> *` before dispatching the
      chain, and again on every produced subgoal after a successful tactic.
