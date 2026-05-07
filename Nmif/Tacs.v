@@ -596,10 +596,20 @@ Module Dominate.
 
   (* After these tactics are done, you need to shuffle goals.. *)
   (* TODO: What are the user facing tactics? *)
+
+
   Tactic Notation "dominate" := ltac2:(dominate None); goal_hygiene.
   Tactic Notation "dominate" integer(n) :=
     let f := ltac2:(nn |- dominate (Some (Option.get (Ltac1.to_int nn)))) in
     f n; goal_hygiene.
   Tactic Notation "dominate_step" := ltac2:(dominate_step ()); goal_hygiene.
+
+  (* 
+    - Singleton hintdatabase with dominate_step. 
+    Maybe in the future, the full dominate tactic can run finisher.
+    Clients are not allowed to touch this database
+  *)
+  Create HintDb __dom_step. (* TODO: Does #[local] help *)
+  Hint Extern 100  => dominate_step : __dom_step. (* TODO: Why 100 *)
 
 End Dominate.

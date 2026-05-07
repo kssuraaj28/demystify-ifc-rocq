@@ -601,7 +601,7 @@ Section inv.
            rewrite -/(WellFormedProg _ _).
            move=> /step_soundness=> snd.
            apply/flows_to_subtype_prog;[|apply/snd].
-           dominate. }
+           auto with __dom_step. }
         move=> /= ? <- /=.
          move newpce: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. {
             erewrite tr_cmd_cnt;
