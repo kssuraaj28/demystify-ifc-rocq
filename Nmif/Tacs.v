@@ -349,6 +349,7 @@ Module Dominate.
     fun () => delete0 (l ()) idxs.
 
   (* TODO: This desc() is sus *)
+  (* TODO: Maybe check that there is no name duplication in the future? Throw a warning if this is the case *)
   Ltac2 Notation "append_tac" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
     fun () => (t, desc ()) :: (l ()).
 
