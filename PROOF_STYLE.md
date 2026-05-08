@@ -18,8 +18,17 @@ Set Mangle Names. Set Mangle Names Light.
 - Do not use the `all:` goal selector. Write the goal numbers explicitly.
 - Unification variables (existential variables) should be generated and consumed within the same tactic.
 - There is no strict rule against mixing ssreflect and normal tactics. In fact, for automation it is required.
-- Every user-defined tactic should be wrapped by `assert_goals`, `ensure_goals`, or `harden`. Use `assert_goals` (hard throw) when a goal-count mismatch indicates a programmer error; use `ensure_goals` (soft failure) when the call site needs to backtrack on a mismatch; fall back to `harden` when you cannot assert a goal count. You may have to prefix your tactic by `idtac;` to prevent eager evaluation (https://rocq-prover.zulipchat.com/#narrow/channel/237977-Rocq-users/topic/Weird.20bug/with/593251599).
-- User-defined tactics must not finish with shelved goals. The shelf may be used internally during the tactic's operation, but all shelved goals must be unshelved (or solved) before the tactic returns.
+- Try to wrap user-defined tactics by `assert_goals`, `ensure_goals`, or
+  `harden`. Use `assert_goals` (hard throw) when a goal-count mismatch
+  indicates a programmer error; use `ensure_goals` (soft failure) when the call
+  site needs to backtrack on a mismatch; fall back to `harden` when you cannot
+  assert a goal count. A hardened tactic must not finish with shelved goals.
+  The shelf may be used internally during the tactic's operation, but all
+  shelved goals must be unshelved (or solved) before the tactic returns.
+  Moreover, hardened tactic result should not have evars.
+  You may have to prefix your tactic by `idtac;` to
+  prevent eager evaluation
+  (https://rocq-prover.zulipchat.com/#narrow/channel/237977-Rocq-users/topic/Weird.20bug/with/593251599).
 
 ## `dominate`
 
