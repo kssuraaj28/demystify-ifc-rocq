@@ -93,9 +93,7 @@ Section test.
   Abort.
 End test.
 
-(*
-  Run `t`. If it succeeds, then check goals
-*)
+(* Run `t`. If it succeeds, then check goals. TODO: Reconsider Control.enter. Maybe better to pull that out? *)
 (* TODO: Is Ltac1.run tt the same as ltac1:(x |- x) tt ?*)
 Ltac2 goals_check (t : unit -> unit) (n: int) (is_le: bool) (is_hard: bool) : unit :=
   let err := if is_hard then Control.throw else Control.zero in 
@@ -356,36 +354,31 @@ Module Dominate.
   Ltac2 Notation "join_tacs" l1(tactic(0)) l2(tactic(0)) :=
     fun () => List.append (l1 ()) (l2 ()).
 
-
-  (* `dominate_step` normalizes goals with `move=> *` before dispatching the
-     chain, and again on every produced subgoal after a successful tactic.
-     Contract for chain-step authors: you can assume `move=> *` was just run on
-     the goal you receive, and `move=> *` will run on every goal you produce. *)
-  (* TODO: Finishers. Two options: (1) run `auto with dom_db` after every
-     dominate_step, where dom_db is a hint database whose hints can call
-     dominate; (2) register the finisher itself as a dominate step (hardened so
-     it only succeeds on progress). *)
-  Ltac2 dominate_step () : unit :=
+  Ltac2 dominate_step_n (i : int) : unit :=
     let gls := Control.numgoals() in
     if Bool.neg (Int.equal gls 1) then
-        Control.throw (Tactic_failure (Some (fprintf "dominate_step: Needs to run with one focused goal"))) else
+        Control.throw (Tactic_failure (Some (fprintf "dominate_step_n: Needs to run with one focused goal"))) else
+    let l := curr_dom_list () in
+    match List.nth_opt l i with
+    | None => Control.throw (Tactic_failure (Some (fprintf "dominate_step_n: index %i out of range (length %i)" i (List.length l))))
+    | Some (t, _) => ltac1:(move => * ); t (); ltac1:(move=> * )
+    end.
 
-    ltac1:(move => * );
-
-    let rec go ts :=
-      match ts with
-      | [] => Control.zero (Tactic_failure (Some (fprintf "dominate_step: all tactics failed")))
-      | (t, desc) :: rest =>
-          match Control.case t with
-          (* It is the client's responsibility to put harden. If the client does not put it, then the thing will spin forever! *)
-          | Val ((),_) =>
-              (if dom_debug then printf "dominate_step: %s success" desc else ());
-              Control.enter (fun () => ltac1:(move => * ))
-          | Err _ => go rest
-          end
+  Ltac2 dominate_step () : unit :=
+    let l := curr_dom_list () in
+    let len := List.length l in
+    let rec go i :=
+      if Int.ge i len then Control.zero (Tactic_failure (Some (fprintf "dominate_step: all tactics failed")))else
+      match Control.case (fun () => dominate_step_n i) with
+      (* It is the client's responsibility to put harden. If the client does not put it, then the thing will spin forever! *)
+      | Val ((),_) => if Bool.neg dom_debug then () else
+                        let (_, desc) := List.nth l i in
+                        printf "dominate_step[%i]: %s success" i desc
+      | Err _ => go (Int.add i 1)
       end in
 
-    go (curr_dom_list ()).
+    go 0.
+
 
   (* 
     - Singleton hintdatabase with dominate_step. 
@@ -594,6 +587,9 @@ Module Dominate.
     let f := ltac2:(nn |- dominate (Some (Option.get (Ltac1.to_int nn)))) in
     f n; goal_hygiene.
   Tactic Notation "dominate_step" := ltac2:(dominate_step ()); goal_hygiene.
+  Tactic Notation "dominate_step" integer(n) :=
+    let f := ltac2:(nn |- dominate_step_n (Option.get (Ltac1.to_int nn))) in
+    f n; goal_hygiene.
   Tactic Notation "dominate_auto" := ltac2:(dominate_auto ()); goal_hygiene.
 
 

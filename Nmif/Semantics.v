@@ -87,7 +87,6 @@ Ltac optcmd_stp_store_simpl_dstep :=
    let e := fresh in let v := fresh in 
    move e: (optcmd_stp_store (Some _) _)=> v;
    rewrite/optcmd_stp_store/oapp/id in e; rewrite -{}e {v}).
-
 Ltac2 Set dom_list_ as old := append_tac ltac1:(optcmd_stp_store_simpl_dstep) "optcmd_stp_store_simpl_dstep" old.
 
 (* This is a decent forward reasoning tactic *)
@@ -588,6 +587,8 @@ Section inv.
       case; rewrite {}/CmbCmdInv=> - []; cycle 1. 
 
       - move=>>[]_; rewrite/StateInv=> + [].
+        ltac2:(print_domlist curr_dom_list).
+        dominate_step 5.
         (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split; dominate. 
           { revert_hyp_type_dep (option Cmd); case => /=; dominate. }
         move=> /=; dominate. (* This is automatable Forall True /\ ..*)
@@ -602,7 +603,7 @@ Section inv.
           { revert_hyp_type_dep PcLbl; case=> [+ []] /==> *; dominate. }
         move=> /=.  
         apply/Forall_and; dominate.
-        revert_hyp_type_dep PcLbl; case=> [[] ?] /=.
+        revert_hyp_type_dep PcLbl. case=> [[] ?] /=.
           { dominate.
            revert_hyp_type_dep (option Cmd); case=> //= >.
            rewrite -/(WellFormedProg _ _).
@@ -611,8 +612,8 @@ Section inv.
            dominate. }
         move=> /= ? <- /=.
         move ?: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. 
-           {erewrite tr_cmd_cnt; [apply/Forall_combine2_same/Forall_map/Forall_forall => // | eassumption |..]. 
-             1-2: dominate. }
+           {erewrite tr_cmd_cnt; [apply/Forall_combine2_same/Forall_map/Forall_forall => // | eassumption |..] ; dominate.
+             }
         dominate.
         rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
         revert_hyp_type_dep Cmd=> ? /step_soundness snd newpce.
