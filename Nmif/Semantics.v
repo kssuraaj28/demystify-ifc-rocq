@@ -90,41 +90,7 @@ Section test.
 
   Goal forall (P: _ -> Prop) c s, P (optcmd_stp_store (Some c) s).
   Proof. dominate. Abort.
-
 End test.
-
-(* This is a decent forward reasoning tactic *)
-Ltac if_easy_goals :=
-  ensure_goals <= 1
-  (
-  idtac;
-  (* In Ltac, doing match goals will do focus *)
-  match goal with
-  |- context [if ?b then _ else _] =>  
-      let e := fresh in let v := fresh in 
-      move e: b=> v; move: v e;
-      (* TODO: Goal hygiene after every step *)
-      case=> ?; try done (* TODO parameterize? *)
-  end).
-
-Ltac2 Set dom_list_ as old := append_tac <= 1 ltac1:(if_easy_goals) "if_easy_goals" old.
-
-
-Ltac2 Set dom_list_ as old := 
-  append_tac 1 
-    ltac1:(match goal with  (* rewriting obviously *)
-           | H: ?x = (?b :> bool) |- context [if ?x then _ else _] =>
-             is_constructor b; rewrite H
-           end)
-    "rewrite_if_hyp_eq" old.
-
-Lemma if_same {T} (b : bool) (t: T) : 
-  (if b then t else t) = t.
-Proof.  case: b; done. Qed. 
-
-Ltac2 Set dom_list_ as old := append_tac 1 ltac1:(rewrite if_same) "if_same" old.
-
-Ltac2 Set dom_list_ as old := append_tac 1 ltac1:(rewrite Forall_map) "Forall_map" old.
 
 
 (* TODO: Maybe elsewere *)
@@ -480,6 +446,7 @@ Section inv.
     apply/flows_from_untr; eauto; done.
   Qed.
 
+(* TODO: Why indent? *)
   Ltac2 Set dom_list_ as old :=
     append_tac 1
       ltac1:(unshelve erewrite wt_cmd_st_int_untr;[..|eassumption])
@@ -519,14 +486,6 @@ Section inv.
               end)
        "Forall_zip" old.
 
-   Ltac2 Set dom_list_ as old :=
-     append_tac 2
-       ltac1:(match goal with
-              | |- Forall _ (combine_extend2 _ _ _ _) => apply/Forall_combine2_ind1; [move=> ?; apply|..]
-              | |- Forall _ (combine_extend2 _ _ _ _) => apply/Forall_combine2_ind2; [move=> ?; apply|..]
-              end)
-       "Forall_combine2_ind" old.
-
 
   Lemma pubuntr_wf_cont: 
     forall c st, 
@@ -560,11 +519,13 @@ Section inv.
     Ltac2 Set curr_dom_list := (fun () => dom_list_ ()).
 
     Ltac2 Set curr_dom_list as old := join_taclist Attacker.dom_list old.
+    Ltac2 Set curr_dom_list as old := join_taclist Util.dom_list old.
+    Ltac2 Set curr_dom_list as old := join_taclist Util.List.dom_list old.
 
     Ltac2 Eval print_domlist (keep_only curr_dom_list [1;3]).
     Ltac2 Eval print_domlist (delete curr_dom_list [1;3]).
     Ltac2 Eval print_domlist curr_dom_list.
-    Ltac2 Set dom_debug := false. (* TODO: Why can't I access this? *)
+    Ltac2 Set dom_debug := true. (* TODO: Why can't I access this? *)
 
     Hint Resolve pubuntr_wf_cont : core.
     (* TODO: Why can I not add resolve? *)
@@ -585,10 +546,10 @@ Section inv.
       case; rewrite {}/CmbCmdInv=> - []; cycle 1. 
 
       - move=>>[]_; rewrite/StateInv=> + [].
-        (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split; dominate. 
-          { revert_hyp_type_dep (option Cmd); case => /=; dominate. }
-        move=> /=; dominate. (* This is automatable Forall True /\ ..*)
-        apply/Forall_and; dominate. 
+        (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split; dominate.
+         { revert_hyp_type_dep (option Cmd); case => /=; dominate. }
+        dominate=> /=; dominate.
+        apply/Forall_and; dominate.
         rewrite-/(WellFormedProg _ _).
         revert_hyp_type_dep (option Cmd); case=> * /=; dominate.
 

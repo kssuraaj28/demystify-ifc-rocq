@@ -2,13 +2,15 @@ From Stdlib Require List ssreflect ssrbool ssrfun.
 Import List ListNotations ssreflect ssrbool ssrfun.
 
 Require Tacs.
-Import Tacs.
+Import Tacs Tacs.Dominate.
 
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
+
+#[local] Ltac2 mutable dom_list_ := create_new_domlist.
 
 Module DecEq.
   (* 
@@ -31,6 +33,9 @@ Module DecEq.
 End DecEq.
 
 Module List.
+  Import Tacs.Dominate.
+  #[local] Ltac2 mutable dom_list_ := create_new_domlist.
+
   Fixpoint combine_extend2 {A B} 
     (la : list A) (lb : list B)
     (da : A) (db : B) : list (A * B) :=
@@ -107,6 +112,14 @@ Module List.
         exact: (IH _ _ _ _ HPQ HQt2 HQd).
   Qed.
 
+  Ltac2 Set dom_list_ as old :=
+    append_tac 2
+      ltac1:(match goal with
+             | |- Forall _ (combine_extend2 _ _ _ _) => apply/Forall_combine2_ind1; [move=> ?; apply|..]
+             | |- Forall _ (combine_extend2 _ _ _ _) => apply/Forall_combine2_ind2; [move=> ?; apply|..]
+             end)
+      "Forall_combine2_ind" old.
+
 
   Lemma Forall_combine2_same:
     forall {A} P l (d: A),
@@ -119,16 +132,66 @@ Module List.
       by apply: Forall_cons; [|apply: IH].
   Qed.
 
-  (* TODO: What naming conventions am I using? *)
-  Ltac stp_Forall_app_gl := lazymatch goal with |- Forall _ (_ ++ _) => apply/Forall_app end.
+  Ltac2 Set dom_list_ as old := append_tac 1 ltac1:(apply:Forall_combine2_same) "Forall_combine2_same" old.
+
+  Ltac2 Set dom_list_ as old := append_tac 2 
+    ltac1:(lazymatch goal with |- Forall _ (_ ++ _) => apply/Forall_app; split end)
+    "Forall_app" old.
   
   Section test.
+    Ltac2 Set curr_dom_list := (fun () => dom_list_ ()). (* Maybe keep only 1 *)
     Generalizable All Variables.
     Goal `(Forall (A := A) P (l1 ++ l2)).
-    Proof.  move=> *; stp_Forall_app_gl.  Abort.
+    Proof.  move=> *; dominate.  Abort.
   End test.
   
   (* A high good tactic consumes 'low grade' hypotheses (in context), and produces high grade hypotheses (intros) *)
-  Ltac Forall_inv H :=   move: H=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _).
+  Ltac Forall_inv H :=   
+    assert_goals 1
+    (idtac; move: H=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _)).
+
+  Ltac2 Set dom_list_ as old := append_tac 1 ltac1:(someh Forall_inv) "Forall_inv" old.
   (* TODO: Test for these also *)
+  Ltac2 Set dom_list_ as old := append_tac 1 
+    ltac1:(lazymatch goal with |- Forall _ (map _ _) => apply/Forall_map end)
+    "Forall_map" old.
+  Ltac2 dom_list () := dom_list_ ().
 End List.
+
+
+(* This is a decent forward reasoning tactic *)
+Ltac if_easy_goals :=
+  ensure_goals <= 1
+  (
+  idtac;
+  (* In Ltac, doing match goals will do focus *)
+  match goal with
+  |- context [if ?b then _ else _] =>  
+      let e := fresh in let v := fresh in 
+      move e: b=> v; move: v e;
+      (* TODO: Goal hygiene after every step *)
+      case=> ?; try done (* TODO parameterize? *)
+  end).
+
+Ltac2 Set dom_list_ as old := append_tac <= 1 ltac1:(if_easy_goals) "if_easy_goals" old.
+
+Ltac2 Set dom_list_ as old := 
+  append_tac 1 
+    ltac1:(match goal with  (* rewriting obviously *)
+           | H: ?x = (?b :> bool) |- context [if ?x then _ else _] =>
+             is_constructor b; rewrite H
+           end)
+    "rewrite_if_hyp_eq" old.
+
+(* TODO: maybe better to have  
+Example map_nil_simpl {A B} (f: A -> B) := (erefl : ltac2:(cbn_eq (map f []))). 
+*)
+Lemma map_nil_simpl {A B} (f: A -> B) : ltac2:(cbn_eq (map f [])). Proof. done. Qed.
+Ltac2 Set dom_list_ as old := append_tac 1 ltac1:(rewrite map_nil_simpl) "map_nil_simpl" old.
+
+Lemma if_same {T} (b : bool) (t: T) : 
+  (if b then t else t) = t.
+Proof.  case: b; done. Qed. 
+
+Ltac2 Set dom_list_ as old := append_tac 1 ltac1:(rewrite if_same) "if_same" old.
+Ltac2 dom_list () := dom_list_ ().
