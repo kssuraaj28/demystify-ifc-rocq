@@ -52,10 +52,14 @@ Section test.
   Proof. NAME_GOALS_AFTER split a b. Abort.
 End test.
 
+Tactic Notation "enter" tactic0(t) := 
+  let f := ltac2:(tt |- Control.enter (fun () => Ltac1.run tt)) in  f t.
 
-Ltac2 Type exn ::= [ ProgressWrap (exn) ].
+#[local] Ltac2 Type exn ::= [ ProgressWrap (exn) ].
 
-Ltac2 harden0 (t: unit -> unit) : unit :=
+#[local] Ltac2 harden0 (t: unit -> unit) : unit :=
+    if Bool.neg (Int.equal (Control.numgoals()) 1) then
+        Control.throw (Tactic_failure (Some (fprintf "harden: Needs to run with one focused goal"))) else
     match Control.case (fun () =>
       Control.progress (fun () =>
         match Control.case t with
@@ -73,7 +77,7 @@ Ltac2 harden0 (t: unit -> unit) : unit :=
 Ltac2 Notation "harden" t(thunk(self)) := harden0 t.
 
 Tactic Notation "harden" tactic0(t) :=
-  let f := ltac2:(tt |- harden (ltac1:(t |- t) tt)) in
+  let f := ltac2:(tt |- harden (Ltac1.run tt)) in
   f t.
 
 Section test.
@@ -95,17 +99,18 @@ End test.
 
 (* Run `t`. If it succeeds, then check goals. TODO: Reconsider Control.enter. Maybe better to pull that out? *)
 (* TODO: Is Ltac1.run tt the same as ltac1:(x |- x) tt ?*)
-Ltac2 goals_check (t : unit -> unit) (n: int) (is_le: bool) (is_hard: bool) : unit :=
+#[local] Ltac2 goals_check (t : unit -> unit) (n: int) (is_le: bool) (is_hard: bool) : unit :=
+  if Bool.neg (Int.equal (Control.numgoals()) 1) then
+      Control.throw (Tactic_failure (Some (fprintf "goals_check: Needs to run with one focused goal"))) else
   let err := if is_hard then Control.throw else Control.zero in 
-  Control.enter (fun () =>
-    t ();
-    let m := Control.numgoals () in
-    let tst := if is_le then (Int.le m n) else (Int.equal m n) in
-    if tst then () else
-    let e_str := if is_le 
-                    then fprintf "assert_goals: got %i goal(s), not less than %i" m n
-                    else fprintf "assert_goals: got %i goal(s), not equal to %i" m n in
-    err (Tactic_failure (Some e_str))).
+  t ();
+  let m := Control.numgoals () in
+  let tst := if is_le then (Int.le m n) else (Int.equal m n) in
+  if tst then () else
+  let e_str := if is_le 
+                  then fprintf "assert_goals: got %i goal(s), not less than %i" m n
+                  else fprintf "assert_goals: got %i goal(s), not equal to %i" m n in
+  err (Tactic_failure (Some e_str)).
 
 
 Ltac2 Notation "ensure_goals" n(tactic(0)) t(thunk(self)) :=
@@ -162,8 +167,10 @@ Section test.
   Goal P /\ P.  Proof. ensure_goals 2 split. Abort.
   Goal P /\ P.  Proof. Fail ensure_goals 3 split. Abort.
   Goal P /\ P.  Proof. first [ idtac "Trying 3"; ensure_goals 3 split | idtac "Trying 2"; ensure_goals 2 split ]. Abort.
-  Goal (P /\ P) /\ (P /\ P).  Proof.  split. all: ensure_goals 2 split. Abort.
-  Goal (P /\ P) /\ (P /\ P).  Proof.  split; ensure_goals 2 split. Abort.
+  Goal (P /\ P) /\ (P /\ P).  Proof.  split. Fail all: ensure_goals 2 split. Abort.
+  Goal (P /\ P) /\ (P /\ P).  Proof.  split. all: enter (ensure_goals 2 split). Abort.
+  Goal (P /\ P) /\ (P /\ P).  Proof.  split. Fail all: (ensure_goals 2 (enter split)). Abort.
+  Goal (P /\ P) /\ (P /\ P).  Proof.  split; enter (ensure_goals 2 split). Abort.
 
   Goal P /\ P.  Proof. assert_goals 2 split. Abort.
   Goal P /\ P.  Proof. Fail assert_goals 3 split. Abort.
@@ -507,8 +514,7 @@ Module Dominate.
 
   #[local] Ltac2 dominate_step_n (i : int) : unit :=
     let gls := Control.numgoals() in
-    if Bool.neg (Int.equal gls 1) then
-        Control.throw (Tactic_failure (Some (fprintf "dominate_step_n: Needs to run with one focused goal"))) else
+    if Bool.neg (Int.equal gls 1) then Control.throw (Tactic_failure (Some (fprintf "dominate_step_n: Needs to run with one focused goal"))) else
     let l := curr_dom_list () in
     match List.nth_opt l i with
     | None => Control.throw (Tactic_failure (Some (fprintf "dominate_step_n: index %i out of range (length %i)" i (List.length l))))

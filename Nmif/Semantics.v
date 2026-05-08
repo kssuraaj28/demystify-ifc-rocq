@@ -328,7 +328,7 @@ Section cmb_step.
       forall st,
         WellFormedProg (compute_new_pc pc c) (clean_cmd_stp_cnt c st).
   Proof.
-    move=> + > => - []=> * //=; if_easy_goals_dstep.
+    move=> + > => - []=> * //=; enter if_easy_goals_dstep.
     apply/Forall_app. split=> //.
     constructor 2=> //.
     constructor 3. apply/Forall_impl; [| eassumption]; clear=> *.
