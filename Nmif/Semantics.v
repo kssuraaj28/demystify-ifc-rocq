@@ -299,7 +299,7 @@ End cmb_cmd.
 
 Section new_pc.
   Import Lattice4pt.Notations.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
 
   Definition compute_new_pc (old_pc : PcLbl) (cmd: Cmd): PcLbl :=
     match cmd with
@@ -311,7 +311,11 @@ Section new_pc.
   Definition compute_new_pc_opt (old_pc : PcLbl) (cmd: option Cmd): PcLbl :=
     if cmd isn't Some cmd then old_pc else
     compute_new_pc old_pc cmd.
+End new_pc.
 
+Section thms.
+  Import VarValStore.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
   Lemma compute_new_pc_untr:
     forall p c, exists p',
       compute_new_pc (mk_lbl true p) c = (mk_lbl true p').
@@ -320,7 +324,37 @@ Section new_pc.
     1-2: case: (var_lbl g) => u pg. (* TODO: This could be a lemma *)
     1-2: exists (pg && p); case: u; done.
   Qed.
-End new_pc.
+
+  Lemma tr_cmd_cnt:
+    forall p c,
+      let: lbl := mk_lbl false p in
+      let: new_lbl := (compute_new_pc lbl c) in
+      WellFormedCmd lbl c ->
+      untrusted new_lbl = false ->
+      forall st1 st2,
+        ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
+        clean_cmd_stp_cnt c st1 = clean_cmd_stp_cnt c st2.
+  Proof.
+    move=> >. move e: (mk_lbl _ _)=> l; move: e=> /[swap].
+    case=> //= > => [_ _| _] <- untrg *.
+    1-2: set gr := (X in _ = (if X then _ else _)); set gl := (X in (if X then _ else _) = _).
+    1-2: suff: gl = gr; [move=> -> //|subst gl gr]; congr (_ _).
+    1-2: apply/storeview_eq; [eassumption|].
+    1-2: move: untrg; rewrite Bool.orb_false_r /is_trusted/is_untrusted=> -> //.
+  Qed.
+
+  Lemma step_soundness c pc:
+      WellFormedCmd pc c ->
+      forall st,
+        WellFormedProg (compute_new_pc pc c) (clean_cmd_stp_cnt c st).
+  Proof.
+    move=> + > => - []=> * //=; enter if_easy_goals.
+    apply/Forall_app. split=> //.
+    constructor 2=> //.
+    constructor 3. apply/Forall_impl; [| eassumption]; clear=> *.
+    rewrite -join_assoc join_idem=> //.
+  Qed.
+End thms.
 
 Ltac2 Set this_cookbook_ as old :=
   append_tac 1
@@ -348,39 +382,6 @@ Section cmb_step.
     let: atk_steps := repeat true atk_steps in
     let: comb := List.combine_extend3 real_cont ideal_cont atk_steps None None false in
     map (fun '(rc, ic, abit) => mk_cmbcmd rc abit ic pc_lbl) comb.
-
-
-  Import VarValStore.Notations.
-  Lemma tr_cmd_cnt:
-    forall p c,
-      let: lbl := mk_lbl false p in
-      let: new_lbl := (compute_new_pc lbl c) in
-      WellFormedCmd lbl c ->
-      untrusted new_lbl = false ->
-      forall st1 st2,
-        ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
-        clean_cmd_stp_cnt c st1 = clean_cmd_stp_cnt c st2.
-  Proof.
-    move=> >. move e: (mk_lbl _ _)=> l; move: e=> /[swap].
-    case=> //= > => [_ _| _] <- untrg *.
-    1-2: set gr := (X in _ = (if X then _ else _)); set gl := (X in (if X then _ else _) = _).
-    1-2: suff: gl = gr; [move=> -> //|subst gl gr]; congr (_ _).
-    1-2: apply/storeview_eq; [eassumption|].
-    1-2: move: untrg; rewrite Bool.orb_false_r /is_trusted/is_untrusted=> -> //.
-  Qed.
-
-
-  Lemma step_soundness c pc:
-      WellFormedCmd pc c ->
-      forall st,
-        WellFormedProg (compute_new_pc pc c) (clean_cmd_stp_cnt c st).
-  Proof.
-    move=> + > => - []=> * //=; enter if_easy_goals.
-    apply/Forall_app. split=> //.
-    constructor 2=> //.
-    constructor 3. apply/Forall_impl; [| eassumption]; clear=> *.
-    rewrite -join_assoc join_idem=> //.
-  Qed.
 
   Context {AtkStates : Type}.
 
