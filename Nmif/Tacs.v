@@ -281,6 +281,11 @@ Section test.
   Proof. move=> *. cnstrct_eq_gl. Abort.
 End test.
 
+Ltac2 Notation "cbn_eq" t(thunk(constr)) :=
+  let t := t () in
+  let t' := eval cbn in $t in
+  exact ($t = $t').
+
 Module GallinaHole.
   (* Holes *)
   #[local] Ltac2 admit_tac () := 
@@ -602,6 +607,6 @@ End Dominate.
 Section usage.
   Import Dominate.
   Ltac2 mutable db := create_new_domlist.
-  Ltac2 Set db as old := append_tac 1 ltac1:(progress idtac) "corr_int_gl_dstep" old.
+  Ltac2 Set db as old := append_tac 1 ltac1:(progress idtac) "desc" old.
   Ltac2 Set db as old := join_taclist old old.
 End usage.  Fail Ltac2 Check db.

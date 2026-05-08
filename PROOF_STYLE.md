@@ -33,8 +33,9 @@ forever! It is the client's responsibility to harden their tactics using
 - `dominate` runs to completion (no gas).
 - `dominate n` runs at most `n` outer iterations (gas). Goals are consumed in a dfs manner.
 - `dominate_step` runs one pass over the registered list on a single focused goal.
+- `dominate_step n` runs the `nth` registered tactic.
 - `curr_dom_list` is an ltac2 list of the currently registered tactics. To change, use 
-    `Ltac2 Set curr_dom_list`, and use `append_tac` and `join_tacs`.
+    `Ltac2 Set curr_dom_list`, and use `append_tac` and `join_taclist`.
 - Set `Ltac2 Set dom_debug := true.` to print a trace: the focused goal count
   before each iteration, and the description of each tactic that succeeds
   inside `dominate_step`.
@@ -48,18 +49,19 @@ produce.
 After running, all `dominate*` notations apply `goal_hygiene` (revert +
 reintroduce) to give clean, fresh hypothesis names.
 
-### Conventions for tactics registered in the chain
+### Tactics registered in the chain
 
-- **`_dstep` suffix**: every tactic that is registered into a `dominate_taclist`
-  ends in `_dstep`. There is no `_dstep` tactic that isn't registered, and no
-  registered tactic without the suffix.
-- **Register inline**: each `_dstep` tactic is registered into its file's
-  `dom_list_` immediately after its definition, in the same scope. Don't batch
-  registrations in a separate block.
-- **Description matches name**: `append_tac ltac1:(foo_dstep) "foo_dstep" old` —
-  the description string is the tactic's name verbatim.
+Best practice (not enforced): the description string passed to `append_tac`
+matches the underlying lemma name, e.g. `append_tac 1 ltac1:(rewrite
+Forall_map) "Forall_map" old`. Helps when reading debug output.
+
+When a step boils down to "rewrite a normalization equality", prefer writing a
+plain `Lemma` and registering `rewrite <lemma>`. For lemmas whose RHS is just
+the `cbn`-normalized LHS, the `cbn_eq` Ltac2 notation builds the equality type
+for you.
+
 
 > Open: where the registered list lives. The current pattern is a per-file
-> `#[local] Ltac2 mutable dom_list_ () : dominate_taclist := [].` near the top,
-> with theorem-specific sections assembling `curr_dom_list` via `join_tacs`.
-> Not yet a settled convention.
+> `#[local] Ltac2 mutable dom_list_ := create_new_domlist.` near the top, with
+> theorem-specific sections assembling `curr_dom_list` via `join_taclist`. Not
+> yet a settled convention.

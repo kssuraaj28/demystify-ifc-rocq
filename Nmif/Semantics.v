@@ -16,11 +16,9 @@ Set Mangle Names. Set Mangle Names Light.
 Fail Ltac2 Check Attacker.dom_list_.
 #[local] Ltac2 mutable dom_list_ := create_new_domlist.
 
-Ltac done_dstep := assert_goals 0 done.
-Ltac2 Set dom_list_ as old := append_tac ltac1:(done_dstep) "done_dstep" old.
+Ltac2 Set dom_list_ as old := append_tac 0 ltac1:(done) "done" old.
 
-Ltac subst_dstep := assert_goals 1 (progress subst).
-Ltac2 Set dom_list_ as old := append_tac ltac1:(subst_dstep) "subst_dstep" old.
+Ltac2 Set dom_list_ as old := append_tac 1 ltac1:(progress subst) "subst" old.
 
 Section exp.
   Context `{!VarPrm, !ValPrm}.
@@ -81,17 +79,22 @@ Section cleanstep.
   (* TODO: Have examples below this *)
   Definition optcmd_evnt := oapp clean_cmd_evnt (fun _ => None).
 
+  Lemma optcmd_stp_store_simpl c s: ltac2:(cbn_eq (optcmd_stp_store (Some c) s)). Proof. done. Qed.
 End cleanstep.
-Ltac optcmd_stp_store_simpl_dstep :=
-   assert_goals 1
-   (idtac;
-   let e := fresh in let v := fresh in 
-   move e: (optcmd_stp_store (Some _) _)=> v;
-   rewrite/optcmd_stp_store/oapp/id in e; rewrite -{}e {v}).
-Ltac2 Set dom_list_ as old := append_tac ltac1:(optcmd_stp_store_simpl_dstep) "optcmd_stp_store_simpl_dstep" old.
+
+Ltac2 Set dom_list_ as old := append_tac 1 ltac1:(rewrite optcmd_stp_store_simpl) "optcmd_stp_store_simpl" old.
+
+Section test.
+  Context `{!VarPrm, !ValPrm}.
+  Ltac2 Set curr_dom_list := (fun () => dom_list_ ()). (* Maybe keep only 1 *)
+
+  Goal forall (P: _ -> Prop) c s, P (optcmd_stp_store (Some c) s).
+  Proof. dominate. Abort.
+
+End test.
 
 (* This is a decent forward reasoning tactic *)
-Ltac if_easy_goals_dstep:=
+Ltac if_easy_goals :=
   ensure_goals <= 1
   (
   idtac;
@@ -104,34 +107,24 @@ Ltac if_easy_goals_dstep:=
       case=> ?; try done (* TODO parameterize? *)
   end).
 
-Ltac2 Set dom_list_ as old := append_tac ltac1:(if_easy_goals_dstep) "if_easy_goals_dstep" old.
+Ltac2 Set dom_list_ as old := append_tac <= 1 ltac1:(if_easy_goals) "if_easy_goals" old.
 
-Ltac rewrite_if_hyp_eq_dstep :=
-  assert_goals 1
-  (idtac;
-  match goal with  (* rewriting obviously *)
-  | H: ?x = (?b :> bool) |- context [if ?x then _ else _] =>
-    is_constructor b; rewrite H
-  end).
 
-Ltac2 Set dom_list_ as old := append_tac ltac1:(rewrite_if_hyp_eq_dstep) "rewrite_if_hyp_eq_dstep" old.
+Ltac2 Set dom_list_ as old := 
+  append_tac 1 
+    ltac1:(match goal with  (* rewriting obviously *)
+           | H: ?x = (?b :> bool) |- context [if ?x then _ else _] =>
+             is_constructor b; rewrite H
+           end)
+    "rewrite_if_hyp_eq" old.
 
-Ltac if_same_dstep :=
-  assert_goals 1
-    (idtac;
-    let x := fresh in
-    set x := if _ then ?[B] else ?B;
-    let t := eval cbv delta [x] in x in
-    lazymatch t with
-    | if ?b then ?b1 else _ =>
-      have  {x} ->: x = b1; [destruct b; subst; done|]
-    end).
+Lemma if_same {T} (b : bool) (t: T) : 
+  (if b then t else t) = t.
+Proof.  case: b; done. Qed. 
 
-Ltac2 Set dom_list_ as old := append_tac ltac1:(if_same_dstep) "if_same_dstep" old.
+Ltac2 Set dom_list_ as old := append_tac 1 ltac1:(rewrite if_same) "if_same" old.
 
-Ltac forall_map_dstep := assert_goals 1 (idtac; rewrite Forall_map).
-
-Ltac2 Set dom_list_ as old := append_tac ltac1:(forall_map_dstep) "forall_map_dstep" old.
+Ltac2 Set dom_list_ as old := append_tac 1 ltac1:(rewrite Forall_map) "Forall_map" old.
 
 
 (* TODO: Maybe elsewere *)
@@ -280,17 +273,22 @@ Section new_pc.
   Qed.
 End new_pc.
 
-Ltac compute_new_pc_untr_dstep :=
-  assert_goals 1
-    (
-    idtac;
-    lazymatch goal with
-    |- context [compute_new_pc (mk_lbl true ?p) ?c] =>
-       move: ([elaborate compute_new_pc_untr p c])=> [] ? /[dup] ? ->
-    end).
-(* TODO: Test.. *)
+Ltac2 Set dom_list_ as old :=
+  append_tac 1
+    ltac1:(lazymatch goal with
+           |- context [compute_new_pc (mk_lbl true ?p) ?c] =>
+              move: ([elaborate compute_new_pc_untr p c])=> [] ? /[dup] ? ->
+           end)
+    "compute_new_pc_untr" old.
 
-Ltac2 Set dom_list_ as old := append_tac ltac1:(compute_new_pc_untr_dstep) "compute_new_pc_untr_dstep" old.
+Section test.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Ltac2 Set curr_dom_list := (fun () => dom_list_ ()).
+
+  Goal forall (P: _ -> Prop) p c, P (compute_new_pc (mk_lbl true p) c).
+  Proof. dominate. Abort.
+
+End test.
 
 Section cmb_step.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
@@ -328,7 +326,7 @@ Section cmb_step.
       forall st,
         WellFormedProg (compute_new_pc pc c) (clean_cmd_stp_cnt c st).
   Proof.
-    move=> + > => - []=> * //=; enter if_easy_goals_dstep.
+    move=> + > => - []=> * //=; enter if_easy_goals.
     apply/Forall_app. split=> //.
     constructor 2=> //.
     constructor 3. apply/Forall_impl; [| eassumption]; clear=> *.
@@ -482,25 +480,25 @@ Section inv.
     apply/flows_from_untr; eauto; done.
   Qed.
 
-  Ltac wt_cmd_st_int_untr_dstep :=
-    assert_goals 1
-    (idtac; unshelve erewrite wt_cmd_st_int_untr;[..|eassumption]).
-  Ltac2 Set dom_list_ as old := append_tac ltac1:(wt_cmd_st_int_untr_dstep) "wt_cmd_st_int_untr_dstep" old.
+  Ltac2 Set dom_list_ as old :=
+    append_tac 1
+      ltac1:(unshelve erewrite wt_cmd_st_int_untr;[..|eassumption])
+      "wt_cmd_st_int_untr" old.
 
-  Ltac wt_cmd_st_conf_sec_dstep :=
-    assert_goals 1
-    (idtac; unshelve erewrite wt_cmd_st_conf_sec;[..|eassumption]).
-  Ltac2 Set dom_list_ as old := append_tac ltac1:(wt_cmd_st_conf_sec_dstep) "wt_cmd_st_conf_sec_dstep" old.
+  Ltac2 Set dom_list_ as old :=
+    append_tac 1
+      ltac1:(unshelve erewrite wt_cmd_st_conf_sec;[..|eassumption])
+      "wt_cmd_st_conf_sec" old.
 
-  Ltac wt_cmd_st_int_dstep :=
-    assert_goals 1
-    (idtac; apply/wt_cmd_st_int; [eassumption|]).
-  Ltac2 Set dom_list_ as old := append_tac ltac1:(wt_cmd_st_int_dstep) "wt_cmd_st_int_dstep" old.
+  Ltac2 Set dom_list_ as old :=
+    append_tac 1
+      ltac1:(apply/wt_cmd_st_int; [eassumption|])
+      "wt_cmd_st_int" old.
 
-  Ltac wt_cmd_st_conf_dstep :=
-    assert_goals 1
-    (idtac; apply/wt_cmd_st_conf; [eassumption|]).
-  Ltac2 Set dom_list_ as old := append_tac ltac1:(wt_cmd_st_conf_dstep) "wt_cmd_st_conf_dstep" old.
+  Ltac2 Set dom_list_ as old :=
+    append_tac 1
+      ltac1:(apply/wt_cmd_st_conf; [eassumption|])
+      "wt_cmd_st_conf" old.
 
    Import Util.List.
    Lemma Forall_zip:
@@ -511,25 +509,23 @@ Section inv.
    Proof.
      move=> *; rewrite /zip.
      apply/Forall_map/Forall_combine2_ind1;[|eassumption|]=> //= => [[] [] > //|].
-     if_easy_goals_dstep.
+     if_easy_goals.
    Qed.
 
-   Ltac forall_zip_dstep :=
-     assert_goals 1
-     (idtac;
-     match goal with
-     | |- Forall _ (zip _ _ _ _) => apply/Forall_zip
-     end).
-   Ltac2 Set dom_list_ as old := append_tac ltac1:(forall_zip_dstep) "forall_zip_dstep" old.
+   Ltac2 Set dom_list_ as old :=
+     append_tac 1
+       ltac1:(lazymatch goal with
+              | |- Forall _ (zip _ _ _ _) => apply/Forall_zip
+              end)
+       "Forall_zip" old.
 
-   Ltac forall_combine2_ind_dstep :=
-     assert_goals 2
-     (idtac;
-     match goal with
-     | |- Forall _ (combine_extend2 _ _ _ _) => apply/Forall_combine2_ind1; [move=> ?; apply|..]
-     | |- Forall _ (combine_extend2 _ _ _ _) => apply/Forall_combine2_ind2; [move=> ?; apply|..]
-     end).
-   Ltac2 Set dom_list_ as old := append_tac ltac1:(forall_combine2_ind_dstep) "forall_combine2_ind_dstep" old.
+   Ltac2 Set dom_list_ as old :=
+     append_tac 2
+       ltac1:(match goal with
+              | |- Forall _ (combine_extend2 _ _ _ _) => apply/Forall_combine2_ind1; [move=> ?; apply|..]
+              | |- Forall _ (combine_extend2 _ _ _ _) => apply/Forall_combine2_ind2; [move=> ?; apply|..]
+              end)
+       "Forall_combine2_ind" old.
 
 
   Lemma pubuntr_wf_cont: 
