@@ -178,8 +178,8 @@ Ltac2 Set dom_list_ as old := append_tac <= 1 ltac1:(if_easy_goals) "if_easy_goa
 Ltac2 Set dom_list_ as old := 
   append_tac 1 
     ltac1:(match goal with  (* rewriting obviously *)
-           | H: ?x = (?b :> bool) |- context [if ?x then _ else _] =>
-             is_constructor b; rewrite H
+           | H: ?x = (?b :> bool) |- context [if ?x then _ else _] => is_constructor b; rewrite H
+           | H: (?b :> bool) = ?x |- context [if ?x then _ else _] => is_constructor b; rewrite H
            end)
     "rewrite_if_hyp_eq" old.
 

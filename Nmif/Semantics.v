@@ -525,7 +525,7 @@ Section inv.
     Ltac2 Eval print_domlist (keep_only curr_dom_list [1;3]).
     Ltac2 Eval print_domlist (delete curr_dom_list [1;3]).
     Ltac2 Eval print_domlist curr_dom_list.
-    Ltac2 Set dom_debug := true. (* TODO: Why can't I access this? *)
+    Ltac2 Set dom_debug := false. (* TODO: Why can't I access this? *)
 
     Hint Resolve pubuntr_wf_cont : core.
     (* TODO: Why can I not add resolve? *)
