@@ -587,8 +587,6 @@ Section inv.
       case; rewrite {}/CmbCmdInv=> - []; cycle 1. 
 
       - move=>>[]_; rewrite/StateInv=> + [].
-        ltac2:(print_domlist curr_dom_list).
-        dominate_step 5.
         (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split; dominate. 
           { revert_hyp_type_dep (option Cmd); case => /=; dominate. }
         move=> /=; dominate. (* This is automatable Forall True /\ ..*)
