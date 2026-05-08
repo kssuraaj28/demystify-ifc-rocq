@@ -9,7 +9,7 @@ Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
-#[local] Ltac2 mutable dom_list_ () : dominate_taclist := []. (* TODO: Create empty dom_list function*)
+#[local] Ltac2 mutable dom_list_ := create_new_domlist.
 
 Class AdvLeakPrm := LeakVals : Type.
 
@@ -77,8 +77,9 @@ Arguments AdvStateMachine: clear implicits.
 Arguments AdvStateMachine {_ _ _ _} AtkStates.
 
 Ltac corr_int_gl_dstep := assert_goals 1 (idtac; rewrite corruptor_wf_int).
-Ltac2 Set dom_list_ as old := 
-  append_tac ltac1:(corr_int_gl_dstep) "corr_int_gl_dstep" old.
+Ltac2 Check append_tac ltac1:(corr_int_gl_dstep) "corr_int_gl_dstep" dom_list_.
+
+Ltac2 Set dom_list_ as old := append_tac ltac1:(corr_int_gl_dstep) "corr_int_gl_dstep" old.
 
 Ltac corr_conf_gl_dstep := (* TODO: ensure_goals? *)
   assert_goals 1 (idtac; unshelve erewrite corruptor_wf_conf;[|reflexivity|]).

@@ -313,48 +313,199 @@ Module GallinaHole.
 End GallinaHole.
 
 
+  (* TODO: You could do some preprocessing. Check if id's are really in hypotheses *)
+#[local] Ltac2 rec exfalso_move_some_hack (ids : ident list) : ident * bool :=
+  exfalso;
+  match ids with
+  | [] => Control.throw (Tactic_failure (Some (fprintf "move_some: nothing movable")))
+  | id :: rest =>
+      match Control.case (fun () =>
+        ltac1:(h |- move: h) (Ltac1.of_ident id)) with
+      | Val ((), _) =>
+          let still_there := List.exist
+            (fun h => let (i, _, _) := h in Ident.equal i id)
+            (Control.hyps ()) in
+          (id, still_there)
+      | Err _ => exfalso_move_some_hack rest
+      end
+  end.
+
+Section test.
+  Variables A B : Prop.
+  Let x := 5.
+  Goal A -> B -> True.
+  Proof.
+    move=> ha hb.
+    ltac2:(
+      let (id, sv) := exfalso_move_some_hack [@ha; @hb] in 
+      if sv then printf "secvar" else ();
+      printf "id: %I" id).
+
+    ltac2:(
+      let (id, sv) := exfalso_move_some_hack [@ha; @hb] in 
+      if sv then printf "secvar" else ();
+      printf "id: %I" id).
+
+    ltac2:(
+      let (id, sv) := exfalso_move_some_hack [@A; @hb] in 
+      if sv then printf "secvar" else ();
+      printf "id: %I" id).
+
+    Fail ltac2:(let (id, _) := move_some [@ha; @hb] in printf "id: %I" id).
+
+    ltac2:(
+      let (id, sv) := exfalso_move_some_hack [@x] in 
+      if sv then printf "secvar" else ();
+      printf "id: %I" id).
+  Abort.
+
+End test.
+
+#[local] Ltac2 Type exn ::= [ SectionVarsResult (ident list) ].
+
+Ltac2 section_vars () : ident list :=
+  match Control.case (fun () =>
+    let remaining := List.map (fun h => let (i, _, _) := h in i) (Control.hyps ()) in
+    let rec loop (remaining : ident list) (section : ident list) : ident list :=
+      if Int.equal (List.length remaining) 0 then section else
+      match Control.case (fun () => exfalso_move_some_hack remaining) with
+      | Val ((moved_h, is_secvar), _) =>
+          let new_section := if is_secvar then (moved_h :: section) else section in
+          loop (List.filter (fun i => Bool.neg (Ident.equal i moved_h)) remaining) new_section
+      | _ => Control.throw (Tactic_failure (Some (fprintf "section_vars: move_some failed unexpectedly")))
+      end in
+    let result := loop remaining [] in
+    Control.zero (SectionVarsResult result))
+  with
+  | Err (SectionVarsResult l) => l
+  | _ => Control.throw (Tactic_failure (Some (fprintf "section_vars: unexpected control flow")))
+  end.
+
+Section test.
+  Variables A B : Prop.
+  Goal False.
+  Proof.
+    ltac2:(let svs := section_vars () in 
+      if Int.equal (List.length svs) 2 then ()
+      else Control.throw (Tactic_failure (Some (fprintf "expected 2 section vars, got %i" (List.length svs))))).
+  Abort.
+
+  Variables C : Prop.
+
+  Goal False.
+  Proof.
+    ltac2:(let svs := section_vars () in
+      if Int.equal (List.length svs) 3 then ()
+      else Control.throw (Tactic_failure (Some (fprintf "expected 2 section vars, got %i" (List.length svs))))).
+  Abort.
+End test.
+
+(* These two funtions are AI generated. I don't care *)
+#[local] Ltac2 strip_underscores (s : string) : string :=
+  let n := String.length s in
+  let underscore := Char.of_int 95 in
+  let rec drop_leading i :=
+    if Int.equal i n then i
+    else if Char.equal (String.get s i) underscore then drop_leading (Int.add i 1)
+    else i in
+  let rec drop_trailing j :=
+    if Int.equal j 0 then 0
+    else if Char.equal (String.get s (Int.sub j 1)) underscore then drop_trailing (Int.sub j 1)
+    else j in
+  let lo := drop_leading 0 in
+  let hi := drop_trailing n in
+  if Int.le hi lo then "" else String.sub s lo (Int.sub hi lo).
+
+#[local] Ltac2 cleanup_id (id : ident) : string :=
+  let s := Ident.to_string id in
+  if Int.equal (String.length s) 0 then
+    Control.throw (Tactic_failure (Some (fprintf "cleanup_id: empty identifier"))) else
+  strip_underscores s.
+
+#[local] Ltac2 collect_renames (hyps : ident list) : (ident * ident) list :=
+  let rec go hyps used :=
+    match hyps with
+    | [] => []
+    | id :: rest =>
+        let core := cleanup_id id in
+        let core_id := Option.get (Ident.of_string core) in
+        let fresh_core := Fresh.fresh used core_id in
+        let used' := Fresh.Free.union used (Fresh.Free.of_ids [fresh_core]) in
+        let wrapped_str := String.app "_" (String.app (Ident.to_string fresh_core) "_") in
+        let wrapped := Option.get (Ident.of_string wrapped_str) in
+        (id, wrapped) :: go rest used'
+    end in
+  go hyps (Fresh.Free.of_goal ()).
+
+#[local] Ltac2 goal_hygiene0 () : unit :=
+  Control.enter (fun () =>
+    let hyps := List.map (fun h => let (i, _, _) := h in i) (Control.hyps ()) in
+    let sec := section_vars () in
+    let hyps := List.filter (fun id => Bool.neg (List.exist (fun s => Ident.equal s id) sec)) hyps in
+    let renames := collect_renames hyps in
+    match Control.case (fun () => Std.rename renames) with
+    | Val ((),_) => ()
+    | Err e => 
+      printf "Error: goal_hygiene failure";
+      Control.throw e
+    end).
+
+Ltac goal_hygiene := ltac2:(goal_hygiene0 ()).
+
+Section test.
+  Variables A B C : Prop.
+  Goal A -> B -> C -> A. Proof. 
+  move=> *. goal_hygiene. assumption. Abort.
+  Goal A -> B -> C -> A. Proof. move=> > _ha_ ha *. goal_hygiene. Abort.
+  Goal A /\ B. Proof. split; goal_hygiene. Abort.
+
+  Variables P : nat -> Prop.
+  Goal forall n, P n. Proof. move=> i. goal_hygiene. Abort.
+  
+End test.
+
+
 Module Dominate.
 
-  (* A tactic + a description of the tactic *)
-  Ltac2 Type dominate_tac := ((unit -> unit) * (string)).
-  Ltac2 Type dominate_taclist := dominate_tac list.
+  #[abstract] Ltac2 Type dominate_tac := ((unit -> unit) * (string)).
+  #[abstract] Ltac2 Type dominate_taclist := dominate_tac list.
 
+  Ltac2 create_new_domlist () : dominate_taclist := [].
   Ltac2 mutable curr_dom_list () : dominate_taclist := []. (* TODO notation that wraps () *)
   Ltac2 mutable dom_debug : bool := false.
 
-  Ltac2 print_domlist0 (l : dominate_taclist) : unit :=
+  #[local] Ltac2 print_domlist0 (l : dominate_taclist) : unit :=
     List.iteri (fun i p => let (_, desc) := p in printf "%i: %s" i desc) (l).
 
-  Ltac2 keep_only0 (l : dominate_taclist) (idxs : int list) : dominate_taclist :=
+  Ltac2 Notation "print_domlist" l(tactic(0)) :=  print_domlist0 (l ()).
+
+  #[local] Ltac2 keep_only0 (l : dominate_taclist) (idxs : int list) : dominate_taclist :=
     let mem i := List.exist (fun n => Int.equal n i) idxs in
     List.map (fun p => let (_, x) := p in x)
       (List.filter (fun p => let (i, _) := p in mem i)
         (List.mapi (fun i x => (i, x)) l)).
 
-  Ltac2 delete0 (l : dominate_taclist) (idxs : int list) : dominate_taclist :=
+  Ltac2 Notation "keep_only" l(tactic(0)) idxs(tactic(0)) := fun () => keep_only0 (l ()) idxs.
+
+  #[local] Ltac2 delete0 (l : dominate_taclist) (idxs : int list) : dominate_taclist :=
     let mem i := List.exist (fun n => Int.equal n i) idxs in
     List.map (fun p => let (_, x) := p in x)
       (List.filter (fun p => let (i, _) := p in Bool.neg (mem i))
         (List.mapi (fun i x => (i, x)) l)).
 
-  Ltac2 Notation "print_domlist" l(tactic(0)) :=
-    print_domlist0 (l ()).
+  Ltac2 Notation "delete" l(tactic(0)) idxs(tactic(0)) :=  fun () => delete0 (l ()) idxs.
 
-  Ltac2 Notation "keep_only" l(tactic(0)) idxs(tactic(0)) :=
-    fun () => keep_only0 (l ()) idxs.
-
-  Ltac2 Notation "delete" l(tactic(0)) idxs(tactic(0)) :=
-    fun () => delete0 (l ()) idxs.
+  (* TODO: Maybe check that there is no name duplication in the future? Throw a warning if this is the case *)
+  #[local] Ltac2 append_tac0 (t: unit -> unit)  (desc: string) (l : dominate_taclist) : dominate_taclist := (t, desc) :: l.
 
   (* TODO: This desc() is sus *)
-  (* TODO: Maybe check that there is no name duplication in the future? Throw a warning if this is the case *)
-  Ltac2 Notation "append_tac" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
-    fun () => (t, desc ()) :: (l ()).
+  Ltac2 Notation "append_tac" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) := fun () => append_tac0 t (desc ()) (l ()).
 
-  Ltac2 Notation "join_tacs" l1(tactic(0)) l2(tactic(0)) :=
-    fun () => List.append (l1 ()) (l2 ()).
+  #[local] Ltac2 join_taclist0 (l1: dominate_taclist)(l2 : dominate_taclist) : dominate_taclist := List.append l1 l2.
 
-  Ltac2 dominate_step_n (i : int) : unit :=
+  Ltac2 Notation "join_taclist" l1(tactic(0)) l2(tactic(0)) := fun () => join_taclist0 (l1 ()) (l2 ()).
+
+  #[local] Ltac2 dominate_step_n (i : int) : unit :=
     let gls := Control.numgoals() in
     if Bool.neg (Int.equal gls 1) then
         Control.throw (Tactic_failure (Some (fprintf "dominate_step_n: Needs to run with one focused goal"))) else
@@ -364,7 +515,11 @@ Module Dominate.
     | Some (t, _) => ltac1:(move => * ); t (); ltac1:(move=> * )
     end.
 
-  Ltac2 dominate_step () : unit :=
+  Tactic Notation "dominate_step" integer(n) :=
+    let f := ltac2:(nn |- dominate_step_n (Option.get (Ltac1.to_int nn))) in
+    f n; goal_hygiene.
+
+  #[local] Ltac2 dominate_step () : unit :=
     let l := curr_dom_list () in
     let len := List.length l in
     let rec go i :=
@@ -379,6 +534,7 @@ Module Dominate.
 
     go 0.
 
+  Tactic Notation "dominate_step" := ltac2:(dominate_step ()); goal_hygiene.
 
   (* 
     - Singleton hintdatabase with dominate_step. 
@@ -391,14 +547,15 @@ Module Dominate.
   Ltac2 mutable dom_auto_dbs () : ident list := [].
   Ltac2 mutable dom_auto_depth : int := 5.
 
-  Ltac2 dominate_auto () : unit :=
+  #[local] Ltac2 dominate_auto () : unit :=
     let dbs := List.append (dom_auto_dbs ()) [@__dom_step] in
     let dbg := if dom_debug then Std.Info else Std.Off in
     Std.auto dbg (Some dom_auto_depth) [] (Some dbs).
 
+  Tactic Notation "dominate_auto" := ltac2:(dominate_auto ()); goal_hygiene.
 
   (* For every focued goal, it runs dominate_step one by one. (dfs strategy)  *)
-  Ltac2 dominate (gas : int option) : unit :=
+  #[local] Ltac2 dominate (gas : int option) : unit :=
     let rec go (gas : int option) : unit :=
       (* Gas check *)
       if match gas with Some n => Int.equal n 0 | None => false end then () else
@@ -423,174 +580,16 @@ Module Dominate.
        go next_gas) in
     unshelve (go gas).
   
-
-
-
-  (* TODO: You could do some preprocessing. Check if id's are really in hypotheses *)
-  #[local] Ltac2 rec exfalso_move_some_hack (ids : ident list) : ident * bool :=
-    exfalso;
-    match ids with
-    | [] => Control.throw (Tactic_failure (Some (fprintf "move_some: nothing movable")))
-    | id :: rest =>
-        match Control.case (fun () =>
-          ltac1:(h |- move: h) (Ltac1.of_ident id)) with
-        | Val ((), _) =>
-            let still_there := List.exist
-              (fun h => let (i, _, _) := h in Ident.equal i id)
-              (Control.hyps ()) in
-            (id, still_there)
-        | Err _ => exfalso_move_some_hack rest
-        end
-    end.
-
-  Section test.
-    Variables A B : Prop.
-    Let x := 5.
-    Goal A -> B -> True.
-    Proof.
-      move=> ha hb.
-      ltac2:(
-        let (id, sv) := exfalso_move_some_hack [@ha; @hb] in 
-        if sv then printf "secvar" else ();
-        printf "id: %I" id).
-
-      ltac2:(
-        let (id, sv) := exfalso_move_some_hack [@ha; @hb] in 
-        if sv then printf "secvar" else ();
-        printf "id: %I" id).
-
-      ltac2:(
-        let (id, sv) := exfalso_move_some_hack [@A; @hb] in 
-        if sv then printf "secvar" else ();
-        printf "id: %I" id).
-
-      Fail ltac2:(let (id, _) := move_some [@ha; @hb] in printf "id: %I" id).
-
-      ltac2:(
-        let (id, sv) := exfalso_move_some_hack [@x] in 
-        if sv then printf "secvar" else ();
-        printf "id: %I" id).
-    Abort.
-
-  End test.
-
-  #[local] Ltac2 Type exn ::= [ SectionVarsResult (ident list) ].
-
-  (* TODO: This can be somewhere else. *)
-  #[local] Ltac2 section_vars () : ident list :=
-    match Control.case (fun () =>
-      let remaining := List.map (fun h => let (i, _, _) := h in i) (Control.hyps ()) in
-      let rec loop (remaining : ident list) (section : ident list) : ident list :=
-        if Int.equal (List.length remaining) 0 then section else
-        match Control.case (fun () => exfalso_move_some_hack remaining) with
-        | Val ((moved_h, is_secvar), _) =>
-            let new_section := if is_secvar then (moved_h :: section) else section in
-            loop (List.filter (fun i => Bool.neg (Ident.equal i moved_h)) remaining) new_section
-        | _ => Control.throw (Tactic_failure (Some (fprintf "section_vars: move_some failed unexpectedly")))
-        end in
-      let result := loop remaining [] in
-      Control.zero (SectionVarsResult result))
-    with
-    | Err (SectionVarsResult l) => l
-    | _ => Control.throw (Tactic_failure (Some (fprintf "section_vars: unexpected control flow")))
-    end.
-
-  Section test.
-    Variables A B : Prop.
-    Goal False.
-    Proof.
-      ltac2:(let svs := section_vars () in 
-        if Int.equal (List.length svs) 2 then ()
-        else Control.throw (Tactic_failure (Some (fprintf "expected 2 section vars, got %i" (List.length svs))))).
-    Abort.
-
-    Variables C : Prop.
-
-    Goal False.
-    Proof.
-      ltac2:(let svs := section_vars () in
-        if Int.equal (List.length svs) 3 then ()
-        else Control.throw (Tactic_failure (Some (fprintf "expected 2 section vars, got %i" (List.length svs))))).
-    Abort.
-  End test.
-
-  (* These two funtions are AI generated. I don't care *)
-  #[local] Ltac2 strip_underscores (s : string) : string :=
-    let n := String.length s in
-    let underscore := Char.of_int 95 in
-    let rec drop_leading i :=
-      if Int.equal i n then i
-      else if Char.equal (String.get s i) underscore then drop_leading (Int.add i 1)
-      else i in
-    let rec drop_trailing j :=
-      if Int.equal j 0 then 0
-      else if Char.equal (String.get s (Int.sub j 1)) underscore then drop_trailing (Int.sub j 1)
-      else j in
-    let lo := drop_leading 0 in
-    let hi := drop_trailing n in
-    if Int.le hi lo then "" else String.sub s lo (Int.sub hi lo).
-
-  #[local] Ltac2 cleanup_id (id : ident) : string :=
-    let s := Ident.to_string id in
-    if Int.equal (String.length s) 0 then
-      Control.throw (Tactic_failure (Some (fprintf "cleanup_id: empty identifier"))) else
-    strip_underscores s.
-
-  #[local] Ltac2 collect_renames (hyps : ident list) : (ident * ident) list :=
-    let rec go hyps used :=
-      match hyps with
-      | [] => []
-      | id :: rest =>
-          let core := cleanup_id id in
-          let core_id := Option.get (Ident.of_string core) in
-          let fresh_core := Fresh.fresh used core_id in
-          let used' := Fresh.Free.union used (Fresh.Free.of_ids [fresh_core]) in
-          let wrapped_str := String.app "_" (String.app (Ident.to_string fresh_core) "_") in
-          let wrapped := Option.get (Ident.of_string wrapped_str) in
-          (id, wrapped) :: go rest used'
-      end in
-    go hyps (Fresh.Free.of_goal ()).
-
-  Ltac2 goal_hygiene0 () : unit :=
-    Control.enter (fun () =>
-      let hyps := List.map (fun h => let (i, _, _) := h in i) (Control.hyps ()) in
-      let sec := section_vars () in
-      let hyps := List.filter (fun id => Bool.neg (List.exist (fun s => Ident.equal s id) sec)) hyps in
-      let renames := collect_renames hyps in
-      match Control.case (fun () => Std.rename renames) with
-      | Val ((),_) => ()
-      | Err e => 
-        printf "Error: goal_hygiene failure";
-        Control.throw e
-      end).
-
-  Ltac goal_hygiene := ltac2:(goal_hygiene0 ()).
-
-  Section test.
-    Variables A B C : Prop.
-    Goal A -> B -> C -> A. Proof. 
-    move=> *. goal_hygiene. assumption. Abort.
-    Goal A -> B -> C -> A. Proof. move=> > _ha_ ha *. goal_hygiene. Abort.
-    Goal A /\ B. Proof. split; goal_hygiene. Abort.
-
-    Variables P : nat -> Prop.
-    Goal forall n, P n. Proof. move=> i. goal_hygiene. Abort.
-    
-  End test.
-
-  (* After these tactics are done, you need to shuffle goals.. *)
-  (* TODO: What are the user facing tactics? *)
-
-
   Tactic Notation "dominate" := ltac2:(dominate None); goal_hygiene.
   Tactic Notation "dominate" integer(n) :=
     let f := ltac2:(nn |- dominate (Some (Option.get (Ltac1.to_int nn)))) in
     f n; goal_hygiene.
-  Tactic Notation "dominate_step" := ltac2:(dominate_step ()); goal_hygiene.
-  Tactic Notation "dominate_step" integer(n) :=
-    let f := ltac2:(nn |- dominate_step_n (Option.get (Ltac1.to_int nn))) in
-    f n; goal_hygiene.
-  Tactic Notation "dominate_auto" := ltac2:(dominate_auto ()); goal_hygiene.
-
+  
 
 End Dominate.
+Section usage.
+  Import Dominate.
+  Ltac2 mutable db := create_new_domlist.
+  Ltac2 Set db as old := append_tac ltac1:(progress idtac) "corr_int_gl_dstep" old.
+  Ltac2 Set db as old := join_taclist old old.
+End usage.  Fail Ltac2 Check db.

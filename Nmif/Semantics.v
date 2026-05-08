@@ -13,7 +13,8 @@ Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 (* TODO: Order seems to matter. Syntax before fails *)
 
-#[local] Ltac2 mutable dom_list_ () : dominate_taclist := [].
+Fail Ltac2 Check Attacker.dom_list_.
+#[local] Ltac2 mutable dom_list_ := create_new_domlist.
 
 Ltac done_dstep := assert_goals 0 done.
 Ltac2 Set dom_list_ as old := append_tac ltac1:(done_dstep) "done_dstep" old.
@@ -561,7 +562,8 @@ Section inv.
 
   Section dom.
     Ltac2 Set curr_dom_list := (fun () => dom_list_ ()).
-    Ltac2 Set curr_dom_list as old := join_tacs Attacker.dom_list old.
+
+    Ltac2 Set curr_dom_list as old := join_taclist Attacker.dom_list old.
 
     Ltac2 Eval print_domlist (keep_only curr_dom_list [1;3]).
     Ltac2 Eval print_domlist (delete curr_dom_list [1;3]).
