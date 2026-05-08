@@ -569,7 +569,15 @@ Section inv.
     Ltac2 Eval print_domlist curr_dom_list.
     Ltac2 Set dom_debug := true. (* TODO: Why can't I access this? *)
 
-    Hint Extern 10 => match goal with H : _ = _ |- _ => rewrite H end : core.
+    Hint Resolve pubuntr_wf_cont : core.
+    (* TODO: Why can I not add resolve? *)
+    Hint Extern 10 => lazymatch goal with |- _ => apply:step_soundness end: core.
+    Hint Extern 10 => lazymatch goal with H : _ = _ |- _ => rewrite H end : trickbag. (* TODO: This should go somewhere good *)
+    Hint Extern 10 => lazymatch goal with H : _ = _ |- _ => rewrite -H end : trickbag. (* TODO: This should go somewhere good *)
+    Hint Extern 10 => lazymatch goal with _ =>  apply/Forall_forall end : trickbag.
+(*    Hint Extern 100 => lazymatch goal with _ =>  cbn end : trickbag. *)
+    Ltac2 Set dom_auto_dbs := fun () => [@trickbag].
+
     Lemma cmbcmd_step_inv: 
       forall c st, 
         CmbCmdInv c ->
@@ -583,19 +591,17 @@ Section inv.
         (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split; dominate. 
           { revert_hyp_type_dep (option Cmd); case => /=; dominate. }
         move=> /=; dominate.
-        apply/Forall_and;[apply/Forall_forall=> //|]. 
-        (* TODO: This is very easy forward reasonong*)
+        apply/Forall_and; dominate.
         rewrite-/(WellFormedProg _ _).
-        revert_hyp_type_dep (option Cmd); case=> * //=.
-        apply/pubuntr_wf_cont=> //.
+        revert_hyp_type_dep (option Cmd); case=> * /=; dominate.
 
       - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split; dominate.
           { revert_hyp_type bool; case; dominate.
           1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /=; dominate. 
           1-2: revert_hyp_type_dep (option Cmd); case=> /=; dominate. } 
           { revert_hyp_type_dep PcLbl; case=> [+ []] /==> *; dominate. }
-        move=> /=.  (* TODO: The trickiest case? *)
-        apply/Forall_and; dominate; [apply/step_soundness; dominate | ].
+        move=> /=.  
+        apply/Forall_and; dominate.
         revert_hyp_type_dep PcLbl; case=> [[] ?] /=.
           { dominate.
            revert_hyp_type_dep (option Cmd); case=> //= >.
@@ -604,17 +610,14 @@ Section inv.
            apply/flows_to_subtype_prog;[|apply/snd].
            dominate. }
         move=> /= ? <- /=.
-         move newpce: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. {
-            erewrite tr_cmd_cnt;
-               [apply/Forall_combine2_same/Forall_map/Forall_forall => //
-                | eassumption 
-                | rewrite newpce // |]. dominate. }
-         dominate.
-         rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
-         revert_hyp_type_dep Cmd=> ? /step_soundness snd newpce.
-         apply/flows_to_subtype_prog; [|apply/snd].
-         dominate.
-        (* rewrite newpce => //. *)
+        move ?: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. 
+           {erewrite tr_cmd_cnt; [apply/Forall_combine2_same/Forall_map/Forall_forall => // | eassumption |..]. 
+             1-2: dominate. }
+        dominate.
+        rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
+        revert_hyp_type_dep Cmd=> ? /step_soundness snd newpce.
+        apply/flows_to_subtype_prog; [|apply/snd].
+        dominate.
     Qed. 
 
   End dom.

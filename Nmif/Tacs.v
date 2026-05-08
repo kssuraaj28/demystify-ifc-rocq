@@ -395,11 +395,11 @@ Module Dominate.
   Create HintDb __dom_step. (* TODO: Does #[local] help *)
   Hint Extern 100  => ltac2:(dominate_step ()) : __dom_step. 
 
-  Ltac2 mutable dom_auto_dbs : ident list := [].
+  Ltac2 mutable dom_auto_dbs () : ident list := [].
   Ltac2 mutable dom_auto_depth : int := 5.
 
   Ltac2 dominate_auto () : unit :=
-    let dbs := List.append dom_auto_dbs [@__dom_step] in
+    let dbs := List.append (dom_auto_dbs ()) [@__dom_step] in
     let dbg := if dom_debug then Std.Info else Std.Off in
     Std.auto dbg (Some dom_auto_depth) [] (Some dbs).
 
