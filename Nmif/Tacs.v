@@ -503,10 +503,17 @@ Module Dominate.
   Ltac2 Notation "delete" l(tactic(0)) idxs(tactic(0)) :=  fun () => delete0 (l ()) idxs.
 
   (* TODO: Maybe check that there is no name duplication in the future? Throw a warning if this is the case *)
-  #[local] Ltac2 append_tac0 (t: unit -> unit)  (desc: string) (l : dominate_taclist) : dominate_taclist := (t, desc) :: l.
+  #[local] Ltac2 append_tac0 (t: unit -> unit) (desc: string) (n: int) (is_le: bool) (l : dominate_taclist) : dominate_taclist :=
+    let wrapped := if is_le then (fun () => assert_goals <= n t()) else 
+                                 (fun () => assert_goals n t()) in
+    (wrapped, desc) :: l.
 
   (* TODO: This desc() is sus *)
-  Ltac2 Notation "append_tac" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) := fun () => append_tac0 t (desc ()) (l ()).
+  Ltac2 Notation "append_tac" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
+    fun () => append_tac0 t (desc ()) n false (l ()).
+
+  Ltac2 Notation "append_tac" "<=" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
+    fun () => append_tac0 t (desc ()) n true (l ()).
 
   #[local] Ltac2 join_taclist0 (l1: dominate_taclist)(l2 : dominate_taclist) : dominate_taclist := List.append l1 l2.
 
@@ -544,7 +551,6 @@ Module Dominate.
 
   (* 
     - Singleton hintdatabase with dominate_step. 
-    Maybe in the future, the full dominate tactic can run finisher.
     Clients are not allowed to touch this database
   *)
   Create HintDb __dom_step. (* TODO: Does #[local] help *)
@@ -596,6 +602,6 @@ End Dominate.
 Section usage.
   Import Dominate.
   Ltac2 mutable db := create_new_domlist.
-  Ltac2 Set db as old := append_tac ltac1:(progress idtac) "corr_int_gl_dstep" old.
+  Ltac2 Set db as old := append_tac 1 ltac1:(progress idtac) "corr_int_gl_dstep" old.
   Ltac2 Set db as old := join_taclist old old.
 End usage.  Fail Ltac2 Check db.
