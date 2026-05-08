@@ -468,7 +468,7 @@ Section inv.
       "wt_cmd_st_conf" old.
 
    Import Util.List.
-   Lemma Forall_zip:
+   Lemma Forall_CmbCmd_zip:
      forall l1 l2 substeps pc_lbl,
        (* TODO: I didn't have fst and snd before, and that wait painful. How to solve? *)
        Forall (fun p => CmbCmdCoreInv (p.1, p.2, pc_lbl))  (combine_extend2 (map Some l1) (map Some l2) None None) ->
@@ -482,7 +482,7 @@ Section inv.
    Ltac2 Set this_cookbook_ as old :=
      append_tac 1
        ltac1:(lazymatch goal with
-              | |- Forall _ (zip _ _ _ _) => apply/Forall_zip
+              | |- Forall _ (zip _ _ _ _) => apply/Forall_CmbCmd_zip
               end)
        "Forall_zip" old.
 
@@ -516,6 +516,7 @@ Section inv.
 
 
   Section cook.
+    Import Attacker Util Util.List.
     Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()).
 
     Ltac2 Set curr_cookbook as old := join_taclist Attacker.this_cookbook old.
