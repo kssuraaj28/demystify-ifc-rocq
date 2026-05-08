@@ -55,23 +55,64 @@ End test.
 Tactic Notation "enter" tactic0(t) := 
   let f := ltac2:(tt |- Control.enter (fun () => Ltac1.run tt)) in  f t.
 
-#[local] Ltac2 Type exn ::= [ ProgressWrap (exn) ].
 
+Ltac2 assert_no_evars () : unit :=
+    if Bool.neg (Int.equal (Control.numgoals()) 1) then
+        Control.throw (Tactic_failure (Some (fprintf "assert_no_evars: Needs to run with one focused goal"))) else
+    if Constr.has_evar (Control.goal ()) then 
+        Control.throw (Tactic_failure (Some (fprintf "assert_no_evars: Goal has evar"))) else
+    let hyp_has_evar (_, body, ty) :=
+      let body_evar := match body with Some b => Constr.has_evar b | _ => false end in
+      Bool.or body_evar (Constr.has_evar ty) in
+    List.iter (fun (name, body, ty) =>
+      let body_evar := match body with Some b => Constr.has_evar b | _ => false end  in
+      if body_evar then
+        Control.throw (Tactic_failure (Some (fprintf "assert_no_evars: Hyp %I body has evar" name))) else
+      let type_evar := Constr.has_evar ty in
+      if type_evar then
+        Control.throw (Tactic_failure (Some (fprintf "assert_no_evars: Hyp %I has evar" name))) else
+      ()) (Control.hyps()).
+
+
+Tactic Notation "assert_no_evars" := ltac2:(assert_no_evars ()).
+  
+Section test.
+  Goal exists n, n = 2.
+  Proof.
+    assert_no_evars.
+    eexists. Fail assert_no_evars.
+  Abort.
+
+  Goal True.
+  Proof.
+    evar (T : Prop).
+    Fail assert_no_evars.
+  Abort.
+End test.
+
+
+
+#[local] Ltac2 Type exn ::= 
+  [ProgressWrap (exn)].
+
+(* TODO: After this runs, ensure that there are no evars generated. 
+   - You have to unshelve
+   - Maybe also check that there are no evars which get generated
+
+*)
 #[local] Ltac2 harden0 (t: unit -> unit) : unit :=
     if Bool.neg (Int.equal (Control.numgoals()) 1) then
         Control.throw (Tactic_failure (Some (fprintf "harden: Needs to run with one focused goal"))) else
-    match Control.case (fun () =>
-      Control.progress (fun () =>
-        match Control.case t with
-        | Err e => Control.zero (ProgressWrap e)
-        | _ => ()
-        end))
-    with
+    (* once *)
+    let t := fun () => match Control.case t with | Err e => Control.zero (ProgressWrap e) | _ => () end in
+    (* progress *)
+    let t := fun () => Control.progress t in 
+    (* unshelve *)
+    let t := fun () => Control.unshelve t in 
+    match Control.case t with
     | Err (ProgressWrap e) => Control.zero e
-    | Err e =>
-        printf "Error: harden progress failure";
-        Control.throw e
-    | _ => ()
+    | Err e => printf "Error: harden progress failure"; Control.throw e
+    | _ => Control.enter assert_no_evars 
     end.
 
 Ltac2 Notation "harden" t(thunk(self)) := harden0 t.
@@ -180,14 +221,14 @@ End test.
 (*  
     If t is a tactic that takes in a hypothesis, 
     this tactic will apply the top hypothesis on it
-    The top hypothesis might go away
+    The top hypothesis might go away. I'm not doing any hardening. 
+    Maybe worth doing a goals_check? TODO
 *)
-Tactic Notation "toph" tactic(t) := harden (let f := fresh in (move=> f); t f). (* Tactic Notation vs Ltac Notation *)
+Tactic Notation "toph" tactic(t) := (let f := fresh in (move=> f); t f). (* Tactic Notation vs Ltac Notation *)
 
 (* This is a little hacky because you don't you are doing trial and error.. 
    Maybe better to specialize *)
 Tactic Notation "someh" tactic(t) :=
-  harden 
     match goal with
     H : _ |- _ => t H
     end.
@@ -198,10 +239,7 @@ Section test.
   Goal False -> False.  Proof.  move=> *. someh t . Abort.
 End test.
 
-Ltac evar_spec h :=
-  assert_goals 2
-  (idtac;
-  unshelve (move: h; let t := open_constr:(_) in let f := fresh in pose f := t=> /(_ f); subst f); cycle 1).
+Ltac evar_spec h :=  move: h; let t := open_constr:(_) in let f := fresh in pose f := t=> /(_ f); subst f.
 
 
 Section test.
@@ -209,10 +247,9 @@ Section test.
   Variable Q : Prop.
   Goal (P 5 -> Q) -> (forall n, P n) -> Q.
   Proof.
-    Succeed move=> x i; (evar_spec i); [exact x|].
-    Fail move=> x; (toph evar_spec); cycle 1; exact x.
+    Succeed move=> x i; (evar_spec i); exact x.
     Succeed move=> x; (toph evar_spec); exact x.
-    move=> x. unshelve toph evar_spec. 1: exact x. (* Applying to second goal solves the first goal. *)
+    move=> x. unshelve toph evar_spec. 2: exact x. (* Applying to second goal solves the first goal. *)
   Qed.
 End test.
 
@@ -233,6 +270,7 @@ Ltac2 revert_hyp_type (dependent: bool) (ty : constr) :=
   | _ => Control.throw (Tactic_failure (Some (fprintf "Multiple hypotheses of type %t" ty)))
   end).
 
+(* TODO: Maybe change this to an intropattern? *)
 Tactic Notation "revert_hyp_type" constr(ty) :=
   let f := ltac2:(ty |- revert_hyp_type false (Option.get (Ltac1.to_constr ty))) in
   f ty.
