@@ -76,15 +76,9 @@ Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
 Arguments AdvStateMachine: clear implicits.
 Arguments AdvStateMachine {_ _ _ _} AtkStates.
 
-Ltac corr_int_gl_dstep := assert_goals 1 (idtac; rewrite corruptor_wf_int).
-Ltac2 Check append_tac ltac1:(corr_int_gl_dstep) "corr_int_gl_dstep" dom_list_.
-
-Ltac2 Set dom_list_ as old := append_tac ltac1:(corr_int_gl_dstep) "corr_int_gl_dstep" old.
-
-Ltac corr_conf_gl_dstep := (* TODO: ensure_goals? *)
-  assert_goals 1 (idtac; unshelve erewrite corruptor_wf_conf;[|reflexivity|]).
+Ltac2 Set dom_list_ as old := append_tac 1 ltac1:(rewrite corruptor_wf_int) "corruptor_wf_int" old.
 Ltac2 Set dom_list_ as old := 
-  append_tac ltac1:(corr_conf_gl_dstep) "corr_conf_gl_dstep" old.
+  append_tac 1 ltac1:(unshelve erewrite corruptor_wf_conf;[|reflexivity|]) "corruptor_wf_conf" old.
 
 Ltac2 dom_list () := dom_list_ ().
 Ltac2 Eval print_domlist dom_list.
