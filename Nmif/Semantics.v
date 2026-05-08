@@ -623,7 +623,6 @@ Section inv.
   End dom.
 
 
-
   Import Util.List.
   Theorem cfg_step_inv: forall c, Invariant c ->  Invariant (cfg_step c).
   Proof.
