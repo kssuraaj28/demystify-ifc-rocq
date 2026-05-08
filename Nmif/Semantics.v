@@ -176,11 +176,16 @@ Section sa.
       1-3: constructor 2=> //; auto.
     Qed.
   End ind.
+  Definition WellFormedOptCmd (pc: PcLbl) (ocmd : option Cmd): Prop :=
+    if ocmd isn't Some cmd then True else WellFormedCmd pc cmd.
+
 End sa.
+Notation "pc ⊢ ocmd" := (WellFormedOptCmd pc ocmd) (at level 20).
 
 Section thms.
   Import VarValStore.Notations Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
+
 
   Lemma flows_to_subtype_cmd c l1 l2:
       l2 ⊑ l1 -> (* TODO: I don't know whether this is true *)
@@ -261,6 +266,22 @@ Section thms.
     rewrite update_storeview_nochange=> //.
     rewrite/is_trusted/is_untrusted negbF //.
     apply/flows_from_untr; eauto; done.
+  Qed.
+
+  Lemma pubuntr_wf_cont: 
+    forall c st, 
+      WellFormedCmd (mk_lbl true true) c -> 
+      WellFormedProg (mk_lbl true true) (clean_cmd_stp_cnt c st).
+  Proof. 
+    rewrite/WellFormedProg=> >;  move l: (mk_lbl _ _)=> ?; move: l=> /[swap].
+    case=> //= >; rewrite  -!/(WellFormedProg _ _)=>>. 
+    1: move=> ++ e; rewrite -{}e => *.
+    2: move=> + e; rewrite -{}e => *.
+    1-2: case: (X in if X then _ else _) => //. (* all is antipattern *)
+    3: apply/Forall_app; split;[|repeat constructor=>//]; 
+        rewrite -/(WellFormedProg _ _).
+    1-3: apply/flows_to_subtype_prog;[|eassumption].
+    1-3: case: (var_lbl)=> [[] []]=> //. (* TODO: This should be lemma *)
   Qed.
 End thms.
 
@@ -374,7 +395,7 @@ Section test.
 End test.
 
 Section cmb_step.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
 
   Definition zip (real_cont: list Cmd) (ideal_cont: list Cmd) (atk_steps: nat) (pc_lbl: PcLbl): list CmbCmd :=
     let: real_cont := map Some real_cont in
@@ -383,7 +404,6 @@ Section cmb_step.
     let: comb := List.combine_extend3 real_cont ideal_cont atk_steps None None false in
     map (fun '(rc, ic, abit) => mk_cmbcmd rc abit ic pc_lbl) comb.
 
-  Context {AtkStates : Type}.
 
   Section comb_state. 
     #[local] Set Primitive Projections. (* TODO: All records need to have this? Maybe in prelude? *)
@@ -444,8 +464,7 @@ End cmb_step.
 
 
 Section inv.
-  Import Lattice4pt.
-  Import VarValStore.Notations.
+  Import VarValStore.Notations Util.List.
 
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
   Variable (adv: AdvStateMachine AtkStates). 
@@ -454,11 +473,6 @@ Section inv.
   Notation cfg_step := (cfg_step adv).
   Notation cmbcmd_step := (cmbcmd_step adv).
 
-  Definition WellFormedOptCmd (pc: PcLbl) (ocmd : option Cmd): Prop :=
-    if ocmd isn't Some cmd then True else WellFormedCmd pc cmd.
-
-  (* TODO: Notation location *)
-  Notation "pc ⊢ ocmd" := (WellFormedOptCmd pc ocmd) (at level 20).
 
   Definition CmbCmdCoreInv '(rcmd,icmd,pclbl) : Prop :=
     pclbl ⊢ rcmd /\ 
@@ -470,9 +484,21 @@ Section inv.
     let: mk_cmbcmd rcmd _ icmd pclbl := cmb_cmd in (* TODO: is_atk does not make an appearance... *)
     CmbCmdCoreInv (rcmd, icmd, pclbl).
 
-(* TODO: Why indent? *)
+  Definition StateInv (s: CmbState): Prop :=
+    let: mk_cmbstate real_st ideal_st sim_st _ := s in
+    ⟨ real_st | is_trusted ⟩ = ⟨ ideal_st | is_trusted ⟩ /\
+    ⟨ real_st | is_public ⟩ = ⟨ sim_st | is_public ⟩.
 
-   Import Util.List.
+  Definition Invariant (c : Cfg): Prop :=
+    let: (cmbst, cmdlst) := c in
+    Forall CmbCmdInv cmdlst /\
+    StateInv cmbst.
+End inv.
+
+Section thm.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
+
+  Import VarValStore.Notations Util.List.
    Lemma Forall_CmbCmd_zip:
      forall l1 l2 substeps pc_lbl,
        (* TODO: I didn't have fst and snd before, and that wait painful. How to solve? *)
@@ -484,44 +510,25 @@ Section inv.
      if_easy_goals.
    Qed.
 
-   Ltac2 Set this_cookbook_ as old :=
-     append_tac 1
-       ltac1:(lazymatch goal with
-              | |- Forall _ (zip _ _ _ _) => apply/Forall_CmbCmd_zip
-              end)
-       "Forall_zip" old.
+End thm.
 
+Ltac2 Set this_cookbook_ as old :=
+  append_tac 1
+    ltac1:(lazymatch goal with
+           | |- Forall _ (zip _ _ _ _) => apply/Forall_CmbCmd_zip
+           end)
+    "Forall_zip" old.
 
-  Lemma pubuntr_wf_cont: 
-    forall c st, 
-      WellFormedCmd (mk_lbl true true) c -> 
-      WellFormedProg (mk_lbl true true) (clean_cmd_stp_cnt c st).
-  Proof. 
-    rewrite/WellFormedProg=> >;  move l: (mk_lbl _ _)=> ?; move: l=> /[swap].
-    case=> //= >; rewrite  -!/(WellFormedProg _ _)=>>. 
-    1: move=> ++ e; rewrite -{}e => *.
-    2: move=> + e; rewrite -{}e => *.
-    1-2: case: (X in if X then _ else _) => //. (* all is antipattern *)
-    3: apply/Forall_app; split;[|repeat constructor=>//]; 
-        rewrite -/(WellFormedProg _ _).
-    1-3: apply/flows_to_subtype_prog;[|eassumption].
-    1-3: case: (var_lbl)=> [[] []]=> //. (* TODO: This should be lemma *)
-  Qed.
-
-
-  Definition StateInv (s: CmbState): Prop :=
-    let: mk_cmbstate real_st ideal_st sim_st _ := s in
-    ⟨ real_st | is_trusted ⟩ = ⟨ ideal_st | is_trusted ⟩ /\
-    ⟨ real_st | is_public ⟩ = ⟨ sim_st | is_public ⟩.
-
-  Definition Invariant (c : Cfg): Prop :=
-    let: (cmbst, cmdlst) := c in
-    Forall CmbCmdInv cmdlst /\
-    StateInv cmbst.
-
+Section invprf.
+  Import Attacker Util Util.List.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
+  Variable (adv: AdvStateMachine AtkStates). 
+  Notation CmbState := (CmbState (AtkStates := AtkStates)).
+  Notation Cfg := (Cfg (AtkStates := AtkStates)).
+  Notation cfg_step := (cfg_step adv).
+  Notation cmbcmd_step := (cmbcmd_step adv).
 
   Section cook.
-    Import Attacker Util Util.List.
     Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()).
 
     Ltac2 Set curr_cookbook as old := join_taclist Attacker.this_cookbook old.
@@ -583,11 +590,8 @@ Section inv.
         apply/flows_to_subtype_prog; [|apply/snd].
         cook.
     Qed. 
-
   End cook.
 
-
-  Import Util.List.
   Theorem cfg_step_inv: forall c, Invariant c ->  Invariant (cfg_step c).
   Proof.
     case=> + [] //.
