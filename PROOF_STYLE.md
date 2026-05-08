@@ -30,32 +30,29 @@ Set Mangle Names. Set Mangle Names Light.
   prevent eager evaluation
   (https://rocq-prover.zulipchat.com/#narrow/channel/237977-Rocq-users/topic/Weird.20bug/with/593251599).
 
-## `dominate`
+## `cook`
 
-`dominate` is the project automation tactic, defined in `Tacs.v`. It runs
+`cook` is the project automation tactic, defined in `Tacs.v`. It runs
 registered tactics over the focused goals until all goals are either solved or
-all the tactics fail. Disclaimer: If a tactic that does not fail, and also does
-not make progress (like idtac) is registered, it will `dominate` will loop
-forever! It is the client's responsibility to harden their tactics using
-`harden` / `ensure_goals` / `assert_goals`.
+all the tactics fail.
 
-- `dominate` runs to completion (no gas).
-- `dominate n` runs at most `n` outer iterations (gas). Goals are consumed in a dfs manner.
-- `dominate_step` runs one pass over the registered list on a single focused goal.
-- `dominate_step n` runs the `nth` registered tactic.
-- `curr_dom_list` is an ltac2 list of the currently registered tactics. To change, use 
-    `Ltac2 Set curr_dom_list`, and use `append_tac` and `join_taclist`.
-- Set `Ltac2 Set dom_debug := true.` to print a trace: the focused goal count
+- `cook` runs to completion (no gas).
+- `cook n` runs at most `n` outer iterations (gas). Goals are consumed in a dfs manner.
+- `cook_step` runs one pass over the registered list on a single focused goal.
+- `cook_step n` runs the `nth` registered tactic.
+- `curr_cookbook` is an ltac2 list of the currently registered tactics. To change, use 
+    `Ltac2 Set curr_cookbook`, and use `append_tac` and `join_taclist`.
+- Set `Ltac2 Set cook_debug := true.` to print a trace: the focused goal count
   before each iteration, and the description of each tactic that succeeds
-  inside `dominate_step`.
+  inside `cook_step`.
 
-`dominate_step` normalizes the goal with `move=> *` before dispatching the
+`cook_step` normalizes the goal with `move=> *` before dispatching the
 registered chain, and again on every produced subgoal after a successful
 tactic. Contract for chain-step authors: you can assume `move=> *` was just
 run on the goal you receive, and `move=> *` will run on every goal you
 produce.
 
-After running, all `dominate*` notations apply `goal_hygiene` (revert +
+After running, all `cook*` notations apply `goal_hygiene` (revert +
 reintroduce) to give clean, fresh hypothesis names.
 
 ### Tactics registered in the chain
@@ -71,6 +68,6 @@ for you.
 
 
 > Open: where the registered list lives. The current pattern is a per-file
-> `#[local] Ltac2 mutable dom_list_ := create_new_domlist.` near the top, with
-> theorem-specific sections assembling `curr_dom_list` via `join_taclist`. Not
+> `#[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.` near the top, with
+> theorem-specific sections assembling `curr_cookbook` via `join_taclist`. Not
 > yet a settled convention.

@@ -5,7 +5,7 @@ From Ltac2 Require Import Ltac2.
 
 
 Require Tacs Util VarValStore Attacker Syntax Lattice4pt.
-Import Tacs Util VarValStore Attacker Syntax Lattice4pt Tacs.Dominate.
+Import Tacs Util VarValStore Attacker Syntax Lattice4pt Tacs.Cook.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
@@ -13,12 +13,12 @@ Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 (* TODO: Order seems to matter. Syntax before fails *)
 
-Fail Ltac2 Check Attacker.dom_list_.
-#[local] Ltac2 mutable dom_list_ := create_new_domlist.
+Fail Ltac2 Check Attacker.this_cookbook_.
+#[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
 
-Ltac2 Set dom_list_ as old := append_tac 0 ltac1:(done) "done" old.
+Ltac2 Set this_cookbook_ as old := append_tac 0 ltac1:(done) "done" old.
 
-Ltac2 Set dom_list_ as old := append_tac 1 ltac1:(progress subst) "subst" old.
+Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(progress subst) "subst" old.
 
 Section exp.
   Context `{!VarPrm, !ValPrm}.
@@ -82,14 +82,14 @@ Section cleanstep.
   Lemma optcmd_stp_store_simpl c s: ltac2:(cbn_eq (optcmd_stp_store (Some c) s)). Proof. done. Qed.
 End cleanstep.
 
-Ltac2 Set dom_list_ as old := append_tac 1 ltac1:(rewrite optcmd_stp_store_simpl) "optcmd_stp_store_simpl" old.
+Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(rewrite optcmd_stp_store_simpl) "optcmd_stp_store_simpl" old.
 
 Section test.
   Context `{!VarPrm, !ValPrm}.
-  Ltac2 Set curr_dom_list := (fun () => dom_list_ ()). (* Maybe keep only 1 *)
+  Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()). (* Maybe keep only 1 *)
 
   Goal forall (P: _ -> Prop) c s, P (optcmd_stp_store (Some c) s).
-  Proof. dominate. Abort.
+  Proof. cook. Abort.
 End test.
 
 
@@ -239,7 +239,7 @@ Section new_pc.
   Qed.
 End new_pc.
 
-Ltac2 Set dom_list_ as old :=
+Ltac2 Set this_cookbook_ as old :=
   append_tac 1
     ltac1:(lazymatch goal with
            |- context [compute_new_pc (mk_lbl true ?p) ?c] =>
@@ -249,10 +249,10 @@ Ltac2 Set dom_list_ as old :=
 
 Section test.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
-  Ltac2 Set curr_dom_list := (fun () => dom_list_ ()).
+  Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()).
 
   Goal forall (P: _ -> Prop) p c, P (compute_new_pc (mk_lbl true p) c).
-  Proof. dominate. Abort.
+  Proof. cook. Abort.
 
 End test.
 
@@ -447,22 +447,22 @@ Section inv.
   Qed.
 
 (* TODO: Why indent? *)
-  Ltac2 Set dom_list_ as old :=
+  Ltac2 Set this_cookbook_ as old :=
     append_tac 1
       ltac1:(unshelve erewrite wt_cmd_st_int_untr;[..|eassumption])
       "wt_cmd_st_int_untr" old.
 
-  Ltac2 Set dom_list_ as old :=
+  Ltac2 Set this_cookbook_ as old :=
     append_tac 1
       ltac1:(unshelve erewrite wt_cmd_st_conf_sec;[..|eassumption])
       "wt_cmd_st_conf_sec" old.
 
-  Ltac2 Set dom_list_ as old :=
+  Ltac2 Set this_cookbook_ as old :=
     append_tac 1
       ltac1:(apply/wt_cmd_st_int; [eassumption|])
       "wt_cmd_st_int" old.
 
-  Ltac2 Set dom_list_ as old :=
+  Ltac2 Set this_cookbook_ as old :=
     append_tac 1
       ltac1:(apply/wt_cmd_st_conf; [eassumption|])
       "wt_cmd_st_conf" old.
@@ -479,7 +479,7 @@ Section inv.
      if_easy_goals.
    Qed.
 
-   Ltac2 Set dom_list_ as old :=
+   Ltac2 Set this_cookbook_ as old :=
      append_tac 1
        ltac1:(lazymatch goal with
               | |- Forall _ (zip _ _ _ _) => apply/Forall_zip
@@ -515,17 +515,17 @@ Section inv.
     StateInv cmbst.
 
 
-  Section dom.
-    Ltac2 Set curr_dom_list := (fun () => dom_list_ ()).
+  Section cook.
+    Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()).
 
-    Ltac2 Set curr_dom_list as old := join_taclist Attacker.dom_list old.
-    Ltac2 Set curr_dom_list as old := join_taclist Util.dom_list old.
-    Ltac2 Set curr_dom_list as old := join_taclist Util.List.dom_list old.
+    Ltac2 Set curr_cookbook as old := join_taclist Attacker.this_cookbook old.
+    Ltac2 Set curr_cookbook as old := join_taclist Util.this_cookbook old.
+    Ltac2 Set curr_cookbook as old := join_taclist Util.List.this_cookbook old.
 
-    Ltac2 Eval print_domlist (keep_only curr_dom_list [1;3]).
-    Ltac2 Eval print_domlist (delete curr_dom_list [1;3]).
-    Ltac2 Eval print_domlist curr_dom_list.
-    Ltac2 Set dom_debug := false. (* TODO: Why can't I access this? *)
+    Ltac2 Eval print_cookbook (keep_only curr_cookbook [1;3]).
+    Ltac2 Eval print_cookbook (delete curr_cookbook [1;3]).
+    Ltac2 Eval print_cookbook curr_cookbook.
+    Ltac2 Set cook_debug := false. (* TODO: Why can't I access this? *)
 
     Hint Resolve pubuntr_wf_cont : core.
     (* TODO: Why can I not add resolve? *)
@@ -534,7 +534,7 @@ Section inv.
     Hint Extern 10 => lazymatch goal with H : _ = _ |- _ => rewrite -H end : trickbag. (* TODO: This should go somewhere good *)
     Hint Extern 10 => lazymatch goal with _ =>  apply/Forall_forall end : trickbag.
 (*    Hint Extern 100 => lazymatch goal with _ =>  cbn end : trickbag. *)
-    Ltac2 Set dom_auto_dbs := fun () => [@trickbag].
+    Ltac2 Set cook_auto_dbs := fun () => [@trickbag].
 
     Lemma cmbcmd_step_inv: 
       forall c st, 
@@ -546,39 +546,39 @@ Section inv.
       case; rewrite {}/CmbCmdInv=> - []; cycle 1. 
 
       - move=>>[]_; rewrite/StateInv=> + [].
-        (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split; dominate.
-         { revert_hyp_type_dep (option Cmd); case => /=; dominate. }
-        dominate=> /=; dominate.
-        apply/Forall_and; dominate.
+        (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split; cook.
+         { revert_hyp_type_dep (option Cmd); case => /=; cook. }
+        cook=> /=; cook.
+        apply/Forall_and; cook.
         rewrite-/(WellFormedProg _ _).
-        revert_hyp_type_dep (option Cmd); case=> * /=; dominate.
+        revert_hyp_type_dep (option Cmd); case=> * /=; cook.
 
-      - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split; dominate.
-          { revert_hyp_type bool; case; dominate.
-          1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /=; dominate. 
-          1-2: revert_hyp_type_dep (option Cmd); case=> /=; dominate. } 
-          { revert_hyp_type_dep PcLbl; case=> [+ []] /==> *; dominate. }
+      - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split; cook.
+          { revert_hyp_type bool; case; cook.
+          1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /=; cook. 
+          1-2: revert_hyp_type_dep (option Cmd); case=> /=; cook. } 
+          { revert_hyp_type_dep PcLbl; case=> [+ []] /==> *; cook. }
         move=> /=.  
-        apply/Forall_and; dominate.
+        apply/Forall_and; cook.
         revert_hyp_type_dep PcLbl. case=> [[] ?] /=.
-          { dominate.
+          { cook.
            revert_hyp_type_dep (option Cmd); case=> //= >.
            rewrite -/(WellFormedProg _ _).
            move=> /step_soundness=> snd.
            apply/flows_to_subtype_prog;[|apply/snd].
-           dominate. }
+           cook. }
         move=> /= ? <- /=.
         move ?: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. 
            {erewrite tr_cmd_cnt; [apply/Forall_combine2_same/Forall_map/Forall_forall => // | eassumption |..]. 
-           1-2: dominate. }
-        dominate.
+           1-2: cook. }
+        cook.
         rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
         revert_hyp_type_dep Cmd=> ? /step_soundness snd newpce.
         apply/flows_to_subtype_prog; [|apply/snd].
-        dominate.
+        cook.
     Qed. 
 
-  End dom.
+  End cook.
 
 
   Import Util.List.

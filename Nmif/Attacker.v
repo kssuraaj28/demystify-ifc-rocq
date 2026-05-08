@@ -2,14 +2,14 @@ From Stdlib Require Program ssreflect ssrbool.
 Import ssreflect ssrbool.
 
 Require VarValStore Util Noninterference Lattice4pt Tacs. 
-Import VarValStore Noninterference VarValStore.Notations Tacs Tacs.Dominate. 
+Import VarValStore Noninterference VarValStore.Notations Tacs Tacs.Cook. 
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
-#[local] Ltac2 mutable dom_list_ := create_new_domlist.
+#[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
 
 Class AdvLeakPrm := LeakVals : Type.
 
@@ -76,22 +76,22 @@ Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
 Arguments AdvStateMachine: clear implicits.
 Arguments AdvStateMachine {_ _ _ _} AtkStates.
 
-Ltac2 Set dom_list_ as old := append_tac 1 ltac1:(rewrite corruptor_wf_int) "corruptor_wf_int" old.
-Ltac2 Set dom_list_ as old := 
+Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(rewrite corruptor_wf_int) "corruptor_wf_int" old.
+Ltac2 Set this_cookbook_ as old := 
   append_tac 1 ltac1:(unshelve erewrite corruptor_wf_conf;[|reflexivity|]) "corruptor_wf_conf" old.
 
-Ltac2 dom_list () := dom_list_ ().
-Ltac2 Eval print_domlist dom_list.
+Ltac2 this_cookbook () := this_cookbook_ ().
+Ltac2 Eval print_cookbook this_cookbook.
 
 Section test.
   Context `{!VarPrm,!ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
   Generalizable All Variables.
-  Ltac2 Set curr_dom_list := dom_list. 
+  Ltac2 Set curr_cookbook := this_cookbook. 
 
   Goal `(forall P, P ⟨ corruptor (AtkStates := A) adv ast st  | is_trusted ⟩).
   Proof. 
   Set Printing All.
-  move=> *.  dominate.
+  move=> *.  cook.
   Abort.
 
 

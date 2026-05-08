@@ -2,7 +2,7 @@ From Stdlib Require List ssreflect ssrbool ssrfun.
 Import List ListNotations ssreflect ssrbool ssrfun.
 
 Require Tacs.
-Import Tacs Tacs.Dominate.
+Import Tacs Tacs.Cook.
 
 
 Set Default Proof Mode "Classic".
@@ -10,7 +10,7 @@ Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
-#[local] Ltac2 mutable dom_list_ := create_new_domlist.
+#[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
 
 Module DecEq.
   (* 
@@ -33,8 +33,8 @@ Module DecEq.
 End DecEq.
 
 Module List.
-  Import Tacs.Dominate.
-  #[local] Ltac2 mutable dom_list_ := create_new_domlist.
+  Import Tacs.Cook.
+  #[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
 
   Fixpoint combine_extend2 {A B} 
     (la : list A) (lb : list B)
@@ -112,7 +112,7 @@ Module List.
         exact: (IH _ _ _ _ HPQ HQt2 HQd).
   Qed.
 
-  Ltac2 Set dom_list_ as old :=
+  Ltac2 Set this_cookbook_ as old :=
     append_tac 2
       ltac1:(match goal with
              | |- Forall _ (combine_extend2 _ _ _ _) => apply/Forall_combine2_ind1; [move=> ?; apply|..]
@@ -132,17 +132,17 @@ Module List.
       by apply: Forall_cons; [|apply: IH].
   Qed.
 
-  Ltac2 Set dom_list_ as old := append_tac 1 ltac1:(apply:Forall_combine2_same) "Forall_combine2_same" old.
+  Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(apply:Forall_combine2_same) "Forall_combine2_same" old.
 
-  Ltac2 Set dom_list_ as old := append_tac 2 
+  Ltac2 Set this_cookbook_ as old := append_tac 2 
     ltac1:(lazymatch goal with |- Forall _ (_ ++ _) => apply/Forall_app; split end)
     "Forall_app" old.
   
   Section test.
-    Ltac2 Set curr_dom_list := (fun () => dom_list_ ()). (* Maybe keep only 1 *)
+    Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()). (* Maybe keep only 1 *)
     Generalizable All Variables.
     Goal `(Forall (A := A) P (l1 ++ l2)).
-    Proof.  move=> *; dominate.  Abort.
+    Proof.  move=> *; cook.  Abort.
   End test.
   
   (* A high good tactic consumes 'low grade' hypotheses (in context), and produces high grade hypotheses (intros) *)
@@ -150,12 +150,12 @@ Module List.
     assert_goals 1
     (idtac; move: H=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _)).
 
-  Ltac2 Set dom_list_ as old := append_tac 1 ltac1:(someh Forall_inv) "Forall_inv" old.
+  Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(someh Forall_inv) "Forall_inv" old.
   (* TODO: Test for these also *)
-  Ltac2 Set dom_list_ as old := append_tac 1 
+  Ltac2 Set this_cookbook_ as old := append_tac 1 
     ltac1:(lazymatch goal with |- Forall _ (map _ _) => apply/Forall_map end)
     "Forall_map" old.
-  Ltac2 dom_list () := dom_list_ ().
+  Ltac2 this_cookbook () := this_cookbook_ ().
 End List.
 
 
@@ -173,9 +173,9 @@ Ltac if_easy_goals :=
       case=> ?; try done (* TODO parameterize? *)
   end).
 
-Ltac2 Set dom_list_ as old := append_tac <= 1 ltac1:(if_easy_goals) "if_easy_goals" old.
+Ltac2 Set this_cookbook_ as old := append_tac <= 1 ltac1:(if_easy_goals) "if_easy_goals" old.
 
-Ltac2 Set dom_list_ as old := 
+Ltac2 Set this_cookbook_ as old := 
   append_tac 1 
     ltac1:(match goal with  (* rewriting obviously *)
            | H: ?x = (?b :> bool) |- context [if ?x then _ else _] => is_constructor b; rewrite H
@@ -187,11 +187,11 @@ Ltac2 Set dom_list_ as old :=
 Example map_nil_simpl {A B} (f: A -> B) := (erefl : ltac2:(cbn_eq (map f []))). 
 *)
 Lemma map_nil_simpl {A B} (f: A -> B) : ltac2:(cbn_eq (map f [])). Proof. done. Qed.
-Ltac2 Set dom_list_ as old := append_tac 1 ltac1:(rewrite map_nil_simpl) "map_nil_simpl" old.
+Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(rewrite map_nil_simpl) "map_nil_simpl" old.
 
 Lemma if_same {T} (b : bool) (t: T) : 
   (if b then t else t) = t.
 Proof.  case: b; done. Qed. 
 
-Ltac2 Set dom_list_ as old := append_tac 1 ltac1:(rewrite if_same) "if_same" old.
-Ltac2 dom_list () := dom_list_ ().
+Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(rewrite if_same) "if_same" old.
+Ltac2 this_cookbook () := this_cookbook_ ().

@@ -515,21 +515,21 @@ Section test.
 End test.
 
 
-Module Dominate.
+Module Cook.
 
-  #[abstract] Ltac2 Type dominate_tac := ((unit -> unit) * (string)).
-  #[abstract] Ltac2 Type dominate_taclist := dominate_tac list.
+  #[abstract] Ltac2 Type cook_tac := ((unit -> unit) * (string)).
+  #[abstract] Ltac2 Type cookbook := cook_tac list.
 
-  Ltac2 create_new_domlist () : dominate_taclist := [].
-  Ltac2 mutable curr_dom_list () : dominate_taclist := []. (* TODO notation that wraps () *)
-  Ltac2 mutable dom_debug : bool := false.
+  Ltac2 create_new_cookbook () : cookbook := [].
+  Ltac2 mutable curr_cookbook () : cookbook := []. (* TODO notation that wraps () *)
+  Ltac2 mutable cook_debug : bool := false.
 
-  #[local] Ltac2 print_domlist0 (l : dominate_taclist) : unit :=
+  #[local] Ltac2 print_cookbook0 (l : cookbook) : unit :=
     List.iteri (fun i p => let (_, desc) := p in printf "%i: %s" i desc) (l).
 
-  Ltac2 Notation "print_domlist" l(tactic(0)) :=  print_domlist0 (l ()).
+  Ltac2 Notation "print_cookbook" l(tactic(0)) :=  print_cookbook0 (l ()).
 
-  #[local] Ltac2 keep_only0 (l : dominate_taclist) (idxs : int list) : dominate_taclist :=
+  #[local] Ltac2 keep_only0 (l : cookbook) (idxs : int list) : cookbook :=
     let mem i := List.exist (fun n => Int.equal n i) idxs in
     List.map (fun p => let (_, x) := p in x)
       (List.filter (fun p => let (i, _) := p in mem i)
@@ -537,7 +537,7 @@ Module Dominate.
 
   Ltac2 Notation "keep_only" l(tactic(0)) idxs(tactic(0)) := fun () => keep_only0 (l ()) idxs.
 
-  #[local] Ltac2 delete0 (l : dominate_taclist) (idxs : int list) : dominate_taclist :=
+  #[local] Ltac2 delete0 (l : cookbook) (idxs : int list) : cookbook :=
     let mem i := List.exist (fun n => Int.equal n i) idxs in
     List.map (fun p => let (_, x) := p in x)
       (List.filter (fun p => let (i, _) := p in Bool.neg (mem i))
@@ -546,7 +546,7 @@ Module Dominate.
   Ltac2 Notation "delete" l(tactic(0)) idxs(tactic(0)) :=  fun () => delete0 (l ()) idxs.
 
   (* TODO: Maybe check that there is no name duplication in the future? Throw a warning if this is the case *)
-  #[local] Ltac2 append_tac0 (t: unit -> unit) (desc: string) (n: int) (is_le: bool) (l : dominate_taclist) : dominate_taclist :=
+  #[local] Ltac2 append_tac0 (t: unit -> unit) (desc: string) (n: int) (is_le: bool) (l : cookbook) : cookbook :=
     let wrapped := if is_le then (fun () => assert_goals <= n t()) else 
                                  (fun () => assert_goals n t()) in
     (wrapped, desc) :: l.
@@ -558,93 +558,93 @@ Module Dominate.
   Ltac2 Notation "append_tac" "<=" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
     fun () => append_tac0 t (desc ()) n true (l ()).
 
-  #[local] Ltac2 join_taclist0 (l1: dominate_taclist)(l2 : dominate_taclist) : dominate_taclist := List.append l1 l2.
+  #[local] Ltac2 join_taclist0 (l1: cookbook)(l2 : cookbook) : cookbook := List.append l1 l2.
 
   Ltac2 Notation "join_taclist" l1(tactic(0)) l2(tactic(0)) := fun () => join_taclist0 (l1 ()) (l2 ()).
 
-  #[local] Ltac2 dominate_step_n (i : int) : unit :=
+  #[local] Ltac2 cook_step_n (i : int) : unit :=
     let gls := Control.numgoals() in
-    if Bool.neg (Int.equal gls 1) then Control.throw (Tactic_failure (Some (fprintf "dominate_step_n: Needs to run with one focused goal"))) else
-    let l := curr_dom_list () in
+    if Bool.neg (Int.equal gls 1) then Control.throw (Tactic_failure (Some (fprintf "cook_step_n: Needs to run with one focused goal"))) else
+    let l := curr_cookbook () in
     match List.nth_opt l i with
-    | None => Control.throw (Tactic_failure (Some (fprintf "dominate_step_n: index %i out of range (length %i)" i (List.length l))))
+    | None => Control.throw (Tactic_failure (Some (fprintf "cook_step_n: index %i out of range (length %i)" i (List.length l))))
     | Some (t, _) => ltac1:(move => * ); t (); ltac1:(move=> * )
     end.
 
-  Tactic Notation "dominate_step" integer(n) :=
-    let f := ltac2:(nn |- dominate_step_n (Option.get (Ltac1.to_int nn))) in
+  Tactic Notation "cook_step" integer(n) :=
+    let f := ltac2:(nn |- cook_step_n (Option.get (Ltac1.to_int nn))) in
     f n; goal_hygiene.
 
-  #[local] Ltac2 dominate_step () : unit :=
-    let l := curr_dom_list () in
+  #[local] Ltac2 cook_step () : unit :=
+    let l := curr_cookbook () in
     let len := List.length l in
     let rec go i :=
-      if Int.ge i len then Control.zero (Tactic_failure (Some (fprintf "dominate_step: all tactics failed")))else
-      match Control.case (fun () => dominate_step_n i) with
+      if Int.ge i len then Control.zero (Tactic_failure (Some (fprintf "cook_step: all tactics failed")))else
+      match Control.case (fun () => cook_step_n i) with
       (* It is the client's responsibility to put harden. If the client does not put it, then the thing will spin forever! *)
-      | Val ((),_) => if Bool.neg dom_debug then () else
+      | Val ((),_) => if Bool.neg cook_debug then () else
                         let (_, desc) := List.nth l i in
-                        printf "dominate_step[%i]: %s success" i desc
+                        printf "cook_step[%i]: %s success" i desc
       | Err _ => go (Int.add i 1)
       end in
 
     go 0.
 
-  Tactic Notation "dominate_step" := ltac2:(dominate_step ()); goal_hygiene.
+  Tactic Notation "cook_step" := ltac2:(cook_step ()); goal_hygiene.
 
   (* 
-    - Singleton hintdatabase with dominate_step. 
+    - Singleton hintdatabase with cook_step. 
     Clients are not allowed to touch this database
   *)
-  Create HintDb __dom_step. (* TODO: Does #[local] help *)
-  Hint Extern 100  => ltac2:(dominate_step ()) : __dom_step. 
+  Create HintDb __cook_step. (* TODO: Does #[local] help *)
+  Hint Extern 100  => ltac2:(cook_step ()) : __cook_step. 
 
-  Ltac2 mutable dom_auto_dbs () : ident list := [].
-  Ltac2 mutable dom_auto_depth : int := 5.
+  Ltac2 mutable cook_auto_dbs () : ident list := [].
+  Ltac2 mutable cook_auto_depth : int := 5.
 
-  #[local] Ltac2 dominate_auto () : unit :=
-    let dbs := List.append (dom_auto_dbs ()) [@__dom_step] in
-    let dbg := if dom_debug then Std.Info else Std.Off in
-    Std.auto dbg (Some dom_auto_depth) [] (Some dbs).
+  #[local] Ltac2 cook_auto () : unit :=
+    let dbs := List.append (cook_auto_dbs ()) [@__cook_step] in
+    let dbg := if cook_debug then Std.Info else Std.Off in
+    Std.auto dbg (Some cook_auto_depth) [] (Some dbs).
 
-  Tactic Notation "dominate_auto" := ltac2:(dominate_auto ()); goal_hygiene.
+  Tactic Notation "cook_auto" := ltac2:(cook_auto ()); goal_hygiene.
 
-  (* For every focued goal, it runs dominate_step one by one. (dfs strategy)  *)
-  #[local] Ltac2 dominate (gas : int option) : unit :=
+  (* For every focued goal, it runs cook_step one by one. (dfs strategy)  *)
+  #[local] Ltac2 cook (gas : int option) : unit :=
     let rec go (gas : int option) : unit :=
       (* Gas check *)
       if match gas with Some n => Int.equal n 0 | None => false end then () else
 
       let gls := Control.numgoals () in
-      if dom_debug then printf "dominate: numgoals = %i" gls else ();
+      if cook_debug then printf "cook: numgoals = %i" gls else ();
       (* Goals check: TODO: What happens if we throw or assert? *)
       if Int.equal gls 0 then () else
 
       (* Run the first goal *)
       (Control.focus 1 1 (fun () =>
-        match Control.case (fun () => dominate_step ()) with
+        match Control.case (fun () => cook_step ()) with
         | Val ((), _) => ()
         | Err _ => 
-              (if dom_debug then printf "dominate: FW reasoning failed, trying BW reasoning" else ());
-              dominate_auto (); 
+              (if cook_debug then printf "cook: FW reasoning failed, trying BW reasoning" else ());
+              cook_auto (); 
               if Int.equal (Control.numgoals () ) 0 then () else
-              (if dom_debug then printf "dominate: BW reasoning failed, Can't solve goal " else ());
+              (if cook_debug then printf "cook: BW reasoning failed, Can't solve goal " else ());
               Control.shelve ()
         end);
        let next_gas := match gas with | Some n => Some (Int.sub n 1) | None => None end in
        go next_gas) in
     unshelve (go gas).
   
-  Tactic Notation "dominate" := ltac2:(dominate None); goal_hygiene.
-  Tactic Notation "dominate" integer(n) :=
-    let f := ltac2:(nn |- dominate (Some (Option.get (Ltac1.to_int nn)))) in
+  Tactic Notation "cook" := ltac2:(cook None); goal_hygiene.
+  Tactic Notation "cook" integer(n) :=
+    let f := ltac2:(nn |- cook (Some (Option.get (Ltac1.to_int nn)))) in
     f n; goal_hygiene.
   
 
-End Dominate.
+End Cook.
 Section usage.
-  Import Dominate.
-  Ltac2 mutable db := create_new_domlist.
+  Import Cook.
+  Ltac2 mutable db := create_new_cookbook.
   Ltac2 Set db as old := append_tac 1 ltac1:(progress idtac) "desc" old.
   Ltac2 Set db as old := join_taclist old old.
 End usage.  Fail Ltac2 Check db.
