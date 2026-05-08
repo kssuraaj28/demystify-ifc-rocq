@@ -608,8 +608,8 @@ Section inv.
            dominate. }
         move=> /= ? <- /=.
         move ?: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. 
-           {erewrite tr_cmd_cnt; [apply/Forall_combine2_same/Forall_map/Forall_forall => // | eassumption |..] ; dominate.
-             }
+           {erewrite tr_cmd_cnt; [apply/Forall_combine2_same/Forall_map/Forall_forall => // | eassumption |..]. 
+           1-2: dominate. }
         dominate.
         rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
         revert_hyp_type_dep Cmd=> ? /step_soundness snd newpce.
