@@ -216,5 +216,6 @@ Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(progress subst) "subst" o
 
 Ltac2 this_cookbook () := this_cookbook_ ().
 
-Hint Extern 10 => lazymatch goal with H : _ = _ |- _ => rewrite H end : trickbag. (* TODO: This should go somewhere good *)
-Hint Extern 10 => lazymatch goal with H : _ = _ |- _ => rewrite -H end : trickbag. (* TODO: This should go somewhere good *)
+(* TODO: multimatch vs lazymatch in trickbag *)
+Hint Extern 10 => multimatch goal with H : _ = _ |- _ => rewrite H end : trickbag. (* TODO: This should go somewhere good *)
+Hint Extern 10 => multimatch goal with H : _ = _ |- _ => rewrite -H end : trickbag. (* TODO: This should go somewhere good *)

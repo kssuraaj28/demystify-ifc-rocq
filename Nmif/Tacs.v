@@ -521,7 +521,7 @@ Module Cook.
   #[abstract] Ltac2 Type cookbook := cook_tac list.
 
   Ltac2 create_new_cookbook () : cookbook := [].
-  Ltac2 mutable curr_cookbook () : cookbook := []. (* TODO notation that wraps () *)
+  Ltac2 mutable curr_cookbook () : cookbook := [].
   Ltac2 mutable cook_debug : bool := false.
 
   #[local] Ltac2 print_cookbook0 (l : cookbook) : unit :=
@@ -529,6 +529,7 @@ Module Cook.
 
   Ltac2 Notation "print_cookbook" l(tactic(0)) :=  print_cookbook0 (l ()).
 
+  (* TODO: Eventually, these things need to throw if there is some index error*)
   #[local] Ltac2 keep_only0 (l : cookbook) (idxs : int list) : cookbook :=
     let mem i := List.exist (fun n => Int.equal n i) idxs in
     List.map (fun p => let (_, x) := p in x)
@@ -544,6 +545,20 @@ Module Cook.
         (List.mapi (fun i x => (i, x)) l)).
 
   Ltac2 Notation "delete" l(tactic(0)) idxs(tactic(0)) :=  fun () => delete0 (l ()) idxs.
+
+  #[local] Ltac2 keep_only_named0 (l : cookbook) (names : string list) : cookbook :=
+    let mem s := List.exist (String.equal s) names in
+    List.filter (fun p => let (_, desc) := p in mem desc) l.
+
+  Ltac2 Notation "keep_only_named" l(tactic(0)) names(thunk(tactic(0))) :=
+    fun () => keep_only_named0 (l ()) (names ()).
+
+  #[local] Ltac2 delete_named0 (l : cookbook) (names : string list) : cookbook :=
+    let mem s := List.exist (String.equal s) names in
+    List.filter (fun p => let (_, desc) := p in Bool.neg (mem desc)) l.
+
+  Ltac2 Notation "delete_named" l(tactic(0)) names(thunk(tactic(0))) :=
+    fun () => delete_named0 (l ()) (names ()).
 
   (* TODO: Maybe check that there is no name duplication in the future? Throw a warning if this is the case *)
   #[local] Ltac2 append_tac0 (t: unit -> unit) (desc: string) (n: int) (is_le: bool) (l : cookbook) : cookbook :=
@@ -604,7 +619,7 @@ Module Cook.
 
   #[local] Ltac2 cook_auto () : unit :=
     let dbs := List.append (cook_auto_dbs ()) [@__cook_step] in
-    let dbg := if cook_debug then Std.Info else Std.Off in
+    let dbg := if cook_debug then Std.Debug else Std.Off in
     Std.auto dbg (Some cook_auto_depth) [] (Some dbs).
 
   Tactic Notation "cook_auto" := ltac2:(cook_auto ()); goal_hygiene.

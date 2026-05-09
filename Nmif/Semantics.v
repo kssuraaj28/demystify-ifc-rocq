@@ -381,10 +381,8 @@ Section thms.
   Qed.
 End thms.
 
-(*
 Ltac2 Set this_cookbook_ as old :=
   append_tac 1   ltac1:(rewrite -> untr_compute_new_pc in * ) "untr_compute_new_pc" old.
-  *)
 
 Ltac2 Set this_cookbook_ as old :=
   append_tac 1
@@ -544,10 +542,19 @@ Section invprf.
     Ltac2 Set curr_cookbook as old := join_taclist Util.this_cookbook old.
     Ltac2 Set curr_cookbook as old := join_taclist Util.List.this_cookbook old.
 
-    Ltac2 Eval print_cookbook (keep_only curr_cookbook [1;3]).
-    Ltac2 Eval print_cookbook (delete curr_cookbook [1;3]).
-    Ltac2 Set cook_debug := true. (* TODO: Why can't I access this? *)
+    Ltac2 Set cook_debug := false. (* TODO: Why can't I access this? *)
 
+    Ltac2 Eval print_cookbook curr_cookbook.
+    Ltac2 Set curr_cookbook as old :=  
+      (delete_named old 
+        [
+        "Forall_inv";
+        "Forall_inv";
+        "map_nil_simpl";
+        "safe_case";
+        "optcmd_stp_store_simpl";
+        "subst"
+        ]). 
     Ltac2 Eval print_cookbook curr_cookbook.
 
     Hint Resolve pubuntr_wf_cont : core.
@@ -557,6 +564,7 @@ Section invprf.
 
 (*    Hint Extern 100 => lazymatch goal with _ =>  cbn end : trickbag. *)
 
+    (* TODO: Set Ltac Profiling *)
     Lemma cmbcmd_step_inv: 
       forall c st, 
         CmbCmdInv c ->
