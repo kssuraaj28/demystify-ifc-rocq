@@ -546,22 +546,17 @@ Section invprf.
 
     Ltac2 Eval print_cookbook (keep_only curr_cookbook [1;3]).
     Ltac2 Eval print_cookbook (delete curr_cookbook [1;3]).
-    Ltac2 Set cook_debug := false. (* TODO: Why can't I access this? *)
+    Ltac2 Set cook_debug := true. (* TODO: Why can't I access this? *)
+
+    Ltac2 Eval print_cookbook curr_cookbook.
 
     Hint Resolve pubuntr_wf_cont : core.
     (* TODO: Why can I not add resolve? *)
     Hint Extern 10 => lazymatch goal with |- _ => apply:step_soundness end: core.
-    Hint Extern 10 => lazymatch goal with H : _ = _ |- _ => rewrite H end : trickbag. (* TODO: This should go somewhere good *)
-    Hint Extern 10 => lazymatch goal with H : _ = _ |- _ => rewrite -H end : trickbag. (* TODO: This should go somewhere good *)
-    Hint Extern 10 => lazymatch goal with _ =>  apply/Forall_forall end : trickbag.
-(*    Hint Extern 100 => lazymatch goal with _ =>  cbn end : trickbag. *)
     Ltac2 Set cook_auto_dbs := fun () => [@trickbag].
 
-(*
-    Ltac2 Eval print_cookbook curr_cookbook.
-    Ltac2 Set curr_cookbook as old := delete old [10; 17].
-    *)
-    Ltac2 Eval print_cookbook curr_cookbook.
+(*    Hint Extern 100 => lazymatch goal with _ =>  cbn end : trickbag. *)
+
     Lemma cmbcmd_step_inv: 
       forall c st, 
         CmbCmdInv c ->

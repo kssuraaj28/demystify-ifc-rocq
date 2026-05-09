@@ -158,6 +158,7 @@ Module List.
     ltac1:(lazymatch goal with |- Forall _ (map _ _) => apply/Forall_map end)
     "Forall_map" old.
   Ltac2 this_cookbook () := this_cookbook_ ().
+  Hint Extern 10 => lazymatch goal with _ =>  apply/Forall_forall end : trickbag.
 End List.
 
 
@@ -214,3 +215,6 @@ Ltac2 Set this_cookbook_ as old := append_tac 0 ltac1:(done) "done" old.
 Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(progress subst) "subst" old.
 
 Ltac2 this_cookbook () := this_cookbook_ ().
+
+Hint Extern 10 => lazymatch goal with H : _ = _ |- _ => rewrite H end : trickbag. (* TODO: This should go somewhere good *)
+Hint Extern 10 => lazymatch goal with H : _ = _ |- _ => rewrite -H end : trickbag. (* TODO: This should go somewhere good *)
