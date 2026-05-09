@@ -175,6 +175,18 @@ Ltac if_easy_goals :=
 
 Ltac2 Set this_cookbook_ as old := append_tac <= 1 ltac1:(if_easy_goals) "if_easy_goals" old.
 
+Ltac safe_case :=
+   assert_goals 1
+   (idtac;
+   match goal with 
+   | v: bool |- context [match ?v with _ => _ end] =>  
+     is_var v;  
+     ensure_goals 1 (idtac; case: v) => * (* case: ensures that v does not appear anywhere else *)
+   end).
+
+Ltac2 Set this_cookbook_ as old := 
+  append_tac 1 ltac1:(safe_case) "safe_case" old.
+  
 Ltac2 Set this_cookbook_ as old := 
   append_tac 1 
     ltac1:(match goal with  (* rewriting obviously *)
@@ -192,6 +204,10 @@ Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(rewrite map_nil_simpl) "m
 Lemma if_same {T} (b : bool) (t: T) : 
   (if b then t else t) = t.
 Proof.  case: b; done. Qed. 
+
+Ltac2 Set this_cookbook_ as old := append_tac 0 ltac1:(done) "done" old.
+
+Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(progress subst) "subst" old.
 
 Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(rewrite if_same) "if_same" old.
 Ltac2 this_cookbook () := this_cookbook_ ().

@@ -50,15 +50,23 @@ Module Notations.
 End Notations.
 
 Import Notations.
+(* TODO: Maybe automation here as well *)
+Lemma untr_join x p:
+    untrusted (x ⊔ (mk_lbl true p)) = true.
+Proof.
+  case: p; case: x=> - [] [] //.
+Qed.
+
 Lemma join_flow:
   forall l1 l2 l3,
     l1 ⊔ l2  ⊑  l3 = l1 ⊑ l3 && l2 ⊑ l3.
 Proof. do 3 (case=> - [] [])=> //=. Qed.
 
+
 Lemma join_assoc:
   forall l1 l2 l3,
     (l1 ⊔ l2) ⊔ l3  =  l1 ⊔ (l2 ⊔ l3).
-Proof.   case=> - [] [] //. Qed.
+Proof. case=> - [] [] //. Qed.
 
 Lemma join_idem:
   forall l,  (l ⊔ l) = l.

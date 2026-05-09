@@ -16,9 +16,6 @@ Set Mangle Names. Set Mangle Names Light.
 Fail Ltac2 Check Attacker.this_cookbook_.
 #[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
 
-Ltac2 Set this_cookbook_ as old := append_tac 0 ltac1:(done) "done" old.
-
-Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(progress subst) "subst" old.
 
 Section exp.
   Context `{!VarPrm, !ValPrm}.
@@ -377,6 +374,7 @@ Section thms.
   Qed.
 End thms.
 
+(*
 Ltac2 Set this_cookbook_ as old :=
   append_tac 1
     ltac1:(lazymatch goal with
@@ -384,6 +382,7 @@ Ltac2 Set this_cookbook_ as old :=
               move: ([elaborate compute_new_pc_untr p c])=> [] ? /[dup] ? ->
            end)
     "compute_new_pc_untr" old.
+    *)
 
 Section test.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
@@ -517,7 +516,7 @@ Ltac2 Set this_cookbook_ as old :=
     ltac1:(lazymatch goal with
            | |- Forall _ (zip _ _ _ _) => apply/Forall_CmbCmd_zip
            end)
-    "Forall_zip" old.
+    "Forall_CmbCmd_zip" old.
 
 Section invprf.
   Import Attacker Util Util.List.
@@ -549,6 +548,15 @@ Section invprf.
 (*    Hint Extern 100 => lazymatch goal with _ =>  cbn end : trickbag. *)
     Ltac2 Set cook_auto_dbs := fun () => [@trickbag].
 
+    Lemma untr_compute_new_pc p c: 
+      untrusted (compute_new_pc (mk_lbl true p) c).
+    Proof.
+      case: c=> //= *; enter safe_case; rewrite untr_join //.
+    Qed.
+
+    Ltac2 Eval print_cookbook curr_cookbook.
+    Ltac2 Set curr_cookbook as old := delete old [10; 17].
+    Ltac2 Eval print_cookbook curr_cookbook.
     Lemma cmbcmd_step_inv: 
       forall c st, 
         CmbCmdInv c ->
@@ -573,9 +581,7 @@ Section invprf.
           { revert_hyp_type_dep PcLbl; case=> [+ []] /==> *; cook. }
         move=> /=.  
         apply/Forall_and; cook.
-        revert_hyp_type_dep PcLbl. case=> [[] ?] /=.
-          { cook.
-           revert_hyp_type_dep (option Cmd); case=> //= >.
+        revert_hyp_type_dep PcLbl. case=> [[] ?] /=. {
            rewrite -/(WellFormedProg _ _).
            move=> /step_soundness=> snd.
            apply/flows_to_subtype_prog;[|apply/snd].
@@ -603,7 +609,7 @@ Section invprf.
 
   Print Assumptions cfg_step_inv.
 
-End inv.
+End invprf.
 
 
 (*
