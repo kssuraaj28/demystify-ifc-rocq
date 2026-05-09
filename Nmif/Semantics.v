@@ -79,7 +79,8 @@ Section cleanstep.
   Lemma optcmd_stp_store_simpl c s: ltac2:(cbn_eq (optcmd_stp_store (Some c) s)). Proof. done. Qed.
 End cleanstep.
 
-Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(rewrite optcmd_stp_store_simpl) "optcmd_stp_store_simpl" old.
+(* TODO: All autorewrite-ish tactics should do rewrite -> in * *)
+Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(rewrite -> optcmd_stp_store_simpl in * ) "optcmd_stp_store_simpl" old.
 
 Section test.
   Context `{!VarPrm, !ValPrm}.
@@ -343,6 +344,12 @@ Section thms.
     1-2: exists (pg && p); case: u; done.
   Qed.
 
+ Lemma untr_compute_new_pc p c: 
+   untrusted (compute_new_pc (mk_lbl true p) c).
+ Proof.
+   case: c=> //= *; enter safe_case; rewrite untr_join //.
+ Qed.
+
   Lemma tr_cmd_cnt:
     forall p c,
       let: lbl := mk_lbl false p in
@@ -376,13 +383,16 @@ End thms.
 
 (*
 Ltac2 Set this_cookbook_ as old :=
+  append_tac 1   ltac1:(rewrite -> untr_compute_new_pc in * ) "untr_compute_new_pc" old.
+  *)
+
+Ltac2 Set this_cookbook_ as old :=
   append_tac 1
     ltac1:(lazymatch goal with
            |- context [compute_new_pc (mk_lbl true ?p) ?c] =>
               move: ([elaborate compute_new_pc_untr p c])=> [] ? /[dup] ? ->
            end)
     "compute_new_pc_untr" old.
-    *)
 
 Section test.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
@@ -548,14 +558,10 @@ Section invprf.
 (*    Hint Extern 100 => lazymatch goal with _ =>  cbn end : trickbag. *)
     Ltac2 Set cook_auto_dbs := fun () => [@trickbag].
 
-    Lemma untr_compute_new_pc p c: 
-      untrusted (compute_new_pc (mk_lbl true p) c).
-    Proof.
-      case: c=> //= *; enter safe_case; rewrite untr_join //.
-    Qed.
-
+(*
     Ltac2 Eval print_cookbook curr_cookbook.
     Ltac2 Set curr_cookbook as old := delete old [10; 17].
+    *)
     Ltac2 Eval print_cookbook curr_cookbook.
     Lemma cmbcmd_step_inv: 
       forall c st, 
@@ -581,11 +587,12 @@ Section invprf.
           { revert_hyp_type_dep PcLbl; case=> [+ []] /==> *; cook. }
         move=> /=.  
         apply/Forall_and; cook.
-        revert_hyp_type_dep PcLbl. case=> [[] ?] /=. {
+        revert_hyp_type_dep PcLbl; case=> [[] ?] /= >. {
+           cook. revert_hyp_type_dep (option Cmd)=> - [] //= >.
            rewrite -/(WellFormedProg _ _).
            move=> /step_soundness=> snd.
            apply/flows_to_subtype_prog;[|apply/snd].
-           cook. }
+           cook. } 
         move=> /= ? <- /=.
         move ?: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. 
            {erewrite tr_cmd_cnt; [apply/Forall_combine2_same/Forall_map/Forall_forall => // | eassumption |..]. 
