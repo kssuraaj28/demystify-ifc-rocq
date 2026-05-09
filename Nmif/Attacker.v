@@ -10,6 +10,7 @@ Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
 #[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
+Ltac2 Set this_cookbook_ := create_new_cookbook.
 
 Class AdvLeakPrm := LeakVals : Type.
 
@@ -77,7 +78,7 @@ Arguments AdvStateMachine: clear implicits.
 Arguments AdvStateMachine {_ _ _ _} AtkStates.
 
 Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(rewrite corruptor_wf_int) "corruptor_wf_int" old.
-Ltac2 Set this_cookbook_ as old := 
+Ltac2 Set this_cookbook_ as old :=
   append_tac 1 ltac1:(unshelve erewrite corruptor_wf_conf;[|reflexivity|]) "corruptor_wf_conf" old.
 
 Ltac2 this_cookbook () := this_cookbook_ ().

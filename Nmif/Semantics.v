@@ -15,7 +15,7 @@ Set Mangle Names. Set Mangle Names Light.
 
 Fail Ltac2 Check Attacker.this_cookbook_.
 #[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
-
+Ltac2 Set this_cookbook_ := create_new_cookbook.
 
 Section exp.
   Context `{!VarPrm, !ValPrm}.
@@ -546,7 +546,6 @@ Section invprf.
 
     Ltac2 Eval print_cookbook (keep_only curr_cookbook [1;3]).
     Ltac2 Eval print_cookbook (delete curr_cookbook [1;3]).
-    Ltac2 Eval print_cookbook curr_cookbook.
     Ltac2 Set cook_debug := false. (* TODO: Why can't I access this? *)
 
     Hint Resolve pubuntr_wf_cont : core.

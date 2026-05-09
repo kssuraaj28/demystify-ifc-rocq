@@ -11,6 +11,7 @@ Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
 #[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
+Ltac2 Set this_cookbook_ := create_new_cookbook.
 
 Module DecEq.
   (* 
@@ -35,6 +36,7 @@ End DecEq.
 Module List.
   Import Tacs.Cook.
   #[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
+  Ltac2 Set this_cookbook_ := create_new_cookbook.
 
   Fixpoint combine_extend2 {A B} 
     (la : list A) (lb : list B)
@@ -199,15 +201,16 @@ Ltac2 Set this_cookbook_ as old :=
 Example map_nil_simpl {A B} (f: A -> B) := (erefl : ltac2:(cbn_eq (map f []))). 
 *)
 Lemma map_nil_simpl {A B} (f: A -> B) : ltac2:(cbn_eq (map f [])). Proof. done. Qed.
-Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(rewrite map_nil_simpl) "map_nil_simpl" old.
+Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(rewrite -> map_nil_simpl in * ) "map_nil_simpl" old.
 
 Lemma if_same {T} (b : bool) (t: T) : 
   (if b then t else t) = t.
 Proof.  case: b; done. Qed. 
 
+Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(rewrite -> if_same in * ) "if_same" old.
+
 Ltac2 Set this_cookbook_ as old := append_tac 0 ltac1:(done) "done" old.
 
 Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(progress subst) "subst" old.
 
-Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(rewrite if_same) "if_same" old.
 Ltac2 this_cookbook () := this_cookbook_ ().

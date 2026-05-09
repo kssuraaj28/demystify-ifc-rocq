@@ -11,7 +11,7 @@
   Use `[ t |..]` for `first t`, etc.
 - Do not use `intro`; use `move` instead, for uniformity.
 - Do not use `destruct`, use ssr `case`, for uniformity. Similarly use ssr `elim` instead of `induction`.
-- All rewriting tactics are fine to use (ssreflect, normal, etc.).
+- All rewriting tactics are fine to use (ssreflect, normal, etc.). Normal rewrite can rewrite under binders.
 - Try to wrap user-defined tactics by `assert_goals`, `ensure_goals`, or
   `harden`. 
   - Use `assert_goals` (hard throw) when a goal-count mismatch
@@ -55,4 +55,20 @@ underlying lemma name, e.g. `append_tac 1 ltac1:(rewrite Forall_map)
 When a step boils down to "rewrite a normalization equality", prefer writing a
 plain `Lemma` and registering `rewrite <lemma>`. For lemmas whose RHS is just
 the `cbn`-normalized LHS, the `cbn_eq` Ltac2 notation builds the equality type
-for you.
+for you. It is preferable to use `rewrite -> <lemma> in *`.
+
+### Cookbook re-Import
+
+`Ltac2 Set` declarations replay on every `Import` of the file. Without care,
+a file imported twice doubles the chain. Avoid this by following each
+`#[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.` with a
+redundant `Ltac2 Set this_cookbook_ := create_new_cookbook.` reset:
+
+```coq
+#[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
+Ltac2 Set this_cookbook_ := create_new_cookbook.
+```
+
+The reset is itself a `Set` and replays on Import, wiping any previously
+accumulated chain before the registration `Set`s re-accumulate. The result
+is idempotent under repeated `Import`.
