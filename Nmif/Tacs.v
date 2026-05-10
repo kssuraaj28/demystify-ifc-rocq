@@ -56,6 +56,70 @@ Tactic Notation "enter" tactic0(t) :=
   let f := ltac2:(tt |- Control.enter (fun () => Ltac1.run tt)) in  f t.
 
 
+(* Run `t`. If it succeeds, then check goals. TODO: Reconsider Control.enter. Maybe better to pull that out? *)
+(* TODO: Is Ltac1.run tt the same as ltac1:(x |- x) tt ?*)
+#[local] Ltac2 goals_check (t : unit -> unit) (n: int) (is_le: bool) (is_hard: bool) : unit :=
+  if Bool.neg (Int.equal (Control.numgoals()) 1) then
+      Control.throw (Tactic_failure (Some (fprintf "goals_check: Needs to run with one focused goal"))) else
+  let err := if is_hard then Control.throw else Control.zero in 
+  t ();
+  let m := Control.numgoals () in
+  let tst := if is_le then (Int.le m n) else (Int.equal m n) in
+  if tst then () else
+  let e_str := if is_le 
+                  then fprintf "assert_goals: got %i goal(s), not less than %i" m n
+                  else fprintf "assert_goals: got %i goal(s), not equal to %i" m n in
+  err (Tactic_failure (Some e_str)).
+
+
+Ltac2 Notation "ensure_goals" n(tactic(0)) t(thunk(self)) :=
+  goals_check t n false false.
+
+Ltac2 Notation "ensure_goals" "<=" n(tactic(0)) t(thunk(self)) :=
+  goals_check t n true false.
+
+(* For, `assert_goals` use the harden tactic *)
+
+
+(* 
+   Ltac1 wrappers: use parens for compound tactics, e.g. `assert_goals 3 (a; b)`.
+   tactic0 has tightest precedence is required so the tactic argument doesn't
+   greedily consume the trailing integer. TODO: Check
+*)
+Tactic Notation "ensure_goals" integer(n) tactic0(t):=
+  let f := ltac2:(tt nn |-
+    ensure_goals (Option.get (Ltac1.to_int nn)) (Ltac1.run tt)) in
+  f t n.
+
+Tactic Notation "ensure_goals" "<=" integer(n) tactic0(t):=
+  let f := ltac2:(tt nn |-
+    ensure_goals <= (Option.get (Ltac1.to_int nn)) (Ltac1.run tt)) in
+  f t n.
+
+(* TODO: ensure_goals tests *)
+Section test.
+  Goal True.
+  Proof.
+    Succeed ensure_goals 0 easy. 
+    Fail ensure_goals 1 easy. 
+    Succeed try (ensure_goals 1 easy).  Fail try (assert_goals 1 easy).
+    Succeed ensure_goals <=1 easy.
+    Succeed (ensure_goals 102 fail) || idtac. (* The tactic can fail itself *)
+    Succeed (ensure_goals 102 idtac) || idtac. (* The tactic can fail itself *)
+  Abort.
+
+  (* TODO: Clean these tests.. *)
+  Variable P : Prop.
+  Goal P /\ P.  Proof. ensure_goals 2 split. Abort.
+  Goal P /\ P.  Proof. ensure_goals 3 split || idtac. Abort.
+  Goal P /\ P.  Proof. first [ idtac "Trying 3"; ensure_goals 3 split | idtac "Trying 2"; ensure_goals 2 split ]. Abort.
+  Goal (P /\ P) /\ (P /\ P).  Proof.  split. Fail all: ensure_goals 2 split. Abort.
+  Goal (P /\ P) /\ (P /\ P).  Proof.  split. all: enter (ensure_goals 2 split). Abort.
+  Goal (P /\ P) /\ (P /\ P).  Proof.  split. Fail all: (ensure_goals 2 (enter split)). Abort.
+  Goal (P /\ P) /\ (P /\ P).  Proof.  split; enter (ensure_goals 2 split). Abort.
+End test.
+
+
 Ltac2 assert_no_evars () : unit :=
     if Bool.neg (Int.equal (Control.numgoals()) 1) then
         Control.throw (Tactic_failure (Some (fprintf "assert_no_evars: Needs to run with one focused goal"))) else
@@ -75,6 +139,7 @@ Ltac2 assert_no_evars () : unit :=
 
 
 Tactic Notation "assert_no_evars" := ltac2:(assert_no_evars ()).
+
   
 Section test.
   Goal exists n, n = 2.
@@ -138,43 +203,6 @@ Section test.
   Abort.
 End test.
 
-(* Run `t`. If it succeeds, then check goals. TODO: Reconsider Control.enter. Maybe better to pull that out? *)
-(* TODO: Is Ltac1.run tt the same as ltac1:(x |- x) tt ?*)
-#[local] Ltac2 goals_check (t : unit -> unit) (n: int) (is_le: bool) (is_hard: bool) : unit :=
-  if Bool.neg (Int.equal (Control.numgoals()) 1) then
-      Control.throw (Tactic_failure (Some (fprintf "goals_check: Needs to run with one focused goal"))) else
-  let err := if is_hard then Control.throw else Control.zero in 
-  t ();
-  let m := Control.numgoals () in
-  let tst := if is_le then (Int.le m n) else (Int.equal m n) in
-  if tst then () else
-  let e_str := if is_le 
-                  then fprintf "assert_goals: got %i goal(s), not less than %i" m n
-                  else fprintf "assert_goals: got %i goal(s), not equal to %i" m n in
-  err (Tactic_failure (Some e_str)).
-
-
-Ltac2 Notation "ensure_goals" n(tactic(0)) t(thunk(self)) :=
-  goals_check (fun () => harden0 t) n false false.
-
-(* 
-   Ltac1 wrappers: use parens for compound tactics, e.g. `assert_goals 3 (a; b)`.
-   tactic0 has tightest precedence is required so the tactic argument doesn't
-   greedily consume the trailing integer. TODO: Check
-*)
-Tactic Notation "ensure_goals" integer(n) tactic0(t):=
-  let f := ltac2:(tt nn |-
-    ensure_goals (Option.get (Ltac1.to_int nn)) (Ltac1.run tt)) in
-  f t n.
-
-Ltac2 Notation "ensure_goals" "<=" n(tactic(0)) t(thunk(self)) :=
-  goals_check (fun () => harden0 t) n true false.
-
-Tactic Notation "ensure_goals" "<=" integer(n) tactic0(t):=
-  let f := ltac2:(tt nn |-
-    ensure_goals <= (Option.get (Ltac1.to_int nn)) (Ltac1.run tt)) in
-  f t n.
-
 Ltac2 Notation "assert_goals" n(tactic(0)) t(thunk(self)) :=
   goals_check (fun () => harden0 t) n false true.
 
@@ -197,7 +225,6 @@ Section test.
     Succeed ensure_goals 0 easy. 
     Fail ensure_goals 1 easy. 
     Succeed try (ensure_goals 1 easy).  Fail try (assert_goals 1 easy).
-    Fail try (first [ensure_goals 1 easy | fail_hard]). 
     Succeed ensure_goals <=1 easy.
     Succeed (ensure_goals 102 fail) || idtac. (* The tactic can fail itself *)
   Abort.
@@ -239,7 +266,8 @@ Section test.
   Goal False -> False.  Proof.  move=> *. someh t . Abort.
 End test.
 
-Ltac evar_spec h :=  move: h; let t := open_constr:(_) in let f := fresh in pose f := t=> /(_ f); subst f.
+Ltac evar_spec h :=  
+  move: h; let t := open_constr:(_) in let f := fresh in pose f := t=> /(_ f); subst f.
 
 
 Section test.
