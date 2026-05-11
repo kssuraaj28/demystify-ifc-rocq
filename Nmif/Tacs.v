@@ -7,6 +7,19 @@ Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
 
+Ltac2 panic_m (fn_name: string) (m: message) := 
+  Control.throw (Tactic_failure (Some (fprintf "%s: %m" fn_name m))).
+Ltac2 softfail_m (fn_name: string) (m: message) :=
+  Control.zero (Tactic_failure (Some (fprintf "%s: %m" fn_name m))).
+
+Ltac2 panic_s (fn_name: string) (s: string) := panic_m fn_name (Message.of_string s).
+Ltac2 softfail_s (fn_name: string) (s: string) := softfail_m fn_name (Message.of_string s).
+
+Ltac2 one_goal_assertion (fn_name: string) :=
+  if (Int.equal (Control.numgoals()) 1) then () else
+  panic_s fn_name "Needs to run with one goal".
+ 
+
 (* TODO: This file structure is ugly *)
 
 (* TODO: Notation for this *)
@@ -59,30 +72,23 @@ Tactic Notation "enter" tactic0(t) :=
 (* Run `t`. If it succeeds, then check goals. TODO: Reconsider Control.enter. Maybe better to pull that out? *)
 (* TODO: Is Ltac1.run tt the same as ltac1:(x |- x) tt ?*)
 #[local] Ltac2 goals_check (t : unit -> unit) (n: int) (is_le: bool) (is_hard: bool) : unit :=
-  if Bool.neg (Int.equal (Control.numgoals()) 1) then
-      Control.throw (Tactic_failure (Some (fprintf "goals_check: Needs to run with one focused goal"))) else
-  let err := if is_hard then Control.throw else Control.zero in 
+  one_goal_assertion "goals_check";
   t ();
   let m := Control.numgoals () in
   let tst := if is_le then (Int.le m n) else (Int.equal m n) in
   if tst then () else
   let e_str := if is_le 
-                  then fprintf "assert_goals: got %i goal(s), not less than %i" m n
-                  else fprintf "assert_goals: got %i goal(s), not equal to %i" m n in
-  err (Tactic_failure (Some e_str)).
+                  then fprintf "got %i goal(s), not less than %i" m n
+                  else fprintf "got %i goal(s), not equal to %i" m n in
+  if is_hard 
+    then panic_m "goals_check" e_str 
+    else softfail_m "goals_check" e_str.
 
 
 Ltac2 Notation "ensure_goals" n(tactic(0)) t(thunk(self)) :=
   goals_check t n false false.
 
-Ltac2 Notation "ensure_goals" "<=" n(tactic(0)) t(thunk(self)) :=
-  goals_check t n true false.
-
-(* For, `assert_goals` use the harden tactic *)
-
-
 (* 
-   Ltac1 wrappers: use parens for compound tactics, e.g. `assert_goals 3 (a; b)`.
    tactic0 has tightest precedence is required so the tactic argument doesn't
    greedily consume the trailing integer. TODO: Check
 *)
@@ -91,10 +97,15 @@ Tactic Notation "ensure_goals" integer(n) tactic0(t):=
     ensure_goals (Option.get (Ltac1.to_int nn)) (Ltac1.run tt)) in
   f t n.
 
+Ltac2 Notation "ensure_goals" "<=" n(tactic(0)) t(thunk(self)) :=
+  goals_check t n true false.
+
 Tactic Notation "ensure_goals" "<=" integer(n) tactic0(t):=
   let f := ltac2:(tt nn |-
     ensure_goals <= (Option.get (Ltac1.to_int nn)) (Ltac1.run tt)) in
   f t n.
+
+(* For a hard throw, use the harden tactic *)
 
 (* TODO: ensure_goals tests *)
 Section test.
@@ -102,7 +113,7 @@ Section test.
   Proof.
     Succeed ensure_goals 0 easy. 
     Fail ensure_goals 1 easy. 
-    Succeed try (ensure_goals 1 easy).  Fail try (assert_goals 1 easy).
+    Succeed try (ensure_goals 1 easy). 
     Succeed ensure_goals <=1 easy.
     Succeed (ensure_goals 102 fail) || idtac. (* The tactic can fail itself *)
     Succeed (ensure_goals 102 idtac) || idtac. (* The tactic can fail itself *)
@@ -120,129 +131,149 @@ Section test.
 End test.
 
 
-Ltac2 assert_no_evars () : unit :=
-    if Bool.neg (Int.equal (Control.numgoals()) 1) then
-        Control.throw (Tactic_failure (Some (fprintf "assert_no_evars: Needs to run with one focused goal"))) else
-    if Constr.has_evar (Control.goal ()) then 
-        Control.throw (Tactic_failure (Some (fprintf "assert_no_evars: Goal has evar"))) else
-    let hyp_has_evar (_, body, ty) :=
-      let body_evar := match body with Some b => Constr.has_evar b | _ => false end in
-      Bool.or body_evar (Constr.has_evar ty) in
-    List.iter (fun (name, body, ty) =>
-      let body_evar := match body with Some b => Constr.has_evar b | _ => false end  in
-      if body_evar then
-        Control.throw (Tactic_failure (Some (fprintf "assert_no_evars: Hyp %I body has evar" name))) else
-      let type_evar := Constr.has_evar ty in
-      if type_evar then
-        Control.throw (Tactic_failure (Some (fprintf "assert_no_evars: Hyp %I has evar" name))) else
-      ()) (Control.hyps()).
+(* The harden tactic *)
+#[local] Ltac2 assert_no_evars () : unit :=
+  one_goal_assertion "assert_no_evars";
+  if Constr.has_evar (Control.goal ()) then 
+      panic_s "assert_no_evars" "Goal has evar" else
+  let hyp_has_evar (_, body, ty) :=
+    let body_evar := match body with Some b => Constr.has_evar b | _ => false end in
+    Bool.or body_evar (Constr.has_evar ty) in
+  List.iter (fun (name, body, ty) =>
+    let body_evar := match body with Some b => Constr.has_evar b | _ => false end  in
+    if body_evar then
+      panic_m "assert_no_evars" (fprintf "Hyp %I body has evar" name) else
+    let type_evar := Constr.has_evar ty in
+    if type_evar then
+      panic_m "assert_no_evars" (fprintf "Hyp %I has evar" name) else
+    ()) (Control.hyps()).
 
-
-Tactic Notation "assert_no_evars" := ltac2:(assert_no_evars ()).
-
-  
 Section test.
   Goal exists n, n = 2.
-  Proof.
-    assert_no_evars.
-    eexists. Fail assert_no_evars.
-  Abort.
-
-  Goal True.
-  Proof.
-    evar (T : Prop).
-    Fail assert_no_evars.
-  Abort.
+  Proof Mode "Ltac2". (assert_no_evars ()). eexists. Fail (assert_no_evars ()).  Abort.
+  Goal True.  Proof. evar (T : Prop). Fail ltac2:(assert_no_evars ()).  Abort.
 End test.
-
-
 
 #[local] Ltac2 Type exn ::= 
   [ProgressWrap (exn)].
 
-(* TODO: After this runs, ensure that there are no evars generated. 
-   - You have to unshelve
-   - Maybe also check that there are no evars which get generated
+#[local] Ltac2 once_hard_progress (t: unit -> unit) : unit :=
+  one_goal_assertion "once_hard_progress";
+  let t := fun () => match Control.case t with | Err e => Control.zero (ProgressWrap e) | _ => () end in
+  let t := fun () => Control.progress t in
+  match Control.case t with
+  | Err (ProgressWrap e) => Control.zero e
+  | Err e => printf "Error: harden progress failure"; Control.throw e
+  | _ => ()
+  end.
 
+Section test.
+  Goal False.
+  Proof Mode "Ltac2". 
+    Fail once_hard_progress (fun () => ()).
+    once_hard_progress (fun () => ltac1:(pose n := 4)).
+  Abort.
+End test.
+
+#[local] Ltac2 assert_no_hypchange (t:unit -> unit) : unit :=
+  one_goal_assertion "assert_no_hypchange";
+  let names () := List.map (fun (n, _, _) => n) (Control.hyps ()) in
+  let before := names () in t ();  
+  Control.enter (fun () => (* You will get a not focused exception *)
+    let after := names () in
+    if List.equal Ident.equal before after then () else
+    panic_s "assert_no_hypchange" "Hypotheses changed").
+
+Section test. 
+  Goal True -> False. 
+  Proof Mode "Ltac2".
+    assert_no_hypchange (fun ()=> ltac1:(idtac)).
+    Fail assert_no_hypchange (fun ()=> ltac1:(intros)).
+    intros h.
+    assert_no_hypchange (fun ()=> ltac1:(intros)).
+    Fail assert_no_hypchange (fun ()=> ltac1:(rename h into h')).
+  Abort.
+
+  Goal True -> False /\ False. 
+  Proof Mode "Ltac2".
+    intros h.
+    Succeed assert_no_hypchange (fun ()=> ltac1:(split)).
+    Fail assert_no_hypchange (fun ()=> ltac1:(split; rename h into h')).
+    Fail assert_no_hypchange (fun ()=> ltac1:(split; [rename h into h'|])).
+  Abort.
+ 
+End test. 
+
+
+(* harden should be the one tactic-writer facing tactic. 
+  Hardened tactics must be called with one focused goal
+  Hardened tactics don't backtrack.
+  Hardened tactics unshelve.
+  Hardened tactics can fail. If they don't, 
+  - they must progress
+  - They should not shelve anything
+  - You can assert the number of goals produced
+  - You can assert whether evars are involved
+  - You can assert the hypothesis names remain unchanged
+  If an assertion fails, we panic. 
+  Convenient syntax: harden n, harden <= n, harden ? (for Ltac2 and Ltac1)
+  Use `precise_harden` when not sufficient.
 *)
-#[local] Ltac2 harden0 (t: unit -> unit) : unit :=
-    if Bool.neg (Int.equal (Control.numgoals()) 1) then
-        Control.throw (Tactic_failure (Some (fprintf "harden: Needs to run with one focused goal"))) else
-    (* once *)
-    let t := fun () => match Control.case t with | Err e => Control.zero (ProgressWrap e) | _ => () end in
-    (* progress *)
-    let t := fun () => Control.progress t in 
-    (* unshelve *)
-    let t := fun () => Control.unshelve t in 
-    match Control.case t with
-    | Err (ProgressWrap e) => Control.zero e
-    | Err e => printf "Error: harden progress failure"; Control.throw e
-    | _ => Control.enter assert_no_evars 
-    end.
+(* TODO: This type could be made into a record  *)
+Ltac2 precise_harden (t: unit -> unit) (goals: (int * bool) option) (allow_evar_change: bool) (disallow_hyps_change : bool): unit :=
+    one_goal_assertion "precise_harden";
+    let t := fun () => once_hard_progress t in  (* TODO: What is the correct order? *)
+    let t := fun () => Control.unshelve t in  
+    let t := match goals with
+             | Some (n, b) (* is_le*) =>  fun () => goals_check t n b true 
+             | None => t 
+             end in
+    let t := if allow_evar_change then t else fun () => t(); Control.enter assert_no_evars in
+    let t := if disallow_hyps_change then fun () => assert_no_hypchange t else t in 
+    t ().
 
-Ltac2 Notation "harden" t(thunk(self)) := harden0 t.
+(* Sugar *)
+#[local] Ltac2 harden0 t goals :=  precise_harden t goals false false.
 
-Tactic Notation "harden" tactic0(t) :=
-  let f := ltac2:(tt |- harden (Ltac1.run tt)) in
+Ltac2 Notation "harden" n(tactic(0)) t(thunk(self)) := harden0 t (Some (n,false)).
+
+Tactic Notation "harden" integer(n) tactic0(t):=
+  let f := ltac2:(tt nn |-
+    harden (Option.get (Ltac1.to_int nn)) (Ltac1.run tt)) in
+  f t n.
+
+Ltac2 Notation "harden" "<=" n(tactic(0)) t(thunk(self)) :=  harden0 t (Some (n,true)).
+
+Tactic Notation "harden" "<=" integer(n) tactic0(t):=
+  let f := ltac2:(tt nn |-
+    harden <= (Option.get (Ltac1.to_int nn)) (Ltac1.run tt)) in
+  f t n.
+
+Ltac2 Notation "harden" "?" t(thunk(self)) :=  harden0 t None.
+
+Tactic Notation "harden" "?" tactic0(t):=
+  let f := ltac2:(tt |-
+    harden ? (Ltac1.run tt)) in
   f t.
+
 
 Section test.
   Goal True.
   Proof.
-    Succeed harden easy.
-    Succeed try (harden fail).
-    Fail harden idtac.
-    Fail try (harden idtac).
+    Succeed harden ? easy.
+    Succeed harden 0 easy.
+    Succeed try (harden 100 fail).
+    Succeed try (harden 1 fail).
+    Fail harden 1 idtac.
+    Fail try (harden 1 idtac).
   Abort.
 
   Variable P : Prop.
   Goal P /\ P.  
   Proof. 
-    Succeed harden split. 
-    Fail try (harden idtac).
+    Succeed harden 2 split. 
+    Succeed harden ? intuition. 
   Abort.
-End test.
-
-Ltac2 Notation "assert_goals" n(tactic(0)) t(thunk(self)) :=
-  goals_check (fun () => harden0 t) n false true.
-
-Tactic Notation "assert_goals" integer(n) tactic0(t):=
-  let f := ltac2:(tt nn |-
-    assert_goals (Option.get (Ltac1.to_int nn)) (Ltac1.run tt)) in
-  f t n.
-
-Ltac2 Notation "assert_goals" "<=" n(tactic(0)) t(thunk(self)) :=
-  goals_check (fun () => harden0 t) n true true.
-
-Tactic Notation "assert_goals" "<=" integer(n) tactic0(t):=
-  let f := ltac2:(tt nn |-
-    assert_goals <= (Option.get (Ltac1.to_int nn)) (Ltac1.run tt)) in
-  f t n.
-
-Section test.
-  Goal True.
-  Proof.
-    Succeed ensure_goals 0 easy. 
-    Fail ensure_goals 1 easy. 
-    Succeed try (ensure_goals 1 easy).  Fail try (assert_goals 1 easy).
-    Succeed ensure_goals <=1 easy.
-    Succeed (ensure_goals 102 fail) || idtac. (* The tactic can fail itself *)
-  Abort.
-
-
-  (* TODO: Clean these tests.. *)
-  Variable P : Prop.
-  Goal P /\ P.  Proof. ensure_goals 2 split. Abort.
-  Goal P /\ P.  Proof. Fail ensure_goals 3 split. Abort.
-  Goal P /\ P.  Proof. first [ idtac "Trying 3"; ensure_goals 3 split | idtac "Trying 2"; ensure_goals 2 split ]. Abort.
-  Goal (P /\ P) /\ (P /\ P).  Proof.  split. Fail all: ensure_goals 2 split. Abort.
-  Goal (P /\ P) /\ (P /\ P).  Proof.  split. all: enter (ensure_goals 2 split). Abort.
-  Goal (P /\ P) /\ (P /\ P).  Proof.  split. Fail all: (ensure_goals 2 (enter split)). Abort.
-  Goal (P /\ P) /\ (P /\ P).  Proof.  split; enter (ensure_goals 2 split). Abort.
-
-  Goal P /\ P.  Proof. assert_goals 2 split. Abort.
-  Goal P /\ P.  Proof. Fail assert_goals 3 split. Abort.
-  Goal P /\ P.  Proof. Fail try (assert_goals 3 split). Abort.
 End test.
 
 (*  
@@ -251,14 +282,11 @@ End test.
     The top hypothesis might go away. I'm not doing any hardening. 
     Maybe worth doing a goals_check? TODO
 *)
-Tactic Notation "toph" tactic(t) := (let f := fresh in (move=> f); t f). (* Tactic Notation vs Ltac Notation *)
+Tactic Notation "toph" tactic(t) := (let f := fresh in (move=> f); t f). 
 
 (* This is a little hacky because you don't you are doing trial and error.. 
    Maybe better to specialize *)
-Tactic Notation "someh" tactic(t) :=
-    match goal with
-    H : _ |- _ => t H
-    end.
+Tactic Notation "someh" tactic(t) := match goal with H : _ |- _ => t H end.
 
 Section test.
   Ltac t H := apply H.
@@ -267,7 +295,13 @@ Section test.
 End test.
 
 Ltac evar_spec h :=  
-  move: h; let t := open_constr:(_) in let f := fresh in pose f := t=> /(_ f); subst f.
+  let t := unshelve (move: h; let t := open_constr:(_) in let f := fresh in pose f := t=> /(_ f); subst f) in
+  let f := ltac2:(tt |- precise_harden 
+                (fun () => Ltac1.run(tt)) 
+                (Some (2,false))
+                true
+                false) in(* You're moving h away *)
+  f t. 
 
 
 Section test.
@@ -275,15 +309,15 @@ Section test.
   Variable Q : Prop.
   Goal (P 5 -> Q) -> (forall n, P n) -> Q.
   Proof.
-    Succeed move=> x i; (evar_spec i); exact x.
-    Succeed move=> x; (toph evar_spec); exact x.
+    Succeed move=> x i; (evar_spec i); cycle 1; exact x.
+    Succeed move=> x; (toph evar_spec); cycle 1; exact x.
     move=> x. unshelve toph evar_spec. 2: exact x. (* Applying to second goal solves the first goal. *)
   Qed.
 End test.
 
 
 Ltac2 revert_hyp_type (dependent: bool) (ty : constr) :=
-  assert_goals 1 (
+  harden 1 (
   let hyps := List.filter (fun h => let (_, _, t) := h in Constr.equal t ty) (Control.hyps ()) in
   match hyps with
   (* If others depend on it, we fail*)
@@ -294,8 +328,8 @@ Ltac2 revert_hyp_type (dependent: bool) (ty : constr) :=
     let hcnstr := Control.hyp h in
     revert_t (Ltac1.of_constr hcnstr)
   (* Unless you absolutely require zero, don't use zero *)
-  | [] => Control.throw (Tactic_failure (Some (fprintf "No hypothesis of type %t" ty)))
-  | _ => Control.throw (Tactic_failure (Some (fprintf "Multiple hypotheses of type %t" ty)))
+  | [] => panic_m "revert_hyp_type" (fprintf "No hypothesis of type %t" ty)
+  | _ => panic_m "revert_hyp_type" (fprintf "Multiple hypotheses of type %t" ty)
   end).
 
 (* TODO: Maybe change this to an intropattern? *)
@@ -323,35 +357,13 @@ Ltac2 head (t : constr) : constr :=
   | _ => t
   end.
 
-(* The is_constructor check below is delegated to Ltac1; it could equivalently
-   be written in Ltac2 by inspecting Constr.Unsafe.kind for a Constructor node. *)
-Ltac2 cnstrct_eq_gl () :=
-  harden
-  lazy_match! goal with
-  | [ |- ?a = ?b ] =>
-    let hl := head a in
-    let hr := head b in
-    if Constr.equal hl hr then
-      ltac1:(f |- is_constructor f; congr f) (Ltac1.of_constr hl)
-    else Control.zero (Tactic_failure (Some (fprintf "heads differ: %t vs %t" hl hr)))
-  | [ |- _ ] => Control.zero (Tactic_failure (Some (fprintf "goal is not an equality")))
-  end.
-
-Ltac cnstrct_eq_gl := ltac2:(cnstrct_eq_gl ()).
-
-Section test.
-  Goal forall n m, S n = S m.
-  Proof. move=> *. cnstrct_eq_gl. Abort.
-
-  Goal forall (n1 n2 m1 m2: nat), (n1, n2) = (m1, m2).
-  Proof. move=> *. cnstrct_eq_gl. Abort.
-End test.
-
+(* TODO: Maybe worth generalizing the CBNEQ thing.. *)
 Ltac2 Notation "cbn_eq" t(thunk(constr)) :=
   let t := t () in
   let t' := eval cbn in $t in
   exact ($t = $t').
 
+(* Does the #[refine] attibute make this obsolete? *)
 Module GallinaHole.
   (* Holes *)
   #[local] Ltac2 admit_tac () := 
@@ -391,11 +403,12 @@ Module GallinaHole.
 End GallinaHole.
 
 
+(* section_vars *)
   (* TODO: You could do some preprocessing. Check if id's are really in hypotheses *)
 #[local] Ltac2 rec exfalso_move_some_hack (ids : ident list) : ident * bool :=
   exfalso;
   match ids with
-  | [] => Control.throw (Tactic_failure (Some (fprintf "move_some: nothing movable")))
+  | [] => panic_s "move_some" "nothing movable"
   | id :: rest =>
       match Control.case (fun () =>
         ltac1:(h |- move: h) (Ltac1.of_ident id)) with
@@ -450,22 +463,22 @@ Ltac2 section_vars () : ident list :=
       | Val ((moved_h, is_secvar), _) =>
           let new_section := if is_secvar then (moved_h :: section) else section in
           loop (List.filter (fun i => Bool.neg (Ident.equal i moved_h)) remaining) new_section
-      | _ => Control.throw (Tactic_failure (Some (fprintf "section_vars: move_some failed unexpectedly")))
+      | _ =>  panic_s "section_vars" "move_some failed unexpectedly"
       end in
     let result := loop remaining [] in
     Control.zero (SectionVarsResult result))
   with
   | Err (SectionVarsResult l) => l
-  | _ => Control.throw (Tactic_failure (Some (fprintf "section_vars: unexpected control flow")))
+  | _ => panic_s "section_vars" "unexpected control flow"
   end.
 
 Section test.
   Variables A B : Prop.
   Goal False.
   Proof.
-    ltac2:(let svs := section_vars () in 
+    ltac2:(let svs := section_vars () in
       if Int.equal (List.length svs) 2 then ()
-      else Control.throw (Tactic_failure (Some (fprintf "expected 2 section vars, got %i" (List.length svs))))).
+      else panic_m "section_vars" (fprintf "expected 2 section vars, got %i" (List.length svs))).
   Abort.
 
   Variables C : Prop.
@@ -474,10 +487,11 @@ Section test.
   Proof.
     ltac2:(let svs := section_vars () in
       if Int.equal (List.length svs) 3 then ()
-      else Control.throw (Tactic_failure (Some (fprintf "expected 2 section vars, got %i" (List.length svs))))).
+      else panic_m "section_vars" (fprintf "expected 2 section vars, got %i" (List.length svs))).
   Abort.
 End test.
 
+(* goal_hygiene *)
 (* These two funtions are AI generated. I don't care *)
 #[local] Ltac2 strip_underscores (s : string) : string :=
   let n := String.length s in
@@ -497,7 +511,7 @@ End test.
 #[local] Ltac2 cleanup_id (id : ident) : string :=
   let s := Ident.to_string id in
   if Int.equal (String.length s) 0 then
-    Control.throw (Tactic_failure (Some (fprintf "cleanup_id: empty identifier"))) else
+    panic_s "cleanup_id" "empty identifier" else
   strip_underscores s.
 
 #[local] Ltac2 collect_renames (hyps : ident list) : (ident * ident) list :=
@@ -545,7 +559,7 @@ End test.
 
 Module Cook.
 
-  #[abstract] Ltac2 Type cook_tac := ((unit -> unit) * (string)).
+  #[abstract] Ltac2 Type cook_tac := ((unit -> unit) * (string) * bool).
   #[abstract] Ltac2 Type cookbook := cook_tac list.
 
   Ltac2 create_new_cookbook () : cookbook := [].
@@ -553,94 +567,80 @@ Module Cook.
   Ltac2 mutable cook_debug : bool := false.
 
   #[local] Ltac2 print_cookbook0 (l : cookbook) : unit :=
-    List.iteri (fun i p => let (_, desc) := p in printf "%i: %s" i desc) (l).
+    List.iteri (fun i p =>
+      let (_, desc, dhc) := p in
+      printf "%i: %s [disallow_hyps_change=%s]" i desc (if dhc then "true" else "false")) (l).
 
   Ltac2 Notation "print_cookbook" l(tactic(0)) :=  print_cookbook0 (l ()).
 
-  (* TODO: Eventually, these things need to throw if there is some index error*)
-  #[local] Ltac2 keep_only0 (l : cookbook) (idxs : int list) : cookbook :=
-    let mem i := List.exist (fun n => Int.equal n i) idxs in
-    List.map (fun p => let (_, x) := p in x)
-      (List.filter (fun p => let (i, _) := p in mem i)
-        (List.mapi (fun i x => (i, x)) l)).
-
-  Ltac2 Notation "keep_only" l(tactic(0)) idxs(tactic(0)) := fun () => keep_only0 (l ()) idxs.
-
-  #[local] Ltac2 delete0 (l : cookbook) (idxs : int list) : cookbook :=
-    let mem i := List.exist (fun n => Int.equal n i) idxs in
-    List.map (fun p => let (_, x) := p in x)
-      (List.filter (fun p => let (i, _) := p in Bool.neg (mem i))
-        (List.mapi (fun i x => (i, x)) l)).
-
-  Ltac2 Notation "delete" l(tactic(0)) idxs(tactic(0)) :=  fun () => delete0 (l ()) idxs.
-
-  #[local] Ltac2 keep_only_named0 (l : cookbook) (names : string list) : cookbook :=
+  #[local] Ltac2 keep_only0 (l : cookbook) (names : string list) : cookbook :=
     let mem s := List.exist (String.equal s) names in
-    List.filter (fun p => let (_, desc) := p in mem desc) l.
+    List.filter (fun (_,desc,_) => mem desc) l.
 
-  Ltac2 Notation "keep_only_named" l(tactic(0)) names(thunk(tactic(0))) :=
-    fun () => keep_only_named0 (l ()) (names ()).
+  Ltac2 Notation "keep_only" l(tactic(0)) names(thunk(tactic(0))) :=
+    fun () => keep_only0 (l ()) (names ()).
 
-  #[local] Ltac2 delete_named0 (l : cookbook) (names : string list) : cookbook :=
+  #[local] Ltac2 delete0 (l : cookbook) (names : string list) : cookbook :=
     let mem s := List.exist (String.equal s) names in
-    List.filter (fun p => let (_, desc) := p in Bool.neg (mem desc)) l.
+    List.filter (fun (_,desc,_)=> Bool.neg (mem desc)) l.
 
-  Ltac2 Notation "delete_named" l(tactic(0)) names(thunk(tactic(0))) :=
-    fun () => delete_named0 (l ()) (names ()).
+  Ltac2 Notation "delete" l(tactic(0)) names(thunk(tactic(0))) :=
+    fun () => delete0 (l ()) (names ()).
 
   (* TODO: Maybe check that there is no name duplication in the future? Throw a warning if this is the case *)
-  #[local] Ltac2 append_tac0 (t: unit -> unit) (desc: string) (n: int) (is_le: bool) (l : cookbook) : cookbook :=
-    let wrapped := if is_le then (fun () => assert_goals <= n t()) else 
-                                 (fun () => assert_goals n t()) in
-    (wrapped, desc) :: l.
+  #[local] Ltac2 append_tac0 (t: unit -> unit) (desc: string) (goals: (int * bool) option) (disallow_hyps_change: bool) (l : cookbook) : cookbook :=
+    let hardened := fun () => precise_harden t goals false disallow_hyps_change in 
+    (hardened, desc, disallow_hyps_change) :: l.
 
   (* TODO: This desc() is sus *)
-  Ltac2 Notation "append_tac" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
-    fun () => append_tac0 t (desc ()) n false (l ()).
+  Ltac2 Notation "add_cookstep" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
+    fun () => append_tac0 t (desc ()) (Some (n,false)) false (l ()).
 
-  Ltac2 Notation "append_tac" "<=" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
-    fun () => append_tac0 t (desc ()) n true (l ()).
+  Ltac2 Notation "add_cookstep" "<=" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
+    fun () => append_tac0 t (desc ()) (Some (n,true)) false (l ()).
 
-  #[local] Ltac2 join_taclist0 (l1: cookbook)(l2 : cookbook) : cookbook := List.append l1 l2.
+  Ltac2 Notation "add_cookstep" "?" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
+    fun () => append_tac0 t (desc ()) None false (l ()).
 
-  Ltac2 Notation "join_taclist" l1(tactic(0)) l2(tactic(0)) := fun () => join_taclist0 (l1 ()) (l2 ()).
+  Ltac2 Notation "add_stirstep" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
+    fun () => append_tac0 t (desc ()) (Some (n,false)) true (l ()).
 
-  #[local] Ltac2 cook_step_n (i : int) : unit :=
-    let gls := Control.numgoals() in
-    if Bool.neg (Int.equal gls 1) then Control.throw (Tactic_failure (Some (fprintf "cook_step_n: Needs to run with one focused goal"))) else
-    let l := curr_cookbook () in
-    match List.nth_opt l i with
-    | None => Control.throw (Tactic_failure (Some (fprintf "cook_step_n: index %i out of range (length %i)" i (List.length l))))
-    | Some (t, _) => ltac1:(move => * ); t (); ltac1:(move=> * )
-    end.
+  Ltac2 Notation "add_stirstep" "<=" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
+    fun () => append_tac0 t (desc ()) (Some (n,true)) true (l ()).
 
-  Tactic Notation "cook_step" integer(n) :=
-    let f := ltac2:(nn |- cook_step_n (Option.get (Ltac1.to_int nn))) in
-    f n; goal_hygiene.
+  Ltac2 Notation "add_stirstep" "?" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
+    fun () => append_tac0 t (desc ()) None true (l ()).
 
-  #[local] Ltac2 cook_step () : unit :=
-    let l := curr_cookbook () in
-    let len := List.length l in
-    let rec go i :=
-      if Int.ge i len then Control.zero (Tactic_failure (Some (fprintf "cook_step: all tactics failed")))else
-      match Control.case (fun () => cook_step_n i) with
-      (* It is the client's responsibility to put harden. If the client does not put it, then the thing will spin forever! *)
-      | Val ((),_) => if Bool.neg cook_debug then () else
-                        let (_, desc) := List.nth l i in
-                        printf "cook_step[%i]: %s success" i desc
-      | Err _ => go (Int.add i 1)
+  (* TODO: PROOF_STYLE.md is going to be very different *)
+  #[local] Ltac2 join_cookbooks0 (l1: cookbook)(l2 : cookbook) : cookbook := List.append l1 l2.
+
+  Ltac2 Notation "join_cookbooks" l1(tactic(0)) l2(tactic(0)) := fun () => join_cookbooks0 (l1 ()) (l2 ()).
+
+  #[local] Ltac2 cook_stir_step (only_stir : bool) : unit :=
+    one_goal_assertion "cook_stir_step";
+    let book := curr_cookbook () in
+    let book := if only_stir then List.filter (fun (_, _, is_stir) => is_stir) book else book in
+    let rec go i l :=
+      match l with
+      | [] => softfail_s "cook_stir_step" "all tactics failed"
+      | (t, desc, _) :: rest =>
+        match Control.case (fun () => ltac1:(move => * ); t (); ltac1:(move=> * )) with
+        (* It is the client's responsibility to put harden. If the client does not put it, then the thing will spin forever! *)
+        | Val ((),_) => if Bool.neg cook_debug then () else printf "cook_stir_step[%i]: %s success" i desc
+        | Err _ => go (Int.add i 1) rest
+        end
       end in
+    go 0 book.
 
-    go 0.
-
-  Tactic Notation "cook_step" := ltac2:(cook_step ()); goal_hygiene.
+  Tactic Notation "cook_step" := ltac2:(cook_stir_step false); goal_hygiene.
+  Tactic Notation "stir_step" := ltac2:(cook_stir_step true).
 
   (* 
     - Singleton hintdatabase with cook_step. 
     Clients are not allowed to touch this database
   *)
   Create HintDb __cook_step. (* TODO: Does #[local] help *)
-  Hint Extern 100  => ltac2:(cook_step ()) : __cook_step. 
+  Hint Extern 100  => ltac2:(cook_stir_step false) : __cook_step. 
 
   Ltac2 mutable cook_auto_dbs () : ident list := [].
   Ltac2 mutable cook_auto_depth : int := 5.
@@ -650,10 +650,10 @@ Module Cook.
     let dbg := if cook_debug then Std.Debug else Std.Off in
     Std.auto dbg (Some cook_auto_depth) [] (Some dbs).
 
-  Tactic Notation "cook_auto" := ltac2:(cook_auto ()); goal_hygiene.
+  Tactic Notation "cook_auto" := ltac2:(cook_auto ()). 
 
   (* For every focued goal, it runs cook_step one by one. (dfs strategy)  *)
-  #[local] Ltac2 cook (gas : int option) : unit :=
+  #[local] Ltac2 cook (only_stir: bool) (gas : int option) : unit :=
     let rec go (gas : int option) : unit :=
       (* Gas check *)
       if match gas with Some n => Int.equal n 0 | None => false end then () else
@@ -665,7 +665,7 @@ Module Cook.
 
       (* Run the first goal *)
       (Control.focus 1 1 (fun () =>
-        match Control.case (fun () => cook_step ()) with
+        match Control.case (fun () => cook_stir_step only_stir) with
         | Val ((), _) => ()
         | Err _ => 
               (if cook_debug then printf "cook: FW reasoning failed, trying BW reasoning" else ());
@@ -678,16 +678,20 @@ Module Cook.
        go next_gas) in
     unshelve (go gas).
   
-  Tactic Notation "cook" := ltac2:(cook None); goal_hygiene.
+  Tactic Notation "cook" := ltac2:(cook false); goal_hygiene.
+  Tactic Notation "stir" := ltac2:(cook true). 
   Tactic Notation "cook" integer(n) :=
-    let f := ltac2:(nn |- cook (Some (Option.get (Ltac1.to_int nn)))) in
+    let f := ltac2:(nn |- cook false (Some (Option.get (Ltac1.to_int nn)))) in
     f n; goal_hygiene.
-  
-
+  Tactic Notation "stir" integer(n) :=
+    let f := ltac2:(nn |- cook true (Some (Option.get (Ltac1.to_int nn)))) in
+    f n.
 End Cook.
+
 Section usage.
   Import Cook.
   Ltac2 mutable db := create_new_cookbook.
-  Ltac2 Set db as old := append_tac 1 ltac1:(progress idtac) "desc" old.
-  Ltac2 Set db as old := join_taclist old old.
+  Ltac2 Set db as old := add_cookstep 1 ltac1:(progress idtac) "desc" old.
+  Ltac2 Set db as old := join_cookbooks old old.
+  Ltac2 Eval print_cookbook db.
 End usage.  Fail Ltac2 Check db.
