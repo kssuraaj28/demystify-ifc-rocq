@@ -536,25 +536,14 @@ Section invprf.
   Notation cmbcmd_step := (cmbcmd_step adv).
 
   Section cook.
-    Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()).
+    Import VarValStore.Notations.
 
+    Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()).
     Ltac2 Set curr_cookbook as old := join_cookbooks Attacker.this_cookbook old.
     Ltac2 Set curr_cookbook as old := join_cookbooks Util.this_cookbook old.
     Ltac2 Set curr_cookbook as old := join_cookbooks Util.List.this_cookbook old.
 
-(* TODO 3 debug levels *)
-    Ltac2 Set cook_debug := false. (* TODO: Why can't I access this? *)
 
-    Ltac2 Eval print_cookbook curr_cookbook.
-    Ltac2 Set curr_cookbook as old :=  
-      (delete old 
-        [
-        "Forall_inv";
-        "Forall_inv";
-        "safe_case";
-        "optcmd_stp_store_simpl"
-        (*"move=> *" *) (* TODO: I dont know what the best practice for this is *)
-        ]). 
     Ltac2 Eval print_cookbook curr_cookbook.
     Ltac2 Eval print_cookbook curr_stirbook.
 
@@ -564,6 +553,8 @@ Section invprf.
 
 (*    Hint Extern 100 => lazymatch goal with _ =>  cbn end : trickbag. *)
 
+(* TODO 3 debug levels *)
+    Ltac2 Set cook_debug := false. (* TODO: Why can't I access this? *)
     Ltac2 Set cook_auto_depth := 4.
     (* TODO: Why does cook make this extremely slow? *)
     (* TODO: Set Ltac Profiling *)
@@ -587,7 +578,6 @@ Section invprf.
       - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split; stir.
           { revert_hyp_type bool; case; stir.
           1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /=; stir. 
-          Import VarValStore.Notations.
           1-2: revert_hyp_type_dep (option Cmd); case=> /= *; cook.  }
           { revert_hyp_type_dep PcLbl; case=> [+ []] /==> *; stir. }
         move=> /=.  
