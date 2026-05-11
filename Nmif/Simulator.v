@@ -40,26 +40,31 @@ Section sim_constr.
   Notation SimStates := (SimStates (AtkStates:=AtkStates)).
   Notation SimStateMachine := (AdvStateMachine SimStates).
 
-
   Variables (atk: AdvStateMachine AtkStates) (prog: Prog).
 
-  #[refine] Definition sim_step (simst: SimStates): SimStates :=
+  (* `c` has a guard and is secret.. *)
+  #[refine] Definition is_secret_guard (c: option Cmd) : bool :=
+    match c with
+    | Some (cond exp b1 b2) =>  _
+    | Some (while exp b) => _
+    | _ =>  false
+    end. all: admit. Admitted.
+  Import Util.List.
+
+  Definition sim_step (simst: SimStates): Store *  ?? :=
     let: mk_simstate ast sim_st program_mem := simst in 
     if program_mem isn't ((ocmd, isatk) :: rest) then simst else
 
     let: sim_st' :=  sim_st in 
     let: sim_st' := if isatk is true then (corruptor atk ast sim_st) else sim_st' in 
+
+    let: cont_prog := if is_secret_guard ocmd is true then [] else 
+                  map Some (optcmd_stp_cnt ocmd sim_st') in 
+    let: cont_atk := repeat true (substeps atk ast) in 
+    let: cont_full := combine_extend2 cont_prog cont_atk None false in
+
     let: sim_st' := optcmd_stp_store ocmd sim_st' in
-
-
-    (* Here, I think that you need to do big brain *)
-
-
-    mk_simstate (learner atk ast sim_st') sim_st' (_ ++ rest).
-    Proof. 
-    Check (corruptor atk ast sim_st).
-
-    kall: cycle 1.
+    mk_simstate (learner atk ast sim_st') sim_st' (cont_full ++ rest).
 
   
   #[refine] Definition construct_simulator : SimStateMachine := 
