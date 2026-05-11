@@ -47,6 +47,7 @@ Definition AdvEvent `{!AdvLeakPrm} := option LeakVals.
 Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} 
     {AtkStates : Type} := {
     init_state: StoreView -> AtkStates; (* You only get untrusted*)
+    (* TODO: There needs to be an init_state well-formed also *)
     corruptor: AtkStates -> Store -> Store;
  
     corruptor_wf_int: 
