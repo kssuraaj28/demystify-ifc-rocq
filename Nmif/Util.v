@@ -1,6 +1,9 @@
 From Stdlib Require List ssreflect ssrbool ssrfun.
 Import List ListNotations ssreflect ssrbool ssrfun.
 
+From Ltac2 Require Ltac2 Printf.
+Import Ltac2 Printf.
+
 Require Tacs.
 Import Tacs Tacs.Cook.
 
@@ -115,7 +118,7 @@ Module List.
   Qed.
 
   Ltac2 Set this_cookbook_ as old :=
-    append_tac 2
+    add_stirstep 2
       ltac1:(match goal with
              | |- Forall _ (combine_extend2 _ _ _ _) => apply/Forall_combine2_ind1; [move=> ?; apply|..]
              | |- Forall _ (combine_extend2 _ _ _ _) => apply/Forall_combine2_ind2; [move=> ?; apply|..]
@@ -134,9 +137,9 @@ Module List.
       by apply: Forall_cons; [|apply: IH].
   Qed.
 
-  Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(apply:Forall_combine2_same) "Forall_combine2_same" old.
+  Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(apply:Forall_combine2_same) "Forall_combine2_same" old.
 
-  Ltac2 Set this_cookbook_ as old := append_tac 2 
+  Ltac2 Set this_cookbook_ as old := add_stirstep 2 
     ltac1:(lazymatch goal with |- Forall _ (_ ++ _) => apply/Forall_app; split end)
     "Forall_app" old.
   
@@ -149,12 +152,12 @@ Module List.
   
   (* A high good tactic consumes 'low grade' hypotheses (in context), and produces high grade hypotheses (intros) *)
   Ltac Forall_inv H :=   
-    assert_goals 1
     (idtac; move: H=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _)).
+  Ltac2 Set this_cookbook_ as old := add_cookstep 1 ltac1:(someh Forall_inv) "Forall_inv" old.
 
-  Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(someh Forall_inv) "Forall_inv" old.
+
   (* TODO: Test for these also *)
-  Ltac2 Set this_cookbook_ as old := append_tac 1 
+  Ltac2 Set this_cookbook_ as old := add_stirstep 1 
     ltac1:(lazymatch goal with |- Forall _ (map _ _) => apply/Forall_map end)
     "Forall_map" old.
   Ltac2 this_cookbook () := this_cookbook_ ().
@@ -164,55 +167,122 @@ End List.
 
 (* This is a decent forward reasoning tactic *)
 Ltac if_easy_goals :=
-  ensure_goals <= 1
-  (
-  idtac;
   (* In Ltac, doing match goals will do focus *)
+  (idtac; (* TODO: harden. This will change hyps though.. *)
   match goal with
   |- context [if ?b then _ else _] =>  
       let e := fresh in let v := fresh in 
       move e: b=> v; move: v e;
-      (* TODO: Goal hygiene after every step *)
-      case=> ?; try done (* TODO parameterize? *)
+      ensure_goals <= 1 (idtac; case=> ?; try done) (* TODO: Parameterize *)
   end).
+Section test.
+  Goal forall b, if b then True else False.
+  Proof. move=> ?. if_easy_goals. Abort.
+End test.
+Ltac2 Set this_cookbook_ as old := add_cookstep <= 1 ltac1:(if_easy_goals) "if_easy_goals" old.
 
-Ltac2 Set this_cookbook_ as old := append_tac <= 1 ltac1:(if_easy_goals) "if_easy_goals" old.
+(* 
+  Maybe it is not worth forcing goal count in cook.
+  This is certainly a very very good forward reasoning tactic.
+*)
+(* The is_constructor check below is delegated to Ltac1; it could equivalently
+   be written in Ltac2 by inspecting Constr.Unsafe.kind for a Constructor node. *)
+Ltac2 cnstrct_eq_gl () :=
+  let t := fun () =>
+    lazy_match! goal with
+    | [ |- ?a = ?b ] =>
+      let hl := head a in
+      let hr := head b in
+      if Constr.equal hl hr then
+        ltac1:(f |- is_constructor f; congr f) (Ltac1.of_constr hl)
+      else softfail_m "cnstrct_eq_gl" (fprintf "heads differ: %t vs %t" hl hr) 
+    end in
+  precise_harden t None false true. (* You don't really touch the hypothesis here! *)
 
-Ltac safe_case :=
-   assert_goals 1
-   (idtac;
-   match goal with 
-   | v: bool |- context [match ?v with _ => _ end] =>  
-     is_var v;  
-     ensure_goals 1 (idtac; case: v) => * (* case: ensures that v does not appear anywhere else *)
-   end).
+Ltac cnstrct_eq_gl := ltac2:(cnstrct_eq_gl ()).
+
+
+Section test.
+  Goal forall n m, S n = S m.
+  Proof. move=> *. cnstrct_eq_gl. Abort.
+
+  Goal forall (n1 n2 m1 m2: nat), (n1, n2) = (m1, m2).
+  Proof. move=> *. cnstrct_eq_gl. Abort.
+End test.
+
+Ltac2 Set this_cookbook_ as old :=
+  add_stirstep 1 ltac1:(match goal with H : Some _ = Some _ |- _ => move:H; case=> H end) "some_eq_hyp" old.
+
+(* TODO: This is no longer built into the tactic  *)
+Ltac2 Set this_cookbook_ as old := 
+  add_cookstep 1 ltac1:(progress (move=> * )) "move=> *" old.
 
 Ltac2 Set this_cookbook_ as old := 
-  append_tac 1 ltac1:(safe_case) "safe_case" old.
+  add_cookstep 1 
+    ltac1:(
+      match goal with 
+      |- context [match ?v with _ => _ end] =>  
+        is_var v;  
+        ensure_goals 1 (idtac; case: v) => * (* case: ensures that v does not appear anywhere else *)
+      end)
+   "safe_case" old.
+
+Section test.
+  Variable P : nat -> Prop.
+  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["safe_case"]) ().
+  Ltac2 Eval print_cookbook curr_cookbook.
+  Ltac2 Eval print_cookbook curr_stirbook.
+  Ltac2 Set cook_debug := true.
+  Goal forall x: (nat*nat), let: (n,_) := x in  P n.
+  Proof. 
+    move=> *; goal_hygiene.
+    Succeed cook_step; (cook_step || idtac "no more").
+    Fail stir_step. 
+    Succeed progress cook.
+  Abort.
+End test.
+
   
 Ltac2 Set this_cookbook_ as old := 
-  append_tac 1 
-    ltac1:(match goal with  (* rewriting obviously *)
-           | H: ?x = (?b :> bool) |- context [if ?x then _ else _] => is_constructor b; rewrite H
-           | H: (?b :> bool) = ?x |- context [if ?x then _ else _] => is_constructor b; rewrite H
+  add_stirstep 1 
+    ltac1:(match goal with  
+           | H: ?x = ?b |- context [if ?x then _ else _] => is_constructor b; pattern x; rewrite H
+           | H: ?b = ?x |- context [if ?x then _ else _] => is_constructor b; pattern x; rewrite -H
            end)
-    "rewrite_if_hyp_eq" old.
+    "if_w_hyp_eq" old.
+
+Section test.
+  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["if_w_hyp_eq"]) ().
+  Ltac2 Eval print_cookbook curr_cookbook.  Ltac2 Eval print_cookbook curr_stirbook.
+  Ltac2 Set cook_debug := true.
+  Goal forall b, b = true -> if b then True else False.
+  Proof. 
+    Succeed now cook. (* Backward reasoning *)
+    Succeed now stir.
+    Fail cook_step.
+    Fail stir_step.
+    move=> ? ?.
+    stir_step.
+    exact I.
+  Qed.
+End test.
+
 
 (* TODO: maybe better to have  
 Example map_nil_simpl {A B} (f: A -> B) := (erefl : ltac2:(cbn_eq (map f []))). 
 *)
 Lemma map_nil_simpl {A B} (f: A -> B) : ltac2:(cbn_eq (map f [])). Proof. done. Qed.
-Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(rewrite -> map_nil_simpl in * ) "map_nil_simpl" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> map_nil_simpl in * ) "map_nil_simpl" old.
 
 Lemma if_same {T} (b : bool) (t: T) : 
   (if b then t else t) = t.
 Proof.  case: b; done. Qed. 
 
-Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(rewrite -> if_same in * ) "if_same" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> if_same in * ) "if_same" old.
 
-Ltac2 Set this_cookbook_ as old := append_tac 0 ltac1:(done) "done" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 0 ltac1:(done) "done" old.
 
-Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(progress subst) "subst" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep 1 ltac1:(progress subst) "subst" old.
 
 Ltac2 this_cookbook () := this_cookbook_ ().
 

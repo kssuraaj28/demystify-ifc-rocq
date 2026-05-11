@@ -80,7 +80,7 @@ Section cleanstep.
 End cleanstep.
 
 (* TODO: All autorewrite-ish tactics should do rewrite -> in * *)
-Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(rewrite -> optcmd_stp_store_simpl in * ) "optcmd_stp_store_simpl" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> optcmd_stp_store_simpl in * ) "optcmd_stp_store_simpl" old.
 
 Section test.
   Context `{!VarPrm, !ValPrm}.
@@ -284,22 +284,22 @@ Section thms.
 End thms.
 
 Ltac2 Set this_cookbook_ as old :=
-  append_tac 1
+  add_stirstep 1
     ltac1:(unshelve erewrite wt_cmd_st_int_untr;[..|eassumption])
     "wt_cmd_st_int_untr" old.
 
 Ltac2 Set this_cookbook_ as old :=
-  append_tac 1
+  add_stirstep 1
     ltac1:(unshelve erewrite wt_cmd_st_conf_sec;[..|eassumption])
     "wt_cmd_st_conf_sec" old.
 
 Ltac2 Set this_cookbook_ as old :=
-  append_tac 1
+  add_stirstep 1
     ltac1:(apply/wt_cmd_st_int; [eassumption|])
     "wt_cmd_st_int" old.
 
 Ltac2 Set this_cookbook_ as old :=
-  append_tac 1
+  add_stirstep 1
     ltac1:(apply/wt_cmd_st_conf; [eassumption|])
     "wt_cmd_st_conf" old.
 
@@ -347,7 +347,7 @@ Section thms.
  Lemma untr_compute_new_pc p c: 
    untrusted (compute_new_pc (mk_lbl true p) c).
  Proof.
-   case: c=> //= *; enter safe_case; rewrite untr_join //.
+   case: c=> //=; case=> * ; rewrite untr_join //.
  Qed.
 
   Lemma tr_cmd_cnt:
@@ -382,10 +382,10 @@ Section thms.
 End thms.
 
 Ltac2 Set this_cookbook_ as old :=
-  append_tac 1   ltac1:(rewrite -> untr_compute_new_pc in * ) "untr_compute_new_pc" old.
+  add_stirstep 1   ltac1:(rewrite -> untr_compute_new_pc in * ) "untr_compute_new_pc" old.
 
 Ltac2 Set this_cookbook_ as old :=
-  append_tac 1
+  add_cookstep 1
     ltac1:(lazymatch goal with
            |- context [compute_new_pc (mk_lbl true ?p) ?c] =>
               move: ([elaborate compute_new_pc_untr p c])=> [] ? /[dup] ? ->
@@ -520,7 +520,7 @@ Section thm.
 End thm.
 
 Ltac2 Set this_cookbook_ as old :=
-  append_tac 1
+  add_stirstep 1
     ltac1:(lazymatch goal with
            | |- Forall _ (zip _ _ _ _) => apply/Forall_CmbCmd_zip
            end)
@@ -538,32 +538,34 @@ Section invprf.
   Section cook.
     Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()).
 
-    Ltac2 Set curr_cookbook as old := join_taclist Attacker.this_cookbook old.
-    Ltac2 Set curr_cookbook as old := join_taclist Util.this_cookbook old.
-    Ltac2 Set curr_cookbook as old := join_taclist Util.List.this_cookbook old.
+    Ltac2 Set curr_cookbook as old := join_cookbooks Attacker.this_cookbook old.
+    Ltac2 Set curr_cookbook as old := join_cookbooks Util.this_cookbook old.
+    Ltac2 Set curr_cookbook as old := join_cookbooks Util.List.this_cookbook old.
 
+(* TODO 3 debug levels *)
     Ltac2 Set cook_debug := false. (* TODO: Why can't I access this? *)
 
     Ltac2 Eval print_cookbook curr_cookbook.
     Ltac2 Set curr_cookbook as old :=  
-      (delete_named old 
+      (delete old 
         [
         "Forall_inv";
         "Forall_inv";
-        "map_nil_simpl";
         "safe_case";
         "optcmd_stp_store_simpl";
-        "subst"
+        "move=> *" (* TODO: I dont know what the best practice for this is *)
         ]). 
     Ltac2 Eval print_cookbook curr_cookbook.
+    Ltac2 Eval print_cookbook curr_stirbook.
 
-    Hint Resolve pubuntr_wf_cont : core.
-    (* TODO: Why can I not add resolve? *)
+    Hint Extern 10 => lazymatch goal with |- _ => apply:pubuntr_wf_cont end: core.
     Hint Extern 10 => lazymatch goal with |- _ => apply:step_soundness end: core.
     Ltac2 Set cook_auto_dbs := fun () => [@trickbag].
 
 (*    Hint Extern 100 => lazymatch goal with _ =>  cbn end : trickbag. *)
 
+    Ltac2 Set cook_auto_depth := 5.
+    (* TODO: Why does cook make this extremely slow? *)
     (* TODO: Set Ltac Profiling *)
     Lemma cmbcmd_step_inv: 
       forall c st, 
@@ -575,35 +577,37 @@ Section invprf.
       case; rewrite {}/CmbCmdInv=> - []; cycle 1. 
 
       - move=>>[]_; rewrite/StateInv=> + [].
-        (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split; cook.
-         { revert_hyp_type_dep (option Cmd); case => /=; cook. }
-        cook=> /=; cook.
-        apply/Forall_and; cook.
+        (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split; stir.
+         { revert_hyp_type_dep (option Cmd); case => /= *; cook. }
+        move=> /=. 
+        apply/Forall_and; [stir|]. 
         rewrite-/(WellFormedProg _ _).
-        revert_hyp_type_dep (option Cmd); case=> * /=; cook.
+        revert_hyp_type_dep (option Cmd); case=> /= *; cook.
 
-      - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split; cook.
-          { revert_hyp_type bool; case; cook.
-          1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /=; cook. 
-          1-2: revert_hyp_type_dep (option Cmd); case=> /=; cook. } 
-          { revert_hyp_type_dep PcLbl; case=> [+ []] /==> *; cook. }
+      - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split; stir.
+          { revert_hyp_type bool; case; stir.
+          1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /=; stir. 
+          Import VarValStore.Notations.
+          1-2: revert_hyp_type_dep (option Cmd); case=> /= *; cook.  }
+          { revert_hyp_type_dep PcLbl; case=> [+ []] /==> *; stir. }
         move=> /=.  
-        apply/Forall_and; cook.
+        apply/Forall_and; stir.
         revert_hyp_type_dep PcLbl; case=> [[] ?] /= >. {
-           cook. revert_hyp_type_dep (option Cmd)=> - [] //= >.
+           move=> *; stir.
+           revert_hyp_type_dep (option Cmd)=> - [] //= >.
            rewrite -/(WellFormedProg _ _).
            move=> /step_soundness=> snd.
            apply/flows_to_subtype_prog;[|apply/snd].
-           cook. } 
+           stir. } 
         move=> /= ? <- /=.
         move ?: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. 
            {erewrite tr_cmd_cnt; [apply/Forall_combine2_same/Forall_map/Forall_forall => // | eassumption |..]. 
-           1-2: cook. }
-        cook.
+           1-2: stir. }
+        stir.
         rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
         revert_hyp_type_dep Cmd=> ? /step_soundness snd newpce.
         apply/flows_to_subtype_prog; [|apply/snd].
-        cook.
+        stir.
     Qed. 
   End cook.
 

@@ -77,9 +77,10 @@ Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
 Arguments AdvStateMachine: clear implicits.
 Arguments AdvStateMachine {_ _ _ _} AtkStates.
 
-Ltac2 Set this_cookbook_ as old := append_tac 1 ltac1:(rewrite corruptor_wf_int) "corruptor_wf_int" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite ->corruptor_wf_int in * ) "corruptor_wf_int" old.
 Ltac2 Set this_cookbook_ as old :=
-  append_tac 1 ltac1:(unshelve erewrite corruptor_wf_conf;[|reflexivity|]) "corruptor_wf_conf" old.
+  add_stirstep 1 ltac1:(unshelve erewrite corruptor_wf_conf;[|reflexivity|]) "corruptor_wf_conf" old. 
+  (* TODO: I think maybe apply is better? TODO *)
 
 Ltac2 this_cookbook () := this_cookbook_ ().
 Ltac2 Eval print_cookbook this_cookbook.
@@ -90,10 +91,5 @@ Section test.
   Ltac2 Set curr_cookbook := this_cookbook. 
 
   Goal `(forall P, P ⟨ corruptor (AtkStates := A) adv ast st  | is_trusted ⟩).
-  Proof. 
-  Set Printing All.
-  move=> *.  cook.
-  Abort.
-
-
+  Proof.   move=> *.  cook.  Abort.
 End test.

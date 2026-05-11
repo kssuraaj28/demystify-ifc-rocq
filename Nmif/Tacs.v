@@ -220,7 +220,7 @@ End test.
   Use `precise_harden` when not sufficient.
 *)
 (* TODO: This type could be made into a record  *)
-Ltac2 precise_harden (t: unit -> unit) (goals: (int * bool) option) (allow_evar_change: bool) (disallow_hyps_change : bool): unit :=
+Ltac2 precise_harden (t: unit -> unit) (goals: (int * bool) option) (allow_evar_change: bool) (allow_hyps_change : bool): unit :=
     one_goal_assertion "precise_harden";
     let t := fun () => once_hard_progress t in  (* TODO: What is the correct order? *)
     let t := fun () => Control.unshelve t in  
@@ -229,10 +229,10 @@ Ltac2 precise_harden (t: unit -> unit) (goals: (int * bool) option) (allow_evar_
              | None => t 
              end in
     let t := if allow_evar_change then t else fun () => t(); Control.enter assert_no_evars in
-    let t := if disallow_hyps_change then fun () => assert_no_hypchange t else t in 
+    let t := if allow_hyps_change then t else fun () => assert_no_hypchange t in
     t ().
 
-(* Sugar *)
+(* Sugar: The default values of these bools are false *)
 #[local] Ltac2 harden0 t goals :=  precise_harden t goals false false.
 
 Ltac2 Notation "harden" n(tactic(0)) t(thunk(self)) := harden0 t (Some (n,false)).
@@ -300,7 +300,7 @@ Ltac evar_spec h :=
                 (fun () => Ltac1.run(tt)) 
                 (Some (2,false))
                 true
-                false) in(* You're moving h away *)
+                true) in(* You're moving h away *)
   f t. 
 
 
@@ -317,20 +317,21 @@ End test.
 
 
 Ltac2 revert_hyp_type (dependent: bool) (ty : constr) :=
-  harden 1 (
-  let hyps := List.filter (fun h => let (_, _, t) := h in Constr.equal t ty) (Control.hyps ()) in
-  match hyps with
-  (* If others depend on it, we fail*)
-  | [(h, _, _)] =>
-    let revert_t := if dependent
-                      then ltac1:(x |- generalize dependent x)
-                      else ltac1:(x |- revert x)  in
-    let hcnstr := Control.hyp h in
-    revert_t (Ltac1.of_constr hcnstr)
-  (* Unless you absolutely require zero, don't use zero *)
-  | [] => panic_m "revert_hyp_type" (fprintf "No hypothesis of type %t" ty)
-  | _ => panic_m "revert_hyp_type" (fprintf "Multiple hypotheses of type %t" ty)
-  end).
+  let t := fun () =>
+    let hyps := List.filter (fun h => let (_, _, t) := h in Constr.equal t ty) (Control.hyps ()) in
+    match hyps with
+    (* If others depend on it, we fail*)
+    | [(h, _, _)] =>
+      let revert_t := if dependent
+                        then ltac1:(x |- generalize dependent x)
+                        else ltac1:(x |- revert x)  in
+      let hcnstr := Control.hyp h in
+      revert_t (Ltac1.of_constr hcnstr)
+    (* Unless you absolutely require zero, don't use zero *)
+    | [] => panic_m "revert_hyp_type" (fprintf "No hypothesis of type %t" ty)
+    | _ => panic_m "revert_hyp_type" (fprintf "Multiple hypotheses of type %t" ty)
+    end in
+ precise_harden t (Some (1, false)) false true.
 
 (* TODO: Maybe change this to an intropattern? *)
 Tactic Notation "revert_hyp_type" constr(ty) :=
@@ -559,17 +560,20 @@ End test.
 
 Module Cook.
 
+  (* t, dest, allow_hyps_change *)
   #[abstract] Ltac2 Type cook_tac := ((unit -> unit) * (string) * bool).
   #[abstract] Ltac2 Type cookbook := cook_tac list.
 
   Ltac2 create_new_cookbook () : cookbook := [].
   Ltac2 mutable curr_cookbook () : cookbook := [].
+  Ltac2 curr_stirbook () : cookbook := 
+    List.filter (fun (_, _, allow_hyps_change) => Bool.neg allow_hyps_change) (curr_cookbook ()).
   Ltac2 mutable cook_debug : bool := false.
 
   #[local] Ltac2 print_cookbook0 (l : cookbook) : unit :=
     List.iteri (fun i p =>
       let (_, desc, dhc) := p in
-      printf "%i: %s [disallow_hyps_change=%s]" i desc (if dhc then "true" else "false")) (l).
+      printf "%i: %s [allow_hyps_change=%s]" i desc (if dhc then "true" else "false")) (l).
 
   Ltac2 Notation "print_cookbook" l(tactic(0)) :=  print_cookbook0 (l ()).
 
@@ -588,43 +592,43 @@ Module Cook.
     fun () => delete0 (l ()) (names ()).
 
   (* TODO: Maybe check that there is no name duplication in the future? Throw a warning if this is the case *)
-  #[local] Ltac2 append_tac0 (t: unit -> unit) (desc: string) (goals: (int * bool) option) (disallow_hyps_change: bool) (l : cookbook) : cookbook :=
-    let hardened := fun () => precise_harden t goals false disallow_hyps_change in 
-    (hardened, desc, disallow_hyps_change) :: l.
+  #[local] Ltac2 append_tac0 (t: unit -> unit) (desc: string) (goals: (int * bool) option) (allow_hyps_change: bool) (l : cookbook) : cookbook :=
+    let hardened := fun () => precise_harden t goals false allow_hyps_change in 
+    (hardened, desc, allow_hyps_change) :: l.
 
   (* TODO: This desc() is sus *)
   Ltac2 Notation "add_cookstep" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
-    fun () => append_tac0 t (desc ()) (Some (n,false)) false (l ()).
-
-  Ltac2 Notation "add_cookstep" "<=" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
-    fun () => append_tac0 t (desc ()) (Some (n,true)) false (l ()).
-
-  Ltac2 Notation "add_cookstep" "?" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
-    fun () => append_tac0 t (desc ()) None false (l ()).
-
-  Ltac2 Notation "add_stirstep" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
     fun () => append_tac0 t (desc ()) (Some (n,false)) true (l ()).
 
-  Ltac2 Notation "add_stirstep" "<=" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
+  Ltac2 Notation "add_cookstep" "<=" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
     fun () => append_tac0 t (desc ()) (Some (n,true)) true (l ()).
 
-  Ltac2 Notation "add_stirstep" "?" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
+  Ltac2 Notation "add_cookstep" "?" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
     fun () => append_tac0 t (desc ()) None true (l ()).
+
+  Ltac2 Notation "add_stirstep" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
+    fun () => append_tac0 t (desc ()) (Some (n,false)) false (l ()).
+
+  Ltac2 Notation "add_stirstep" "<=" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
+    fun () => append_tac0 t (desc ()) (Some (n,true)) false (l ()).
+
+  Ltac2 Notation "add_stirstep" "?" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
+    fun () => append_tac0 t (desc ()) None false (l ()).
 
   (* TODO: PROOF_STYLE.md is going to be very different *)
   #[local] Ltac2 join_cookbooks0 (l1: cookbook)(l2 : cookbook) : cookbook := List.append l1 l2.
 
   Ltac2 Notation "join_cookbooks" l1(tactic(0)) l2(tactic(0)) := fun () => join_cookbooks0 (l1 ()) (l2 ()).
 
-  #[local] Ltac2 cook_stir_step (only_stir : bool) : unit :=
+  #[local] Ltac2 cook_step (only_stir : bool) : unit :=
     one_goal_assertion "cook_stir_step";
-    let book := curr_cookbook () in
-    let book := if only_stir then List.filter (fun (_, _, is_stir) => is_stir) book else book in
+    let book := if only_stir then curr_stirbook () else  curr_cookbook () in
     let rec go i l :=
       match l with
       | [] => softfail_s "cook_stir_step" "all tactics failed"
       | (t, desc, _) :: rest =>
-        match Control.case (fun () => ltac1:(move => * ); t (); ltac1:(move=> * )) with
+       if Bool.neg cook_debug then () else printf "Trying: cook_stir_step[%i]: %s" i desc;
+        match Control.case t with
         (* It is the client's responsibility to put harden. If the client does not put it, then the thing will spin forever! *)
         | Val ((),_) => if Bool.neg cook_debug then () else printf "cook_stir_step[%i]: %s success" i desc
         | Err _ => go (Int.add i 1) rest
@@ -632,15 +636,15 @@ Module Cook.
       end in
     go 0 book.
 
-  Tactic Notation "cook_step" := ltac2:(cook_stir_step false); goal_hygiene.
-  Tactic Notation "stir_step" := ltac2:(cook_stir_step true).
+  Tactic Notation "cook_step" := ltac2:(cook_step false); goal_hygiene.
+  Tactic Notation "stir_step" := ltac2:(cook_step true).
 
   (* 
     - Singleton hintdatabase with cook_step. 
     Clients are not allowed to touch this database
   *)
   Create HintDb __cook_step. (* TODO: Does #[local] help *)
-  Hint Extern 100  => ltac2:(cook_stir_step false) : __cook_step. 
+  Hint Extern 100  => ltac2:(cook_step false) : __cook_step. 
 
   Ltac2 mutable cook_auto_dbs () : ident list := [].
   Ltac2 mutable cook_auto_depth : int := 5.
@@ -665,7 +669,7 @@ Module Cook.
 
       (* Run the first goal *)
       (Control.focus 1 1 (fun () =>
-        match Control.case (fun () => cook_stir_step only_stir) with
+        match Control.case (fun () => cook_step only_stir) with
         | Val ((), _) => ()
         | Err _ => 
               (if cook_debug then printf "cook: FW reasoning failed, trying BW reasoning" else ());
@@ -678,14 +682,17 @@ Module Cook.
        go next_gas) in
     unshelve (go gas).
   
-  Tactic Notation "cook" := ltac2:(cook false); goal_hygiene.
-  Tactic Notation "stir" := ltac2:(cook true). 
+  Tactic Notation "cook" := ltac2:(cook false None); goal_hygiene.
+  Tactic Notation "stir" := ltac2:(cook true None). 
   Tactic Notation "cook" integer(n) :=
     let f := ltac2:(nn |- cook false (Some (Option.get (Ltac1.to_int nn)))) in
     f n; goal_hygiene.
   Tactic Notation "stir" integer(n) :=
     let f := ltac2:(nn |- cook true (Some (Option.get (Ltac1.to_int nn)))) in
     f n.
+
+  (* TODO: You need to have a lot of tests here.. TODO: Maybe claude can help *)
+
 End Cook.
 
 Section usage.
@@ -695,3 +702,31 @@ Section usage.
   Ltac2 Set db as old := join_cookbooks old old.
   Ltac2 Eval print_cookbook db.
 End usage.  Fail Ltac2 Check db.
+
+
+Section test.
+  Import Cook.
+
+  Section progfail.
+    Ltac2 this_cookbook_ :=
+      add_stirstep 1 ltac1:(idtac) "dummy" create_new_cookbook.
+    Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()). (* Maybe keep only 1 *)
+    Goal False. Proof. Fail cook.  Abort.
+  End progfail.
+  
+  (* bad stir *)
+  Section bad_stir.
+    Ltac2 this_cookbook_ :=
+      add_stirstep 1 ltac1:(pose n := 5) "dummy" create_new_cookbook.
+    Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()). (* Maybe keep only 1 *)
+    Goal False. Proof. Fail cook.  Abort.
+  End bad_stir.
+  
+  (* stir vs cook *)
+  Section stir_vs_cook.
+    Ltac2 this_cookbook_ :=
+      add_cookstep 1 ltac1:(pose n := 5) "pose" create_new_cookbook.
+    Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()). (* Maybe keep only 1 *)
+    Goal False. Proof. progress cook. Fail progress stir. Abort.
+  End stir_vs_cook.
+End test.
