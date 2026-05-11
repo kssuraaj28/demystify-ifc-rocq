@@ -552,8 +552,8 @@ Section invprf.
         "Forall_inv";
         "Forall_inv";
         "safe_case";
-        "optcmd_stp_store_simpl";
-        "move=> *" (* TODO: I dont know what the best practice for this is *)
+        "optcmd_stp_store_simpl"
+        (*"move=> *" *) (* TODO: I dont know what the best practice for this is *)
         ]). 
     Ltac2 Eval print_cookbook curr_cookbook.
     Ltac2 Eval print_cookbook curr_stirbook.
@@ -564,7 +564,7 @@ Section invprf.
 
 (*    Hint Extern 100 => lazymatch goal with _ =>  cbn end : trickbag. *)
 
-    Ltac2 Set cook_auto_depth := 5.
+    Ltac2 Set cook_auto_depth := 4.
     (* TODO: Why does cook make this extremely slow? *)
     (* TODO: Set Ltac Profiling *)
     Lemma cmbcmd_step_inv: 
@@ -577,7 +577,7 @@ Section invprf.
       case; rewrite {}/CmbCmdInv=> - []; cycle 1. 
 
       - move=>>[]_; rewrite/StateInv=> + [].
-        (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split; stir.
+        (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split; cook.
          { revert_hyp_type_dep (option Cmd); case => /= *; cook. }
         move=> /=. 
         apply/Forall_and; [stir|]. 
