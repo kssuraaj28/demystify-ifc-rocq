@@ -34,7 +34,7 @@ Section sim_constr.
   Notation SimStates := (SimStates (AtkStates:=AtkStates)).
   Notation SimStateMachine := (AdvNextStep SimStates).
 
-  Variables (atk: AdvNextStep AtkStates) (prog: Prog).
+  Variables (atk: AdvNextStep AtkStates)(* (prog: Prog) You only need this when you do the init*).
 
   (* `c` has a guard and is secret.. *)
   Definition is_secret_guard (c: option Cmd) : bool :=
