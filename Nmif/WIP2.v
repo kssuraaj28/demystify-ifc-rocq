@@ -49,7 +49,7 @@ Section twocfg.
                    (map Some p2) (repeat true (substeps adv2 ast2))
                    None false None false in
     let: cont := map (fun '(oc1, a1, oc2, a2) => (mk_atkcmd a1 oc1, mk_atkcmd a2 oc2)) cont in
-    (cont ++ rest, s1, s2).
+    (cont ++ rest, (store1, ast1), (store2, ast2)).
 End twocfg.
 
 
