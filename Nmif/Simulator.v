@@ -53,17 +53,19 @@ Section sim_constr.
 
   Definition sim_step 
     (ocmd: option Cmd) (isatk: bool) (sim_st : Store) (ast: AtkStates):
-    (Store (* sim_st *) *  list ((option Cmd) * bool)) :=
+    (Store (* sim_st *) * AtkStates *  list ((option Cmd) * bool)) :=
 
     let: sim_st := if isatk is true then (corruptor atk ast sim_st) else sim_st in 
+    let: ast := if isatk is true then (learner atk ast sim_st) else ast in 
+    let: steps := if isatk is true then (substeps atk ast) else 0 in 
 
     let: cont_prog := if is_secret_guard ocmd is true then [] else map Some (optcmd_stp_cnt ocmd sim_st) in 
-    let: cont_atk := repeat true (substeps atk ast) in 
+    let: cont_atk := repeat true steps in
     let: cont_full := combine_extend2 cont_prog cont_atk None false in
 
     let: sim_st := optcmd_stp_store ocmd sim_st in (* TODO This should really not matter. *)
 
-    (sim_st, cont_full).
+    (sim_st, ast, cont_full).
 
   
   Obligation Tactic := easy. (* TODO: Program cases or whatnot *)
@@ -72,8 +74,7 @@ Section sim_constr.
       learner st _ :=
         let: (mk_simstate ast sim_st prg) :=  st in 
         if prg isn't (ocmd, isatk) :: rest then st else
-        let: (sim_st, cont) := sim_step ocmd isatk sim_st ast in
-        let: new_ast := if isatk then learner atk ast sim_st else ast in
+        let: (sim_st, new_ast, cont) := sim_step ocmd isatk sim_st ast in
         mk_simstate new_ast sim_st (cont ++ rest);
         
 

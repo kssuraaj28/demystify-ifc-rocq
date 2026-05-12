@@ -128,7 +128,9 @@ Section extract_step_commute.
     1:{ done. }
     1:{ case: cmbcmd inv => rcmd ratk icmd pclbl inv.
         rewrite /extract_2cfg /cmd_map /cmd_map_sim /=.
-        show_state. admit. }
+        f_equal; [f_equal | ].
+        1:{ idtac "==SUBGOAL 1=="; show_state. admit. }
+        1:{ idtac "==SUBGOAL 2=="; show_state. admit. } }
   Admitted.
 
 End extract_step_commute.
@@ -138,6 +140,14 @@ CmbCmd. invariant holds.
 
 
 *)
+
+
+
+
+
+
+
+
 
 
 
