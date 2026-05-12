@@ -20,13 +20,14 @@ Section acmd.  (* TODO: This needs to go to some place good *)
   Definition State := (Store * AtkStates)%type.
 
   (* TODO: Maybe this is useful enough that you should use this in other places. Simulator construction. Combined *)
-  Definition acmd_step (ac: AtkCmd) (s: State): Prog * State :=  
+  Definition acmd_step (ac: AtkCmd) (s: State): Prog * State * nat :=  
     let: mk_atkcmd isatk cmd := ac in 
     let: (store, atk_st) := s in 
     let: st := if isatk is true then corruptor adv atk_st store else store in 
     let: (prog, st) := (optcmd_stp_cnt cmd st,  optcmd_stp_store cmd st) in 
     let: atk_st := if isatk is true then learner adv atk_st st else atk_st in 
-    (prog, (st, atk_st)).
+    let: steps := if isatk is true then  substeps adv atk_st else 0 in
+    (prog, (st, atk_st), steps).
 End acmd.
 
 Section twocfg.
@@ -42,14 +43,15 @@ Section twocfg.
   Definition step (c: Cfg): Cfg :=
     let: (c2lst, s1, s2) := c in
     if c2lst isn't (ac1, ac2) :: rest then c else
-    let: (p1, (store1, ast1)) := (acmd_step adv1 ac1 s1) in
-    let: (p2, (store2, ast2)) := (acmd_step adv2 ac2 s2) in
-    let: cont := combine_extend4 
-                   (map Some p1) (repeat true (substeps adv1 ast1))
-                   (map Some p2) (repeat true (substeps adv2 ast2))
+    let: (p1, st1, steps1) := (acmd_step adv1 ac1 s1) in
+    let: (p2, st2, steps2) := (acmd_step adv2 ac2 s2) in
+
+    let: cont := combine_extend4
+                   (map Some p1) (repeat true steps1)
+                   (map Some p2) (repeat true steps2)
                    None false None false in
     let: cont := map (fun '(oc1, a1, oc2, a2) => (mk_atkcmd a1 oc1, mk_atkcmd a2 oc2)) cont in
-    (cont ++ rest, (store1, ast1), (store2, ast2)).
+    (cont ++ rest, st1, st2).
 End twocfg.
 
 
@@ -79,13 +81,16 @@ Section comb_compile_simulator.
           mk_atkcmd (sim_active cmbcmd) (ideal_cmd cmbcmd)) in
       map mapfn lst.
 
-    Definition cmd_map_sim (lst: list CmbCmd) : list (option Cmd * bool) := 
+    (* TODO: flat_map would fuse the filter+map into one traversal and
+       make reasoning slightly easier. Sticking with separate filter and
+       map for now to match the rest of the codebase. *)
+    Definition cmd_map_sim (lst: list CmbCmd) : list (option Cmd * bool) :=
       let: mapfn :=
-        fun cmbcmd => 
+        fun cmbcmd =>
           let: ocmd := if (public (pc_lbl cmbcmd)) is false then None else
                          (real_cmd cmbcmd) in
           (ocmd, real_atk_bit cmbcmd) in
-      map mapfn lst.
+      map mapfn (filter sim_active lst).
   End cmd_map.
 
   Section extract.
@@ -133,6 +138,9 @@ CmbCmd. invariant holds.
 
 
 *)
+
+
+
 
 
 
