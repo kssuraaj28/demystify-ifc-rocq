@@ -99,6 +99,12 @@ Section comb_compile_simulator.
 End comb_compile_simulator.
 
 
+Ltac show_state :=
+  idtac "==HYPS==";
+  (try (match reverse goal with H : ?T |- _ => idtac H ":" T; fail end));
+  match goal with |- ?G => idtac "==GOAL==" G end;
+  idtac "==END==".
+
 Section extract_step_commute.
   Import Simulator.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
@@ -109,8 +115,15 @@ Section extract_step_commute.
   Notation extract_2cfg := (extract_2cfg (AtkStates := AtkStates)).
   Notation step := (step adv (construct_simulator adv)).
 
-  Theorem extract_step_commute: forall c, step (extract_2cfg c) = extract_2cfg (comb_step c).
+  Theorem extract_step_commute c:
+    Combined.Invariant c ->
+    step (extract_2cfg c) = extract_2cfg (comb_step c).
   Proof.
+    case: c => [[rst ist simst atkst] [|cmbcmd cmblst']] inv.
+    1:{ done. }
+    1:{ case: cmbcmd inv => rcmd ratk icmd pclbl inv.
+        rewrite /extract_2cfg /cmd_map /cmd_map_sim /=.
+        show_state. admit. }
   Admitted.
 
 End extract_step_commute.
@@ -120,3 +133,6 @@ CmbCmd. invariant holds.
 
 
 *)
+
+
+

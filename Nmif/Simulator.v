@@ -73,7 +73,8 @@ Section sim_constr.
         let: (mk_simstate ast sim_st prg) :=  st in 
         if prg isn't (ocmd, isatk) :: rest then st else
         let: (sim_st, cont) := sim_step ocmd isatk sim_st ast in
-        mk_simstate (learner atk ast sim_st) sim_st (cont ++ rest);
+        let: new_ast := if isatk then learner atk ast sim_st else ast in
+        mk_simstate new_ast sim_st (cont ++ rest);
         
 
       substeps '(mk_simstate ast sim_st prg) := 
