@@ -62,6 +62,11 @@ Module List.
     (da : A) (db : B) (dc : C) : list (A * B * C) :=
       combine_extend2 (combine_extend2 la lb da db) lc (da,db) dc.
 
+  Definition combine_extend4 {A B C D}
+    (la : list A) (lb : list B) (lc : list C) (ld: list D)
+    (da : A) (db : B) (dc : C) (dd: D) : list (A * B * C * D) :=
+      combine_extend2 (combine_extend3 la lb lc da db dc) ld (da,db,dc) dd.
+
   Lemma combine_extend3_empty:
     forall {A B C} l2 l3 (d1 :A) (d2: B) (d3: C),
       combine_extend3 [] l2 l3 d1 d2 d3 =

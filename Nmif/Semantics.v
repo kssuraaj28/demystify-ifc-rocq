@@ -35,9 +35,6 @@ Section cleanstep.
 
   Notation Continuation := Syntax.Prog.
 
-  (* The option is epsilon  *)
-  Definition CmdEvent := option (Vars * Vals).
-
   Definition clean_cmd_stp_store (c: Cmd) (s: Store) : Store :=
     match c with
     | assign dst exp => 
@@ -62,6 +59,9 @@ Section cleanstep.
 
   (* TODO: Have examples below this *)
   Definition optcmd_stp_cnt := oapp clean_cmd_stp_cnt (fun _ => []).
+
+  (* The option is epsilon  *)
+  Definition CmdEvent := option (Vars * Vals).
 
   Definition clean_cmd_evnt (c: Cmd) (s: Store) : CmdEvent :=
     match c with

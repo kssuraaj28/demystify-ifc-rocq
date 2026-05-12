@@ -21,16 +21,8 @@ Section sim_st.
   Record SimStates  := mk_simstate {
       ast : AtkStates;
       sim_st : Store; 
-      program : list ((option Cmd) * bool);
-      (* You need to have a list of pending activations. 
-      In an activation, you can have:
-        - command
-        - whether the attacker is running
-      *)
+      program : list ((option Cmd) * bool); 
     }.
-
-    (* Maybe having a sim_stepping relation *)
-
 End sim_st.
 
 
@@ -92,26 +84,5 @@ Section sim_constr.
       curr_event '(mk_simstate ast _ _):=  curr_event atk ast;
     |}.
 End sim_constr.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 Ltac2 this_cookbook () := this_cookbook_ ().
