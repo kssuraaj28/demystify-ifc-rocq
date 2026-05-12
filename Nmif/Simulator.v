@@ -32,9 +32,9 @@ Section sim_constr.
 
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
   Notation SimStates := (SimStates (AtkStates:=AtkStates)).
-  Notation SimStateMachine := (AdvStateMachine SimStates).
+  Notation SimStateMachine := (AdvNextStep SimStates).
 
-  Variables (atk: AdvStateMachine AtkStates) (prog: Prog).
+  Variables (atk: AdvNextStep AtkStates) (prog: Prog).
 
   (* `c` has a guard and is secret.. *)
   Definition is_secret_guard (c: option Cmd) : bool :=
@@ -44,9 +44,12 @@ Section sim_constr.
     | _ =>  false
     end. 
 
-  Definition sim_init (init_sv : StoreView) : SimStates :=
-    let: store := fun v => if (init_sv v) is Some vl then vl else val_ne in
-    mk_simstate (init_state atk init_sv) store (map (fun c=> (Some c, true)) prog).
+  (* sim_init forwarded the underlying attacker's init_state to build a
+     SimStates from the public store view:
+       Definition sim_init (init_sv : StoreView) : SimStates :=
+         let: store := fun v => if (init_sv v) is Some vl then vl else val_ne in
+         mk_simstate (init_state atk init_sv) store (map (fun c => (Some c, true)) prog).
+     Dropped along with the init_state field of AdvNextStep. *)
 
   Definition sim_step 
     (ocmd: option Cmd) (isatk: bool) (sim_st : Store) (ast: AtkStates):
@@ -65,9 +68,7 @@ Section sim_constr.
   
   Obligation Tactic := easy. (* TODO: Program cases or whatnot *)
   Program Definition construct_simulator : SimStateMachine := 
-    {| 
-      init_state := sim_init;
-
+    {|
       learner st _ :=
         let: (mk_simstate ast sim_st prg) :=  st in 
         if prg isn't (ocmd, isatk) :: rest then st else

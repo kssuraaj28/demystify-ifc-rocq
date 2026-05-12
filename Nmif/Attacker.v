@@ -44,10 +44,13 @@ End defs.
 
 Definition AdvEvent `{!AdvLeakPrm} := option LeakVals.
 
-Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} 
+(* Previously this record also carried
+     init_state : StoreView -> AtkStates
+   (the attacker only sees the untrusted view) together with a TODO for an
+   init_state well-formedness obligation. Dropped during the rename to
+   AdvNextStep — initial-state construction now lives outside this record. *)
+Record AdvNextStep `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
     {AtkStates : Type} := {
-    init_state: StoreView -> AtkStates; (* You only get untrusted*)
-    (* TODO: There needs to be an init_state well-formed also *)
     corruptor: AtkStates -> Store -> Store;
  
     corruptor_wf_int: 
@@ -75,8 +78,8 @@ Record AdvStateMachine `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
     substeps : AtkStates -> nat;
   }.
 
-Arguments AdvStateMachine: clear implicits.
-Arguments AdvStateMachine {_ _ _ _} AtkStates.
+Arguments AdvNextStep: clear implicits.
+Arguments AdvNextStep {_ _ _ _} AtkStates.
 
 Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite ->corruptor_wf_int in * ) "corruptor_wf_int" old.
 Ltac2 Set this_cookbook_ as old :=

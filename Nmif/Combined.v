@@ -54,7 +54,7 @@ Section cmb_step.
 
 
   Section step.
-    Variable (adv: AdvStateMachine AtkStates). 
+    Variable (adv: AdvNextStep AtkStates). 
     Notation corruptor := (corruptor adv).
     Notation learner := (learner adv).
     Notation atk_substeps := (substeps adv).
@@ -98,7 +98,7 @@ Section inv.
   Import VarValStore.Notations Util.List.
 
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
-  Variable (adv: AdvStateMachine AtkStates). 
+  Variable (adv: AdvNextStep AtkStates). 
   Notation CmbState := (CmbState (AtkStates := AtkStates)).
   Notation Cfg := (Cfg (AtkStates := AtkStates)).
   Notation cfg_step := (cfg_step adv).
@@ -153,7 +153,7 @@ Ltac2 Set this_cookbook_ as old :=
 Section invprf.
   Import Attacker Util Util.List.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
-  Variable (adv: AdvStateMachine AtkStates). 
+  Variable (adv: AdvNextStep AtkStates). 
   Notation CmbState := (CmbState (AtkStates := AtkStates)).
   Notation Cfg := (Cfg (AtkStates := AtkStates)).
   Notation cfg_step := (cfg_step adv).
@@ -204,7 +204,7 @@ Section invprf.
       - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split; stir.
           { revert_hyp_type bool; case; stir.
           1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /=; stir. 
-          1-2: revert_hyp_type_dep (option Cmd); case=> /= *; cook.  }
+          1-2: revert_hyp_type_dep (option Cmd); case=> /= *; stir.  }
           { revert_hyp_type_dep PcLbl; case=> [+ []] /==> *; stir. }
         move=> /=.  
         apply/Forall_and; stir.

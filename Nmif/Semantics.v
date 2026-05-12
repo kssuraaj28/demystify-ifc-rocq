@@ -149,7 +149,7 @@ Section atk_cmd_step.
 
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
-  Context  {AtkStates : Type} (atksm: AdvStateMachine AtkStates).
+  Context  {AtkStates : Type} (atksm: AdvNextStep AtkStates).
     init_substeps: AtkStates -> nat; (* We allow atkstates because this can depend on the public store. You could force adv to run  cou *)
 
 
@@ -201,7 +201,7 @@ Section init_cfg.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
   Context {AtkStates : Type}.
 
-  Definition initial_cfg (p: Prog) (atksm : AdvStateMachine AtkStates) (s: Store) : Cfg AtkStates :=
+  Definition initial_cfg (p: Prog) (atksm : AdvNextStep AtkStates) (s: Store) : Cfg AtkStates :=
     let: atkst := init_state atksm ⟨s | is_public⟩ in
     let: init_cont := prog_zip p (init_substeps atksm atkst) in
     (init_cont, s, atkst, []).
@@ -210,7 +210,7 @@ End init_cfg.
 Section cfg_step.
   Import VarValStore.Notations. 
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
-  Context {AtkStates : Type} (atksm : AdvStateMachine AtkStates). (* TODO: unify *)
+  Context {AtkStates : Type} (atksm : AdvNextStep AtkStates). (* TODO: unify *)
 
   Notation Cfg := (Cfg AtkStates).
 
@@ -242,10 +242,10 @@ Section program_sem.
 
   Definition Behavior := Store -> nat -> ObservationTrace.
 
-  Context {AtkStates : Type} (atksm : AdvStateMachine AtkStates).
+  Context {AtkStates : Type} (atksm : AdvNextStep AtkStates).
 
   (* Simulating coinduction... *)
-  Definition prog_behavior {AtkStates} (p : Prog) (atksm : AdvStateMachine AtkStates) : Behavior :=
+  Definition prog_behavior {AtkStates} (p : Prog) (atksm : AdvNextStep AtkStates) : Behavior :=
                           fun init_store gas =>
                             let: init_cfg := initial_cfg p atksm init_store in
                             extract_trace (multistep atksm gas init_cfg).
