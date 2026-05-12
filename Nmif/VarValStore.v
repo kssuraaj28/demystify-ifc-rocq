@@ -9,7 +9,7 @@ Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
 Class VarPrm := {Vars : Type ; vars_deceq :: DecEq Vars}. 
-Class ValPrm := {Vals : Type}.
+Class ValPrm := {Vals : Type; val_ne : Vals}.
 
 Section store.
   Import Util.DecEq.Notations.
