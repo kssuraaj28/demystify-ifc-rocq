@@ -15,7 +15,7 @@ Ltac2 Set this_cookbook_ := create_new_cookbook.
 
 Section acmd.  (* TODO: This needs to go to some place good *)
   Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvLvlPrm} {AtkStates : Type}.
-  Variable (adv: AdvStateMachine AtkStates).
+  Variable (adv: AdvNextStep AtkStates).
   Record AtkCmd := mk_atkcmd {is_attacked: bool; cmd : option Cmd}.
   Definition State := (Store * AtkStates)%type.
 
@@ -32,7 +32,7 @@ End acmd.
 Section twocfg.
   Import Util.List.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates1 AtkStates2 : Type}.
-  Variable (adv1: AdvStateMachine AtkStates1) (adv2: AdvStateMachine AtkStates2). 
+  Variable (adv1: AdvNextStep AtkStates1) (adv2: AdvNextStep AtkStates2). 
 
   Notation State1 := (State (AtkStates:=AtkStates1)).  
   Notation State2 := (State (AtkStates:=AtkStates2)).  
@@ -102,16 +102,16 @@ End comb_compile_simulator.
 Section extract_step_commute.
   Import Simulator.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
-  Variable adv : (AdvStateMachine AtkStates).
+  Variable adv : (AdvNextStep AtkStates).
 
   Notation CombCfg := Combined.Cfg.
   Notation comb_step := (Combined.cfg_step adv).
   Notation extract_2cfg := (extract_2cfg (AtkStates := AtkStates)).
-  Notation step := (step _ _).
+  Notation step := (step adv (construct_simulator adv)).
 
-  Goal forall c, step (extract_2cfg c) = extract_2cfg (comb_step c).
-  Check comb_step.
-
+  Theorem extract_step_commute: forall c, step (extract_2cfg c) = extract_2cfg (comb_step c).
+  Proof.
+  Admitted.
 
 End extract_step_commute.
 (* The theorem: 
