@@ -80,7 +80,7 @@ Section cmb_step.
       let: ideal_st := optcmd_stp_store ideal_cmd ideal_st in
     
       let: atk_st := if real_atk_bit is true then learner atk_st real_st else atk_st in (* This could be sim_st as well, right? TODO: You need to think about whether the attacker is active, right? *)
-      let: atk_substeps := atk_substeps atk_st in
+      let: atk_substeps := if real_atk_bit is true then atk_substeps atk_st else 0 in
 
       let: new_pc := compute_new_pc_opt pc_lbl real_cmd in
       (mk_cmbstate real_st ideal_st sim_st atk_st, zip real_cnt ideal_cnt atk_substeps new_pc). 
