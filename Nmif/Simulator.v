@@ -36,6 +36,8 @@ End sim_st.
 
 
 Section sim_constr.
+  Import Util.List.
+
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
   Notation SimStates := (SimStates (AtkStates:=AtkStates)).
   Notation SimStateMachine := (AdvStateMachine SimStates).
@@ -43,48 +45,52 @@ Section sim_constr.
   Variables (atk: AdvStateMachine AtkStates) (prog: Prog).
 
   (* `c` has a guard and is secret.. *)
-  #[refine] Definition is_secret_guard (c: option Cmd) : bool :=
+  Definition is_secret_guard (c: option Cmd) : bool :=
     match c with
-    | Some (cond exp b1 b2) =>  _
-    | Some (while exp b) => _
+    | Some (cond (gvar, _) _ _) => is_secret gvar
+    | Some (while (gvar, _) _) => is_secret gvar
     | _ =>  false
-    end. all: admit. Admitted.
-  Import Util.List.
+    end. 
 
-  Definition sim_step (simst: SimStates): Store *  ?? :=
-    let: mk_simstate ast sim_st program_mem := simst in 
-    if program_mem isn't ((ocmd, isatk) :: rest) then simst else
+  Definition sim_init (init_sv : StoreView) : SimStates :=
+    let: store := fun v => if (init_sv v) is Some vl then vl else val_ne in
+    mk_simstate (init_state atk init_sv) store (map (fun c=> (Some c, true)) prog).
 
-    let: sim_st' :=  sim_st in 
-    let: sim_st' := if isatk is true then (corruptor atk ast sim_st) else sim_st' in 
+  Definition sim_step 
+    (ocmd: option Cmd) (isatk: bool) (sim_st : Store) (ast: AtkStates):
+    (Store (* sim_st *) *  list ((option Cmd) * bool)) :=
 
-    let: cont_prog := if is_secret_guard ocmd is true then [] else 
-                  map Some (optcmd_stp_cnt ocmd sim_st') in 
+    let: sim_st := if isatk is true then (corruptor atk ast sim_st) else sim_st in 
+
+    let: cont_prog := if is_secret_guard ocmd is true then [] else map Some (optcmd_stp_cnt ocmd sim_st) in 
     let: cont_atk := repeat true (substeps atk ast) in 
     let: cont_full := combine_extend2 cont_prog cont_atk None false in
 
-    let: sim_st' := optcmd_stp_store ocmd sim_st' in
-    mk_simstate (learner atk ast sim_st') sim_st' (cont_full ++ rest).
+    let: sim_st := optcmd_stp_store ocmd sim_st in (* TODO This should really not matter. *)
+
+    (sim_st, cont_full).
 
   
-  #[refine] Definition construct_simulator : SimStateMachine := 
+  Obligation Tactic := easy. (* TODO: Program cases or whatnot *)
+  Program Definition construct_simulator : SimStateMachine := 
     {| 
-      init_state sv :=  
-        (mk_simstate _ _ _) ;
+      init_state := sim_init;
 
-      learner :=  _ ;
+      learner st _ :=
+        let: (mk_simstate ast sim_st prg) :=  st in 
+        if prg isn't (ocmd, isatk) :: rest then st else
+        let: (sim_st, cont) := sim_step ocmd isatk sim_st ast in
+        mk_simstate (learner atk ast sim_st) sim_st (cont ++ rest);
+        
+
+      substeps '(mk_simstate ast sim_st prg) := 
+        if prg isn't (ocmd, isatk) :: _ then 0 else
+        let: (_, cont) := sim_step ocmd isatk sim_st ast in
+        length cont;
 
       corruptor _ st :=  st ;  (* Ideal corruptor is weak *)
-      curr_event simst := 
-        let: mk_simstate ast _ _ := simst in
-        curr_event atk ast;
-      substeps simst := 
-        let: mk_simstate ast _ _ := simst in
-        substeps atk ast; (* This is not correct! *)
+      curr_event '(mk_simstate ast _ _):=  curr_event atk ast;
     |}.
-  econstructor.
-  (* How does one construct simulator? I  *)
-
 End sim_constr.
 
 
