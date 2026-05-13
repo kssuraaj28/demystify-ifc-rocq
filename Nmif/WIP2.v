@@ -68,8 +68,9 @@ Section comb_compile_simulator.
     Import Combined.
     Definition sim_active (c: CmbCmd) : bool :=
       let: is_rattack := real_atk_bit c in 
-      let: is_public_pc := public (pc_lbl c) in 
-      is_rattack || is_public_pc.
+      let: is_public_rcmd := 
+        public (pc_lbl c) && if (real_cmd c) is None then false else true in 
+      is_rattack || is_public_rcmd.
   End sim_active.
 
   Section cmd_map.
@@ -129,7 +130,13 @@ Section extract_step_commute.
     1:{ case: cmbcmd inv => rcmd ratk icmd pclbl inv.
         rewrite /extract_2cfg /cmd_map /cmd_map_sim /=.
         f_equal; [f_equal | ].
-        1:{ idtac "==SUBGOAL 1=="; show_state. admit. }
+        1:{ rewrite map_app.
+            f_equal.
+            1:{ move: inv; case: ratk; case ep: (public pclbl); move=> inv /=.
+                1:{ idtac "==CASE TT=="; show_state. admit. }
+                1:{ idtac "==CASE TF=="; show_state. admit. }
+                1:{ idtac "==CASE FT=="; show_state. admit. }
+                1:{ idtac "==CASE FF=="; show_state. admit. } } }
         1:{ idtac "==SUBGOAL 2=="; show_state. admit. } }
   Admitted.
 
@@ -140,6 +147,10 @@ CmbCmd. invariant holds.
 
 
 *)
+
+
+
+
 
 
 
