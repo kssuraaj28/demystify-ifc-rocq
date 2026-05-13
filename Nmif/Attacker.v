@@ -51,17 +51,18 @@ Definition AdvEvent `{!AdvLeakPrm} := option LeakVals.
    AdvNextStep — initial-state construction now lives outside this record. *)
 Record AdvNextStep `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
     {AtkStates : Type} := {
-    corruptor: AtkStates -> Store -> Store;
+    (* Corruption *)
+    pre_cmd_action: AtkStates -> Store -> Store;
  
-    corruptor_wf_int: 
+    pre_cmd_wf_int: 
       forall ast, 
-        let: ast_corr := corruptor ast in
+        let: ast_corr := pre_cmd_action ast in
         let: tr_view := (store_to_view is_trusted) in
         (forall st, tr_view (ast_corr st) = (tr_view st));  (* The adversary does not touch trusted computation. This is a little bit ugly *)
 
-    corruptor_wf_conf: 
+    pre_cmd_wf_conf: 
       forall ast, 
-        let: ast_corr := corruptor ast in
+        let: ast_corr := pre_cmd_action ast in
         let: pub_view := (store_to_view is_public) in 
         Noninterfering pub_view ast_corr pub_view; (* public outputs don't chnage if public inputs don't *)
 
@@ -81,9 +82,9 @@ Record AdvNextStep `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
 Arguments AdvNextStep: clear implicits.
 Arguments AdvNextStep {_ _ _ _} AtkStates.
 
-Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite ->corruptor_wf_int in * ) "corruptor_wf_int" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite ->pre_cmd_wf_int in * ) "pre_cmd_wf_int" old.
 Ltac2 Set this_cookbook_ as old :=
-  add_stirstep 1 ltac1:(unshelve erewrite corruptor_wf_conf;[|reflexivity|]) "corruptor_wf_conf" old. 
+  add_stirstep 1 ltac1:(unshelve erewrite pre_cmd_wf_conf;[|reflexivity|]) "pre_cmd_wf_conf" old.
   (* TODO: I think maybe apply is better? TODO *)
 
 Ltac2 this_cookbook () := this_cookbook_ ().
@@ -94,6 +95,6 @@ Section test.
   Generalizable All Variables.
   Ltac2 Set curr_cookbook := this_cookbook. 
 
-  Goal `(forall P, P ⟨ corruptor (AtkStates := A) adv ast st  | is_trusted ⟩).
+  Goal `(forall P, P ⟨ pre_cmd_action (AtkStates := A) adv ast st  | is_trusted ⟩).
   Proof.   move=> *.  cook.  Abort.
 End test.

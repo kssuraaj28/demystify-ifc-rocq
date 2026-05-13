@@ -135,7 +135,7 @@ Section idealatk.
 
       (* TODO: I don't know what is happening. Is this correct?*)
       init_substeps st := length (sim_cont(extra st));
-      corruptor _ := id; (* TODO: We need to show a stronger property, which we don't.. But which is obvious.. We need to say that simulator only does things at x or y*)
+      pre_cmd_action _ := id; (* TODO: We need to show a stronger property, which we don't.. But which is obvious.. We need to say that simulator only does things at x or y*)
       leaker st := leaker atkreal (real_sim st);
       substeps st :=  length (sim_cont(extra st))
       |}.

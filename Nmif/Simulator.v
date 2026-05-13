@@ -55,7 +55,7 @@ Section sim_constr.
     (ocmd: option Cmd) (isatk: bool) (sim_st : Store) (ast: AtkStates):
     (Store (* sim_st *) * AtkStates *  list ((option Cmd) * bool)) :=
 
-    let: sim_st := if isatk is true then (corruptor atk ast sim_st) else sim_st in 
+    let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in
     let: ast := if isatk is true then (learner atk ast sim_st) else ast in 
     let: steps := if isatk is true then (substeps atk ast) else 0 in 
 
@@ -83,7 +83,7 @@ Section sim_constr.
         let: (_, cont) := sim_step ocmd isatk sim_st ast in
         length cont;
 
-      corruptor _ st :=  st ;  (* Ideal corruptor is weak *)
+      pre_cmd_action _ st :=  st ;  (* Ideal pre-cmd action is weak *)
       curr_event '(mk_simstate ast _ _):=  curr_event atk ast;
     |}.
 End sim_constr.

@@ -23,7 +23,7 @@ Section acmd.  (* TODO: This needs to go to some place good *)
   Definition acmd_step (ac: AtkCmd) (s: State): Prog * State * nat :=  
     let: mk_atkcmd isatk cmd := ac in 
     let: (store, atk_st) := s in 
-    let: st := if isatk is true then corruptor adv atk_st store else store in 
+    let: st := if isatk is true then pre_cmd_action adv atk_st store else store in
     let: (prog, st) := (optcmd_stp_cnt cmd st,  optcmd_stp_store cmd st) in 
     let: atk_st := if isatk is true then learner adv atk_st st else atk_st in 
     let: steps := if isatk is true then  substeps adv atk_st else 0 in

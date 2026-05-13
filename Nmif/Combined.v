@@ -55,7 +55,7 @@ Section cmb_step.
 
   Section step.
     Variable (adv: AdvNextStep AtkStates). 
-    Notation corruptor := (corruptor adv).
+    Notation pre_cmd_action := (pre_cmd_action adv).
     Notation learner := (learner adv).
     Notation atk_substeps := (substeps adv).
 
@@ -64,10 +64,10 @@ Section cmb_step.
       let: mk_cmbstate real_st ideal_st sim_st atk_st := s in
     
       (* Corruption first. TODO: When there is endorsement, there will need to be an update to the ideal store as well *)
-      let: real_st := if real_atk_bit is true then corruptor atk_st real_st else real_st in 
+      let: real_st := if real_atk_bit is true then pre_cmd_action atk_st real_st else real_st in 
       let: (real_cnt, real_st) := (optcmd_stp_cnt real_cmd real_st,  optcmd_stp_store real_cmd real_st) in (* TODO: The proof breaks when you update real_st before real_cnt. Why? *)
 
-      let: sim_st := if real_atk_bit is true then corruptor atk_st sim_st else sim_st in  
+      let: sim_st := if real_atk_bit is true then pre_cmd_action atk_st sim_st else sim_st in  
       (* If pc is secret, then there will not be any change to public vars, so this is okay!    The simulator will not have access to real_cmd in a secret branch *)
       let: sim_st := if (public pc_lbl) is false then sim_st else optcmd_stp_store real_cmd sim_st in  
     
