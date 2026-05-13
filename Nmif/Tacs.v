@@ -175,31 +175,32 @@ Section test.
   Abort.
 End test.
 
-#[local] Ltac2 assert_no_hypchange (t:unit -> unit) : unit :=
-  one_goal_assertion "assert_no_hypchange";
+#[local] Ltac2 assert_no_hyp_loss (t:unit -> unit) : unit :=
+  one_goal_assertion "assert_no_hyp_loss";
   let names () := List.map (fun (n, _, _) => n) (Control.hyps ()) in
-  let before := names () in t ();  
+  let before := names () in t ();
   Control.enter (fun () => (* You will get a not focused exception *)
     let after := names () in
-    if List.equal Ident.equal before after then () else
-    panic_s "assert_no_hypchange" "Hypotheses changed").
+    if List.for_all (fun n => List.mem Ident.equal n after) before then () else
+    panic_s "assert_no_hyp_loss" "Hypothesis removed or renamed").
 
 Section test. 
-  Goal True -> False. 
+  Goal True -> False.
   Proof Mode "Ltac2".
-    assert_no_hypchange (fun ()=> ltac1:(idtac)).
-    Fail assert_no_hypchange (fun ()=> ltac1:(intros)).
+    assert_no_hyp_loss (fun ()=> ltac1:(idtac)).
+    (* New: adding hypotheses is allowed. *)
+    Succeed assert_no_hyp_loss (fun ()=> ltac1:(intros)).
     intros h.
-    assert_no_hypchange (fun ()=> ltac1:(intros)).
-    Fail assert_no_hypchange (fun ()=> ltac1:(rename h into h')).
+    assert_no_hyp_loss (fun ()=> ltac1:(intros)).
+    Fail assert_no_hyp_loss (fun ()=> ltac1:(rename h into h')).
   Abort.
 
   Goal True -> False /\ False. 
   Proof Mode "Ltac2".
     intros h.
-    Succeed assert_no_hypchange (fun ()=> ltac1:(split)).
-    Fail assert_no_hypchange (fun ()=> ltac1:(split; rename h into h')).
-    Fail assert_no_hypchange (fun ()=> ltac1:(split; [rename h into h'|])).
+    Succeed assert_no_hyp_loss (fun ()=> ltac1:(split)).
+    Fail assert_no_hyp_loss (fun ()=> ltac1:(split; rename h into h')).
+    Fail assert_no_hyp_loss (fun ()=> ltac1:(split; [rename h into h'|])).
   Abort.
  
 End test. 
@@ -220,7 +221,7 @@ End test.
   Use `precise_harden` when not sufficient.
 *)
 (* TODO: This type could be made into a record  *)
-Ltac2 precise_harden (t: unit -> unit) (goals: (int * bool) option) (allow_evar_change: bool) (allow_hyps_change : bool): unit :=
+Ltac2 precise_harden (t: unit -> unit) (goals: (int * bool) option) (allow_evar_change: bool) (allow_hyps_remove : bool): unit :=
     one_goal_assertion "precise_harden";
     let t := fun () => once_hard_progress t in  (* TODO: What is the correct order? *)
     let t := fun () => Control.unshelve t in  
@@ -229,7 +230,7 @@ Ltac2 precise_harden (t: unit -> unit) (goals: (int * bool) option) (allow_evar_
              | None => t 
              end in
     let t := if allow_evar_change then t else fun () => t(); Control.enter assert_no_evars in
-    let t := if allow_hyps_change then t else fun () => assert_no_hypchange t in
+    let t := if allow_hyps_remove then t else fun () => assert_no_hyp_loss t in
     t ().
 
 (* Sugar: The default values of these bools are false *)
@@ -560,20 +561,20 @@ End test.
 
 Module Cook.
 
-  (* t, dest, allow_hyps_change *)
+  (* t, dest, allow_hyps_remove *)
   #[abstract] Ltac2 Type cook_tac := ((unit -> unit) * (string) * bool).
   #[abstract] Ltac2 Type cookbook := cook_tac list.
 
   Ltac2 create_new_cookbook () : cookbook := [].
   Ltac2 mutable curr_cookbook () : cookbook := [].
   Ltac2 curr_stirbook () : cookbook := 
-    List.filter (fun (_, _, allow_hyps_change) => Bool.neg allow_hyps_change) (curr_cookbook ()).
+    List.filter (fun (_, _, allow_hyps_remove) => Bool.neg allow_hyps_remove) (curr_cookbook ()).
   Ltac2 mutable cook_debug : bool := false.
 
   #[local] Ltac2 print_cookbook0 (l : cookbook) : unit :=
     List.iteri (fun i p =>
       let (_, desc, dhc) := p in
-      printf "%i: %s [allow_hyps_change=%s]" i desc (if dhc then "true" else "false")) (l).
+      printf "%i: %s [allow_hyps_remove=%s]" i desc (if dhc then "true" else "false")) (l).
 
   Ltac2 Notation "print_cookbook" l(tactic(0)) :=  print_cookbook0 (l ()).
 
@@ -592,9 +593,9 @@ Module Cook.
     fun () => delete0 (l ()) (names ()).
 
   (* TODO: Maybe check that there is no name duplication in the future? Throw a warning if this is the case *)
-  #[local] Ltac2 append_tac0 (t: unit -> unit) (desc: string) (goals: (int * bool) option) (allow_hyps_change: bool) (l : cookbook) : cookbook :=
-    let hardened := fun () => precise_harden t goals false allow_hyps_change in 
-    (hardened, desc, allow_hyps_change) :: l.
+  #[local] Ltac2 append_tac0 (t: unit -> unit) (desc: string) (goals: (int * bool) option) (allow_hyps_remove: bool) (l : cookbook) : cookbook :=
+    let hardened := fun () => precise_harden t goals false allow_hyps_remove in 
+    (hardened, desc, allow_hyps_remove) :: l.
 
   (* TODO: This desc() is sus *)
   Ltac2 Notation "add_cookstep" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
@@ -717,9 +718,9 @@ Section test.
   (* bad stir *)
   Section bad_stir.
     Ltac2 this_cookbook_ :=
-      add_stirstep 1 ltac1:(pose n := 5) "dummy" create_new_cookbook.
+      add_stirstep 1 ltac1:(lazymatch goal with H: True |- _ => clear H end ) "dummy" create_new_cookbook.
     Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()). (* Maybe keep only 1 *)
-    Goal False. Proof. Fail cook.  Abort.
+    Goal True -> False. Proof. Fail cook.  Abort.
   End bad_stir.
   
   (* stir vs cook *)
