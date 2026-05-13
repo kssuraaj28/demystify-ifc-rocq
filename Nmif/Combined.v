@@ -197,8 +197,9 @@ Section invprf.
 
       - move=>>[]_; rewrite/StateInv=> + [].
         case pce: (untrusted _); cycle 1.
-         { move=> <- /= <- *; repeat split; cook. }
-        move=> * /=. repeat split; cook.
+        1: move=> <- /= <- *.
+        2: move=> * /=. 
+        1-2: repeat split; cook.
          { revert_hyp_type_dep (option Cmd); case => /= *; cook. }
         move=> /=. 
         apply/Forall_and; [stir|]. 
