@@ -539,17 +539,22 @@ Definition idVE (src : Vars) : ValExp := (src, src, fun a _ => a).
 Definition idBE (src : Vars) : BoolExp := (src, fun b => b).
 
 Definition cAssPT          : Cmd := assign PT (idVE PT).
+Definition cAssST          : Cmd := assign ST (idVE ST).        (* trusted secret *)
 Definition cAssPU_fromPT   : Cmd := assign PU (idVE PT).
 Definition cAssSU_fromPT   : Cmd := assign SU (idVE PT).
 
 Definition cCondPT : Cmd := cond (idBE PT) [cAssPT] [cAssPT].
 Definition cCondPU : Cmd := cond (idBE PU) [cAssPT] [cAssPT].
+Definition cCondST : Cmd := cond (idBE ST) [cAssST] [cAssST].   (* trusted secret guard *)
 
 Definition cWhilePT : Cmd := while (idBE PT) [cAssPT].
 Definition cWhilePU : Cmd := while (idBE PU) [cAssPT].
+Definition cWhileST : Cmd := while (idBE ST) [cAssST].          (* trusted secret guard *)
 
-Definition pcPubUntr : TypeSystem.PcLbl := mk_lbl true true.
-Definition pcSecUntr : TypeSystem.PcLbl := mk_lbl true false.
+Definition pcPubUntr : TypeSystem.PcLbl := mk_lbl true  true.
+Definition pcSecUntr : TypeSystem.PcLbl := mk_lbl true  false.
+Definition pcPubTrust: TypeSystem.PcLbl := mk_lbl false true.   (* trusted public *)
+Definition pcSecTrust: TypeSystem.PcLbl := mk_lbl false false.  (* trusted secret *)
 
 Section Tests.
   Import Simulator. Import WIP2.
@@ -663,5 +668,106 @@ Section Tests.
   Goal step2 (extract_2cfg (cS, cMulti)) = extract_2cfg (comb_step2 (cS, cMulti)).
   Proof. vm_compute. reflexivity. Qed.
 End Tests.
+
+(* ============================================================
+   Trusted pclbl tests (untrusted bit = false).
+   Under the invariant, trusted pclbl forces rcmd = icmd
+   (CmbCmdCoreInv case b), so all tests are symmetric.
+   ============================================================ *)
+Section TrustedPc.
+  Import Simulator. Import WIP2.
+
+  Notation extract_2cfg := (extract_2cfg (AtkStates := cAtkStates)).
+  Notation step         := (WIP2.step cAdv (construct_simulator cAdv)).
+  Notation comb_step    := (Combined.cfg_step cAdv).
+
+  Notation step2        := (WIP2.step (cAdvN 2) (construct_simulator (cAdvN 2))).
+  Notation comb_step2   := (Combined.cfg_step (cAdvN 2)).
+
+  (* --- Trusted public pclbl, varying ratk and cmd shape. --- *)
+  Goal step (extract_2cfg (cS, [mkB (Some cAssPT) (Some cAssPT) false pcPubTrust])) =
+       extract_2cfg (comb_step (cS, [mkB (Some cAssPT) (Some cAssPT) false pcPubTrust])).
+  Proof. vm_compute. reflexivity. Qed.
+
+  Goal step (extract_2cfg (cS, [mkB (Some cAssPT) (Some cAssPT) true  pcPubTrust])) =
+       extract_2cfg (comb_step (cS, [mkB (Some cAssPT) (Some cAssPT) true  pcPubTrust])).
+  Proof. vm_compute. reflexivity. Qed.
+
+  Goal step (extract_2cfg (cS, [mkB (Some cCondPT) (Some cCondPT) false pcPubTrust])) =
+       extract_2cfg (comb_step (cS, [mkB (Some cCondPT) (Some cCondPT) false pcPubTrust])).
+  Proof. vm_compute. reflexivity. Qed.
+
+  Goal step (extract_2cfg (cS, [mkB (Some cCondPT) (Some cCondPT) true  pcPubTrust])) =
+       extract_2cfg (comb_step (cS, [mkB (Some cCondPT) (Some cCondPT) true  pcPubTrust])).
+  Proof. vm_compute. reflexivity. Qed.
+
+  Goal step (extract_2cfg (cS, [mkB (Some cWhilePT) (Some cWhilePT) false pcPubTrust])) =
+       extract_2cfg (comb_step (cS, [mkB (Some cWhilePT) (Some cWhilePT) false pcPubTrust])).
+  Proof. vm_compute. reflexivity. Qed.
+
+  Goal step (extract_2cfg (cS, [mkB (Some cWhilePT) (Some cWhilePT) true  pcPubTrust])) =
+       extract_2cfg (comb_step (cS, [mkB (Some cWhilePT) (Some cWhilePT) true  pcPubTrust])).
+  Proof. vm_compute. reflexivity. Qed.
+
+  (* --- Trusted secret pclbl, varying ratk and cmd shape. ---
+     Note: real and ideal stores agree on trusted vars {PT, ST}, so the
+     ST-guarded cond/while take the same branch on both sides. *)
+  Goal step (extract_2cfg (cS, [mkB (Some cAssST) (Some cAssST) false pcSecTrust])) =
+       extract_2cfg (comb_step (cS, [mkB (Some cAssST) (Some cAssST) false pcSecTrust])).
+  Proof. vm_compute. reflexivity. Qed.
+
+  Goal step (extract_2cfg (cS, [mkB (Some cAssST) (Some cAssST) true  pcSecTrust])) =
+       extract_2cfg (comb_step (cS, [mkB (Some cAssST) (Some cAssST) true  pcSecTrust])).
+  Proof. vm_compute. reflexivity. Qed.
+
+  Goal step (extract_2cfg (cS, [mkB (Some cCondST) (Some cCondST) false pcSecTrust])) =
+       extract_2cfg (comb_step (cS, [mkB (Some cCondST) (Some cCondST) false pcSecTrust])).
+  Proof. vm_compute. reflexivity. Qed.
+
+  Goal step (extract_2cfg (cS, [mkB (Some cCondST) (Some cCondST) true  pcSecTrust])) =
+       extract_2cfg (comb_step (cS, [mkB (Some cCondST) (Some cCondST) true  pcSecTrust])).
+  Proof. vm_compute. reflexivity. Qed.
+
+  Goal step (extract_2cfg (cS, [mkB (Some cWhileST) (Some cWhileST) false pcSecTrust])) =
+       extract_2cfg (comb_step (cS, [mkB (Some cWhileST) (Some cWhileST) false pcSecTrust])).
+  Proof. vm_compute. reflexivity. Qed.
+
+  Goal step (extract_2cfg (cS, [mkB (Some cWhileST) (Some cWhileST) true  pcSecTrust])) =
+       extract_2cfg (comb_step (cS, [mkB (Some cWhileST) (Some cWhileST) true  pcSecTrust])).
+  Proof. vm_compute. reflexivity. Qed.
+
+  (* --- None and both-None padding at trusted pclbl. --- *)
+  Goal step (extract_2cfg (cS, [mkB None None false pcPubTrust])) =
+       extract_2cfg (comb_step (cS, [mkB None None false pcPubTrust])).
+  Proof. vm_compute. reflexivity. Qed.
+
+  Goal step (extract_2cfg (cS, [mkB None None true  pcSecTrust])) =
+       extract_2cfg (comb_step (cS, [mkB None None true  pcSecTrust])).
+  Proof. vm_compute. reflexivity. Qed.
+
+  (* --- Non-zero substeps at trusted pclbl. --- *)
+  Goal step2 (extract_2cfg (cS, [mkB (Some cCondPT) (Some cCondPT) true pcPubTrust])) =
+       extract_2cfg (comb_step2 (cS, [mkB (Some cCondPT) (Some cCondPT) true pcPubTrust])).
+  Proof. vm_compute. reflexivity. Qed.
+
+  Goal step2 (extract_2cfg (cS, [mkB (Some cWhileST) (Some cWhileST) true pcSecTrust])) =
+       extract_2cfg (comb_step2 (cS, [mkB (Some cWhileST) (Some cWhileST) true pcSecTrust])).
+  Proof. vm_compute. reflexivity. Qed.
+
+  (* --- Multi-cmbcmd list mixing trusted and untrusted pclbls. --- *)
+  Definition cMultiTrust : list Combined.CmbCmd :=
+    [ mkB (Some cAssPT)   (Some cAssPT)   false pcPubTrust
+    ; mkB (Some cCondST)  (Some cCondST)  true  pcSecTrust
+    ; mkB (Some cWhilePT) (Some cWhilePT) false pcPubTrust
+    ; mkB None            None            true  pcSecTrust ].
+
+  Goal step (extract_2cfg (cS, cMultiTrust)) =
+       extract_2cfg (comb_step (cS, cMultiTrust)).
+  Proof. vm_compute. reflexivity. Qed.
+
+  Goal step2 (extract_2cfg (cS, cMultiTrust)) =
+       extract_2cfg (comb_step2 (cS, cMultiTrust)).
+  Proof. vm_compute. reflexivity. Qed.
+End TrustedPc.
 
 End Var4Vars.
