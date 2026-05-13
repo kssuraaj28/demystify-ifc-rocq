@@ -56,8 +56,7 @@ Section sim_constr.
     (Store (* sim_st *) * AtkStates *  list ((option Cmd) * bool)) :=
 
     let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in
-    let: ast := if isatk is true then (learner atk ast sim_st) else ast in 
-    let: steps := if isatk is true then (substeps atk ast) else 0 in 
+    let: (ast, steps) := if isatk is false then (ast, 0) else (post_cmd_action atk ast sim_st)  in
 
     let: cont_prog := if is_secret_guard ocmd is true then [] else map Some (optcmd_stp_cnt ocmd sim_st) in 
     let: cont_atk := repeat true steps in
@@ -71,20 +70,21 @@ Section sim_constr.
   Obligation Tactic := easy. (* TODO: Program cases or whatnot *)
   Program Definition construct_simulator : SimStateMachine := 
     {|
-      learner st _ :=
+      post_cmd_action st _ :=
         let: (mk_simstate ast sim_st prg) :=  st in 
-        if prg isn't (ocmd, isatk) :: rest then st else
+        if prg isn't (ocmd, isatk) :: rest then (st, 0) else
         let: (sim_st, new_ast, cont) := sim_step ocmd isatk sim_st ast in
-        mk_simstate new_ast sim_st (cont ++ rest);
+        (mk_simstate new_ast sim_st (cont ++ rest), length cont);
         
 
+(*
       substeps '(mk_simstate ast sim_st prg) := 
         if prg isn't (ocmd, isatk) :: _ then 0 else
         let: (_, cont) := sim_step ocmd isatk sim_st ast in
         length cont;
+        *)
 
       pre_cmd_action _ st :=  st ;  (* Ideal pre-cmd action is weak *)
-      curr_event '(mk_simstate ast _ _):=  curr_event atk ast;
     |}.
 End sim_constr.
 

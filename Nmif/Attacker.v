@@ -67,16 +67,13 @@ Record AdvNextStep `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
         Noninterfering pub_view ast_corr pub_view; (* public outputs don't chnage if public inputs don't *)
 
 
-    learner : AtkStates -> Store -> AtkStates;
-
-    learner_wf:
+    post_cmd_action: AtkStates -> Store -> (AtkStates * (*AdvEvent * *) nat); (* New state, event, and substeps *)
+    post_cmd_wf:
       forall ast,
-        let: ast_lrn := learner ast in
+        let: ast_lrn := post_cmd_action ast in
         let: pub_view := store_to_view is_public in
         Noninterfering pub_view ast_lrn id;
 
-    curr_event : AtkStates -> AdvEvent;
-    substeps : AtkStates -> nat;
   }.
 
 Arguments AdvNextStep: clear implicits.

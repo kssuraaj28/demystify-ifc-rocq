@@ -56,8 +56,7 @@ Section cmb_step.
   Section step.
     Variable (adv: AdvNextStep AtkStates). 
     Notation pre_cmd_action := (pre_cmd_action adv).
-    Notation learner := (learner adv).
-    Notation atk_substeps := (substeps adv).
+    Notation post_cmd_action := (post_cmd_action adv).
 
     Definition cmbcmd_step (c: CmbCmd) (s: CmbState) : Cfg :=
       let: mk_cmbcmd real_cmd real_atk_bit ideal_cmd pc_lbl := c in
@@ -79,8 +78,10 @@ Section cmb_step.
       (* I think that this will change if there is downgrading.. TODO *)
       let: ideal_st := optcmd_stp_store ideal_cmd ideal_st in
     
-      let: atk_st := if real_atk_bit is true then learner atk_st real_st else atk_st in (* This could be sim_st as well, right? TODO: You need to think about whether the attacker is active, right? *)
-      let: atk_substeps := if real_atk_bit is true then atk_substeps atk_st else 0 in
+      let: atk_pst := (post_cmd_action atk_st real_st) in (* Not having this was quite painful. TODO *)
+      let: atk_st := if real_atk_bit is true then atk_pst.1 else atk_st in
+      let: atk_substeps := if real_atk_bit is true then atk_pst.2 else 0 in
+
 
       let: new_pc := compute_new_pc_opt pc_lbl real_cmd in
       (mk_cmbstate real_st ideal_st sim_st atk_st, zip real_cnt ideal_cnt atk_substeps new_pc). 
@@ -184,17 +185,20 @@ Section invprf.
     Ltac2 Set cook_auto_depth := 4.
     (* TODO: Why does cook make this extremely slow? *)
     (* TODO: Set Ltac Profiling *)
-    Lemma cmbcmd_step_inv: 
-      forall c st, 
+
+    Lemma cmbcmd_step_inv:
+      forall c st,
         CmbCmdInv c ->
         StateInv st ->
         let: (st', clst') := cmbcmd_step c st in
         StateInv st' /\ Forall CmbCmdInv clst'.
-    Proof. 
+    Proof.
       case; rewrite {}/CmbCmdInv=> - []; cycle 1. 
 
       - move=>>[]_; rewrite/StateInv=> + [].
-        (case pce: (untrusted _))=> [* /= | <- /= <- *]; repeat split; cook.
+        case pce: (untrusted _); cycle 1.
+         { move=> <- /= <- *; repeat split; cook. }
+        move=> * /=. repeat split; cook.
          { revert_hyp_type_dep (option Cmd); case => /= *; cook. }
         move=> /=. 
         apply/Forall_and; [stir|]. 
@@ -225,7 +229,6 @@ Section invprf.
         apply/flows_to_subtype_prog; [|apply/snd].
         stir.
     Qed. 
-  End cook.
 
   Theorem cfg_step_inv: forall c, Invariant c ->  Invariant (cfg_step c).
   Proof.
