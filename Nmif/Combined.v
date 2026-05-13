@@ -230,6 +230,7 @@ Section invprf.
         apply/flows_to_subtype_prog; [|apply/snd].
         stir.
     Qed. 
+  End cook.
 
   Theorem cfg_step_inv: forall c, Invariant c ->  Invariant (cfg_step c).
   Proof.
