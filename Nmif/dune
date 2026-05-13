@@ -1,5 +1,9 @@
+; Pick up .v files in subdirectories (e.g. Test/Tests.v) as part of
+; this theory, with qualified module paths (Nmif.Test.Tests).
+(include_subdirs qualified)
+
 (rocq.theory
   (name Nmif)
-  (theories 
+  (theories
     Ltac2
-    Stdlib)) 
+    Stdlib))
