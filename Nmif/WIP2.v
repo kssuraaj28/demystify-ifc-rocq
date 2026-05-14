@@ -129,6 +129,7 @@ Section comb_compile_simulator.
       cmd_map (l1 ++ l2) = cmd_map l1 ++ cmd_map l2.
     Proof. rewrite /cmd_map map_app. done. Qed.
 
+    Import Util.List.
     Lemma cmd_map_zip rl il steps pclbl :
       cmd_map (zip rl il steps pclbl) =
         map (fun '(rc, ic, abit) =>
@@ -137,12 +138,22 @@ Section comb_compile_simulator.
                            (public pclbl &&
                             if rc is None then false else true))
                           ic))
-            (Util.List.combine_extend3 (map Some rl) (map Some il)
+            (combine_extend3 (map Some rl) (map Some il)
                              (repeat true steps) None None false).
     Proof.
       rewrite /cmd_map /zip /sim_active map_map.
       apply: map_ext. case=> -[rc ic] abit. done.
     Qed.
+
+    Lemma map_proj_map_mk pclbl l :
+      map (fun _c : CmbCmd =>
+             (real_cmd _c, real_atk_bit _c, ideal_cmd _c, sim_active _c))
+          (map (fun '(_rc, _ic, _abit) => mk_cmbcmd _rc _abit _ic pclbl) l) =
+      map (fun '(_rc, _ic, _abit) =>
+             (_rc, _abit, _ic,
+              _abit || (public pclbl && if _rc is None then false else true)))
+          l.
+    Proof. rewrite map_map. apply: map_ext. case=> -[rc ic] abit. rewrite /sim_active /=. done. Qed.
 
   End cmd_map.
 
@@ -228,33 +239,28 @@ Section extract_step_commute.
       rewrite /= in inv. move: inv=> []. (toph Forall_inv)=> i1 restinv i3.
       rewrite /CmbCmdInv/CmbCmdCoreInv in i1. case: i1=> rwt iwt.
       rewrite /StateInv in i3. case: i3=> treq pubeq.
-      move: isatk pclbl rcmd rwt iwt. 
-      case; (case=> - ? ?); (case=> [rcmd|]); stir=> rwt iwt.
-      + rewrite/comb_step/cmbcmd_step {2}/extract_2cfg; stir.
-        rewrite /extract_2cfg; stir.
-        rewrite/sim_active; stir.
-        rewrite/step; stir.
-        cbv zeta; stir.
-        congr (_,_,_).
-        -- congr (_ ++ _); stir. (* TODO: Forward reasoning *) 
-           rewrite/cmd_map.
-           set l1 := (X in map _ X = _).
-           set l2 := (X in _ = map _ X).
-           suff: l1 = map (fun c => (real_cmd c, real_atk_bit c,  ideal_cmd c, sim_active c)) l2;
-             [move=> ->; rewrite map_map //| subst l1 l2]. (* TODO: This could be lemma / rewrite rule *)
-           rewrite/sim_step. stir.
-           case e: (is_secret_guard); stir.
+      move: pclbl rwt iwt.
+      (case=> - ? ?); stir=> rwt iwt.
+      rewrite/comb_step/cmbcmd_step {2}/extract_2cfg; stir.
+      rewrite /extract_2cfg; stir.
+      rewrite/sim_active; stir.
+      rewrite/step; stir.
+      congr (_,_,_).
+      -- congr (_ ++ _); stir. (* TODO: Forward reasoning *) 
+         rewrite/cmd_map.
+         set l1 := (X in map _ X = _).
+         set l2 := (X in _ = map _ X).
+         suff: l1 = map (fun c => (real_cmd c, real_atk_bit c,  ideal_cmd c, sim_active c)) l2;
+           [move=> ->; rewrite map_map //| subst l1 l2]. (* TODO: This could be lemma / rewrite rule *)
+         rewrite/sim_step. stir.
+         case e: (is_secret_guard); stir; admit.
+         (*
            ++ rewrite map_repeat. 
               rewrite repeat_length; stir.
-              rewrite map_zip. stir.
-              rewrite/zip.
-
-
-              rewrite clean_cmd_stp_store_secret_guard;[assumption|].
-              rewrite clean_cmd_stp_store_secret_guard;[assumption|].
-              erewrite <- (noninterfering_post_pre _ _ _ simst);[| eassumption].
-              rewrite/zip. admit.
-           ++ admit. (* This is a super hard case *) 
+              rewrite map_proj_map_mk. (* This is pretty dogshit *)
+              *)
+         
+      -- congr(_,_).
 
           rewrite map_map.
         rewrite /sim_step.
