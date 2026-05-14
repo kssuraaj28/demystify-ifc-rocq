@@ -56,6 +56,8 @@ Section sim_constr.
     (Store (* sim_st *) * AtkStates *  list ((option Cmd) * bool)) :=
 
     let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in
+    let: sim_st := optcmd_stp_store ocmd sim_st in 
+
     let: post_atk := post_cmd_action atk ast sim_st in
     let: ast := if isatk is true then post_atk.1 else ast in
     let: steps := if isatk is true then post_atk.2 else 0 in
@@ -64,7 +66,6 @@ Section sim_constr.
     let: cont_atk := repeat true steps in
     let: cont_full := combine_extend2 cont_prog cont_atk None false in
 
-    let: sim_st := optcmd_stp_store ocmd sim_st in (* TODO This should really not matter. *)
 
     (sim_st, ast, cont_full).
 
@@ -98,7 +99,12 @@ Section sim_constr.
       (mk_simstate ast sim_st ((ocmd, isatk) :: rest)) st =
       let: (sim_st', new_ast, cont) := sim_step ocmd isatk sim_st ast in
       (mk_simstate new_ast sim_st' (cont ++ rest), length cont).
-  Proof. rewrite /=; case isatk=>  //=. Qed. 
+  Proof. rewrite /=; case isatk=>  //=. Qed.
+
+  Lemma clean_cmd_stp_store_secret_guard c s :
+    is_secret_guard (Some c) = true ->
+    clean_cmd_stp_store c s = s.
+  Proof. case: c => [dst exp | [g cmp] b1 b2 | [g cmp] b] //=. Qed.
 End sim_constr.
 
 Ltac2 this_cookbook () := this_cookbook_ ().

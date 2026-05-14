@@ -56,6 +56,14 @@ Module List.
   Goal combine_extend2 [1; 3] [true; false; false] 10 false = [(1, true); (3, false); (10, false)].
   Proof. done. Qed.
 
+  Lemma combine_extend2_nil_l {A B} lb (da:A) (db:B) :
+    ltac2:(cbn_eq (combine_extend2 [] lb da db)).
+  Proof. done. Qed.
+
+  Lemma combine_extend2_nil_r {A B} la (da:A) (db:B) :
+    ltac2:(cbn_eq (combine_extend2 la [] da db)).
+  Proof. case: la; done. Qed.
+
   (* Maybe use Ltac2 to define this.. *)
   Definition combine_extend3 {A B C}
     (la : list A) (lb : list B) (lc : list C)
@@ -162,9 +170,15 @@ Module List.
 
 
   (* TODO: Test for these also *)
-  Ltac2 Set this_cookbook_ as old := add_stirstep 1 
+  Ltac2 Set this_cookbook_ as old := add_stirstep 1
     ltac1:(lazymatch goal with |- Forall _ (map _ _) => apply/Forall_map end)
     "Forall_map" old.
+
+  Ltac2 Set this_cookbook_ as old :=
+    add_stirstep 1 ltac1:(rewrite -> combine_extend2_nil_l in * ) "combine_extend2_nil_l" old.
+  Ltac2 Set this_cookbook_ as old :=
+    add_stirstep 1 ltac1:(rewrite -> combine_extend2_nil_r in * ) "combine_extend2_nil_r" old.
+
   Ltac2 this_cookbook () := this_cookbook_ ().
   Hint Extern 10 => lazymatch goal with _ =>  apply/Forall_forall end : trickbag.
 End List.
@@ -279,11 +293,17 @@ Example map_nil_simpl {A B} (f: A -> B) := (erefl : ltac2:(cbn_eq (map f []))).
 Lemma map_nil_simpl {A B} (f: A -> B) : ltac2:(cbn_eq (map f [])). Proof. done. Qed.
 Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> map_nil_simpl in * ) "map_nil_simpl" old.
 
-Lemma if_same {T} (b : bool) (t: T) : 
+Lemma if_same {T} (b : bool) (t: T) :
   (if b then t else t) = t.
-Proof.  case: b; done. Qed. 
+Proof.  case: b; done. Qed.
 
 Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> if_same in * ) "if_same" old.
+
+Lemma fst_pair {A B} (a : A) (b : B) : ltac2:(cbn_eq (a, b).1). Proof. done. Qed.
+Lemma snd_pair {A B} (a : A) (b : B) : ltac2:(cbn_eq (a, b).2). Proof. done. Qed.
+
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> fst_pair in * ) "fst_pair" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> snd_pair in * ) "snd_pair" old.
 
 Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> orTb in * ) "orTb" old.
 Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> orbT in * ) "orbT" old.

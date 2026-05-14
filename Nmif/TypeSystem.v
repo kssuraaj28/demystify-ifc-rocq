@@ -248,7 +248,14 @@ Section new_pc.
   Definition compute_new_pc_opt (old_pc : PcLbl) (cmd: option Cmd): PcLbl :=
     if cmd isn't Some cmd then old_pc else
     compute_new_pc old_pc cmd.
+
+  Lemma compute_new_pc_opt_Some pc cmd :
+    ltac2:(cbn_eq (compute_new_pc_opt pc (Some cmd))).
+  Proof. done. Qed.
 End new_pc.
+
+Ltac2 Set this_cookbook_ as old :=
+  add_stirstep 1 ltac1:(rewrite -> compute_new_pc_opt_Some in * ) "compute_new_pc_opt_Some" old.
 
 Section thms.
   Import VarValStore.Notations.

@@ -124,6 +124,26 @@ Section comb_compile_simulator.
               real_atk_bit a) :: cmd_map_sim l
         else cmd_map_sim l.
     Proof. rewrite /cmd_map_sim /=. case: (sim_active a)=> //=. Qed.
+
+    Lemma cmd_map_app l1 l2 :
+      cmd_map (l1 ++ l2) = cmd_map l1 ++ cmd_map l2.
+    Proof. rewrite /cmd_map map_app. done. Qed.
+
+    Lemma cmd_map_zip rl il steps pclbl :
+      cmd_map (zip rl il steps pclbl) =
+        map (fun '(rc, ic, abit) =>
+               (mk_atkcmd abit rc,
+                mk_atkcmd (abit ||
+                           (public pclbl &&
+                            if rc is None then false else true))
+                          ic))
+            (Util.List.combine_extend3 (map Some rl) (map Some il)
+                             (repeat true steps) None None false).
+    Proof.
+      rewrite /cmd_map /zip /sim_active map_map.
+      apply: map_ext. case=> -[rc ic] abit. done.
+    Qed.
+
   End cmd_map.
 
   Section extract.
@@ -172,6 +192,12 @@ Section extract_step_commute.
     Ltac2 Set curr_cookbook as old :=
       add_stirstep 1 ltac1:(rewrite -> cmd_map_cons in * ) "cmd_map_cons" old.
     Ltac2 Set curr_cookbook as old :=
+      add_stirstep 1 ltac1:(rewrite -> cmd_map_app in * ) "cmd_map_app" old.
+      (*
+    Ltac2 Set curr_cookbook as old :=
+      add_stirstep 1 ltac1:(rewrite -> cmd_map_zip in * ) "cmd_map_zip" old.
+      *)
+    Ltac2 Set curr_cookbook as old :=
       add_stirstep 1 ltac1:(rewrite -> cmd_map_sim_cons in * ) "cmd_map_sim_cons" old.
     Ltac2 Set curr_cookbook as old :=
       add_stirstep 1 ltac1:(rewrite -> untrusted_mk in * ) "untrusted_mk" old.
@@ -203,45 +229,35 @@ Section extract_step_commute.
       rewrite /CmbCmdInv/CmbCmdCoreInv in i1. case: i1=> rwt iwt.
       rewrite /StateInv in i3. case: i3=> treq pubeq.
       move: isatk pclbl rcmd rwt iwt. 
-      case; (case=> - [] []); (case=> [rcmd|]); stir=> rwt iwt.
+      case; (case=> - ? ?); (case=> [rcmd|]); stir=> rwt iwt.
       + rewrite/comb_step/cmbcmd_step {2}/extract_2cfg; stir.
         rewrite /extract_2cfg; stir.
         rewrite/sim_active; stir.
         rewrite/step; stir.
         cbv zeta; stir.
         congr (_,_,_).
-        -- rewrite /sim_step.
+        -- congr (_ ++ _); stir. (* TODO: Forward reasoning *) 
+           rewrite/cmd_map.
+           set l1 := (X in map _ X = _).
+           set l2 := (X in _ = map _ X).
+           suff: l1 = map (fun c => (real_cmd c, real_atk_bit c,  ideal_cmd c, sim_active c)) l2;
+             [move=> ->; rewrite map_map //| subst l1 l2]. (* TODO: This could be lemma / rewrite rule *)
+           rewrite/sim_step. stir.
+           case e: (is_secret_guard); stir.
+           ++ rewrite map_repeat. 
+              rewrite repeat_length; stir.
+              rewrite map_zip. stir.
+              rewrite/zip.
 
-Unset SsrIdents.
-set
-     (post_cmd_action (construct_simulator adv)
-       {|
-         ast := atkst;
-         sim_st := simst;
-         program := (Some rcmd, true) :: cmd_map_sim restcmd
-       |} _st').
-        rewrite construct_simulator_post_cmd_cons.
 
-        rewrite/pre_cmd_action.
-        rewrite{1}/acmd_step.
-        rewrite acmd_step_atk.
-        move e:(acmd_step _ _ _)=> ?; exfalso.
-        rewrite/acmd_step/=.
-        rewrite/sim_step/=.
+              rewrite clean_cmd_stp_store_secret_guard;[assumption|].
+              rewrite clean_cmd_stp_store_secret_guard;[assumption|].
+              erewrite <- (noninterfering_post_pre _ _ _ simst);[| eassumption].
+              rewrite/zip. admit.
+           ++ admit. (* This is a super hard case *) 
 
-      {2}/extract_2cfg; stir.
-        rewrite/extract_2cfg; stir.
-        rewrite /sim_active; stir.
-
-        Print cmd_map.
-        rewrite map_cons.
-        congr (_,_,_). 
-          - Ltac2 Set cook_debug := true.
-          stir_step.
-          stir_step.
-        set x := (X in (combine_extend4 _ _ _ (repeat true X))). 
-        rewrite -/map.
-
+          rewrite map_map.
+        rewrite /sim_step.
         admit. 
         - 
         congr (_,_).

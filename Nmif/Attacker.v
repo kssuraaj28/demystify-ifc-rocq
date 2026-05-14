@@ -79,6 +79,13 @@ Record AdvNextStep `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
 Arguments AdvNextStep: clear implicits.
 Arguments AdvNextStep {_ _ _ _} AtkStates.
 
+Lemma noninterfering_post_pre `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
+  {AtkStates} (adv : AdvNextStep AtkStates) ast s1 s2 :
+  ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
+  post_cmd_action adv ast (pre_cmd_action adv ast s1) =
+  post_cmd_action adv ast (pre_cmd_action adv ast s2).
+Proof.  move=> hyp.  apply: post_cmd_wf.  apply: pre_cmd_wf_conf. done. Qed.
+
 Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite ->pre_cmd_wf_int in * ) "pre_cmd_wf_int" old.
 Ltac2 Set this_cookbook_ as old :=
   add_stirstep 1 ltac1:(unshelve erewrite pre_cmd_wf_conf;[|reflexivity|]) "pre_cmd_wf_conf" old.

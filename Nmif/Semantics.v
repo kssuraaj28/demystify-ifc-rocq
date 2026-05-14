@@ -76,10 +76,12 @@ Section cleanstep.
   Definition optcmd_evnt := oapp clean_cmd_evnt (fun _ => None).
 
   Lemma optcmd_stp_store_simpl c s: ltac2:(cbn_eq (optcmd_stp_store (Some c) s)). Proof. done. Qed.
+  Lemma optcmd_stp_cnt_simpl c s: ltac2:(cbn_eq (optcmd_stp_cnt (Some c) s)). Proof. done. Qed.
 End cleanstep.
 
 (* TODO: All autorewrite-ish tactics should do rewrite -> in * *)
 Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> optcmd_stp_store_simpl in * ) "optcmd_stp_store_simpl" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> optcmd_stp_cnt_simpl in * ) "optcmd_stp_cnt_simpl" old.
 
 Section test.
   Context `{!VarPrm, !ValPrm}.
