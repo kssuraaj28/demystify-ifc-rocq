@@ -365,45 +365,6 @@ Ltac2 Notation "cbn_eq" t(thunk(constr)) :=
   let t' := eval cbn in $t in
   exact ($t = $t').
 
-(* Does the #[refine] attibute make this obsolete? *)
-Module GallinaHole.
-  (* Holes *)
-  #[local] Ltac2 admit_tac () := 
-    let hole_constr := Control.hyp @hole in
-    Control.refine (fun () => '($hole_constr _)).
-
-    (* TODO: I wish that this was exact. 
-    I also wish that I could check the type of hole,
-    and make sure that it is forall T, T
-
-    Maybe then have marked hole, etc.
-    You could have a way to look for marked holes, etc.
-
-    You could also attach arbitrary ltac2 things.
-    Maybe the right place for this is to know the types of certain things..
-    Can we get gallina notations for this?
-    Notation x _ := x.
-    *)
-  Notation "??" := ltac2:(admit_tac ()) (only parsing).
-
-  Section usage. 
-    Fail Check ?? + 5.
-    Hypothesis hole : forall T, T.
-    Check ??.
-    Let x := ?? + ??. Print x.
-    Let y := 5 + ??. Print x.
-    Check ?? + 5.
-
-    Compute  (match ?? with 
-      | true => ??
-      | false => ??
-      end).
-
-  End usage.
-
-  Section test. Variable hole : bool.   Fail Check ??.  End test.
-End GallinaHole.
-
 
 (* section_vars *)
   (* TODO: You could do some preprocessing. Check if id's are really in hypotheses *)
