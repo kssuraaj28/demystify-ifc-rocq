@@ -211,6 +211,25 @@ Section thms.
   Qed.
 End thms.
 
+Section thms_atk.
+  Import VarValStore.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+
+  Lemma noninterfering_post_clean_pre {AtkStates} (adv : AdvNextStep AtkStates)
+    ast l c s1 s2 :
+    WellFormedCmd l c ->
+    ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
+    post_cmd_action adv ast (clean_cmd_stp_store c (pre_cmd_action adv ast s1)) =
+    post_cmd_action adv ast (clean_cmd_stp_store c (pre_cmd_action adv ast s2)).
+  Proof.
+    move=> wt hyp.
+    apply: post_cmd_wf.
+    apply: (wt_cmd_st_conf _ _ _ _ wt).
+    apply: pre_cmd_wf_conf.
+    exact: hyp.
+  Qed.
+End thms_atk.
+
 Ltac2 Set this_cookbook_ as old :=
   add_stirstep 1
     ltac1:(unshelve erewrite wt_cmd_st_int_untr;[..|eassumption])

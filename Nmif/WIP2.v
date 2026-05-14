@@ -129,6 +129,10 @@ Section comb_compile_simulator.
       cmd_map (l1 ++ l2) = cmd_map l1 ++ cmd_map l2.
     Proof. rewrite /cmd_map map_app. done. Qed.
 
+    Lemma cmd_map_sim_app l1 l2 :
+      cmd_map_sim (l1 ++ l2) = cmd_map_sim l1 ++ cmd_map_sim l2.
+    Proof. rewrite /cmd_map_sim filter_app map_app. done. Qed.
+
     Import Util.List.
     Lemma cmd_map_zip rl il steps pclbl :
       cmd_map (zip rl il steps pclbl) =
@@ -240,7 +244,7 @@ Section extract_step_commute.
       rewrite /CmbCmdInv/CmbCmdCoreInv in i1. case: i1=> rwt iwt.
       rewrite /StateInv in i3. case: i3=> treq pubeq.
       move: pclbl rwt iwt.
-      (case=> - ? ?); stir=> rwt iwt.
+      (case=> - untr pub); stir=> rwt iwt.
       rewrite/comb_step/cmbcmd_step {2}/extract_2cfg; stir.
       rewrite /extract_2cfg; stir.
       rewrite/sim_active; stir.
@@ -253,23 +257,23 @@ Section extract_step_commute.
          suff: l1 = map (fun c => (real_cmd c, real_atk_bit c,  ideal_cmd c, sim_active c)) l2;
            [move=> ->; rewrite map_map //| subst l1 l2]. (* TODO: This could be lemma / rewrite rule *)
          rewrite/sim_step. stir.
-         case e: (is_secret_guard); stir; admit.
+         admit.
          (*
            ++ rewrite map_repeat. 
               rewrite repeat_length; stir.
               rewrite map_proj_map_mk. (* This is pretty dogshit *)
               *)
          
-      -- congr(_,_).
+      -- congr(_,_); stir.
+         move: isatk untr pub rcmd rwt iwt.
+         (case; case; case; (case=> [rcmd|])); stir=> rwt iwt.
+         { rewrite/sim_step; stir.
+           erewrite noninterfering_post_clean_pre;[ |eassumption | symmetry; eassumption ].
+           f_equal.
+           rewrite cmd_map_sim_app.
+           f_equal.
 
-          rewrite map_map.
-        rewrite /sim_step.
-        admit. 
-        - 
-        congr (_,_).
-        - admit. 
-      admit.
-      + admit.
+
     Admitted.
   End cook.
 
@@ -280,21 +284,5 @@ CmbCmd. invariant holds.
 
 
 *)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

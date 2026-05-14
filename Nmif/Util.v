@@ -305,14 +305,7 @@ Lemma snd_pair {A B} (a : A) (b : B) : ltac2:(cbn_eq (a, b).2). Proof. done. Qed
 Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> fst_pair in * ) "fst_pair" old.
 Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> snd_pair in * ) "snd_pair" old.
 
-Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> orTb in * ) "orTb" old.
-Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> orbT in * ) "orbT" old.
-Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> orFb in * ) "orFb" old.
-Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> orbF in * ) "orbF" old.
-Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> andTb in * ) "andTb" old.
-Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> andbT in * ) "andbT" old.
-Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> andFb in * ) "andFb" old.
-Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> andbF in * ) "andbF" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(progress cbn [andb orb]) "cbn_andb_orb" old.
 
 Ltac2 Set this_cookbook_ as old := add_stirstep 0 ltac1:(done) "done" old.
 
