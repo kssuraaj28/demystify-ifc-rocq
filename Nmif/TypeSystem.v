@@ -101,6 +101,10 @@ Section sa.
   Definition WellFormedOptCmd (pc: PcLbl) (ocmd : option Cmd): Prop :=
     if ocmd isn't Some cmd then True else WellFormedCmd pc cmd.
 
+  Lemma WellFormedOptCmd_Some pc c :
+    ltac2:(cbn_eq (WellFormedOptCmd pc (Some c))).
+  Proof. done. Qed.
+
 End sa.
 Notation "pc ⊢ ocmd" := (WellFormedOptCmd pc ocmd) (at level 20).
 
@@ -226,6 +230,9 @@ Ltac2 Set this_cookbook_ as old :=
   add_stirstep 1
     ltac1:(apply/wt_cmd_st_conf; [eassumption|])
     "wt_cmd_st_conf" old.
+
+Ltac2 Set this_cookbook_ as old :=
+  add_stirstep 1 ltac1:(rewrite -> WellFormedOptCmd_Some in * ) "WellFormedOptCmd_Some" old.
 
 Section new_pc.
   Import Lattice4pt.Notations.

@@ -26,6 +26,22 @@ Section cmb_cmd.
     ideal_cmd : option Cmd ;
     pc_lbl : PcLbl ;
   }.
+
+  Lemma real_cmd_mk rcmd ratk icmd pclbl :
+    ltac2:(cbn_eq (real_cmd (mk_cmbcmd rcmd ratk icmd pclbl))).
+  Proof. done. Qed.
+
+  Lemma real_atk_bit_mk rcmd ratk icmd pclbl :
+    ltac2:(cbn_eq (real_atk_bit (mk_cmbcmd rcmd ratk icmd pclbl))).
+  Proof. done. Qed.
+
+  Lemma ideal_cmd_mk rcmd ratk icmd pclbl :
+    ltac2:(cbn_eq (ideal_cmd (mk_cmbcmd rcmd ratk icmd pclbl))).
+  Proof. done. Qed.
+
+  Lemma pc_lbl_mk rcmd ratk icmd pclbl :
+    ltac2:(cbn_eq (pc_lbl (mk_cmbcmd rcmd ratk icmd pclbl))).
+  Proof. done. Qed.
 End cmb_cmd.
 
 Section cmb_step.
@@ -151,6 +167,17 @@ Ltac2 Set this_cookbook_ as old :=
            end)
     "Forall_CmbCmd_zip" old.
 
+Ltac2 Set this_cookbook_ as old :=
+  add_stirstep 1 ltac1:(rewrite -> real_cmd_mk in * ) "real_cmd_mk" old.
+Ltac2 Set this_cookbook_ as old :=
+  add_stirstep 1 ltac1:(rewrite -> real_atk_bit_mk in * ) "real_atk_bit_mk" old.
+Ltac2 Set this_cookbook_ as old :=
+  add_stirstep 1 ltac1:(rewrite -> ideal_cmd_mk in * ) "ideal_cmd_mk" old.
+Ltac2 Set this_cookbook_ as old :=
+  add_stirstep 1 ltac1:(rewrite -> pc_lbl_mk in * ) "pc_lbl_mk" old.
+
+Ltac2 this_cookbook () := this_cookbook_ ().
+
 Section invprf.
   Import Attacker Util Util.List.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
@@ -181,7 +208,7 @@ Section invprf.
 (*    Hint Extern 100 => lazymatch goal with _ =>  cbn end : trickbag. *)
 
 (* TODO 3 debug levels *)
-    Ltac2 Set cook_debug := false. (* TODO: Why can't I access this? *)
+    Ltac2 Set cook_debug := 0. (* TODO: Why can't I access this? *)
     Ltac2 Set cook_auto_depth := 4.
     (* TODO: Why does cook make this extremely slow? *)
     (* TODO: Set Ltac Profiling *)
@@ -235,7 +262,7 @@ Section invprf.
   Theorem cfg_step_inv: forall c, Invariant c ->  Invariant (cfg_step c).
   Proof.
     case=> + [] //.
-    rewrite/Invariant/cfg_step=> > []; toph Forall_inv.
+    rewrite/Invariant/cfg_step=> > []. toph Forall_inv.
     case e: (cmbcmd_step _ _)=> h1 ? h2. 
     move: (cmbcmd_step_inv _ _ h1 h2); rewrite {}e=> - [] *.
     split=> //; apply/Forall_app=> //.

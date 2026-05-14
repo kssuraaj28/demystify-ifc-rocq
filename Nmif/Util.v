@@ -237,7 +237,7 @@ Section test.
   Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["safe_case"]) ().
   Ltac2 Eval print_cookbook curr_cookbook.
   Ltac2 Eval print_cookbook curr_stirbook.
-  Ltac2 Set cook_debug := true.
+  Ltac2 Set cook_debug := 2.
   Goal forall x: (nat*nat), let: (n,_) := x in  P n.
   Proof. 
     move=> *; goal_hygiene.
@@ -259,7 +259,7 @@ Ltac2 Set this_cookbook_ as old :=
 Section test.
   Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["if_w_hyp_eq"]) ().
   Ltac2 Eval print_cookbook curr_cookbook.  Ltac2 Eval print_cookbook curr_stirbook.
-  Ltac2 Set cook_debug := true.
+  Ltac2 Set cook_debug := 2.
   Goal forall b, b = true -> if b then True else False.
   Proof. 
     Succeed now cook. (* Backward reasoning *)
@@ -284,6 +284,15 @@ Lemma if_same {T} (b : bool) (t: T) :
 Proof.  case: b; done. Qed. 
 
 Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> if_same in * ) "if_same" old.
+
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> orTb in * ) "orTb" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> orbT in * ) "orbT" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> orFb in * ) "orFb" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> orbF in * ) "orbF" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> andTb in * ) "andTb" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> andbT in * ) "andbT" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> andFb in * ) "andFb" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> andbF in * ) "andbF" old.
 
 Ltac2 Set this_cookbook_ as old := add_stirstep 0 ltac1:(done) "done" old.
 

@@ -530,7 +530,13 @@ Module Cook.
   Ltac2 mutable curr_cookbook () : cookbook := [].
   Ltac2 curr_stirbook () : cookbook := 
     List.filter (fun (_, _, allow_hyps_remove) => Bool.neg allow_hyps_remove) (curr_cookbook ()).
-  Ltac2 mutable cook_debug : bool := false.
+  (* 0 = silent, 1 = info (print successes + auto info),
+     2 = full (also print attempts, numgoals, FW/BW failures, auto debug) *)
+  Ltac2 mutable cook_debug : int := 0.
+
+  (* Print [msg ()] when cook_debug is at least [lvl]. *)
+  #[local] Ltac2 cook_dbg (lvl : int) (msg : unit -> unit) : unit :=
+    if Int.ge cook_debug lvl then msg () else ().
 
   #[local] Ltac2 print_cookbook0 (l : cookbook) : unit :=
     List.iteri (fun i p =>
@@ -589,10 +595,10 @@ Module Cook.
       match l with
       | [] => softfail_s "cook_stir_step" "all tactics failed"
       | (t, desc, _) :: rest =>
-       if Bool.neg cook_debug then () else printf "Trying: cook_stir_step[%i]: %s" i desc;
+        cook_dbg 2 (fun () => printf "Trying: cook_stir_step[%i]: %s" i desc);
         match Control.case t with
         (* It is the client's responsibility to put harden. If the client does not put it, then the thing will spin forever! *)
-        | Val ((),_) => if Bool.neg cook_debug then () else printf "cook_stir_step[%i]: %s success" i desc
+        | Val ((),_) => cook_dbg 1 (fun () => printf "cook_stir_step[%i]: %s success" i desc)
         | Err _ => go (Int.add i 1) rest
         end
       end in
@@ -613,7 +619,10 @@ Module Cook.
 
   #[local] Ltac2 cook_auto () : unit :=
     let dbs := List.append (cook_auto_dbs ()) [@__cook_step] in
-    let dbg := if cook_debug then Std.Debug else Std.Off in
+    let dbg :=
+      if Int.ge cook_debug 2 then Std.Debug
+      else if Int.ge cook_debug 1 then Std.Info
+      else Std.Off in
     Std.auto dbg (Some cook_auto_depth) [] (Some dbs).
 
   Tactic Notation "cook_auto" := ltac2:(cook_auto ()). 
@@ -625,7 +634,7 @@ Module Cook.
       if match gas with Some n => Int.equal n 0 | None => false end then () else
 
       let gls := Control.numgoals () in
-      if cook_debug then printf "cook: numgoals = %i" gls else ();
+      cook_dbg 1 (fun () => printf "cook: numgoals = %i" gls);
       (* Goals check: TODO: What happens if we throw or assert? *)
       if Int.equal gls 0 then () else
 
@@ -634,10 +643,10 @@ Module Cook.
         match Control.case (fun () => cook_step only_stir) with
         | Val ((), _) => ()
         | Err _ => 
-              (if cook_debug then printf "cook: FW reasoning failed, trying BW reasoning" else ());
-              cook_auto (); 
+              cook_dbg 2 (fun () => printf "cook: FW reasoning failed, trying BW reasoning");
+              cook_auto ();
               if Int.equal (Control.numgoals () ) 0 then () else
-              (if cook_debug then printf "cook: BW reasoning failed, Can't solve goal " else ());
+              cook_dbg 2 (fun () => printf "cook: BW reasoning failed, Can't solve goal ");
               Control.shelve ()
         end);
        let next_gas := match gas with | Some n => Some (Int.sub n 1) | None => None end in

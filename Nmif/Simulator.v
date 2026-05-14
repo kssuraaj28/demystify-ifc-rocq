@@ -56,7 +56,9 @@ Section sim_constr.
     (Store (* sim_st *) * AtkStates *  list ((option Cmd) * bool)) :=
 
     let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in
-    let: (ast, steps) := if isatk is false then (ast, 0) else (post_cmd_action atk ast sim_st)  in
+    let: post_atk := post_cmd_action atk ast sim_st in
+    let: ast := if isatk is true then post_atk.1 else ast in
+    let: steps := if isatk is true then post_atk.2 else 0 in
 
     let: cont_prog := if is_secret_guard ocmd is true then [] else map Some (optcmd_stp_cnt ocmd sim_st) in 
     let: cont_atk := repeat true steps in
@@ -86,6 +88,17 @@ Section sim_constr.
 
       pre_cmd_action _ st :=  st ;  (* Ideal pre-cmd action is weak *)
     |}.
+
+  Lemma construct_simulator_pre_cmd ast st :
+    pre_cmd_action construct_simulator ast st = st.
+  Proof. done. Qed.
+
+  Lemma construct_simulator_post_cmd_cons ocmd isatk rest ast sim_st st :
+    post_cmd_action construct_simulator
+      (mk_simstate ast sim_st ((ocmd, isatk) :: rest)) st =
+      let: (sim_st', new_ast, cont) := sim_step ocmd isatk sim_st ast in
+      (mk_simstate new_ast sim_st' (cont ++ rest), length cont).
+  Proof. rewrite /=; case isatk=>  //=. Qed. 
 End sim_constr.
 
 Ltac2 this_cookbook () := this_cookbook_ ().
