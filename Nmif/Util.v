@@ -57,12 +57,64 @@ Module List.
   Proof. done. Qed.
 
   Lemma combine_extend2_nil_l {A B} lb (da:A) (db:B) :
-    ltac2:(cbn_eq (combine_extend2 [] lb da db)).
+    combine_extend2 [] lb da db = map (fun b => (da, b)) lb.
   Proof. done. Qed.
 
   Lemma combine_extend2_nil_r {A B} la (da:A) (db:B) :
-    ltac2:(cbn_eq (combine_extend2 la [] da db)).
+    combine_extend2 la [] da db = map (fun a => (a, db)) la.
   Proof. case: la; done. Qed.
+
+  (* Uniform cons lemmas: combine_extend2 advances both lists by one,
+     using the default when a list has run out. *)
+  Lemma combine_extend2_consl {A B} x (X : list A) (Y : list B) dX dY :
+    combine_extend2 (x :: X) Y dX dY =
+    (x, hd dY Y) :: combine_extend2 X (tl Y) dX dY.
+  Proof.
+    case: Y => [|y Y'].
+    - case: X => [|x' X']; reflexivity.
+    - reflexivity.
+  Qed.
+
+  Lemma combine_extend2_consr {A B} (X : list A) y (Y : list B) dX dY :
+    combine_extend2 X (y :: Y) dX dY =
+    (hd dX X, y) :: combine_extend2 (tl X) Y dX dY.
+  Proof. case: X => [|x X']; reflexivity. Qed.
+
+  (* If the 2nd column of the zip is `map g X`, the zip is `map (x => (x, g x)) X`.
+     (The hypothesis being a list equality also forces |Y| <= |X|.) *)
+  Lemma combine_extend2_map_snd {A B} (X : list A) (Y : list B) dX dY (g : A -> B) :
+    map snd (combine_extend2 X Y dX dY) = map g X ->
+    combine_extend2 X Y dX dY = map (fun x => (x, g x)) X.
+  Proof.
+    elim: X Y => [|x X' IH] Y.
+    - case: Y => [|y Y'] /=.
+      + done.
+      + move=> H; discriminate H.
+    - rewrite combine_extend2_consl /=. move=> [= Hd Ht].
+      congr (_ :: _).
+      + congr (_, _). exact: Hd.
+      + apply: IH. exact: Ht.
+  Qed.
+
+  (* Mirror of combine_extend2_map_snd: if the 1st column is `map h Y`. *)
+  Lemma combine_extend2_map_fst {A B} (X : list A) (Y : list B) dX dY (h : B -> A) :
+    map fst (combine_extend2 X Y dX dY) = map h Y ->
+    combine_extend2 X Y dX dY = map (fun y => (h y, y)) Y.
+  Proof.
+    elim: Y X => [|y Y' IH] X.
+    - case: X => [|x X'] /=.
+      + done.
+      + move=> H; discriminate H.
+    - rewrite combine_extend2_consr /=. move=> [= Hd Ht].
+      congr (_ :: _).
+      + congr (_, _). exact: Hd.
+      + apply: IH. exact: Ht.
+  Qed.
+
+  (* Zipping a list against itself is the diagonal. *)
+  Lemma combine_extend2_same {A} (l : list A) (d : A) :
+    combine_extend2 l l d d = map (fun x => (x, x)) l.
+  Proof. elim: l => [| h t IH] //=. rewrite IH //. Qed.
 
   (* Maybe use Ltac2 to define this.. *)
   Definition combine_extend3 {A B C}
@@ -75,18 +127,163 @@ Module List.
     (da : A) (db : B) (dc : C) (dd: D) : list (A * B * C * D) :=
       combine_extend2 (combine_extend3 la lb lc da db dc) ld (da,db,dc) dd.
 
-  Lemma combine_extend3_empty:
-    forall {A B C} l2 l3 (d1 :A) (d2: B) (d3: C),
-      combine_extend3 [] l2 l3 d1 d2 d3 =
-      map (fun '(e2, e3) => (d1,e2,e3))(combine_extend2 l2 l3 d2 d3).
+  Lemma combine_extend4_regroup3 {A B C D}
+    (la : list A) (lb : list B) (lc : list C) (ld : list D)
+    da db dc dd :
+    combine_extend4 la lb lc ld da db dc dd =
+    map (fun '(a, b, d, c) => (a, b, c, d))
+        (combine_extend2 (combine_extend3 la lb ld da db dd) lc (da,db,dd) dc).
+  Admitted. (* TODO: combinatorial induction. *)
+
+  Lemma combine_extend3_regroup2 {A B C}
+    (la : list A) (lb : list B) (lc : list C) da db dc :
+    combine_extend3 la lb lc da db dc =
+    map (fun '(a, c, b) => (a, b, c))
+        (combine_extend2 (combine_extend2 la lc da dc) lb (da,dc) db).
+  Admitted. (* TODO: combinatorial induction. *)
+
+  Lemma combine_extend3_swap23 {A B C}
+    (la : list A) (lb : list B) (lc : list C) da db dc :
+    combine_extend3 la lb lc da db dc =
+    map (fun '(a, c, b) => (a, b, c)) (combine_extend3 la lc lb da dc db).
+  Proof. exact: combine_extend3_regroup2. Qed.
+
+  Lemma combine_extend4_swap34 {A B C D}
+    (la : list A) (lb : list B) (lc : list C) (ld : list D) da db dc dd :
+    combine_extend4 la lb lc ld da db dc dd =
+    map (fun '(a, b, d, c) => (a, b, c, d)) (combine_extend4 la lb ld lc da db dd dc).
+  Proof. exact: combine_extend4_regroup3. Qed.
+
+  (* combine_extend3 grouped as ((a,b),c) -- this is the definition. *)
+  Lemma combine_extend3_splitr {A B C}
+    (la : list A) (lb : list B) (lc : list C) da db dc :
+    combine_extend3 la lb lc da db dc =
+    combine_extend2 (combine_extend2 la lb da db) lc (da, db) dc.
+  Proof. done. Qed.
+
+  (* combine_extend3 grouped as (a,(b,c)) -- zip-with-padding is associative. *)
+  Lemma combine_extend3_splitl {A B C}
+    (la : list A) (lb : list B) (lc : list C) da db dc :
+    combine_extend3 la lb lc da db dc =
+    map (fun '(a, (b, c)) => (a, b, c))
+        (combine_extend2 la (combine_extend2 lb lc db dc) da (db, dc)).
+  Admitted. (* TODO: associativity of combine_extend2-with-padding. *)
+
+  (* Map fusion: a `map` on the first list pulls out of `combine_extend2`. *)
+  Lemma combine_extend2_map_l {A A' B} (f : A -> A')
+    (X : list A) (Y : list B) (dX : A) (dX': A') (dY : B) :
+    dX' = f dX ->
+    combine_extend2 (map f X) Y dX' dY =
+    map (fun '(x, y) => (f x, y)) (combine_extend2 X Y dX dY).
   Proof.
-    move=> A B C; elim=> [|h2 t2 IH] l3 d1 d2 d3.
-    - by rewrite /combine_extend3 /= map_map.
-    - case: l3 => [|h3 t3].
-      + by rewrite /combine_extend3 /= !map_map.
-      + rewrite /combine_extend3 /= -/(combine_extend3 [] t2 t3 d1 d2 d3).
-        by rewrite IH.
+    move=> ->; elim: X Y => [| x X' IH] Y.
+    - rewrite /= map_map //.
+    - rewrite map_cons !combine_extend2_consl map_cons IH //.
   Qed.
+
+  (* Map fusion: a `map` on the second list pulls out of `combine_extend2`. *)
+  Lemma combine_extend2_map_r {A B B'} (g : B -> B')
+    (X : list A) (Y : list B) (dX : A) (dY': B') (dY : B) :
+    dY' = g dY ->
+    combine_extend2 X (map g Y) dX dY' =
+    map (fun '(x, y) => (x, g y)) (combine_extend2 X Y dX dY).
+  Proof.
+    move=> ->; elim: Y X => [| y Y' IH] X.
+    - rewrite /= !combine_extend2_nil_r map_map //.
+    - rewrite map_cons !combine_extend2_consr map_cons IH //.
+  Qed.
+
+  (* Second list is `map g` of the first: equal length, so defaults are dead. *)
+  Lemma combine_extend2_map_self_r {A B} (g : A -> B) (X : list A) dX dY :
+    combine_extend2 X (map g X) dX dY = map (fun x => (x, g x)) X.
+  Proof. elim: X => [| h t IH] //=. rewrite IH //. Qed.
+
+  (* First list is `map f` of the second: equal length, so defaults are dead. *)
+  Lemma combine_extend2_map_self_l {A B} (f : B -> A) (Y : list B) dX dY :
+    combine_extend2 (map f Y) Y dX dY = map (fun y => (f y, y)) Y.
+  Proof. elim: Y => [| h t IH] //=. rewrite IH //. Qed.
+
+  (* Swapping the two lists transposes the columns. *)
+  Lemma combine_extend2_swap {A B} (X : list A) (Y : list B) dX dY :
+    combine_extend2 X Y dX dY =
+    map (fun '(y, x) => (x, y)) (combine_extend2 Y X dY dX).
+  Proof.
+    elim: X Y => [| x X' IH] Y.
+    - rewrite combine_extend2_nil_l combine_extend2_nil_r map_map //.
+    - case: Y => [| y Y'].
+      + rewrite combine_extend2_nil_r combine_extend2_nil_l map_map //.
+      + rewrite /= IH //.
+  Qed.
+
+  (* map o filter over combine_extend2 collapses to a single list when the
+     filter predicate factors through one column and the map ignores the
+     other -- the discarded column is exactly the one filter desyncs.
+     Needs only `q d = false` on the governing column's default. *)
+  Lemma map_filter_combine_extend2_ind1 {A B C}
+    (l1 : list A) (l2 : list B) d1 d2
+    (p : A * B -> bool) (q : A -> bool) (f : A * B -> C) (g : A -> C) :
+    (forall x y, p (x, y) = q x) ->
+    (forall x y, f (x, y) = g x) ->
+    q d1 = false ->
+    map f (filter p (combine_extend2 l1 l2 d1 d2)) = map g (filter q l1).
+  Proof.
+    move=> pq fg qd1.
+    elim: l1 l2 => [| x l1' IH] l2.
+    - rewrite combine_extend2_nil_l.
+      elim: l2 => [| y l2' IH2] //=.
+      rewrite pq qd1 /=. exact: IH2.
+    - rewrite combine_extend2_consl /=.
+      rewrite pq. case: (q x) => /=.
+      + rewrite fg IH //.
+      + rewrite IH //.
+  Qed.
+
+  Lemma map_filter_combine_extend2_ind2 {A B C}
+    (l1 : list A) (l2 : list B) d1 d2
+    (p : A * B -> bool) (q : B -> bool) (f : A * B -> C) (g : B -> C) :
+    (forall x y, p (x, y) = q y) ->
+    (forall x y, f (x, y) = g y) ->
+    q d2 = false ->
+    map f (filter p (combine_extend2 l1 l2 d1 d2)) = map g (filter q l2).
+  Proof.
+    move=> pq fg qd2.
+    elim: l2 l1 => [| y l2' IH] l1.
+    - rewrite combine_extend2_nil_r.
+      elim: l1 => [| x l1' IH1] //=.
+      rewrite pq qd2 /=. exact: IH1.
+    - rewrite combine_extend2_consr /=.
+      rewrite pq. case: (q y) => /=.
+      + rewrite fg IH //.
+      + rewrite IH //.
+  Qed.
+
+  Lemma combine_extend3_nil1 {A B C}
+    (l2 : list B) (l3 : list C) (d1 : A) (d2 : B) (d3 : C) :
+    combine_extend3 [] l2 l3 d1 d2 d3 =
+    map (fun '(b, c) => (d1, b, c)) (combine_extend2 l2 l3 d2 d3).
+  Proof.
+    rewrite /combine_extend3 combine_extend2_nil_l.
+    erewrite (combine_extend2_map_l (fun b => (d1, b)))=> //.
+  Qed.
+
+  Lemma combine_extend3_nil2 {A B C}
+    (l1 : list A) (l3 : list C) (d1 : A) (d2 : B) (d3 : C) :
+    combine_extend3 l1 [] l3 d1 d2 d3 =
+    map (fun '(a, c) => (a, d2, c)) (combine_extend2 l1 l3 d1 d3).
+  Proof.
+    rewrite /combine_extend3 combine_extend2_nil_r.
+    erewrite (combine_extend2_map_l (fun a => (a, d2)))=> //.
+  Qed.
+
+  Lemma combine_extend3_nil3 {A B C}
+    (l1 : list A) (l2 : list B) (d1 : A) (d2 : B) (d3 : C) :
+    combine_extend3 l1 l2 [] d1 d2 d3 =
+    map (fun '(a, b) => (a, b, d3)) (combine_extend2 l1 l2 d1 d2).
+  Proof.
+    rewrite /combine_extend3 combine_extend2_nil_r.
+    apply: map_ext. move=> [a b] //.
+  Qed.
+
 
   Lemma Forall_combine2_ind1 :
      forall {A B} P l1 l2 (d1:A) (d2:B) Q,
@@ -302,10 +499,24 @@ Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> if_same in *
 Lemma fst_pair {A B} (a : A) (b : B) : ltac2:(cbn_eq (a, b).1). Proof. done. Qed.
 Lemma snd_pair {A B} (a : A) (b : B) : ltac2:(cbn_eq (a, b).2). Proof. done. Qed.
 
+Lemma repeat_0 {A} (x : A) : repeat x 0 = []. Proof. done. Qed.
+
 Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> fst_pair in * ) "fst_pair" old.
 Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> snd_pair in * ) "snd_pair" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> repeat_0 in * ) "repeat_0" old.
 
 Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(progress cbn [andb orb]) "cbn_andb_orb" old.
+
+(* cbn reduces andb/orb only when the FIRST operand is a literal. These cover
+   the right-operand cases, which need a rewrite (case split), not reduction. *)
+(* DEBUG: bool rewrite stir rules were removed once before — `andFb` caused a
+   "2 goals focused" crash during stir/cook. Not re-added here; if that error
+   resurfaces, one of the four below (rewrite ... in * with no hit, or a
+   leftover evar in a hyp) is the suspect — bisect by stir-step name. *)
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> andbF in * ) "andbF" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> andbT in * ) "andbT" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> orbF in * ) "orbF" old.
+Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> orbT in * ) "orbT" old.
 
 Ltac2 Set this_cookbook_ as old := add_stirstep 0 ltac1:(done) "done" old.
 

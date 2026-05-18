@@ -228,6 +228,35 @@ Section thms_atk.
     apply: pre_cmd_wf_conf.
     exact: hyp.
   Qed.
+
+  (* In a secret context the command's store-step is invisible to post:
+     it can only move secret state, and post_cmd_action sees only the
+     public view. So `optcmd_stp_store oc` drops out entirely. *)
+  Lemma post_optcmd_stp_store_sec {AtkStates} (adv : AdvNextStep AtkStates)
+    ast i oc s :
+    mk_lbl i false ⊢ oc ->
+    post_cmd_action adv ast (optcmd_stp_store oc s) =
+    post_cmd_action adv ast s.
+  Proof.
+    case: oc => [c | ] wt.
+    - apply: post_cmd_wf. apply: wt_cmd_st_conf_sec. exact: wt.
+    - done.
+  Qed.
+
+  (* noninterfering_post_clean_pre with an option-Cmd store-step. *)
+  Lemma noninterfering_post_optcmd_pre {AtkStates} (adv : AdvNextStep AtkStates)
+    ast l oc s1 s2 :
+    l ⊢ oc ->
+    ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
+    post_cmd_action adv ast (optcmd_stp_store oc (pre_cmd_action adv ast s1)) =
+    post_cmd_action adv ast (optcmd_stp_store oc (pre_cmd_action adv ast s2)).
+  Proof.
+    move=> wt hyp.
+    apply: post_cmd_wf.
+    case: oc wt => [c | ] wt.
+    - apply: (wt_cmd_st_conf _ _ _ _ wt). apply: pre_cmd_wf_conf. exact: hyp.
+    - apply: pre_cmd_wf_conf. exact: hyp.
+  Qed.
 End thms_atk.
 
 Ltac2 Set this_cookbook_ as old :=
@@ -268,13 +297,32 @@ Section new_pc.
     if cmd isn't Some cmd then old_pc else
     compute_new_pc old_pc cmd.
 
-  Lemma compute_new_pc_opt_Some pc cmd :
+  Lemma compute_new_pc_opt_some pc cmd :
     ltac2:(cbn_eq (compute_new_pc_opt pc (Some cmd))).
   Proof. done. Qed.
+
+  Lemma compute_new_pc_secret untr c :
+    public (compute_new_pc (mk_lbl untr false) c) = false.
+  Proof.
+    case: c => [dst exp | [g cmp] b1 b2 | [g cmp] b].
+    - done.
+    - cbn [compute_new_pc]. rewrite pub_join //.
+    - cbn [compute_new_pc]. rewrite pub_join //.
+  Qed.
+
+  Lemma compute_new_pc_opt_secret untr c :
+    public (compute_new_pc_opt (mk_lbl untr false) c) = false.
+  Proof.
+    rewrite /compute_new_pc_opt.
+    case: c => [c | ] //.
+    rewrite compute_new_pc_secret //.
+  Qed.
 End new_pc.
 
 Ltac2 Set this_cookbook_ as old :=
-  add_stirstep 1 ltac1:(rewrite -> compute_new_pc_opt_Some in * ) "compute_new_pc_opt_Some" old.
+  add_stirstep 1 ltac1:(rewrite -> compute_new_pc_opt_some in * ) "compute_new_pc_opt_some" old.
+Ltac2 Set this_cookbook_ as old :=
+  add_stirstep 1 ltac1:(rewrite -> compute_new_pc_opt_secret in * ) "compute_new_pc_opt_secret" old.
 
 Section thms.
   Import VarValStore.Notations.

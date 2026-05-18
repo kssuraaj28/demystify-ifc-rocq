@@ -67,6 +67,10 @@ Proof.
   case: p; case: x=> - [] [] //.
 Qed.
 
+Lemma pub_join x u:
+    public (x ⊔ (mk_lbl u false)) = false.
+Proof. case: x=> - [] [] //. Qed.
+
 Lemma join_flow:
   forall l1 l2 l3,
     l1 ⊔ l2  ⊑  l3 = l1 ⊑ l3 && l2 ⊑ l3.

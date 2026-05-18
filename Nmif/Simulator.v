@@ -105,6 +105,31 @@ Section sim_constr.
     is_secret_guard (Some c) = true ->
     clean_cmd_stp_store c s = s.
   Proof. case: c => [dst exp | [g cmp] b1 b2 | [g cmp] b] //=. Qed.
+
+  Import VarValStore.Notations.
+  Lemma clean_cmd_stp_cnt_pub_nf c st1 st2:
+    is_secret_guard (Some c) = false ->
+    ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
+    clean_cmd_stp_cnt c st1 = clean_cmd_stp_cnt c st2.
+  Proof.
+    case: c => [dst exp | [g cmp] b1 b2 | [g cmp] b] //=.
+    - move=> nsg pubeq.
+      rewrite /is_secret_guard /= /is_secret in nsg.
+      have gp : is_public g.
+      { move: nsg. case: (is_public g) => //. }
+      rewrite /eval_bool_exp /=.
+      have eqg : st1 g = st2 g.
+      { apply: storeview_eq; [exact: pubeq | exact: gp]. }
+      rewrite eqg. done.
+    - move=> nsg pubeq.
+      rewrite /is_secret_guard /= /is_secret in nsg.
+      have gp : is_public g.
+      { move: nsg. case: (is_public g) => //. }
+      rewrite /eval_bool_exp /=.
+      have eqg : st1 g = st2 g.
+      { apply: storeview_eq; [exact: pubeq | exact: gp]. }
+      rewrite eqg. done.
+  Qed.
 End sim_constr.
 
 Ltac2 this_cookbook () := this_cookbook_ ().
