@@ -424,6 +424,7 @@ Section extract_step_commute.
              stir. set l1 := filter _ _. set l2 := repeat true _.
              suff: map (fun '(_,i,_) => i) l1 = l2; [move: l1 l2=> > <-; clear |subst l1 l2].
                { rewrite map_map; apply: map_ext=> - [] [] //. }
+
              move: (if _ then _ else _) (map Some _)=> ? ?.
              rewrite combine_extend3_splitr [combine_extend2 _ (repeat _ _) _ _]combine_extend2_swap;
              erewrite combine_extend2_map_l; [|instantiate (1 := (_,_)); reflexivity];
@@ -434,14 +435,54 @@ Section extract_step_commute.
              erewrite map_filter_combine_extend2_ind1.
              2,3: move=> *; instantiate (1:= fun _ => _); reflexivity. 2: done.
              rewrite map_id; clear; revert_hyp_type nat; elim=> //= *; f_equal=> //. }
+
            have ->: is_secret_guard rcmd = true by admit. (* TODO: lots of same as before *)
            rewrite combine_extend2_nil_l.
            stir. set l1 := filter _ _. set l2 := repeat true _.
            suff: map (fun '(_,i,_) => i) l1 = l2; [move: l1 l2=> > <-; clear |subst l1 l2]. (* I copied this *)
              { rewrite map_map; apply: map_ext=> - [] [] //. } (* I feel like this is going to be very similar to previous case *)
-           admit. }
-         admit.
+           set pca1 := (post_cmd_action _ _ (_ _ (if isatk then _ else rst))). 
+           set pca2 := (post_cmd_action _ _ (_ _ (if isatk then _ else simst))). 
+           have ->: pca1 = pca2; [subst pca1 pca2|move: pca1 pca2=> _ [>]; stir].
+             { admit. }
+           stir. set l1 := filter _ _. set l2 := repeat true _.
+           suff: map (fun '(_,i,_) => i) l1 = l2; [move: l1 l2=> > <-; clear |subst l1 l2].
+             { apply: map_ext=> - [] [] //. }
 
+           move: (if _ then _ else _) (map Some _)=> ? ?.
+           rewrite combine_extend3_splitr [combine_extend2 _ (repeat _ _) _ _]combine_extend2_swap;
+           erewrite combine_extend2_map_l; [|instantiate (1 := (_,_)); reflexivity];
+           rewrite -combine_extend3_splitr combine_extend3_splitl !map_map filter_map_swap map_map;
+           erewrite filter_ext; [|case=> ?;case=> *; instantiate (1 := fun '(_,_) => _); reflexivity];
+           erewrite map_ext; [|case=> ?;case=> *; instantiate (1 := fun '(_,_) => _); reflexivity];
+           move: (X in combine_extend2 _ X _ _)=> ?.
+           erewrite map_filter_combine_extend2_ind1.
+           2,3: move=> *; instantiate (1:= fun _ => _); reflexivity. 2: done.
+           rewrite map_id; clear; revert_hyp_type nat; elim=> //= *; f_equal=> //.  } (* I copied alot!! TODO: Cleanup *)
+         case: pub in rwt newpce *; [| move=> /=;stir].
+         have rcmd_grd: is_secret_guard rcmd = false by admit. (* Copied!! *)
+         rewrite rcmd_grd.
+         set cnt1 := (optcmd_stp_cnt _ (if _ then _ else rst)).
+         set cnt2 := (optcmd_stp_cnt _ (if _ then _ else simst)).
+         have <-: cnt1 = cnt2; subst cnt1 cnt2.
+           {  destruct rcmd => //. 
+           apply: clean_cmd_stp_cnt_pub_nf=> //.
+           case: isatk; stir. }
+         set pca1 := (post_cmd_action _ _ (_ _ (if isatk then _ else rst))). 
+         set pca2 := (post_cmd_action _ _ (_ _ (if isatk then _ else simst))). 
+         have ->: pca1 = pca2; [subst pca1 pca2|move: pca1 pca2=> _ [>]; stir].
+           { admit. }
+         rewrite combine_extend3_splitr. 
+         move: (X in (map Some X)) (X in (repeat true X))=> *.
+         erewrite map_filter_combine_extend2_ind1.
+         2,3: case=> *; instantiate (1:= fun '(_,_) => _); reflexivity; done. 2: done.
+         clear. erewrite map_ext; [|instantiate (1 := id); case=> //]. rewrite map_id.
+         revert_hyp_type nat; revert_hyp_type Prog. 
+         elim; [elim=> //= n ?; f_equal=> //|].
+         move=> > ?; case=> /= *; [| f_equal; eauto].
+         rewrite !filter_map_swap.
+         erewrite filter_ext; [| move=> * /=; reflexivity].
+         rewrite filter_true //.
     Admitted.
   End cook.
 
