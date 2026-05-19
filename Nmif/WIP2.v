@@ -290,8 +290,7 @@ Section extract_step_commute.
          set new_pc := (compute_new_pc_opt _ _).
          set l1 := (map Some (optcmd_stp_cnt rcmd _)). set l2 := (map Some (optcmd_stp_cnt icmd _)). set l3 := (repeat true _).
          set c4l := (combine_extend4 _ _ _ _ _ _ _ _). set c3l := (combine_extend3 _ _ _ _ _ _).
-         rewrite /cmd_map.
-         rewrite !map_map. 
+         rewrite /cmd_map !map_map. 
          erewrite map_ext; cycle 1.
            { case. case. cbn. rewrite/sim_active. cbn=> *. 
            instantiate (1  := fun '(_,_,_) => (_, _, _, _ )). (* Very cool. Like `refine`, I think *)
@@ -400,7 +399,7 @@ Section extract_step_commute.
            case=> *; stir. }
          rewrite/sim_step; stir; f_equal; stir.
            { admit. }
-           { admit. }
+           { if_easy_goals. } (* TODO: It's worth having this be a stir rule *)
          rewrite cmd_map_sim_app. 
          set l1 := (X in X ++ ?[y] = _ ++ ?y). set l2 := (X in _ ++ ?[y] = X ++ ?y); suff->: l1 = l2=> //; subst l1 l2.
          rewrite/zip/cmd_map_sim filter_map_swap map_map. symmetry.
