@@ -98,6 +98,7 @@ Section comb_compile_simulator.
           (ratk = true \/ (pub = true /\ exists cmd, rcmd = Some cmd)) ->
           sim_active'_spec rcmd ratk pub true.
 
+    
     (* This is an ssr trick *)
     Lemma sim_active'P rcmd ratk pub :
       sim_active'_spec rcmd ratk pub (sim_active' rcmd ratk pub).
@@ -203,13 +204,6 @@ Section comb_compile_simulator.
       (cfg2prog, (rst, atkst), (ist, mk_simstate atkst simst simprog)).
   End extract.
 End comb_compile_simulator.
-
-
-Ltac show_state :=
-  idtac "==HYPS==";
-  (try (match reverse goal with H : ?T |- _ => idtac H ":" T; fail end));
-  match goal with |- ?G => idtac "==GOAL==" G end;
-  idtac "==END==".
 
 Section extract_step_commute.
   Import TypeSystem Simulator.
@@ -369,7 +363,7 @@ Section extract_step_commute.
            { admit. }
 
          pattern_eq_2 [ (optcmd_stp_cnt _ (if _ then _ else rst)) ]  [(optcmd_stp_cnt _ (if _ then _ else simst)) ]=> [| <-].
-           {  destruct rcmd => //. 
+           { destruct rcmd => //. 
            apply: clean_cmd_stp_cnt_pub_nf=> //.
            case: isatk; stir. }
 
@@ -450,9 +444,8 @@ Section extract_step_commute.
            stir. set l1 := filter _ _. set l2 := repeat true _.
            suff: map (fun '(_,i,_) => i) l1 = l2; [move: l1 l2=> > <-; clear |subst l1 l2]. (* I copied this *)
              { rewrite map_map; apply: map_ext=> - [] [] //. } (* I feel like this is going to be very similar to previous case *)
-           set pca1 := (post_cmd_action _ _ (_ _ (if isatk then _ else rst))). 
-           set pca2 := (post_cmd_action _ _ (_ _ (if isatk then _ else simst))). 
-           have ->: pca1 = pca2; [subst pca1 pca2|move: pca1 pca2=> _ [>]; stir].
+           pattern_eq_2 [post_cmd_action _ _ (_ _ (if isatk then _ else rst))]
+                        [post_cmd_action _ _ (_ _ (if isatk then _ else simst))] => [| ->].
              { admit. }
            stir. set l1 := filter _ _. set l2 := repeat true _.
            suff: map (fun '(_,i,_) => i) l1 = l2; [move: l1 l2=> > <-; clear |subst l1 l2].
@@ -471,15 +464,11 @@ Section extract_step_commute.
          case: pub in rwt newpce *; [| move=> /=;stir].
          have rcmd_grd: is_secret_guard rcmd = false by admit. (* Copied!! *)
          rewrite rcmd_grd.
-         set cnt1 := (optcmd_stp_cnt _ (if _ then _ else rst)).
-         set cnt2 := (optcmd_stp_cnt _ (if _ then _ else simst)).
-         have <-: cnt1 = cnt2; subst cnt1 cnt2.
-           {  destruct rcmd => //. 
-           apply: clean_cmd_stp_cnt_pub_nf=> //.
-           case: isatk; stir. }
-         set pca1 := (post_cmd_action _ _ (_ _ (if isatk then _ else rst))). 
-         set pca2 := (post_cmd_action _ _ (_ _ (if isatk then _ else simst))). 
-         have ->: pca1 = pca2; [subst pca1 pca2|move: pca1 pca2=> _ [>]; stir].
+         pattern_eq_2 [ (optcmd_stp_cnt _ (if _ then _ else rst)) ]
+                      [ (optcmd_stp_cnt _ (if _ then _ else simst)) ] => [| <-].
+           {  destruct rcmd => //. apply: clean_cmd_stp_cnt_pub_nf=> //. case: isatk; stir. }
+         pattern_eq_2 [post_cmd_action _ _ (_ _ (if isatk then _ else rst))]
+                      [post_cmd_action _ _ (_ _ (if isatk then _ else simst))] => [| ->].
            { admit. }
          rewrite combine_extend3_splitr. 
          move: (X in (map Some X)) (X in (repeat true X))=> *.
