@@ -3,6 +3,8 @@ Import List ListNotations ssreflect ssrfun ssrbool FunctionalExtensionality.
 
 From Ltac2 Require Import Ltac2.
 
+Require Import ssrmatching.
+
 Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem Combined Simulator.
 Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem Tacs.Cook.
 
@@ -265,6 +267,21 @@ Section extract_step_commute.
     Ltac2 Set cook_debug := 1.
     Ltac2 Set cook_auto_depth := 0.
 
+  (* ssrpatternarg lets you parse X in X... However, you need to delimit with [ ]
+    With uconstr, you don't need to, but you can't use X in .
+    TODO: cpattern *)
+  Tactic Notation "pattern_eq_2" "[" ssrpatternarg(p1) "]" "[" ssrpatternarg(p2) "]" :=
+    let a := fresh "_e1" in
+    let b := fresh "_e2" in
+    ssrpattern p1; move=> a;
+    ssrpattern p2; move=> b;
+    have: a = b; subst a b.
+
+  Tactic Notation "pattern_eq" "[" ssrpatternarg(p1) "]" "with" constr(c) :=
+    let a := fresh "_e1" in
+    ssrpattern p1; move=> a;
+    have: a = c; subst a.
+
     Theorem extract_step_commute c:
       Invariant c ->
       step (extract_2cfg c) = extract_2cfg (comb_step c).
@@ -326,9 +343,7 @@ Section extract_step_commute.
              { move=> /=; stir.
              rewrite length_map repeat_length.
              erewrite post_optcmd_stp_store_sec;[|eassumption].
-             set pca1 := (post_cmd_action _ _ (if isatk then _ else rst)).
-             set pca2 := (post_cmd_action _ _ (if isatk then _ else simst)).
-             have ->: pca1 = pca2; [subst pca1 pca2|move: pca1 pca2=> _ [>]].
+             pattern_eq_2 [post_cmd_action _ _ (if isatk then _ else rst)] [post_cmd_action _ _ (if isatk then _ else simst)]=> [|->].
                { case: isatk; [apply: noninterfering_post_pre| apply: post_cmd_wf]=> //. } (* This pattern can be automated *)
              stir.  rewrite combine_extend3_splitl map_map. symmetry;
              erewrite map_ext; [|case=> ? [] *; instantiate (1 := fun '(_,(_,_)) => _); reflexivity].
@@ -338,12 +353,11 @@ Section extract_step_commute.
              apply: map_ext; case=> *. rewrite /sim_active'; stir. }
            have ->: is_secret_guard rcmd = true by admit. (* TODO: lots of same as before *)
            rewrite /= length_map repeat_length.
-           set pca1 := post_cmd_action _ _ (_ _(if _ then _ else rst)).
-           set pca2 := post_cmd_action _ _ (_ _(if _ then _ else simst)).
-           have ->: pca1 = pca2; [subst pca1 pca2|move: pca1 pca2=> _ [>]].
-             { destruct rcmd; stir.
+           pattern_eq_2 [post_cmd_action _ _ (_ _(if _ then _ else rst))] [post_cmd_action _ _ (_ _(if _ then _ else simst))]=> [|->].
+             { destruct rcmd=> //;
              case: isatk; [|apply: post_cmd_wf]; stir.
              apply: noninterfering_post_clean_pre; [eassumption|]=>//. }
+
            rewrite combine_extend3_splitl combine_extend2_same map_map; symmetry.
            erewrite combine_extend2_map_r; [|done]. rewrite map_map.
            erewrite map_ext; [|case=> ?; instantiate (1 := (fun '(_,_) => _)); reflexivity].
@@ -351,16 +365,14 @@ Section extract_step_commute.
          case: pub in rwt newpce *; [|move=> /=;stir].
          have rcmd_grd: is_secret_guard rcmd = false by admit.
          rewrite rcmd_grd /=. stir.
-         set pca1 := post_cmd_action _ _ (_ _(if _ then _ else rst)).
-         set pca2 := post_cmd_action _ _ (_ _(if _ then _ else simst)).
-         have ->: pca1 = pca2; [subst pca1 pca2|move: pca1 pca2=> _ [>]].
+         pattern_eq_2  [ (post_cmd_action _ _ (_ _(if _ then _ else rst)))] [ (post_cmd_action _ _ (_ _(if _ then _ else simst)))] => [|->].
            { admit. }
-         set cnt1 := (optcmd_stp_cnt _ (if _ then _ else rst)).
-         set cnt2 := (optcmd_stp_cnt _ (if _ then _ else simst)).
-         have <-: cnt1 = cnt2; subst cnt1 cnt2.
+
+         pattern_eq_2 [ (optcmd_stp_cnt _ (if _ then _ else rst)) ]  [(optcmd_stp_cnt _ (if _ then _ else simst)) ]=> [| <-].
            {  destruct rcmd => //. 
            apply: clean_cmd_stp_cnt_pub_nf=> //.
            case: isatk; stir. }
+
          rewrite combine_extend3_splitr. 
          set l:= combine_extend2 (map Some _) (repeat true _) _ _.
          rewrite -map_const combine_extend2_map_self_r map_map. 
@@ -416,9 +428,7 @@ Section extract_step_commute.
                instantiate (1 := fun '(_,_,_) => _). reflexivity. }
            case: pub in rwt newpce *; cycle 1.
              { erewrite post_optcmd_stp_store_sec; [| eassumption]=> /=.
-             set pca1 := (post_cmd_action _ _ (if isatk then _ else rst)). (* There needs to be a tactic for this *)
-             set pca2 := (post_cmd_action _ _ (if isatk then _ else simst)).
-             have ->: pca1 = pca2; [subst pca1 pca2|move: pca1 pca2=> _ [>]].
+             pattern_eq_2 [(post_cmd_action _ _ (if _ then _ else rst))] [(post_cmd_action _ _ (if _ then _ else simst))] => [|->].
                { case: isatk; [apply: noninterfering_post_pre| apply: post_cmd_wf]=> //. } (* This pattern can be automated *)
              stir. set l1 := filter _ _. set l2 := repeat true _.
              suff: map (fun '(_,i,_) => i) l1 = l2; [move: l1 l2=> > <-; clear |subst l1 l2].
