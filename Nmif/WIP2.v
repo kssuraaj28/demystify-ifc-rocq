@@ -232,15 +232,15 @@ Section extract_step_commute.
             | isatk : bool , _ : ⟨ ?rst | is_public ⟩ = ⟨ ?simst | is_public ⟩
             |- _ => pattern_eq_2 [post_cmd_action _ _ (if isatk then _ else rst)] [post_cmd_action _ _ (if isatk then _ else simst)]=> [|<-];
                 [ case: isatk; [apply: noninterfering_post_pre| apply: post_cmd_wf]; done|]
-            end) "eq_rw1" old.
+            end) "trick1" old.
 
     Ltac2 Set curr_cookbook as old :=
       add_cookstep 
         ltac1:(match goal with
             | isatk : bool ,rcmd: option Cmd , _ : ⟨ ?rst | is_public ⟩ = ⟨ ?simst | is_public ⟩
             |- _ => pattern_eq_2 [post_cmd_action _ _ (_ _(if _ then _ else rst))] [post_cmd_action _ _ (_ _(if _ then _ else simst))]=> [|<-];
-                [  destruct rcmd=> //; case: isatk; [|apply: post_cmd_wf]=> //=; eauto using wt_cmd_st_conf,noninterfering_post_clean_pre |]
-            end) "eq_rw2" old.
+                [  destruct rcmd=> //; case: isatk; [|apply: post_cmd_wf]=> //=; eauto using wt_cmd_st_conf,noninterfering_post_clean_pre; done |]
+            end) "trick2" old.
 
     Ltac2 Set cook_debug := 1.
 
@@ -314,7 +314,7 @@ Section extract_step_commute.
             erewrite map_ext; [|case=> *; instantiate (1 := fun '(_,_)=> _);  reflexivity].
             apply: map_ext; case=> *. rewrite /sim_active'; cook. }
           have ->: is_secret_guard rcmd = true by admit. (* TODO: lots of same as before *)
-          rewrite /= length_map repeat_length. cook.
+          rewrite /= length_map repeat_length. cook_step.
 
 
           rewrite combine_extend3_splitl combine_extend2_same map_map; symmetry.
@@ -323,16 +323,13 @@ Section extract_step_commute.
           apply: map_ext. case=> *. rewrite/sim_active'. cook. }
         case: pub in rwt newpce *; [| exfalso; do [cook] in newpce].
         have rcmd_grd: is_secret_guard rcmd = false by admit.
-        rewrite rcmd_grd /=. cook.
+        rewrite rcmd_grd /=.
 
         pattern_eq_2  [ (post_cmd_action _ _ (_ _(if _ then _ else rst)))] [ (post_cmd_action _ _ (_ _(if _ then _ else simst)))] => [|->].
           { admit. }
 
-        pattern_eq_2 [ (optcmd_stp_cnt _ (if _ then _ else rst)) ]  [(optcmd_stp_cnt _ (if _ then _ else simst)) ]=> [| <-].
-          { destruct rcmd => //. 
-          apply: clean_cmd_stp_cnt_pub_nf=> //.
-          case: isatk=> //. 
-          apply:pre_cmd_wf_conf=> //. }
+        pattern_eq_2 [ (optcmd_stp_cnt _ (if _ then _ else rst)) ]  [(optcmd_stp_cnt _ (if _ then _ else simst)) ]=> [| <-]; 
+          [ destruct rcmd => //;apply: clean_cmd_stp_cnt_pub_nf=> //;case: isatk=> //; apply:pre_cmd_wf_conf=> // |].
 
         rewrite combine_extend3_splitr. 
         set l:= combine_extend2 (map Some _) (repeat true _) _ _.

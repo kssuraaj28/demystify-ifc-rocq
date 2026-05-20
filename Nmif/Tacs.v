@@ -413,6 +413,7 @@ Module Cook.
   Ltac2 Notation "delete" l(tactic(0)) names(thunk(tactic(0))) :=
     fun () => delete0 (l ()) (names ()).
 
+
   (* TODO: Maybe check that there is no name duplication in the future? Throw a warning if this is the case *)
   #[local] Ltac2 append_tac0 (t: unit -> unit) (desc: string) (l : cookbook) : cookbook :=
     let hardened := fun () => precise_harden t (Some (1, true)) false in
