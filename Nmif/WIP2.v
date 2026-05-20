@@ -3,7 +3,6 @@ Import List ListNotations ssreflect ssrfun ssrbool FunctionalExtensionality.
 
 From Ltac2 Require Import Ltac2.
 
-Require Import ssrmatching.
 
 Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem Combined Simulator.
 Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem Tacs.Cook.
@@ -261,20 +260,6 @@ Section extract_step_commute.
     Ltac2 Set cook_debug := 1.
     Ltac2 Set cook_auto_depth := 0.
 
-  (* ssrpatternarg lets you parse X in X... However, you need to delimit with [ ]
-    With uconstr, you don't need to, but you can't use X in .
-    TODO: cpattern *)
-  Tactic Notation "pattern_eq_2" "[" ssrpatternarg(p1) "]" "[" ssrpatternarg(p2) "]" :=
-    let a := fresh "_e1" in
-    let b := fresh "_e2" in
-    ssrpattern p1; move=> a;
-    ssrpattern p2; move=> b;
-    have: a = b; subst a b.
-
-  Tactic Notation "pattern_eq" "[" ssrpatternarg(p1) "]" "with" constr(c) :=
-    let a := fresh "_e1" in
-    ssrpattern p1; move=> a;
-    have: a = c; subst a.
 
     Theorem extract_step_commute c:
       Invariant c ->
@@ -286,201 +271,178 @@ Section extract_step_commute.
       rewrite /CmbCmdInv/CmbCmdCoreInv in i1. case: i1=> rwt iwt.
       rewrite /StateInv in i3. case: i3=> treq pubeq.
       move: pclbl rwt iwt.
-      (case=> - untr pub); stir=> rwt iwt.
+      (case=> - untr pub); stir=> rwt iwt. (* TODO: Remove iwt. We don't care *)
       rewrite/comb_step/cmbcmd_step {2}/extract_2cfg; stir.
       rewrite /extract_2cfg; stir.
       rewrite/sim_active; stir.
       rewrite/step; stir.
       congr (_,_,_).
-      -- congr (_ ++ _). stir. (* TODO: Forward reasoning *) 
-         set l1 := (X in map _ X = _).
-         set l2 := (X in _ = map _ X).
-         suff: l1 = map (fun c => (real_cmd c, real_atk_bit c,  ideal_cmd c, sim_active c)) l2;
-           [move=> ->; rewrite map_map //| subst l1 l2]. (* TODO: This could be lemma / rewrite rule *)
-         rewrite/zip.
-         set new_pc := (compute_new_pc_opt _ _).
-         set l1 := (map Some (optcmd_stp_cnt rcmd _)). set l2 := (map Some (optcmd_stp_cnt icmd _)). set l3 := (repeat true _).
-         set c4l := (combine_extend4 _ _ _ _ _ _ _ _). set c3l := (combine_extend3 _ _ _ _ _ _).
-         rewrite /cmd_map !map_map. 
-         erewrite map_ext; cycle 1.
-           { case. case. cbn. rewrite/sim_active. cbn=> *. 
-           instantiate (1  := fun '(_,_,_) => (_, _, _, _ )). (* Very cool. Like `refine`, I think *)
-           reflexivity. }
-         subst c4l c3l.
-         set idlatkcont := (repeat true _). 
-         rewrite combine_extend3_swap23 map_map.
-         erewrite (map_ext);cycle 1.
-           { (do 2 case)=> >.
-             instantiate (1  := fun '(_,_,_) => (_, _, _, _ )). 
-             reflexivity. }
-         suff: combine_extend3 l1 l3 idlatkcont None false false =
-               map (fun '(c, b) => (c, b, sim_active' c b (public new_pc))) (combine_extend2 l1 l3 None false) by admit.
-         set lhs := LHS. set rhs := RHS.
-         suff: map (fun '(_,_,x) => x) lhs = 
-               map (fun '(_,_,x) => x) rhs; rewrite {}/lhs {}/rhs; rewrite map_map.
-         1: move=>/esym; erewrite (map_ext).
-         3: symmetry; erewrite (map_ext).
-         2,4: case=> >; instantiate (1 := fun '(_,_) => _); reflexivity.
-           { rewrite combine_extend3_splitr. move: (combine_extend2 _ _ _ _)=> l. clear.
-           move: idlatkcont=>idlatkcont. clear=> h.
-           erewrite combine_extend2_map_snd; [apply: map_ext; case=> >; f_equal; instantiate (1:= fun '(_,_) => _); reflexivity|].
-           rewrite h. apply: map_ext; case; case=> * //. }
-         clear l2 treq iwt.
-         subst new_pc l1 l3 idlatkcont. 
-         case: sim_active'P=>[|_].
-           { move=> -> [] e; rewrite -> e in *=> {e} //=.
-           rewrite combine_extend3_splitr; stir. rewrite !map_map.
-           apply: map_ext=> *; stir. }
-         stir. rewrite/sim_step. stir.
-         set (public _) as x; case newpce: x; subst x; cycle 1. (* TODO: ssr version of this? *)
-           { case: pub in rwt newpce *; cycle 1. (* Maybe custom rewriting rule *)
-             { move=> /=; stir.
-             rewrite length_map repeat_length.
-             erewrite post_optcmd_stp_store_sec;[|eassumption].
-             pattern_eq_2 [post_cmd_action _ _ (if isatk then _ else rst)] [post_cmd_action _ _ (if isatk then _ else simst)]=> [|->].
-               { case: isatk; [apply: noninterfering_post_pre| apply: post_cmd_wf]=> //. } (* This pattern can be automated *)
-             stir.  rewrite combine_extend3_splitl map_map. symmetry;
-             erewrite map_ext; [|case=> ? [] *; instantiate (1 := fun '(_,(_,_)) => _); reflexivity].
-             rewrite combine_extend2_same. set l := (map Some _).
-             erewrite combine_extend2_map_r; [|done]. rewrite map_map.
-             erewrite map_ext; [|case=> *; instantiate (1 := fun '(_,_)=> _);  reflexivity].
-             apply: map_ext; case=> *. rewrite /sim_active'; stir. }
-           have ->: is_secret_guard rcmd = true by admit. (* TODO: lots of same as before *)
-           rewrite /= length_map repeat_length.
-           pattern_eq_2 [post_cmd_action _ _ (_ _(if _ then _ else rst))] [post_cmd_action _ _ (_ _(if _ then _ else simst))]=> [|->].
-             { destruct rcmd=> //;
-             case: isatk; [|apply: post_cmd_wf]; stir.
-             apply: noninterfering_post_clean_pre; [eassumption|]=>//. }
+      - congr (_ ++ _). stir. (* TODO: Forward reasoning *) 
+        set l1 := (X in map _ X = _).
+        set l2 := (X in _ = map _ X).
+        suff: l1 = map (fun c => (real_cmd c, real_atk_bit c,  ideal_cmd c, sim_active c)) l2;
+          [move=> ->; rewrite map_map //| subst l1 l2]. (* TODO: This could be lemma / rewrite rule *)
+        rewrite/zip.
+        set new_pc := (compute_new_pc_opt _ _).
+        set l1 := (map Some (optcmd_stp_cnt rcmd _)). set l2 := (map Some (optcmd_stp_cnt icmd _)). set l3 := (repeat true _).
+        set c4l := (combine_extend4 _ _ _ _ _ _ _ _). set c3l := (combine_extend3 _ _ _ _ _ _).
+        rewrite /cmd_map !map_map. 
+        erewrite map_ext; cycle 1.
+          { case. case. cbn. rewrite/sim_active. cbn=> *. 
+          instantiate (1  := fun '(_,_,_) => (_, _, _, _ )). (* Very cool. Like `refine`, I think *)
+          reflexivity. }
+        subst c4l c3l.
+        set idlatkcont := (repeat true _). 
+        rewrite combine_extend3_swap23 map_map.
+        erewrite (map_ext); [|(do 2 case)=> >; instantiate (1  := fun '(_,_,_) => (_, _, _, _ )); reflexivity].
+        suff: combine_extend3 l1 l3 idlatkcont None false false =
+              map (fun '(c, b) => (c, b, sim_active' c b (public new_pc))) (combine_extend2 l1 l3 None false).
+          { move: l1 l2 l3 new_pc idlatkcont=> >; clear=> h. 
+          rewrite combine_extend4_regroup3 {}h.
+          erewrite combine_extend2_map_l; [|instantiate (1 := (None, false))=> //=;stir].
+          rewrite -combine_extend3_splitr map_map.
+          apply: map_ext; case;case=> //. }
+        set lhs := LHS. set rhs := RHS.
+        suff: map (fun '(_,_,x) => x) lhs = map (fun '(_,_,x) => x) rhs; rewrite {}/lhs {}/rhs; rewrite map_map.
+        1: move=>/esym; erewrite (map_ext).
+        3: symmetry; erewrite (map_ext).
+        2,4: case=> >; instantiate (1 := fun '(_,_) => _); reflexivity.
+          { rewrite combine_extend3_splitr. move: (combine_extend2 _ _ _ _)=> l. clear.
+          move: idlatkcont=>idlatkcont. clear=> h.
+          erewrite combine_extend2_map_snd; [apply: map_ext; case=> >; f_equal; instantiate (1:= fun '(_,_) => _); reflexivity|].
+          rewrite h. apply: map_ext; case; case=> * //. }
+        clear l2 treq iwt.
+        subst new_pc l1 l3 idlatkcont. 
+        case: sim_active'P=>[|_].
+          { move=> -> [] e; rewrite -> e in *=> {e} //=.
+          rewrite combine_extend3_splitr; stir. rewrite !map_map.
+          apply: map_ext=> *; stir. }
+        stir. rewrite/sim_step. stir.
+        set (public _) as x; case newpce: x; subst x; cycle 1. (* TODO: ssr version of this? *)
+          { case: pub in rwt newpce *; cycle 1. (* Maybe custom rewriting rule *)
+            { move=> /=; stir.
+            rewrite length_map repeat_length.
+            erewrite post_optcmd_stp_store_sec;[|eassumption].
+            pattern_eq_2 [post_cmd_action _ _ (if isatk then _ else rst)] [post_cmd_action _ _ (if isatk then _ else simst)]=> [|->].
+              { case: isatk; [apply: noninterfering_post_pre| apply: post_cmd_wf]=> //. } (* This pattern can be automated *)
+            stir.  rewrite combine_extend3_splitl map_map. symmetry;
+            erewrite map_ext; [|case=> ? [] *; instantiate (1 := fun '(_,(_,_)) => _); reflexivity].
+            rewrite combine_extend2_same. set l := (map Some _).
+            erewrite combine_extend2_map_r; [|done]. rewrite map_map.
+            erewrite map_ext; [|case=> *; instantiate (1 := fun '(_,_)=> _);  reflexivity].
+            apply: map_ext; case=> *. rewrite /sim_active'; stir. }
+          have ->: is_secret_guard rcmd = true by admit. (* TODO: lots of same as before *)
+          rewrite /= length_map repeat_length.
+          pattern_eq_2 [post_cmd_action _ _ (_ _(if _ then _ else rst))] [post_cmd_action _ _ (_ _(if _ then _ else simst))]=> [|->].
+            { destruct rcmd=> //;
+            case: isatk; [|apply: post_cmd_wf]; stir.
+            apply: noninterfering_post_clean_pre; [eassumption|]=>//. }
 
-           rewrite combine_extend3_splitl combine_extend2_same map_map; symmetry.
-           erewrite combine_extend2_map_r; [|done]. rewrite map_map.
-           erewrite map_ext; [|case=> ?; instantiate (1 := (fun '(_,_) => _)); reflexivity].
-           apply: map_ext. case=> *. rewrite/sim_active'. stir. }
-         case: pub in rwt newpce *; [|move=> /=;stir].
-         have rcmd_grd: is_secret_guard rcmd = false by admit.
-         rewrite rcmd_grd /=. stir.
-         pattern_eq_2  [ (post_cmd_action _ _ (_ _(if _ then _ else rst)))] [ (post_cmd_action _ _ (_ _(if _ then _ else simst)))] => [|->].
-           { admit. }
+          rewrite combine_extend3_splitl combine_extend2_same map_map; symmetry.
+          erewrite combine_extend2_map_r; [|done]. rewrite map_map.
+          erewrite map_ext; [|case=> ?; instantiate (1 := (fun '(_,_) => _)); reflexivity].
+          apply: map_ext. case=> *. rewrite/sim_active'. stir. }
+        case: pub in rwt newpce *; [|move=> /=;stir].
+        have rcmd_grd: is_secret_guard rcmd = false by admit.
+        rewrite rcmd_grd /=. stir.
+        pattern_eq_2  [ (post_cmd_action _ _ (_ _(if _ then _ else rst)))] [ (post_cmd_action _ _ (_ _(if _ then _ else simst)))] => [|->].
+          { admit. }
 
-         pattern_eq_2 [ (optcmd_stp_cnt _ (if _ then _ else rst)) ]  [(optcmd_stp_cnt _ (if _ then _ else simst)) ]=> [| <-].
-           { destruct rcmd => //. 
-           apply: clean_cmd_stp_cnt_pub_nf=> //.
-           case: isatk; stir. }
+        pattern_eq_2 [ (optcmd_stp_cnt _ (if _ then _ else rst)) ]  [(optcmd_stp_cnt _ (if _ then _ else simst)) ]=> [| <-].
+          { destruct rcmd => //. 
+          apply: clean_cmd_stp_cnt_pub_nf=> //.
+          case: isatk=> //. 
+          apply:pre_cmd_wf_conf=> //. }
 
-         rewrite combine_extend3_splitr. 
-         set l:= combine_extend2 (map Some _) (repeat true _) _ _.
-         rewrite -map_const combine_extend2_map_self_r map_map. 
-         subst l. stir.
-         apply: map_ext_in; case; case=> [?|]; case=> //=.
-         move: (optcmd_stp_cnt _ _)=> l. move: (if _ then _ else _)=> n. 
-         clear=> contra; exfalso; move: contra.
-         elim: l n=> //=; [elim=> //= ? ? [] //|]. (* Damn. I used induction in the base, but not  *)
-         move=> > ?; case=> //=; [|move=> > [] //; eauto].
-         rewrite map_map; case=> // /in_map_iff [] ? [] []//.
+        rewrite combine_extend3_splitr. 
+        set l:= combine_extend2 (map Some _) (repeat true _) _ _.
+        rewrite -map_const combine_extend2_map_self_r map_map. 
+        subst l. stir.
+        apply: map_ext_in; case; case=> [?|]; case=> //=.
+        move: (optcmd_stp_cnt _ _)=> l. move: (if _ then _ else _)=> n. 
+        clear=> contra; exfalso; move: contra.
+        elim: l n=> //=; [elim=> //= ? ? [] //|]. (* Damn. I used induction in the base, but not  *)
+        move=> > ?; case=> //=; [|move=> > [] //; eauto].
+        rewrite map_map; case=> // /in_map_iff [] ? [] []//.
 
-      -- congr (_,_); stir .
-         case: sim_active'P=>[-> |_]; [case=> e; rewrite -> e in *=> {e} /=; f_equal|]; stir.
-         1-2: rewrite /zip cmd_map_sim_app.
-         1-2: set l := (X in _ = X ++ _); suff->: l = []; [done|subst l].
-         1-2: rewrite/ cmd_map_sim.
-         1-2: rewrite filter_map_swap map_map.
-         1-2: set l := (X in map _ X); suff->: l = []; [done|subst l].
-           { erewrite filter_ext; cycle 1.
-               { case; case=> * /=. 
-               rewrite compute_new_pc_opt_secret /=.
-               instantiate (1:= fun '(_,_,_)=> _); reflexivity. }
-             stir. 
-             rewrite combine_extend3_nil3 filter_map_swap.
-             set l := (X in map _ X); suff->: l = []; [done|subst l].
-             erewrite filter_ext; cycle 1.
-               { case=> *. instantiate (1:= fun '(_,_)=> _); reflexivity. }
-             unshelve erewrite filter_ext; [exact xpred0|apply filter_false|].
-             case=> //. }
-           { stir. erewrite filter_ext; cycle 1.
-               { case; case=> * /=. 
-               instantiate (1:= fun '(_,_,_)=> _); reflexivity. }
-           rewrite combine_extend3_nil1 combine_extend2_nil_r !map_map filter_map_swap.
-           set l := (X in map _ X); suff->: l = []; [done|subst l]. (* This is a good stir rule *)
-           unshelve erewrite filter_ext; [exact xpred0|apply filter_false|].
-           case=> *; stir. }
-         rewrite/sim_step; stir; f_equal; stir.
-           { admit. }
-           { if_easy_goals. } (* TODO: It's worth having this be a stir rule *)
-         rewrite cmd_map_sim_app. 
-         set l1 := (X in X ++ ?[y] = _ ++ ?y). set l2 := (X in _ ++ ?[y] = X ++ ?y); suff->: l1 = l2=> //; subst l1 l2.
-         rewrite/zip/cmd_map_sim filter_map_swap map_map. symmetry.
-         erewrite map_ext; [|case; case=> * /=; instantiate (1:= fun '(_,_,_) => _); reflexivity].
-         erewrite filter_ext; [|case; case=> *; rewrite /sim_active; cbn; instantiate (1:= fun '(_,_,_) => _); reflexivity].
-         set x :=(combine_extend3 _ _ _ _ _ _); pattern x; set P :=(X in X x); subst x.
-         rewrite combine_extend3_swap23. move: (map Some (_ _ ist))=> ?. subst P; cbn beta.
-         rewrite filter_map_swap map_map.
-         erewrite map_ext; [|case; case=> * /=; instantiate (1:= fun '(_,_,_) => _); reflexivity].
-         erewrite filter_ext; [|case; case=> *; cbn; instantiate (1:= fun '(_,_,_) => _); reflexivity].
-         set (public _) as x; case newpce: x; subst x; cycle 1. (* TODO: ssr version of this? *)
-           { erewrite filter_ext; cycle 1.
-               { case; case=> ? x ?. rewrite /sim_active' /= Bool.orb_false_r.
-               instantiate (1 := fun '(_,_,_) => _). reflexivity. }
-           case: pub in rwt newpce *; cycle 1.
-             { erewrite post_optcmd_stp_store_sec; [| eassumption]=> /=.
-             pattern_eq_2 [(post_cmd_action _ _ (if _ then _ else rst))] [(post_cmd_action _ _ (if _ then _ else simst))] => [|->].
-               { case: isatk; [apply: noninterfering_post_pre| apply: post_cmd_wf]=> //. } (* This pattern can be automated *)
-             stir. set l1 := filter _ _. set l2 := repeat true _.
-             suff: map (fun '(_,i,_) => i) l1 = l2; [move: l1 l2=> > <-; clear |subst l1 l2].
-               { rewrite map_map; apply: map_ext=> - [] [] //. }
+      - congr (_,_); stir .
+        case: sim_active'P=>[-> |_]; [case=> e; rewrite -> e in *=> {e} /=; f_equal|]; stir.
+        1-2: rewrite /zip cmd_map_sim_app.
+        1-2: pattern_eq [X in _ = X ++ _] with [] => [|->//]. 
+        1-2: rewrite/ cmd_map_sim.
+        1-2: rewrite filter_map_swap map_map.
+        1-2: pattern_eq [X in map _ X] with [] => [|->//]. 
+          { erewrite filter_ext; cycle 1.
+              { case; case=> * /=. 
+              rewrite compute_new_pc_opt_secret /=.
+              instantiate (1:= fun '(_,_,_)=> _); reflexivity. }
+            stir. 
+            rewrite combine_extend3_nil3 filter_map_swap.
+            pattern_eq [X in map _ X] with [] => [|->//].  (* This can be stir rule *)
+            erewrite filter_ext; cycle 1.
+              { case=> *. instantiate (1:= fun '(_,_)=> _); reflexivity. }
+            unshelve erewrite filter_ext; [exact xpred0|apply filter_false|].
+            case=> //. }
+          { stir. erewrite filter_ext; [| case; case=> * /=; instantiate (1:= fun '(_,_,_)=> _); reflexivity].
+          rewrite combine_extend3_nil1 combine_extend2_nil_r !map_map filter_map_swap.
+          pattern_eq [X in map _ X] with [] => [|->//].  (* This can be stir rule *)
+          unshelve erewrite filter_ext; [exact xpred0|apply filter_false|]. stir. }
+        rewrite/sim_step; stir; f_equal; stir.
+          { case: isatk=> //; destruct pub=> /=; admit. }
+          { if_easy_goals. } (* TODO: It's worth having this be a stir rule *)
+        rewrite cmd_map_sim_app. 
+        pattern_eq_2 [X in X ++ ?[y] = _ ++ ?y] [X in _ ++ ?[y] = X ++ ?y]=> [|->//].
+        rewrite/zip/cmd_map_sim filter_map_swap map_map. symmetry.
+        erewrite map_ext; [|case; case=> * /=; instantiate (1:= fun '(_,_,_) => _); reflexivity].
+        erewrite filter_ext; [|case; case=> *; rewrite /sim_active; cbn; instantiate (1:= fun '(_,_,_) => _); reflexivity].
+        rewrite combine_extend3_swap23. move: (map Some (_ _ ist))=> ?.
+        rewrite filter_map_swap map_map.
+        erewrite map_ext; [|case; case=> * /=; instantiate (1:= fun '(_,_,_) => _); reflexivity].
+        erewrite filter_ext; [|case; case=> *; cbn; instantiate (1:= fun '(_,_,_) => _); reflexivity].
+        set (public _) as x; case newpce: x; subst x; cycle 1. (* TODO: ssr version of this? *)
+          { erewrite filter_ext; [|case; case=> ? ? ?; rewrite /sim_active' /= Bool.orb_false_r; instantiate (1 := fun '(_,_,_) => _); reflexivity].
+          case: pub in rwt newpce *.
+          2: erewrite post_optcmd_stp_store_sec; [| eassumption]=> /=.
+          2: pattern_eq_2 [(post_cmd_action _ _ (if _ then _ else rst))] [(post_cmd_action _ _ (if _ then _ else simst))] => [|->];
+             [case: isatk; [apply: noninterfering_post_pre| apply: post_cmd_wf]=> //|].
 
-             move: (if _ then _ else _) (map Some _)=> ? ?.
-             rewrite combine_extend3_splitr [combine_extend2 _ (repeat _ _) _ _]combine_extend2_swap;
-             erewrite combine_extend2_map_l; [|instantiate (1 := (_,_)); reflexivity];
-             rewrite -combine_extend3_splitr combine_extend3_splitl !map_map filter_map_swap map_map;
-             erewrite filter_ext; [|case=> ?;case=> *; instantiate (1 := fun '(_,_) => _); reflexivity];
-             erewrite map_ext; [|case=> ?;case=> *; instantiate (1 := fun '(_,_) => _); reflexivity];
-             move: (X in combine_extend2 _ X _ _)=> ?.
-             erewrite map_filter_combine_extend2_ind1.
-             2,3: move=> *; instantiate (1:= fun _ => _); reflexivity. 2: done.
-             rewrite map_id; clear; revert_hyp_type nat; elim=> //= *; f_equal=> //. }
-
-           have ->: is_secret_guard rcmd = true by admit. (* TODO: lots of same as before *)
-           rewrite combine_extend2_nil_l.
-           stir. set l1 := filter _ _. set l2 := repeat true _.
-           suff: map (fun '(_,i,_) => i) l1 = l2; [move: l1 l2=> > <-; clear |subst l1 l2]. (* I copied this *)
-             { rewrite map_map; apply: map_ext=> - [] [] //. } (* I feel like this is going to be very similar to previous case *)
-           pattern_eq_2 [post_cmd_action _ _ (_ _ (if isatk then _ else rst))]
-                        [post_cmd_action _ _ (_ _ (if isatk then _ else simst))] => [| ->].
-             { admit. }
-           stir. set l1 := filter _ _. set l2 := repeat true _.
-           suff: map (fun '(_,i,_) => i) l1 = l2; [move: l1 l2=> > <-; clear |subst l1 l2].
-             { apply: map_ext=> - [] [] //. }
-
-           move: (if _ then _ else _) (map Some _)=> ? ?.
-           rewrite combine_extend3_splitr [combine_extend2 _ (repeat _ _) _ _]combine_extend2_swap;
+          1: have ->: is_secret_guard rcmd = true by admit. (* I should be able to have an ssr variant *)
+          1: rewrite combine_extend2_nil_l.
+          1: stir; set l1 := filter _ _; set l2 := repeat true _.
+          1: suff: map (fun '(_,i,_) => i) l1 = l2; [move: l1 l2=> > <-; rewrite map_map; apply: map_ext=> - [] [] //|subst l1 l2].  
+          1: pattern_eq_2 [post_cmd_action _ _ (_ _ (if isatk then _ else rst))] [post_cmd_action _ _ (_ _ (if isatk then _ else simst))] => [| ->];
+             [admit|].
+          1-2: move: (if _ then _ else _) (map Some _)=> ? ?.
+          1-2: rewrite combine_extend3_splitr [combine_extend2 _ (repeat _ _) _ _]combine_extend2_swap;
            erewrite combine_extend2_map_l; [|instantiate (1 := (_,_)); reflexivity];
            rewrite -combine_extend3_splitr combine_extend3_splitl !map_map filter_map_swap map_map;
            erewrite filter_ext; [|case=> ?;case=> *; instantiate (1 := fun '(_,_) => _); reflexivity];
            erewrite map_ext; [|case=> ?;case=> *; instantiate (1 := fun '(_,_) => _); reflexivity];
            move: (X in combine_extend2 _ X _ _)=> ?.
-           erewrite map_filter_combine_extend2_ind1.
-           2,3: move=> *; instantiate (1:= fun _ => _); reflexivity. 2: done.
-           rewrite map_id; clear; revert_hyp_type nat; elim=> //= *; f_equal=> //.  } (* I copied alot!! TODO: Cleanup *)
-         case: pub in rwt newpce *; [| move=> /=;stir].
-         have rcmd_grd: is_secret_guard rcmd = false by admit. (* Copied!! *)
-         rewrite rcmd_grd.
-         pattern_eq_2 [ (optcmd_stp_cnt _ (if _ then _ else rst)) ]
-                      [ (optcmd_stp_cnt _ (if _ then _ else simst)) ] => [| <-].
-           {  destruct rcmd => //. apply: clean_cmd_stp_cnt_pub_nf=> //. case: isatk; stir. }
-         pattern_eq_2 [post_cmd_action _ _ (_ _ (if isatk then _ else rst))]
-                      [post_cmd_action _ _ (_ _ (if isatk then _ else simst))] => [| ->].
-           { admit. }
-         rewrite combine_extend3_splitr. 
-         move: (X in (map Some X)) (X in (repeat true X))=> *.
-         erewrite map_filter_combine_extend2_ind1.
-         2,3: case=> *; instantiate (1:= fun '(_,_) => _); reflexivity; done. 2: done.
-         clear. erewrite map_ext; [|instantiate (1 := id); case=> //]. rewrite map_id.
-         revert_hyp_type nat; revert_hyp_type Prog. 
-         elim; [elim=> //= n ?; f_equal=> //|].
-         move=> > ?; case=> /= *; [| f_equal; eauto].
-         rewrite !filter_map_swap.
-         erewrite filter_ext; [| move=> * /=; reflexivity].
-         rewrite filter_true //.
+          1-2: enter (erewrite map_filter_combine_extend2_ind1; only 2,3: (move=> *; instantiate (1:= fun _ => _); reflexivity); only 2: done).
+          (* I would love to use 2 in 1. Or have a combined join lemma. open_constr fails when not focused *)
+          1-2: clear; revert_hyp_type nat; elim=> //= *; f_equal=> //. }
+
+        case: pub in rwt newpce *; [| move=> /=;stir].
+        have rcmd_grd: is_secret_guard rcmd = false by admit. (* Copied!! *)
+        rewrite rcmd_grd.
+        pattern_eq_2 [ (optcmd_stp_cnt _ (if _ then _ else rst)) ]
+                     [ (optcmd_stp_cnt _ (if _ then _ else simst)) ] => [| <-].
+          {  destruct rcmd => //. apply: clean_cmd_stp_cnt_pub_nf=> //. case: isatk; stir. }
+        pattern_eq_2 [post_cmd_action _ _ (_ _ (if isatk then _ else rst))]
+                     [post_cmd_action _ _ (_ _ (if isatk then _ else simst))] => [| ->].
+          { admit. }
+        rewrite combine_extend3_splitr. 
+        move: (X in (map Some X)) (X in (repeat true X))=> *.
+        erewrite map_filter_combine_extend2_ind1.
+        2,3: case=> *; instantiate (1:= fun '(_,_) => _); reflexivity; done. 2: done.
+        clear. erewrite map_ext; [|instantiate (1 := id); case=> //]. rewrite map_id.
+        revert_hyp_type nat; revert_hyp_type Prog. 
+        elim; [elim=> //= n ?; f_equal=> //|].
+        move=> > ?; case=> /= *; [| f_equal; eauto].
+        rewrite !filter_map_swap.
+        erewrite filter_ext; [| move=> * /=; reflexivity]. 
+        repeat f_equal. rewrite filter_true //.
     Admitted.
   End cook.
 

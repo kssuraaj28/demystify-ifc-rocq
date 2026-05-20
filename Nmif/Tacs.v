@@ -1,5 +1,5 @@
 From Ltac2 Require Import Ltac2 Printf. (* TODO: Hygiene *)
-Require Import ssreflect.
+Require Import ssreflect ssrmatching.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
@@ -51,6 +51,21 @@ Section fail.
   Abort.
 End fail.
 
+(* ssrpatternarg lets you parse X in X... However, you need to delimit with [ ]
+  With uconstr, you don't need to, but you can't use X in .
+  TODO: cpattern *)
+Tactic Notation "pattern_eq_2" "[" ssrpatternarg(p1) "]" "[" ssrpatternarg(p2) "]" :=
+  let a := fresh "_e1" in
+  let b := fresh "_e2" in
+  ssrpattern p1; move=> a;
+  ssrpattern p2; move=> b;
+  have: a = b; subst a b.
+
+(* uconstr means you can use [] *)
+Tactic Notation "pattern_eq" "[" ssrpatternarg(p1) "]" "with" uconstr(c) :=
+  let a := fresh "_e1" in
+  ssrpattern p1; move=> a;
+  have: a = c; subst a.
 
 Tactic Notation "NAME_GOALS_AFTER" tactic0(t) ne_ident_list(l) :=
   let f := ltac2:(tt ll |-

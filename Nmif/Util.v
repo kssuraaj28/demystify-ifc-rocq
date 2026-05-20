@@ -162,12 +162,12 @@ Module List.
   Proof. done. Qed.
 
   (* combine_extend3 grouped as (a,(b,c)) -- zip-with-padding is associative. *)
-  Lemma combine_extend3_splitl {A B C}
-    (la : list A) (lb : list B) (lc : list C) da db dc :
+  Lemma combine_extend3_splitl {A B C}:
+    forall (la : list A) (lb : list B) (lc : list C) da db dc,
     combine_extend3 la lb lc da db dc =
     map (fun '(a, (b, c)) => (a, b, c))
         (combine_extend2 la (combine_extend2 lb lc db dc) da (db, dc)).
-  Admitted. (* TODO: associativity of combine_extend2-with-padding. *)
+  Proof.  Admitted. (* TODO: associativity of combine_extend2-with-padding. *)
 
   (* Map fusion: a `map` on the first list pulls out of `combine_extend2`. *)
   Lemma combine_extend2_map_l {A A' B} (f : A -> A')
@@ -428,6 +428,7 @@ End test.
 
 Ltac2 Set this_cookbook_ as old :=
   add_stirstep 1 ltac1:(match goal with H : Some _ = Some _ |- _ => move:H; case=> H end) "some_eq_hyp" old.
+
 
 (* TODO: This is no longer built into the tactic  *)
 Ltac2 Set this_cookbook_ as old := 
