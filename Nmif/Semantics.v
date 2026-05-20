@@ -88,9 +88,9 @@ Section cleanstep.
 End cleanstep.
 
 (* TODO: All autorewrite-ish tactics should do rewrite -> in * *)
-Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> optcmd_stp_store_simpl in * ) "optcmd_stp_store_simpl" old.
-Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> optcmd_stp_cnt_simpl in * ) "optcmd_stp_cnt_simpl" old.
-Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite -> optcmd_stp_cnd_idem in * ) "optcmd_stp_cnd_idem" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite optcmd_stp_store_simpl) "optcmd_stp_store_simpl" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite optcmd_stp_cnt_simpl) "optcmd_stp_cnt_simpl" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite optcmd_stp_cnd_idem) "optcmd_stp_cnd_idem" old.
 
 Section test.
   Context `{!VarPrm, !ValPrm}.

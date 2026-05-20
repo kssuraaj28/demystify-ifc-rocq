@@ -281,26 +281,9 @@ Section test.
   Abort.
 End test.
 
-(*  
-    If t is a tactic that takes in a hypothesis, 
-    this tactic will apply the top hypothesis on it
-    The top hypothesis might go away. I'm not doing any hardening. 
-    Maybe worth doing a goals_check? TODO
-*)
-Tactic Notation "toph" tactic(t) := (let f := fresh in (move=> f); t f). 
 
-(* This is a little hacky because you don't you are doing trial and error.. 
-   Maybe better to specialize *)
-Tactic Notation "someh" tactic(t) := match goal with H : _ |- _ => t H end.
-
-Section test.
-  Ltac t H := apply H.
-  Goal False -> False.  Proof.  toph t. Abort.
-  Goal False -> False.  Proof.  move=> *. someh t . Abort.
-End test.
-
-Ltac evar_spec h :=  
-  let t := unshelve (move: h; let t := open_constr:(_) in let f := fresh in pose f := t=> /(_ f); subst f) in
+Ltac evar_spec_toph :=  
+  let t := unshelve ( let t := open_constr:(_) in let f := fresh in pose f := t=> /(_ f); subst f) in
   let f := ltac2:(tt |- precise_harden 
                 (fun () => Ltac1.run(tt)) 
                 (Some (2,false))  true) in(* You're moving h away *)
@@ -312,9 +295,8 @@ Section test.
   Variable Q : Prop.
   Goal (P 5 -> Q) -> (forall n, P n) -> Q.
   Proof.
-    Succeed move=> x i; (evar_spec i); cycle 1; exact x.
-    Succeed move=> x; (toph evar_spec); cycle 1; exact x.
-    move=> x. unshelve toph evar_spec. 2: exact x. (* Applying to second goal solves the first goal. *)
+    Succeed move=> x; (evar_spec_toph) ; cycle 1; exact x.
+    move=> x. unshelve evar_spec_toph. 2: exact x. (* Applying to second goal solves the first goal. *)
   Qed.
 End test.
 

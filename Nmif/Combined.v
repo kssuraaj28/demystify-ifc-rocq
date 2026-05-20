@@ -155,26 +155,26 @@ Section thm.
    Proof.
      move=> *; rewrite /zip.
      apply/Forall_map/Forall_combine2_ind1;[|eassumption|]=> //= => [[] [] > //|].
-     if_easy_goals.
+     move: (X in if X then _ else _)=> ?; if_easy_goals. (* TODO: Maybe  *)
    Qed.
 
 End thm.
 
 Ltac2 Set this_cookbook_ as old :=
-  add_stirstep 1
+  add_cookstep
     ltac1:(lazymatch goal with
            | |- Forall _ (zip _ _ _ _) => apply/Forall_CmbCmd_zip
            end)
     "Forall_CmbCmd_zip" old.
 
 Ltac2 Set this_cookbook_ as old :=
-  add_stirstep 1 ltac1:(rewrite -> real_cmd_mk in * ) "real_cmd_mk" old.
+  add_cookstep ltac1:(rewrite real_cmd_mk ) "real_cmd_mk" old.
 Ltac2 Set this_cookbook_ as old :=
-  add_stirstep 1 ltac1:(rewrite -> real_atk_bit_mk in * ) "real_atk_bit_mk" old.
+  add_cookstep ltac1:(rewrite real_atk_bit_mk ) "real_atk_bit_mk" old.
 Ltac2 Set this_cookbook_ as old :=
-  add_stirstep 1 ltac1:(rewrite -> ideal_cmd_mk in * ) "ideal_cmd_mk" old.
+  add_cookstep ltac1:(rewrite ideal_cmd_mk) "ideal_cmd_mk" old.
 Ltac2 Set this_cookbook_ as old :=
-  add_stirstep 1 ltac1:(rewrite -> pc_lbl_mk in * ) "pc_lbl_mk" old.
+  add_cookstep ltac1:(rewrite pc_lbl_mk) "pc_lbl_mk" old.
 
 Ltac2 this_cookbook () := this_cookbook_ ().
 
@@ -199,17 +199,18 @@ Section invprf.
 
 
     Ltac2 Eval print_cookbook curr_cookbook.
-    Ltac2 Eval print_cookbook curr_stirbook.
 
+    Hint Extern 10 => lazymatch goal with
+           |- context [compute_new_pc (mk_lbl true ?p) ?c] =>
+              move: ([elaborate compute_new_pc_untr p c])=> [] + ->
+           end: core.
     Hint Extern 10 => lazymatch goal with |- _ => apply:pubuntr_wf_cont end: core.
     Hint Extern 10 => lazymatch goal with |- _ => apply:step_soundness end: core.
-    Ltac2 Set cook_auto_dbs := fun () => [@trickbag].
 
 (*    Hint Extern 100 => lazymatch goal with _ =>  cbn end : trickbag. *)
 
 (* TODO 3 debug levels *)
     Ltac2 Set cook_debug := 0. (* TODO: Why can't I access this? *)
-    Ltac2 Set cook_auto_depth := 4.
     (* TODO: Why does cook make this extremely slow? *)
     (* TODO: Set Ltac Profiling *)
 
@@ -227,42 +228,44 @@ Section invprf.
         1: move=> <- /= <- *.
         2: move=> * /=. 
         1-2: repeat split; cook.
-         { revert_hyp_type_dep (option Cmd); case => /= *; cook. }
+          { revert_hyp_pat [(option Cmd), (_ ⊢ _)]; case=> /= *; cook. }
         move=> /=. 
-        apply/Forall_and; [stir|]. 
+        apply/Forall_and; cook; auto with trickbag.
         rewrite-/(WellFormedProg _ _).
-        revert_hyp_type_dep (option Cmd); case=> /= *; cook.
+        revert_hyp_pat [(option Cmd), (_ ⊢ _)]; case=> /= *; auto with trickbag.
 
-      - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split; stir.
-          { revert_hyp_type bool; case; stir.
-          1-2: revert_hyp_type_dep PcLbl; case=> [[] ?] /=; stir. 
-          1-2: revert_hyp_type_dep (option Cmd); case=> /= *; stir.  }
-          { revert_hyp_type_dep PcLbl; case=> [+ []] /==> *; stir. }
+      - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split; cook.
+          { revert_hyp_pat bool; case; cook.
+          1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=. 
+          2,4: auto with cook_step trickbag; fail.
+          1-2: revert_hyp_pat (option _); case=> /= *; cook. }
+          { revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [+ []] /==> *; cook. }
         move=> /=.  
-        apply/Forall_and; stir.
-        revert_hyp_type_dep PcLbl; case=> [[] ?] /= >. {
-           move=> *; stir.
-           revert_hyp_type_dep (option Cmd)=> - [] //= >.
+        apply/Forall_and; cook; auto.
+        revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)].
+        case=> [[] ?] /= >. {
+           move=> *; cook.
+           revert_hyp_pat [(option _), (_ ⊢ _)]; case=> //= >.
            rewrite -/(WellFormedProg _ _).
            move=> /step_soundness=> snd.
-           apply/flows_to_subtype_prog;[|apply/snd].
-           stir. } 
+           apply/flows_to_subtype_prog;[|apply/snd]; auto. }
         move=> /= ? <- /=.
         move ?: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. 
            {erewrite tr_cmd_cnt; [apply/Forall_combine2_same/Forall_map/Forall_forall => // | eassumption |..]. 
-           1-2: stir. }
-        stir.
+           1-2: cook; auto with trickbag. }
+        cook.
         rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
-        revert_hyp_type_dep Cmd=> ? /step_soundness snd newpce.
+        revert_hyp_pat [Cmd, (WellFormedCmd _ _), (compute_new_pc _ _ = _)].
+        move=> ? /step_soundness snd newpce.
         apply/flows_to_subtype_prog; [|apply/snd].
-        stir.
+        auto with trickbag.
     Qed. 
   End cook.
 
   Theorem cfg_step_inv: forall c, Invariant c ->  Invariant (cfg_step c).
   Proof.
     case=> + [] //.
-    rewrite/Invariant/cfg_step=> > []. toph Forall_inv.
+    rewrite/Invariant/cfg_step=> > []. Forall_inv_toph.
     case e: (cmbcmd_step _ _)=> h1 ? h2. 
     move: (cmbcmd_step_inv _ _ h1 h2); rewrite {}e=> - [] *.
     split=> //; apply/Forall_app=> //.

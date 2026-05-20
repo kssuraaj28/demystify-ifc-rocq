@@ -86,9 +86,8 @@ Lemma noninterfering_post_pre `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
   post_cmd_action adv ast (pre_cmd_action adv ast s2).
 Proof.  move=> hyp.  apply: post_cmd_wf.  apply: pre_cmd_wf_conf. done. Qed.
 
-Ltac2 Set this_cookbook_ as old := add_stirstep 1 ltac1:(rewrite ->pre_cmd_wf_int in * ) "pre_cmd_wf_int" old.
-Ltac2 Set this_cookbook_ as old :=
-  add_stirstep 1 ltac1:(unshelve erewrite pre_cmd_wf_conf;[|reflexivity|]) "pre_cmd_wf_conf" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite pre_cmd_wf_int) "pre_cmd_wf_int" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(unshelve erewrite pre_cmd_wf_conf;[|reflexivity|]) "pre_cmd_wf_conf" old.
   (* TODO: I think maybe apply is better? TODO *)
 
 Ltac2 this_cookbook () := this_cookbook_ ().

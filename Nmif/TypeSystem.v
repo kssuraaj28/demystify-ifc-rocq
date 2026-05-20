@@ -260,27 +260,19 @@ Section thms_atk.
 End thms_atk.
 
 Ltac2 Set this_cookbook_ as old :=
-  add_stirstep 1
-    ltac1:(unshelve erewrite wt_cmd_st_int_untr;[..|eassumption])
-    "wt_cmd_st_int_untr" old.
+  add_cookstep ltac1:(unshelve erewrite wt_cmd_st_int_untr;[..|eassumption]) "wt_cmd_st_int_untr" old.
 
 Ltac2 Set this_cookbook_ as old :=
-  add_stirstep 1
-    ltac1:(unshelve erewrite wt_cmd_st_conf_sec;[..|eassumption])
-    "wt_cmd_st_conf_sec" old.
+  add_cookstep ltac1:(unshelve erewrite wt_cmd_st_conf_sec;[..|eassumption]) "wt_cmd_st_conf_sec" old.
 
 Ltac2 Set this_cookbook_ as old :=
-  add_stirstep 1
-    ltac1:(apply/wt_cmd_st_int; [eassumption|])
-    "wt_cmd_st_int" old.
+  add_cookstep ltac1:(apply/wt_cmd_st_int; [eassumption|])  "wt_cmd_st_int" old.
 
 Ltac2 Set this_cookbook_ as old :=
-  add_stirstep 1
-    ltac1:(apply/wt_cmd_st_conf; [eassumption|])
-    "wt_cmd_st_conf" old.
+  add_cookstep ltac1:(apply/wt_cmd_st_conf; [eassumption|]) "wt_cmd_st_conf" old.
 
 Ltac2 Set this_cookbook_ as old :=
-  add_stirstep 1 ltac1:(rewrite -> WellFormedOptCmd_Some in * ) "WellFormedOptCmd_Some" old.
+  add_cookstep ltac1:(rewrite WellFormedOptCmd_Some) "WellFormedOptCmd_Some" old.
 
 Section new_pc.
   Import Lattice4pt.Notations.
@@ -319,10 +311,8 @@ Section new_pc.
   Qed.
 End new_pc.
 
-Ltac2 Set this_cookbook_ as old :=
-  add_stirstep 1 ltac1:(rewrite -> compute_new_pc_opt_some in * ) "compute_new_pc_opt_some" old.
-Ltac2 Set this_cookbook_ as old :=
-  add_stirstep 1 ltac1:(rewrite -> compute_new_pc_opt_secret in * ) "compute_new_pc_opt_secret" old.
+Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite compute_new_pc_opt_some) "compute_new_pc_opt_some" old.
+Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite compute_new_pc_opt_secret) "compute_new_pc_opt_secret" old.
 
 Section thms.
   Import VarValStore.Notations.
@@ -365,7 +355,8 @@ Section thms.
       forall st,
         WellFormedProg (compute_new_pc pc c) (clean_cmd_stp_cnt c st).
   Proof.
-    move=> + > => - []=> * //=; enter if_easy_goals.
+    move=> + > => - []=> * //=. 
+    1-2: move: (X in if X then _ else _)=> ?; if_easy_goals.
     apply/Forall_app. split=> //.
     constructor 2=> //.
     constructor 3. apply/Forall_impl; [| eassumption]; clear=> *.
@@ -373,25 +364,9 @@ Section thms.
   Qed.
 End thms.
 
-Ltac2 Set this_cookbook_ as old :=
-  add_stirstep 1   ltac1:(rewrite -> untr_compute_new_pc in * ) "untr_compute_new_pc" old.
 
-Ltac2 Set this_cookbook_ as old :=
-  add_cookstep 1
-    ltac1:(lazymatch goal with
-           |- context [compute_new_pc (mk_lbl true ?p) ?c] =>
-              move: ([elaborate compute_new_pc_untr p c])=> [] ? /[dup] ? ->
-           end)
-    "compute_new_pc_untr" old.
-
-Section test.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
-  Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()).
-
-  Goal forall (P: _ -> Prop) p c, P (compute_new_pc (mk_lbl true p) c).
-  Proof. cook. Abort.
-
-End test.
+(* TODO: rewrite -> vs rewrite  *)
+Ltac2 Set this_cookbook_ as old :=  add_cookstep  ltac1:(rewrite -> untr_compute_new_pc) "untr_compute_new_pc" old.
 
 
 Ltac2 this_cookbook () := this_cookbook_ ().
