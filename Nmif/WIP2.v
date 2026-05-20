@@ -217,11 +217,11 @@ Section extract_step_commute.
   Import Util.List Combined VarValStore.Notations.
 
   Section cook.
-    (* TODO: stir rules in foreign cookbooks reference lemmas by unqualified
+    (* TODO: cook rules in foreign cookbooks reference lemmas by unqualified
        name (e.g. `rewrite -> WellFormedOptCmd_Some in *`). Joining the
        cookbook is not enough — the importing file must also `Import` the
        module so the bare name resolves at fire time, otherwise the rewrite
-       errors and `stir` silently drops the step. Figure out a cleaner fix. *)
+       errors and `cook` silently drops the step. Figure out a cleaner fix. *)
     Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()).
     Ltac2 Set curr_cookbook as old := join_cookbooks Combined.this_cookbook old.
     Ltac2 Set curr_cookbook as old := join_cookbooks Semantics.this_cookbook old.
@@ -231,34 +231,31 @@ Section extract_step_commute.
     Ltac2 Set curr_cookbook as old := join_cookbooks Util.List.this_cookbook old.
 
     Ltac2 Set curr_cookbook as old :=
-      add_stirstep 1 ltac1:(rewrite -> cmd_map_cons in * ) "cmd_map_cons" old.
+      add_cookstep ltac1:(rewrite cmd_map_cons) "cmd_map_cons" old.
     Ltac2 Set curr_cookbook as old :=
-      add_stirstep 1 ltac1:(rewrite -> cmd_map_app in * ) "cmd_map_app" old.
+      add_cookstep ltac1:(rewrite cmd_map_app) "cmd_map_app" old.
       (*
     Ltac2 Set curr_cookbook as old :=
-      add_stirstep 1 ltac1:(rewrite -> cmd_map_zip in * ) "cmd_map_zip" old.
+      add_cookstep ltac1:(rewrite -> cmd_map_zip ) "cmd_map_zip" old.
       *)
     Ltac2 Set curr_cookbook as old :=
-      add_stirstep 1 ltac1:(rewrite -> cmd_map_sim_cons in * ) "cmd_map_sim_cons" old.
+      add_cookstep ltac1:(rewrite cmd_map_sim_cons ) "cmd_map_sim_cons" old.
     Ltac2 Set curr_cookbook as old :=
-      add_stirstep 1 ltac1:(rewrite -> untrusted_mk in * ) "untrusted_mk" old.
+      add_cookstep ltac1:(rewrite untrusted_mk ) "untrusted_mk" old.
     Ltac2 Set curr_cookbook as old :=
-      add_stirstep 1 ltac1:(rewrite -> public_mk in * ) "public_mk" old.
+      add_cookstep ltac1:(rewrite public_mk ) "public_mk" old.
     Ltac2 Set curr_cookbook as old :=
-      add_stirstep 1 ltac1:(rewrite -> acmd_step_atk in * ) "acmd_step_atk" old.
+      add_cookstep ltac1:(rewrite acmd_step_atk ) "acmd_step_atk" old.
     Ltac2 Set curr_cookbook as old :=
-      add_stirstep 1 ltac1:(rewrite -> acmd_step_noatk in * ) "acmd_step_noatk" old.
+      add_cookstep ltac1:(rewrite acmd_step_noatk ) "acmd_step_noatk" old.
     Ltac2 Set curr_cookbook as old :=
-      add_stirstep 1 ltac1:(rewrite -> construct_simulator_pre_cmd in * ) "construct_simulator_pre_cmd" old.
+      add_cookstep ltac1:(rewrite construct_simulator_pre_cmd ) "construct_simulator_pre_cmd" old.
     Ltac2 Set curr_cookbook as old :=
-      add_stirstep 1 ltac1:(rewrite -> construct_simulator_post_cmd_cons in * ) "construct_simulator_post_cmd_cons" old.
+      add_cookstep ltac1:(rewrite construct_simulator_post_cmd_cons ) "construct_simulator_post_cmd_cons" old.
 
     Ltac2 Eval print_cookbook curr_cookbook.
-    Ltac2 Eval print_cookbook curr_stirbook.
 
-    Ltac2 Set cook_auto_dbs := fun () => [@trickbag].
     Ltac2 Set cook_debug := 1.
-    Ltac2 Set cook_auto_depth := 0.
 
 
     Theorem extract_step_commute c:
@@ -267,17 +264,17 @@ Section extract_step_commute.
     Proof.
       case: c. case=> rst ist simst atkst.
       case=> //. case=> rcmd isatk icmd pclbl restcmd inv.
-      rewrite /= in inv. move: inv=> []. (toph Forall_inv)=> i1 restinv i3.
+      rewrite /= in inv. move: inv=> []. (Forall_inv_toph)=> i1 restinv i3.
       rewrite /CmbCmdInv/CmbCmdCoreInv in i1. case: i1=> rwt iwt.
       rewrite /StateInv in i3. case: i3=> treq pubeq.
       move: pclbl rwt iwt.
-      (case=> - untr pub); stir=> rwt iwt. (* TODO: Remove iwt. We don't care *)
-      rewrite/comb_step/cmbcmd_step {2}/extract_2cfg; stir.
-      rewrite /extract_2cfg; stir.
-      rewrite/sim_active; stir.
-      rewrite/step; stir.
+      (case=> - untr pub); cook=> rwt iwt. (* TODO: Remove iwt. We don't care *)
+      rewrite/comb_step/cmbcmd_step {2}/extract_2cfg; cook.
+      rewrite /extract_2cfg; cook.
+      rewrite/sim_active; cook.
+      rewrite/step; cook.
       congr (_,_,_).
-      - congr (_ ++ _). stir. (* TODO: Forward reasoning *) 
+      - congr (_ ++ _). cook. (* TODO: Forward reasoning *) 
         set l1 := (X in map _ X = _).
         set l2 := (X in _ = map _ X).
         suff: l1 = map (fun c => (real_cmd c, real_atk_bit c,  ideal_cmd c, sim_active c)) l2;
@@ -299,7 +296,7 @@ Section extract_step_commute.
               map (fun '(c, b) => (c, b, sim_active' c b (public new_pc))) (combine_extend2 l1 l3 None false).
           { move: l1 l2 l3 new_pc idlatkcont=> >; clear=> h. 
           rewrite combine_extend4_regroup3 {}h.
-          erewrite combine_extend2_map_l; [|instantiate (1 := (None, false))=> //=;stir].
+          erewrite combine_extend2_map_l; [|instantiate (1 := (None, false))=> //=;cook].
           rewrite -combine_extend3_splitr map_map.
           apply: map_ext; case;case=> //. }
         set lhs := LHS. set rhs := RHS.
@@ -315,36 +312,37 @@ Section extract_step_commute.
         subst new_pc l1 l3 idlatkcont. 
         case: sim_active'P=>[|_].
           { move=> -> [] e; rewrite -> e in *=> {e} //=.
-          rewrite combine_extend3_splitr; stir. rewrite !map_map.
-          apply: map_ext=> *; stir. }
-        stir. rewrite/sim_step. stir.
+          rewrite combine_extend3_splitr; cook. rewrite !map_map.
+          apply: map_ext=> *; cook. }
+        cook. rewrite/sim_step. cook.
         set (public _) as x; case newpce: x; subst x; cycle 1. (* TODO: ssr version of this? *)
           { case: pub in rwt newpce *; cycle 1. (* Maybe custom rewriting rule *)
-            { move=> /=; stir.
+            { move=> /=; cook.
             rewrite length_map repeat_length.
             erewrite post_optcmd_stp_store_sec;[|eassumption].
             pattern_eq_2 [post_cmd_action _ _ (if isatk then _ else rst)] [post_cmd_action _ _ (if isatk then _ else simst)]=> [|->].
               { case: isatk; [apply: noninterfering_post_pre| apply: post_cmd_wf]=> //. } (* This pattern can be automated *)
-            stir.  rewrite combine_extend3_splitl map_map. symmetry;
+            cook.  rewrite combine_extend3_splitl map_map. symmetry;
             erewrite map_ext; [|case=> ? [] *; instantiate (1 := fun '(_,(_,_)) => _); reflexivity].
             rewrite combine_extend2_same. set l := (map Some _).
             erewrite combine_extend2_map_r; [|done]. rewrite map_map.
             erewrite map_ext; [|case=> *; instantiate (1 := fun '(_,_)=> _);  reflexivity].
-            apply: map_ext; case=> *. rewrite /sim_active'; stir. }
+            apply: map_ext; case=> *. rewrite /sim_active'; cook. }
           have ->: is_secret_guard rcmd = true by admit. (* TODO: lots of same as before *)
           rewrite /= length_map repeat_length.
           pattern_eq_2 [post_cmd_action _ _ (_ _(if _ then _ else rst))] [post_cmd_action _ _ (_ _(if _ then _ else simst))]=> [|->].
             { destruct rcmd=> //;
-            case: isatk; [|apply: post_cmd_wf]; stir.
+            case: isatk; [|apply: post_cmd_wf]; cook.
             apply: noninterfering_post_clean_pre; [eassumption|]=>//. }
 
           rewrite combine_extend3_splitl combine_extend2_same map_map; symmetry.
           erewrite combine_extend2_map_r; [|done]. rewrite map_map.
           erewrite map_ext; [|case=> ?; instantiate (1 := (fun '(_,_) => _)); reflexivity].
-          apply: map_ext. case=> *. rewrite/sim_active'. stir. }
-        case: pub in rwt newpce *; [|move=> /=;stir].
+          apply: map_ext. case=> *. rewrite/sim_active'. cook. }
+        case: pub in rwt newpce *; [|move=> /=;cook;admit].
+
         have rcmd_grd: is_secret_guard rcmd = false by admit.
-        rewrite rcmd_grd /=. stir.
+        rewrite rcmd_grd /=. cook.
         pattern_eq_2  [ (post_cmd_action _ _ (_ _(if _ then _ else rst)))] [ (post_cmd_action _ _ (_ _(if _ then _ else simst)))] => [|->].
           { admit. }
 
@@ -357,7 +355,7 @@ Section extract_step_commute.
         rewrite combine_extend3_splitr. 
         set l:= combine_extend2 (map Some _) (repeat true _) _ _.
         rewrite -map_const combine_extend2_map_self_r map_map. 
-        subst l. stir.
+        subst l. cook.
         apply: map_ext_in; case; case=> [?|]; case=> //=.
         move: (optcmd_stp_cnt _ _)=> l. move: (if _ then _ else _)=> n. 
         clear=> contra; exfalso; move: contra.
@@ -365,8 +363,8 @@ Section extract_step_commute.
         move=> > ?; case=> //=; [|move=> > [] //; eauto].
         rewrite map_map; case=> // /in_map_iff [] ? [] []//.
 
-      - congr (_,_); stir .
-        case: sim_active'P=>[-> |_]; [case=> e; rewrite -> e in *=> {e} /=; f_equal|]; stir.
+      - congr (_,_); cook .
+        case: sim_active'P=>[-> |_]; [case=> e; rewrite -> e in *=> {e} /=; f_equal|]; cook.
         1-2: rewrite /zip cmd_map_sim_app.
         1-2: pattern_eq [X in _ = X ++ _] with [] => [|->//]. 
         1-2: rewrite/ cmd_map_sim.
@@ -376,20 +374,19 @@ Section extract_step_commute.
               { case; case=> * /=. 
               rewrite compute_new_pc_opt_secret /=.
               instantiate (1:= fun '(_,_,_)=> _); reflexivity. }
-            stir. 
+            cook. 
             rewrite combine_extend3_nil3 filter_map_swap.
-            pattern_eq [X in map _ X] with [] => [|->//].  (* This can be stir rule *)
+            pattern_eq [X in map _ X] with [] => [|->//].  (* This can be cook rule *)
             erewrite filter_ext; cycle 1.
               { case=> *. instantiate (1:= fun '(_,_)=> _); reflexivity. }
             unshelve erewrite filter_ext; [exact xpred0|apply filter_false|].
             case=> //. }
-          { stir. erewrite filter_ext; [| case; case=> * /=; instantiate (1:= fun '(_,_,_)=> _); reflexivity].
+          { cook. erewrite filter_ext; [| case; case=> * /=; instantiate (1:= fun '(_,_,_)=> _); reflexivity].
           rewrite combine_extend3_nil1 combine_extend2_nil_r !map_map filter_map_swap.
-          pattern_eq [X in map _ X] with [] => [|->//].  (* This can be stir rule *)
-          unshelve erewrite filter_ext; [exact xpred0|apply filter_false|]. stir. }
-        rewrite/sim_step; stir; f_equal; stir.
+          pattern_eq [X in map _ X] with [] => [|->//].  (* This can be cook rule *)
+          unshelve erewrite filter_ext; [exact xpred0|apply filter_false|]. cook. }
+        rewrite/sim_step; cook; f_equal; cook.
           { case: isatk=> //; destruct pub=> /=; admit. }
-          { if_easy_goals. } (* TODO: It's worth having this be a stir rule *)
         rewrite cmd_map_sim_app. 
         pattern_eq_2 [X in X ++ ?[y] = _ ++ ?y] [X in _ ++ ?[y] = X ++ ?y]=> [|->//].
         rewrite/zip/cmd_map_sim filter_map_swap map_map. symmetry.
@@ -408,7 +405,7 @@ Section extract_step_commute.
 
           1: have ->: is_secret_guard rcmd = true by admit. (* I should be able to have an ssr variant *)
           1: rewrite combine_extend2_nil_l.
-          1: stir; set l1 := filter _ _; set l2 := repeat true _.
+          1: cook; set l1 := filter _ _; set l2 := repeat true _.
           1: suff: map (fun '(_,i,_) => i) l1 = l2; [move: l1 l2=> > <-; rewrite map_map; apply: map_ext=> - [] [] //|subst l1 l2].  
           1: pattern_eq_2 [post_cmd_action _ _ (_ _ (if isatk then _ else rst))] [post_cmd_action _ _ (_ _ (if isatk then _ else simst))] => [| ->];
              [admit|].
@@ -421,14 +418,14 @@ Section extract_step_commute.
            move: (X in combine_extend2 _ X _ _)=> ?.
           1-2: enter (erewrite map_filter_combine_extend2_ind1; only 2,3: (move=> *; instantiate (1:= fun _ => _); reflexivity); only 2: done).
           (* I would love to use 2 in 1. Or have a combined join lemma. open_constr fails when not focused *)
-          1-2: clear; revert_hyp_type nat; elim=> //= *; f_equal=> //. }
+          1-2: clear; revert_hyp_pat nat; elim=> //= *; f_equal=> //. }
 
-        case: pub in rwt newpce *; [| move=> /=;stir].
+        case: pub in rwt newpce *; [| move=> /=;cook; admit].
         have rcmd_grd: is_secret_guard rcmd = false by admit. (* Copied!! *)
         rewrite rcmd_grd.
         pattern_eq_2 [ (optcmd_stp_cnt _ (if _ then _ else rst)) ]
                      [ (optcmd_stp_cnt _ (if _ then _ else simst)) ] => [| <-].
-          {  destruct rcmd => //. apply: clean_cmd_stp_cnt_pub_nf=> //. case: isatk; stir. }
+          {  destruct rcmd => //. apply: clean_cmd_stp_cnt_pub_nf=> //. case: isatk; cook. }
         pattern_eq_2 [post_cmd_action _ _ (_ _ (if isatk then _ else rst))]
                      [post_cmd_action _ _ (_ _ (if isatk then _ else simst))] => [| ->].
           { admit. }
@@ -437,7 +434,7 @@ Section extract_step_commute.
         erewrite map_filter_combine_extend2_ind1.
         2,3: case=> *; instantiate (1:= fun '(_,_) => _); reflexivity; done. 2: done.
         clear. erewrite map_ext; [|instantiate (1 := id); case=> //]. rewrite map_id.
-        revert_hyp_type nat; revert_hyp_type Prog. 
+        revert_hyp_pat [Prog, nat].
         elim; [elim=> //= n ?; f_equal=> //|].
         move=> > ?; case=> /= *; [| f_equal; eauto].
         rewrite !filter_map_swap.
