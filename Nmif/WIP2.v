@@ -226,21 +226,25 @@ Section extract_step_commute.
       add_cookstep ltac1:(rewrite construct_simulator_pre_cmd ) "construct_simulator_pre_cmd" old.
     Ltac2 Set curr_cookbook as old :=
       add_cookstep ltac1:(rewrite construct_simulator_post_cmd_cons ) "construct_simulator_post_cmd_cons" old.
-    Ltac2 Set curr_cookbook as old :=
-      add_cookstep 
-        ltac1:(match goal with
-            | isatk : bool , _ : ⟨ ?rst | is_public ⟩ = ⟨ ?simst | is_public ⟩
-            |- _ => pattern_eq_2 [post_cmd_action _ _ (if isatk then _ else rst)] [post_cmd_action _ _ (if isatk then _ else simst)]=> [|<-];
-                [ case: isatk; [apply: noninterfering_post_pre| apply: post_cmd_wf]; done|]
-            end) "trick1" old.
 
+    (* TODO: These should really be rewrite rules. I'm too lazy *)
     Ltac2 Set curr_cookbook as old :=
       add_cookstep 
         ltac1:(match goal with
-            | isatk : bool ,rcmd: option Cmd , _ : ⟨ ?rst | is_public ⟩ = ⟨ ?simst | is_public ⟩
-            |- _ => pattern_eq_2 [post_cmd_action _ _ (_ _(if _ then _ else rst))] [post_cmd_action _ _ (_ _(if _ then _ else simst))]=> [|<-];
-                [  destruct rcmd=> //; case: isatk; [|apply: post_cmd_wf]=> //=; eauto using wt_cmd_st_conf,noninterfering_post_clean_pre; done |]
-            end) "trick2" old.
+            | isatk : bool ,rcmd: option Cmd , _ : ⟨ ?rst | is_public ⟩ = ⟨ ?simst | is_public ⟩ |- _ =>
+              (pattern_eq_2 [post_cmd_action _ _ (if isatk then _ else rst)] 
+                            [post_cmd_action _ _ (if isatk then _ else simst)]=> [|<-];
+                  [ case: isatk; [apply: noninterfering_post_pre| apply: post_cmd_wf];done|] )||
+
+              (pattern_eq_2 [post_cmd_action _ _ (_ _(if _ then _ else rst))] 
+                            [post_cmd_action _ _ (_ _(if _ then _ else simst))]=> [|<-]; 
+                  [case: isatk; eauto using noninterfering_post_optcmd_pre;  apply: post_cmd_wf; destruct rcmd=> //; eauto using wt_cmd_st_conf; done|] ) ||
+
+              (pattern_eq_2 [(optcmd_stp_cnt _ (if _ then _ else rst)) ]  
+                            [(optcmd_stp_cnt _ (if _ then _ else simst)) ]=> [| <-];  
+                  [destruct rcmd => //;apply: clean_cmd_stp_cnt_pub_nf=> //;case: isatk=> //; apply:pre_cmd_wf_conf; done|] )
+            end) "tricks" old.
+
 
     Ltac2 Set cook_debug := 1.
 
@@ -314,8 +318,7 @@ Section extract_step_commute.
             erewrite map_ext; [|case=> *; instantiate (1 := fun '(_,_)=> _);  reflexivity].
             apply: map_ext; case=> *. rewrite /sim_active'; cook. }
           have ->: is_secret_guard rcmd = true by admit. (* TODO: lots of same as before *)
-          rewrite /= length_map repeat_length. cook_step.
-
+          rewrite /= length_map repeat_length. cook.
 
           rewrite combine_extend3_splitl combine_extend2_same map_map; symmetry.
           erewrite combine_extend2_map_r; [|done]. rewrite map_map.
@@ -323,14 +326,7 @@ Section extract_step_commute.
           apply: map_ext. case=> *. rewrite/sim_active'. cook. }
         case: pub in rwt newpce *; [| exfalso; do [cook] in newpce].
         have rcmd_grd: is_secret_guard rcmd = false by admit.
-        rewrite rcmd_grd /=.
-
-        pattern_eq_2  [ (post_cmd_action _ _ (_ _(if _ then _ else rst)))] [ (post_cmd_action _ _ (_ _(if _ then _ else simst)))] => [|->].
-          { admit. }
-
-        pattern_eq_2 [ (optcmd_stp_cnt _ (if _ then _ else rst)) ]  [(optcmd_stp_cnt _ (if _ then _ else simst)) ]=> [| <-]; 
-          [ destruct rcmd => //;apply: clean_cmd_stp_cnt_pub_nf=> //;case: isatk=> //; apply:pre_cmd_wf_conf=> // |].
-
+        rewrite rcmd_grd /=. cook.
         rewrite combine_extend3_splitr. 
         set l:= combine_extend2 (map Some _) (repeat true _) _ _.
         rewrite -map_const combine_extend2_map_self_r map_map. 
@@ -364,8 +360,9 @@ Section extract_step_commute.
           rewrite combine_extend3_nil1 combine_extend2_nil_r !map_map filter_map_swap.
           pattern_eq [X in map _ X] with [] => [|->//].  (* This can be cook rule *)
           unshelve erewrite filter_ext; [exact xpred0|apply filter_false|]. cook. }
-        rewrite/sim_step; cook; f_equal; cook.
-          { case: isatk=> //; destruct pub=> /=; admit. }
+        rewrite/sim_step; cook; cnstrct_eq_gl; cook.
+          { case: pub rwt => rwt /=; [erewrite noninterfering_post_optcmd_pre; [reflexivity|eassumption|] | (* TODO: This should be automated *)
+          erewrite post_optcmd_stp_store_sec; [|exact: rwt]; erewrite noninterfering_post_pre; [reflexivity|]]; done. }
         rewrite cmd_map_sim_app. 
         pattern_eq_2 [X in X ++ ?[y] = _ ++ ?y] [X in _ ++ ?[y] = X ++ ?y]=> [|->//].
         rewrite/zip/cmd_map_sim filter_map_swap map_map. symmetry.
@@ -396,13 +393,7 @@ Section extract_step_commute.
           1-2: clear; revert_hyp_pat nat; elim=> //= *; f_equal=> //. }
         case: pub in rwt newpce *; [| exfalso; do [cook] in newpce].
         have rcmd_grd: is_secret_guard rcmd = false by admit. (* Copied!! *)
-        rewrite rcmd_grd.
-        pattern_eq_2 [ (optcmd_stp_cnt _ (if _ then _ else rst)) ]
-                     [ (optcmd_stp_cnt _ (if _ then _ else simst)) ] => [| <-].
-          {  destruct rcmd => //. apply: clean_cmd_stp_cnt_pub_nf=> //. case: isatk; cook. }
-        pattern_eq_2 [post_cmd_action _ _ (_ _ (if isatk then _ else rst))]
-                     [post_cmd_action _ _ (_ _ (if isatk then _ else simst))] => [| ->].
-          { admit. }
+        rewrite rcmd_grd. cook.
         rewrite combine_extend3_splitr. 
         move: (X in (map Some X)) (X in (repeat true X))=> *.
         erewrite map_filter_combine_extend2_ind1.

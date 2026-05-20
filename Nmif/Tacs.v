@@ -384,8 +384,7 @@ Module Cook.
 
   Ltac2 create_new_cookbook () : cookbook := [].
   Ltac2 mutable curr_cookbook () : cookbook := [].
-  (* 0 = silent, 1 = info (print successes + auto info),
-     2 = full (also print attempts, numgoals, FW/BW failures, auto debug) *)
+
   Ltac2 mutable cook_debug : int := 0.
 
   (* Print [msg ()] when cook_debug is at least [lvl]. *)
@@ -447,7 +446,7 @@ Module Cook.
         match Control.case t with
         | Val ((),_) => cook_dbg 1 (fun () => printf "cook_step[%i]: %s success" i desc)
         | Err e =>
-            cook_dbg 2 (fun () => printf "cook_step[%i]: %s failed: %a" i desc (fun () e' => Message.of_exn e') e);
+            cook_dbg 3 (fun () => printf "cook_step[%i]: %s failed: %a" i desc (fun () e' => Message.of_exn e') e);
             go (Int.add i 1) rest
         end
       end in

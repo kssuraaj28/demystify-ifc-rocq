@@ -257,6 +257,7 @@ Section thms_atk.
     - apply: (wt_cmd_st_conf _ _ _ _ wt). apply: pre_cmd_wf_conf. exact: hyp.
     - apply: pre_cmd_wf_conf. exact: hyp.
   Qed.
+
 End thms_atk.
 
 Ltac2 Set this_cookbook_ as old :=
