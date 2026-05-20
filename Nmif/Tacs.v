@@ -399,7 +399,15 @@ Module Cook.
 
   Ltac2 Notation "print_cookbook" l(tactic(0)) :=  print_cookbook0 (l ()).
 
+  #[local] Ltac2 check_all_present (fn_name : string) (l : cookbook) (names : string list) : unit :=
+    let descs := List.map (fun (_, desc) => desc) l in
+    let in_book s := List.exist (String.equal s) descs in
+    List.iter (fun n =>
+      if in_book n then () else panic_m fn_name (fprintf "name not in cookbook: %s" n))
+      names.
+
   #[local] Ltac2 keep_only0 (l : cookbook) (names : string list) : cookbook :=
+    check_all_present "keep_only" l names;
     let mem s := List.exist (String.equal s) names in
     List.filter (fun (_,desc) => mem desc) l.
 
@@ -407,6 +415,7 @@ Module Cook.
     fun () => keep_only0 (l ()) (names ()).
 
   #[local] Ltac2 delete0 (l : cookbook) (names : string list) : cookbook :=
+    check_all_present "delete" l names;
     let mem s := List.exist (String.equal s) names in
     List.filter (fun (_,desc)=> Bool.neg (mem desc)) l.
 
