@@ -303,9 +303,7 @@ Ltac evar_spec h :=
   let t := unshelve (move: h; let t := open_constr:(_) in let f := fresh in pose f := t=> /(_ f); subst f) in
   let f := ltac2:(tt |- precise_harden 
                 (fun () => Ltac1.run(tt)) 
-                (Some (2,false))
-                true
-                true) in(* You're moving h away *)
+                (Some (2,false))  true) in(* You're moving h away *)
   f t. 
 
 
@@ -320,38 +318,64 @@ Section test.
   Qed.
 End test.
 
+(* Revert hyp *)
+#[local] Ltac2 Type exn ::= [ RevertHypProbe ].
 
-Ltac2 revert_hyp_type (dependent: bool) (ty : constr) :=
-  let t := fun () =>
-    let hyps := List.filter (fun h => let (_, _, t) := h in Constr.equal t ty) (Control.hyps ()) in
-    match hyps with
-    (* If others depend on it, we fail*)
-    | [(h, _, _)] =>
-      let revert_t := if dependent
-                        then ltac1:(x |- generalize dependent x)
-                        else ltac1:(x |- revert x)  in
-      let hcnstr := Control.hyp h in
-      revert_t (Ltac1.of_constr hcnstr)
-    (* Unless you absolutely require zero, don't use zero *)
-    | [] => panic_m "revert_hyp_type" (fprintf "No hypothesis of type %t" ty)
-    | _ => panic_m "revert_hyp_type" (fprintf "Multiple hypotheses of type %t" ty)
+Ltac2 revert_hyp_single_pat (pt : preterm) : unit :=
+  let elaborate_thunk () :=
+    Constr.Pretype.pretype
+      Constr.Pretype.Flags.open_constr_flags_no_tc
+      Constr.Pretype.expected_without_type_constraint
+      pt in
+  let matches hty :=
+    match Control.case (fun () =>
+        let ty := elaborate_thunk () in
+        Std.unify hty ty;
+        Control.zero RevertHypProbe) with
+    | Err RevertHypProbe => true
+    | Err _ => false
+    | _ => panic_s "revert_hyp_single_pat" "Unexpected control flow"
     end in
- precise_harden t (Some (1, false)) false true.
+  let hyps := List.filter (fun (_, _, hty) => matches hty) (Control.hyps ()) in
+  let revert_tac h :=
+    match Control.case (fun () => ltac1:(x |- revert x) (Ltac1.of_constr h)) with
+    | Val _ => ()
+    | Err e => Control.throw e
+    end in
+  match hyps with
+  | [(h, _, _)] => revert_tac (Control.hyp h)
+  | [] => panic_s "revert_hyp_single_pat" "No matching hypothesis"
+  | _ => panic_s "revert_hyp_single_pat" "Multiple matching hypotheses"
+  end.
 
-(* TODO: Maybe change this to an intropattern? *)
-Tactic Notation "revert_hyp_type" constr(ty) :=
-  let f := ltac2:(ty |- revert_hyp_type false (Option.get (Ltac1.to_constr ty))) in
-  f ty.
+Ltac2 revert_hyp_pat (pts : preterm list) : unit :=
+  List.iter revert_hyp_single_pat (List.rev pts).
 
-Tactic Notation "revert_hyp_type_dep" constr(ty) :=
-  let f := ltac2:(ty |- revert_hyp_type true (Option.get (Ltac1.to_constr ty))) in
+Tactic Notation "revert_hyp_pat" "[" ne_uconstr_list_sep(pats, ",") "]" :=
+  let f := ltac2:(pats |-
+    revert_hyp_pat
+      (List.map (fun u => Option.get (Ltac1.to_preterm u))
+                (Option.get (Ltac1.to_list pats)))) in
+  f pats.
+
+Tactic Notation "revert_hyp_pat" uconstr(ty) :=
+  let f := ltac2:(ty |- revert_hyp_pat [Option.get (Ltac1.to_preterm ty)]) in
   f ty.
 
 Section test.
-  Goal nat -> False. Proof. move=> *.  revert_hyp_type nat. Abort.
-  Goal nat -> nat -> False. Proof. move=> *.  Fail revert_hyp_type nat. Abort.
+  Goal nat -> False. Proof. move=> *.  revert_hyp_pat nat. Abort.
+  Goal nat -> nat -> False. Proof. move=> *.  Fail revert_hyp_pat nat. Abort.
   Variable P : nat -> Prop.
-  Goal forall n, P n -> False. Proof. move=> *. revert_hyp_type_dep nat. Abort.
+  Goal forall n, P n -> False. 
+  Proof. 
+    Succeed move=> *; revert_hyp_pat [nat, (P _)]. 
+    Fail move=> *; revert_hyp_pat [ (P _), nat]. 
+  Abort.
+
+  Goal nat -> False. Proof. move=> n. revert_hyp_pat (_ -> Prop). Abort.
+  Goal 1 = 2 -> True. Proof. move=> h. revert_hyp_pat (_ = _). Abort.
+  Goal option nat -> True.  Proof. move=> a. revert_hyp_pat (option _). Abort.
+  Goal option nat -> option bool -> True.  Proof. move=> a b. Fail revert_hyp_pat (option _). Abort.
 End test.
 
 (* Using Constr.Unsafe.kind: the App node exposes the full n-ary application
@@ -370,170 +394,14 @@ Ltac2 Notation "cbn_eq" t(thunk(constr)) :=
   exact ($t = $t').
 
 
-(* section_vars *)
-  (* TODO: You could do some preprocessing. Check if id's are really in hypotheses *)
-#[local] Ltac2 rec exfalso_move_some_hack (ids : ident list) : ident * bool :=
-  exfalso;
-  match ids with
-  | [] => panic_s "move_some" "nothing movable"
-  | id :: rest =>
-      match Control.case (fun () =>
-        ltac1:(h |- move: h) (Ltac1.of_ident id)) with
-      | Val ((), _) =>
-          let still_there := List.exist
-            (fun h => let (i, _, _) := h in Ident.equal i id)
-            (Control.hyps ()) in
-          (id, still_there)
-      | Err _ => exfalso_move_some_hack rest
-      end
-  end.
-
-Section test.
-  Variables A B : Prop.
-  Let x := 5.
-  Goal A -> B -> True.
-  Proof.
-    move=> ha hb.
-    ltac2:(
-      let (id, sv) := exfalso_move_some_hack [@ha; @hb] in 
-      if sv then printf "secvar" else ();
-      printf "id: %I" id).
-
-    ltac2:(
-      let (id, sv) := exfalso_move_some_hack [@ha; @hb] in 
-      if sv then printf "secvar" else ();
-      printf "id: %I" id).
-
-    ltac2:(
-      let (id, sv) := exfalso_move_some_hack [@A; @hb] in 
-      if sv then printf "secvar" else ();
-      printf "id: %I" id).
-
-    Fail ltac2:(let (id, _) := move_some [@ha; @hb] in printf "id: %I" id).
-
-    ltac2:(
-      let (id, sv) := exfalso_move_some_hack [@x] in 
-      if sv then printf "secvar" else ();
-      printf "id: %I" id).
-  Abort.
-
-End test.
-
-#[local] Ltac2 Type exn ::= [ SectionVarsResult (ident list) ].
-
-Ltac2 section_vars () : ident list :=
-  match Control.case (fun () =>
-    let remaining := List.map (fun h => let (i, _, _) := h in i) (Control.hyps ()) in
-    let rec loop (remaining : ident list) (section : ident list) : ident list :=
-      if Int.equal (List.length remaining) 0 then section else
-      match Control.case (fun () => exfalso_move_some_hack remaining) with
-      | Val ((moved_h, is_secvar), _) =>
-          let new_section := if is_secvar then (moved_h :: section) else section in
-          loop (List.filter (fun i => Bool.neg (Ident.equal i moved_h)) remaining) new_section
-      | _ =>  panic_s "section_vars" "move_some failed unexpectedly"
-      end in
-    let result := loop remaining [] in
-    Control.zero (SectionVarsResult result))
-  with
-  | Err (SectionVarsResult l) => l
-  | _ => panic_s "section_vars" "unexpected control flow"
-  end.
-
-Section test.
-  Variables A B : Prop.
-  Goal False.
-  Proof.
-    ltac2:(let svs := section_vars () in
-      if Int.equal (List.length svs) 2 then ()
-      else panic_m "section_vars" (fprintf "expected 2 section vars, got %i" (List.length svs))).
-  Abort.
-
-  Variables C : Prop.
-
-  Goal False.
-  Proof.
-    ltac2:(let svs := section_vars () in
-      if Int.equal (List.length svs) 3 then ()
-      else panic_m "section_vars" (fprintf "expected 2 section vars, got %i" (List.length svs))).
-  Abort.
-End test.
-
-(* goal_hygiene *)
-(* These two funtions are AI generated. I don't care *)
-#[local] Ltac2 strip_underscores (s : string) : string :=
-  let n := String.length s in
-  let underscore := Char.of_int 95 in
-  let rec drop_leading i :=
-    if Int.equal i n then i
-    else if Char.equal (String.get s i) underscore then drop_leading (Int.add i 1)
-    else i in
-  let rec drop_trailing j :=
-    if Int.equal j 0 then 0
-    else if Char.equal (String.get s (Int.sub j 1)) underscore then drop_trailing (Int.sub j 1)
-    else j in
-  let lo := drop_leading 0 in
-  let hi := drop_trailing n in
-  if Int.le hi lo then "" else String.sub s lo (Int.sub hi lo).
-
-#[local] Ltac2 cleanup_id (id : ident) : string :=
-  let s := Ident.to_string id in
-  if Int.equal (String.length s) 0 then
-    panic_s "cleanup_id" "empty identifier" else
-  strip_underscores s.
-
-#[local] Ltac2 collect_renames (hyps : ident list) : (ident * ident) list :=
-  let rec go hyps used :=
-    match hyps with
-    | [] => []
-    | id :: rest =>
-        let core := cleanup_id id in
-        let core_id := Option.get (Ident.of_string core) in
-        let fresh_core := Fresh.fresh used core_id in
-        let used' := Fresh.Free.union used (Fresh.Free.of_ids [fresh_core]) in
-        let wrapped_str := String.app "_" (String.app (Ident.to_string fresh_core) "_") in
-        let wrapped := Option.get (Ident.of_string wrapped_str) in
-        (id, wrapped) :: go rest used'
-    end in
-  go hyps (Fresh.Free.of_goal ()).
-
-#[local] Ltac2 goal_hygiene0 () : unit :=
-  Control.enter (fun () =>
-    let hyps := List.map (fun h => let (i, _, _) := h in i) (Control.hyps ()) in
-    let sec := section_vars () in
-    let hyps := List.filter (fun id => Bool.neg (List.exist (fun s => Ident.equal s id) sec)) hyps in
-    let renames := collect_renames hyps in
-    match Control.case (fun () => Std.rename renames) with
-    | Val ((),_) => ()
-    | Err e => 
-      printf "Error: goal_hygiene failure";
-      Control.throw e
-    end).
-
-Ltac goal_hygiene := ltac2:(goal_hygiene0 ()).
-
-Section test.
-  Variables A B C : Prop.
-  Goal A -> B -> C -> A. Proof. 
-  move=> *. goal_hygiene. assumption. Abort.
-  Goal A -> B -> C -> A. Proof. move=> > _ha_ ha *. goal_hygiene. Abort.
-  Goal A /\ B. Proof. split; goal_hygiene. Abort.
-
-  Variables P : nat -> Prop.
-  Goal forall n, P n. Proof. move=> i. goal_hygiene. Abort.
-  
-End test.
-
-
 Module Cook.
 
-  (* t, dest, allow_hyps_remove *)
-  #[abstract] Ltac2 Type cook_tac := ((unit -> unit) * (string) * bool).
+  (* t, desc *)
+  #[abstract] Ltac2 Type cook_tac := ((unit -> unit) * (string)).
   #[abstract] Ltac2 Type cookbook := cook_tac list.
 
   Ltac2 create_new_cookbook () : cookbook := [].
   Ltac2 mutable curr_cookbook () : cookbook := [].
-  Ltac2 curr_stirbook () : cookbook := 
-    List.filter (fun (_, _, allow_hyps_remove) => Bool.neg allow_hyps_remove) (curr_cookbook ()).
   (* 0 = silent, 1 = info (print successes + auto info),
      2 = full (also print attempts, numgoals, FW/BW failures, auto debug) *)
   Ltac2 mutable cook_debug : int := 0.
@@ -544,95 +412,64 @@ Module Cook.
 
   #[local] Ltac2 print_cookbook0 (l : cookbook) : unit :=
     List.iteri (fun i p =>
-      let (_, desc, dhc) := p in
-      printf "%i: %s [allow_hyps_remove=%s]" i desc (if dhc then "true" else "false")) (l).
+      let (_, desc) := p in
+      printf "%i: %s" i desc) (l).
 
   Ltac2 Notation "print_cookbook" l(tactic(0)) :=  print_cookbook0 (l ()).
 
   #[local] Ltac2 keep_only0 (l : cookbook) (names : string list) : cookbook :=
     let mem s := List.exist (String.equal s) names in
-    List.filter (fun (_,desc,_) => mem desc) l.
+    List.filter (fun (_,desc) => mem desc) l.
 
   Ltac2 Notation "keep_only" l(tactic(0)) names(thunk(tactic(0))) :=
     fun () => keep_only0 (l ()) (names ()).
 
   #[local] Ltac2 delete0 (l : cookbook) (names : string list) : cookbook :=
     let mem s := List.exist (String.equal s) names in
-    List.filter (fun (_,desc,_)=> Bool.neg (mem desc)) l.
+    List.filter (fun (_,desc)=> Bool.neg (mem desc)) l.
 
   Ltac2 Notation "delete" l(tactic(0)) names(thunk(tactic(0))) :=
     fun () => delete0 (l ()) (names ()).
 
   (* TODO: Maybe check that there is no name duplication in the future? Throw a warning if this is the case *)
-  #[local] Ltac2 append_tac0 (t: unit -> unit) (desc: string) (goals: (int * bool) option) (allow_hyps_remove: bool) (l : cookbook) : cookbook :=
-    let hardened := fun () => precise_harden t goals false allow_hyps_remove in 
-    (hardened, desc, allow_hyps_remove) :: l.
+  #[local] Ltac2 append_tac0 (t: unit -> unit) (desc: string) (l : cookbook) : cookbook :=
+    let hardened := fun () => precise_harden t (Some (1, true)) false in
+    (hardened, desc) :: l.
 
   (* TODO: This desc() is sus *)
-  Ltac2 Notation "add_cookstep" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
-    fun () => append_tac0 t (desc ()) (Some (n,false)) true (l ()).
-
-  Ltac2 Notation "add_cookstep" "<=" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
-    fun () => append_tac0 t (desc ()) (Some (n,true)) true (l ()).
-
-  Ltac2 Notation "add_cookstep" "?" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
-    fun () => append_tac0 t (desc ()) None true (l ()).
-
-  Ltac2 Notation "add_stirstep" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
-    fun () => append_tac0 t (desc ()) (Some (n,false)) false (l ()).
-
-  Ltac2 Notation "add_stirstep" "<=" n(tactic(0)) t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
-    fun () => append_tac0 t (desc ()) (Some (n,true)) false (l ()).
-
-  Ltac2 Notation "add_stirstep" "?" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
-    fun () => append_tac0 t (desc ()) None false (l ()).
+  Ltac2 Notation "add_cookstep" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
+    fun () => append_tac0 t (desc ()) (l ()).
 
   (* TODO: PROOF_STYLE.md is going to be very different *)
   #[local] Ltac2 join_cookbooks0 (l1: cookbook)(l2 : cookbook) : cookbook := List.append l1 l2.
 
   Ltac2 Notation "join_cookbooks" l1(tactic(0)) l2(tactic(0)) := fun () => join_cookbooks0 (l1 ()) (l2 ()).
 
-  #[local] Ltac2 cook_step (only_stir : bool) : unit :=
-    one_goal_assertion "cook_stir_step";
-    let book := if only_stir then curr_stirbook () else  curr_cookbook () in
+  #[local] Ltac2 cook_step () : unit :=
+    one_goal_assertion "cook_step";
     let rec go i l :=
       match l with
-      | [] => softfail_s "cook_stir_step" "all tactics failed"
-      | (t, desc, _) :: rest =>
-        cook_dbg 2 (fun () => printf "Trying: cook_stir_step[%i]: %s" i desc);
+      | [] => softfail_s "cook_step" "all tactics failed"
+      | (t, desc) :: rest =>
+        cook_dbg 2 (fun () => printf "Trying: cook_step[%i]: %s" i desc);
         match Control.case t with
-        (* It is the client's responsibility to put harden. If the client does not put it, then the thing will spin forever! *)
-        | Val ((),_) => cook_dbg 1 (fun () => printf "cook_stir_step[%i]: %s success" i desc)
+        | Val ((),_) => cook_dbg 1 (fun () => printf "cook_step[%i]: %s success" i desc)
         | Err _ => go (Int.add i 1) rest
         end
       end in
-    go 0 book.
+    go 0 (curr_cookbook ()).
 
-  Tactic Notation "cook_step" := ltac2:(cook_step false); goal_hygiene.
-  Tactic Notation "stir_step" := ltac2:(cook_step true).
+  Tactic Notation "cook_step" := ltac2:(cook_step ()).
 
   (* 
     - Singleton hintdatabase with cook_step. 
     Clients are not allowed to touch this database
   *)
-  Create HintDb __cook_step. (* TODO: Does #[local] help *)
-  Hint Extern 100  => ltac2:(cook_step false) : __cook_step. 
-
-  Ltac2 mutable cook_auto_dbs () : ident list := [].
-  Ltac2 mutable cook_auto_depth : int := 5.
-
-  #[local] Ltac2 cook_auto () : unit :=
-    let dbs := List.append (cook_auto_dbs ()) [@__cook_step] in
-    let dbg :=
-      if Int.ge cook_debug 2 then Std.Debug
-      else if Int.ge cook_debug 1 then Std.Info
-      else Std.Off in
-    Std.auto dbg (Some cook_auto_depth) [] (Some dbs).
-
-  Tactic Notation "cook_auto" := ltac2:(cook_auto ()). 
+  Create HintDb cook_step. (* TODO: Does #[local] help *)
+  Hint Extern 100  => cook_step: cook_step.
 
   (* For every focued goal, it runs cook_step one by one. (dfs strategy)  *)
-  #[local] Ltac2 cook (only_stir: bool) (gas : int option) : unit :=
+  #[local] Ltac2 cook (gas : int option) : unit :=
     let rec go (gas : int option) : unit :=
       (* Gas check *)
       if match gas with Some n => Int.equal n 0 | None => false end then () else
@@ -644,26 +481,19 @@ Module Cook.
 
       (* Run the first goal *)
       (Control.focus 1 1 (fun () =>
-        match Control.case (fun () => cook_step only_stir) with
+        match Control.case (fun () => cook_step ()) with
         | Val ((), _) => ()
-        | Err _ => 
-              cook_dbg 2 (fun () => printf "cook: FW reasoning failed, trying BW reasoning");
-              cook_auto ();
-              if Int.equal (Control.numgoals () ) 0 then () else
-              cook_dbg 2 (fun () => printf "cook: BW reasoning failed, Can't solve goal ");
+        | Err _ =>
+              cook_dbg 2 (fun () => printf "cook: cook_step failed, shelving goal");
               Control.shelve ()
         end);
        let next_gas := match gas with | Some n => Some (Int.sub n 1) | None => None end in
        go next_gas) in
     unshelve (go gas).
-  
-  Tactic Notation "cook" := ltac2:(cook false None); goal_hygiene.
-  Tactic Notation "stir" := ltac2:(cook true None). 
+
+  Tactic Notation "cook" := ltac2:(cook None).
   Tactic Notation "cook" integer(n) :=
-    let f := ltac2:(nn |- cook false (Some (Option.get (Ltac1.to_int nn)))) in
-    f n; goal_hygiene.
-  Tactic Notation "stir" integer(n) :=
-    let f := ltac2:(nn |- cook true (Some (Option.get (Ltac1.to_int nn)))) in
+    let f := ltac2:(nn |- cook (Some (Option.get (Ltac1.to_int nn)))) in
     f n.
 
   (* TODO: You need to have a lot of tests here.. TODO: Maybe claude can help *)
@@ -673,7 +503,7 @@ End Cook.
 Section usage.
   Import Cook.
   Ltac2 mutable db := create_new_cookbook.
-  Ltac2 Set db as old := add_cookstep 1 ltac1:(progress idtac) "desc" old.
+  Ltac2 Set db as old := add_cookstep ltac1:(progress idtac) "desc" old.
   Ltac2 Set db as old := join_cookbooks old old.
   Ltac2 Eval print_cookbook db.
 End usage.  Fail Ltac2 Check db.
@@ -684,24 +514,16 @@ Section test.
 
   Section progfail.
     Ltac2 this_cookbook_ :=
-      add_stirstep 1 ltac1:(idtac) "dummy" create_new_cookbook.
+      add_cookstep ltac1:(idtac) "dummy" create_new_cookbook.
     Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()). (* Maybe keep only 1 *)
     Goal False. Proof. Fail cook.  Abort.
   End progfail.
-  
-  (* bad stir *)
-  Section bad_stir.
+
+  (* clears hyp *)
+  Section bad_cook.
     Ltac2 this_cookbook_ :=
-      add_stirstep 1 ltac1:(lazymatch goal with H: True |- _ => clear H end ) "dummy" create_new_cookbook.
+      add_cookstep ltac1:(lazymatch goal with H: True |- _ => clear H end ) "dummy" create_new_cookbook.
     Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()). (* Maybe keep only 1 *)
-    Goal True -> False. Proof. Fail cook.  Abort.
-  End bad_stir.
-  
-  (* stir vs cook *)
-  Section stir_vs_cook.
-    Ltac2 this_cookbook_ :=
-      add_cookstep 1 ltac1:(pose n := 5) "pose" create_new_cookbook.
-    Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()). (* Maybe keep only 1 *)
-    Goal False. Proof. progress cook. Fail progress stir. Abort.
-  End stir_vs_cook.
+    Goal True -> False. Proof. move=> *. Fail cook.  Abort.
+  End bad_cook.
 End test.
