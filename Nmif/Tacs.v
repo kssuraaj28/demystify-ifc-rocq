@@ -147,27 +147,6 @@ End test.
 
 
 (* The harden tactic *)
-#[local] Ltac2 assert_no_evars () : unit :=
-  one_goal_assertion "assert_no_evars";
-  if Constr.has_evar (Control.goal ()) then 
-      panic_s "assert_no_evars" "Goal has evar" else
-  let hyp_has_evar (_, body, ty) :=
-    let body_evar := match body with Some b => Constr.has_evar b | _ => false end in
-    Bool.or body_evar (Constr.has_evar ty) in
-  List.iter (fun (name, body, ty) =>
-    let body_evar := match body with Some b => Constr.has_evar b | _ => false end  in
-    if body_evar then
-      panic_m "assert_no_evars" (fprintf "Hyp %I body has evar" name) else
-    let type_evar := Constr.has_evar ty in
-    if type_evar then
-      panic_m "assert_no_evars" (fprintf "Hyp %I has evar" name) else
-    ()) (Control.hyps()).
-
-Section test.
-  Goal exists n, n = 2.
-  Proof Mode "Ltac2". (assert_no_evars ()). eexists. Fail (assert_no_evars ()).  Abort.
-  Goal True.  Proof. evar (T : Prop). Fail ltac2:(assert_no_evars ()).  Abort.
-End test.
 
 #[local] Ltac2 Type exn ::= 
   [ProgressWrap (exn)].
@@ -190,66 +169,76 @@ Section test.
   Abort.
 End test.
 
-#[local] Ltac2 assert_no_hyp_loss (t:unit -> unit) : unit :=
-  one_goal_assertion "assert_no_hyp_loss";
-  let names () := List.map (fun (n, _, _) => n) (Control.hyps ()) in
-  let before := names () in t ();
-  Control.enter (fun () => (* You will get a not focused exception *)
-    let after := names () in
-    if List.for_all (fun n => List.mem Ident.equal n after) before then () else
-    panic_s "assert_no_hyp_loss" "Hypothesis removed or renamed").
+#[local] Ltac2 assert_no_hyp_change (t:unit -> unit) : unit :=
+  one_goal_assertion "assert_no_hyp_change";
+  let hyp_eq (n1, b1, t1) (n2, b2, t2) :=
+    Bool.and (Ident.equal n1 n2)
+    (Bool.and
+      (match b1, b2 with
+       | None, None => true
+       | Some c1, Some c2 => Constr.equal c1 c2
+       | _, _ => false
+       end)
+      (Constr.equal t1 t2)) in
+  let before := Control.hyps () in t ();
+  Control.enter (fun () =>
+    let after := Control.hyps () in
+    if Int.equal (List.length before) (List.length after) then
+      (if List.for_all2 hyp_eq before after then ()
+       else panic_s "assert_no_hyp_change" "Hypothesis changed")
+    else panic_s "assert_no_hyp_change" "Hypothesis added or removed").
 
 Section test. 
   Goal True -> False.
   Proof Mode "Ltac2".
-    assert_no_hyp_loss (fun ()=> ltac1:(idtac)).
-    (* New: adding hypotheses is allowed. *)
-    Succeed assert_no_hyp_loss (fun ()=> ltac1:(intros)).
+    assert_no_hyp_change (fun ()=> ltac1:(idtac)).
+    Fail assert_no_hyp_change (fun ()=> ltac1:(intros)).
     intros h.
-    assert_no_hyp_loss (fun ()=> ltac1:(intros)).
-    Fail assert_no_hyp_loss (fun ()=> ltac1:(rename h into h')).
+    assert_no_hyp_change (fun ()=> ltac1:(intros)).
+    Fail assert_no_hyp_change (fun ()=> ltac1:(rename h into h')).
+    Fail assert_no_hyp_change (fun ()=> ltac1:(pose proof I)).
+    ltac1:(pose proof (p := I)).
+    assert_no_hyp_change (fun ()=> ltac1:(move: p=> p)).
+    Fail assert_no_hyp_change (fun ()=> ltac1:(move: h=> h)). (* The order of hyps matters too! *)
   Abort.
 
   Goal True -> False /\ False. 
   Proof Mode "Ltac2".
     intros h.
-    Succeed assert_no_hyp_loss (fun ()=> ltac1:(split)).
-    Fail assert_no_hyp_loss (fun ()=> ltac1:(split; rename h into h')).
-    Fail assert_no_hyp_loss (fun ()=> ltac1:(split; [rename h into h'|])).
+    Succeed assert_no_hyp_change (fun ()=> ltac1:(split)).
+    Fail assert_no_hyp_change (fun ()=> ltac1:(split; rename h into h')).
+    Fail assert_no_hyp_change (fun ()=> ltac1:(split; [rename h into h'|])).
   Abort.
  
 End test. 
 
 
 (* harden should be the one tactic-writer facing tactic. 
-  Hardened tactics must be called with one focused goal
-  Hardened tactics don't backtrack.
-  Hardened tactics unshelve.
-  Hardened tactics can fail. If they don't, 
+  Hardened tactics: 
+  - must be called with one focused goal
+  - can't backtrack.
+  - unshelve.
+  - can fail. 
+  If a hardened tactic succeeds,
   - they must progress
-  - They should not shelve anything
+  - They should not shelve anything  !!
   - You can assert the number of goals produced
-  - You can assert whether evars are involved
   - You can assert the hypothesis names remain unchanged
   If an assertion fails, we panic. 
   Convenient syntax: harden n, harden <= n, harden ? (for Ltac2 and Ltac1)
   Use `precise_harden` when not sufficient.
 *)
 (* TODO: This type could be made into a record  *)
-Ltac2 precise_harden (t: unit -> unit) (goals: (int * bool) option) (allow_evar_change: bool) (allow_hyps_remove : bool): unit :=
+Ltac2 precise_harden (t: unit -> unit) (goals: (int * bool) option) (allow_hyps_change : bool): unit :=
     one_goal_assertion "precise_harden";
     let t := fun () => once_hard_progress t in  (* TODO: What is the correct order? *)
     let t := fun () => Control.unshelve t in  
-    let t := match goals with
-             | Some (n, b) (* is_le*) =>  fun () => goals_check t n b true 
-             | None => t 
-             end in
-    let t := if allow_evar_change then t else fun () => t(); Control.enter assert_no_evars in
-    let t := if allow_hyps_remove then t else fun () => assert_no_hyp_loss t in
+    let t := match goals with | Some (n, b) (* is_le*) =>  fun () => goals_check t n b true | None => t end in
+    let t := if allow_hyps_change then t else fun () => assert_no_hyp_change t in
     t ().
 
 (* Sugar: The default values of these bools are false *)
-#[local] Ltac2 harden0 t goals :=  precise_harden t goals false false.
+#[local] Ltac2 harden0 t goals :=  precise_harden t goals false.
 
 Ltac2 Notation "harden" n(tactic(0)) t(thunk(self)) := harden0 t (Some (n,false)).
 
