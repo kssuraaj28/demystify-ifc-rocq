@@ -446,7 +446,9 @@ Module Cook.
         cook_dbg 2 (fun () => printf "Trying: cook_step[%i]: %s" i desc);
         match Control.case t with
         | Val ((),_) => cook_dbg 1 (fun () => printf "cook_step[%i]: %s success" i desc)
-        | Err _ => go (Int.add i 1) rest
+        | Err e =>
+            cook_dbg 2 (fun () => printf "cook_step[%i]: %s failed: %a" i desc (fun () e' => Message.of_exn e') e);
+            go (Int.add i 1) rest
         end
       end in
     go 0 (curr_cookbook ()).
