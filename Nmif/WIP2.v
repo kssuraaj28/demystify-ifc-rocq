@@ -339,8 +339,7 @@ Section extract_step_commute.
           erewrite combine_extend2_map_r; [|done]. rewrite map_map.
           erewrite map_ext; [|case=> ?; instantiate (1 := (fun '(_,_) => _)); reflexivity].
           apply: map_ext. case=> *. rewrite/sim_active'. cook. }
-        case: pub in rwt newpce *; [|move=> /=;cook;admit].
-
+        case: pub in rwt newpce *; [| exfalso; do [cook] in newpce].
         have rcmd_grd: is_secret_guard rcmd = false by admit.
         rewrite rcmd_grd /=. cook.
         pattern_eq_2  [ (post_cmd_action _ _ (_ _(if _ then _ else rst)))] [ (post_cmd_action _ _ (_ _(if _ then _ else simst)))] => [|->].
@@ -419,8 +418,7 @@ Section extract_step_commute.
           1-2: enter (erewrite map_filter_combine_extend2_ind1; only 2,3: (move=> *; instantiate (1:= fun _ => _); reflexivity); only 2: done).
           (* I would love to use 2 in 1. Or have a combined join lemma. open_constr fails when not focused *)
           1-2: clear; revert_hyp_pat nat; elim=> //= *; f_equal=> //. }
-
-        case: pub in rwt newpce *; [| move=> /=;cook; admit].
+        case: pub in rwt newpce *; [| exfalso; do [cook] in newpce].
         have rcmd_grd: is_secret_guard rcmd = false by admit. (* Copied!! *)
         rewrite rcmd_grd.
         pattern_eq_2 [ (optcmd_stp_cnt _ (if _ then _ else rst)) ]
