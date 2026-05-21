@@ -207,10 +207,12 @@ Module List.
         (combine_extend2 la (combine_extend2 lb lc db dc) da (db, dc)).
   Proof.
     elim: la lb lc => [|a la' IH] lb lc.
-    - rewrite combine_extend2_nil_l.
-      erewrite combine_extend2_map_l; [|reflexivity].
-      rewrite combine_extend2_nil_l map_map //.
-  Admitted.
+      { rewrite combine_extend2_nil_l map_map.
+      erewrite combine_extend2_map_l; [|reflexivity]. done. }
+    rewrite !combine_extend2_consl map_cons. 
+    case: lb=> *; case: lc=> *; cnstrct_eq_gl=> -. (* Ltac1 is stupid *)
+    1-4: rewrite {}IH ?combine_extend2_nil_l ?combine_extend2_nil_r //.
+  Qed.
 
   (* If the 2nd column of the zip is `map g X`, the zip is `map (x => (x, g x)) X`.
      (The hypothesis being a list equality also forces |Y| <= |X|.) *)
@@ -347,32 +349,32 @@ Module List.
         (combine_extend2 la (combine_extend2 lb lc db dc) da (db, dc)).
   Proof. exact: combine_extend2_assoc. Qed.
 
-  Lemma combine_extend3_regroup2 {A B C}
-    (la : list A) (lb : list B) (lc : list C) da db dc :
-    combine_extend3 la lb lc da db dc =
-    map (fun '(a, c, b) => (a, b, c))
-        (combine_extend2 (combine_extend2 la lc da dc) lb (da,dc) db).
-  Admitted. (* TODO: combinatorial induction. *)
-
   Lemma combine_extend3_swap23 {A B C}
     (la : list A) (lb : list B) (lc : list C) da db dc :
     combine_extend3 la lb lc da db dc =
     map (fun '(a, c, b) => (a, b, c)) (combine_extend3 la lc lb da dc db).
-  Proof. exact: combine_extend3_regroup2. Qed.
-
-  Lemma combine_extend4_regroup3 {A B C D}
-    (la : list A) (lb : list B) (lc : list C) (ld : list D)
-    da db dc dd :
-    combine_extend4 la lb lc ld da db dc dd =
-    map (fun '(a, b, d, c) => (a, b, c, d))
-        (combine_extend2 (combine_extend3 la lb ld da db dd) lc (da,db,dd) dc).
-  Admitted. (* TODO: combinatorial induction. *)
+  Proof.
+    rewrite !combine_extend3_splitl.
+    rewrite [combine_extend2 lb lc db dc]combine_extend2_swap.
+    erewrite (combine_extend2_map_r _ _ _ _ _ (dc, db)); [|done].
+    rewrite !map_map.
+    apply: map_ext. case=> a [c b] //.
+  Qed.
 
   Lemma combine_extend4_swap34 {A B C D}
     (la : list A) (lb : list B) (lc : list C) (ld : list D) da db dc dd :
     combine_extend4 la lb lc ld da db dc dd =
     map (fun '(a, b, d, c) => (a, b, c, d)) (combine_extend4 la lb ld lc da db dd dc).
-  Proof. exact: combine_extend4_regroup3. Qed.
+  Proof.
+    rewrite /combine_extend4 /combine_extend3.
+    rewrite combine_extend2_assoc.
+    rewrite [combine_extend2 lc ld dc dd]combine_extend2_swap.
+    erewrite (combine_extend2_map_r _ _ _ _ _ (dd, dc)); [|done].
+    rewrite [in RHS]combine_extend2_assoc.
+    rewrite !map_map.
+    apply: map_ext. case=> [[a b] [d c]] //.
+  Qed.
+
 
   Lemma Forall_combine2_ind1 :
      forall {A B} P l1 l2 (d1:A) (d2:B) Q,

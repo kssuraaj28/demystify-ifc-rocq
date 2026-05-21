@@ -281,7 +281,7 @@ Section extract_step_commute.
         suff: combine_extend3 l1 l3 idlatkcont None false false =
               map (fun '(c, b) => (c, b, sim_active' c b (public new_pc))) (combine_extend2 l1 l3 None false).
           { move: l1 l2 l3 new_pc idlatkcont=> >; clear=> h. 
-          rewrite combine_extend4_regroup3 {}h.
+          rewrite combine_extend4_swap34 /combine_extend4 {}h. (* TODO: combine_extend4 splitr and splitl *)
           erewrite combine_extend2_map_l; [|instantiate (1 := (None, false))=> //=;cook].
           rewrite -combine_extend3_splitr map_map.
           apply: map_ext; case;case=> //. }
