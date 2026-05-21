@@ -50,6 +50,18 @@ Module List.
       | la , [] => map (fun a => (a, db)) la
       end.
   
+  (* Maybe use Ltac2 to define this.. *)
+  Definition combine_extend3 {A B C}
+    (la : list A) (lb : list B) (lc : list C)
+    (da : A) (db : B) (dc : C) : list (A * B * C) :=
+      combine_extend2 (combine_extend2 la lb da db) lc (da,db) dc.
+
+  Definition combine_extend4 {A B C D}
+    (la : list A) (lb : list B) (lc : list C) (ld: list D)
+    (da : A) (db : B) (dc : C) (dd: D) : list (A * B * C * D) :=
+      combine_extend2 (combine_extend3 la lb lc da db dc) ld (da,db,dc) dd.
+
+
   Goal combine_extend2 [1; 3] [true] 10 false = [(1, true); (3, false)].  
   Proof. done. Qed.
 
@@ -64,21 +76,21 @@ Module List.
     combine_extend2 la [] da db = map (fun a => (a, db)) la.
   Proof. case: la; done. Qed.
 
+
   (* Uniform cons lemmas: combine_extend2 advances both lists by one,
      using the default when a list has run out. *)
   Lemma combine_extend2_consl {A B} x (X : list A) (Y : list B) dX dY :
     combine_extend2 (x :: X) Y dX dY =
     (x, hd dY Y) :: combine_extend2 X (tl Y) dX dY.
   Proof.
-    case: Y => [|y Y'].
-    - case: X => [|x' X']; reflexivity.
-    - reflexivity.
+    case: Y => [|y Y']=> //.
+    case: X => [|x' X'] //.
   Qed.
 
   Lemma combine_extend2_consr {A B} (X : list A) y (Y : list B) dX dY :
     combine_extend2 X (y :: Y) dX dY =
     (hd dX X, y) :: combine_extend2 (tl X) Y dX dY.
-  Proof. case: X => [|x X']; reflexivity. Qed.
+  Proof. case: X => [|x X'] //. Qed.
 
   (* If the 2nd column of the zip is `map g X`, the zip is `map (x => (x, g x)) X`.
      (The hypothesis being a list equality also forces |Y| <= |X|.) *)
@@ -116,58 +128,6 @@ Module List.
     combine_extend2 l l d d = map (fun x => (x, x)) l.
   Proof. elim: l => [| h t IH] //=. rewrite IH //. Qed.
 
-  (* Maybe use Ltac2 to define this.. *)
-  Definition combine_extend3 {A B C}
-    (la : list A) (lb : list B) (lc : list C)
-    (da : A) (db : B) (dc : C) : list (A * B * C) :=
-      combine_extend2 (combine_extend2 la lb da db) lc (da,db) dc.
-
-  Definition combine_extend4 {A B C D}
-    (la : list A) (lb : list B) (lc : list C) (ld: list D)
-    (da : A) (db : B) (dc : C) (dd: D) : list (A * B * C * D) :=
-      combine_extend2 (combine_extend3 la lb lc da db dc) ld (da,db,dc) dd.
-
-  Lemma combine_extend4_regroup3 {A B C D}
-    (la : list A) (lb : list B) (lc : list C) (ld : list D)
-    da db dc dd :
-    combine_extend4 la lb lc ld da db dc dd =
-    map (fun '(a, b, d, c) => (a, b, c, d))
-        (combine_extend2 (combine_extend3 la lb ld da db dd) lc (da,db,dd) dc).
-  Admitted. (* TODO: combinatorial induction. *)
-
-  Lemma combine_extend3_regroup2 {A B C}
-    (la : list A) (lb : list B) (lc : list C) da db dc :
-    combine_extend3 la lb lc da db dc =
-    map (fun '(a, c, b) => (a, b, c))
-        (combine_extend2 (combine_extend2 la lc da dc) lb (da,dc) db).
-  Admitted. (* TODO: combinatorial induction. *)
-
-  Lemma combine_extend3_swap23 {A B C}
-    (la : list A) (lb : list B) (lc : list C) da db dc :
-    combine_extend3 la lb lc da db dc =
-    map (fun '(a, c, b) => (a, b, c)) (combine_extend3 la lc lb da dc db).
-  Proof. exact: combine_extend3_regroup2. Qed.
-
-  Lemma combine_extend4_swap34 {A B C D}
-    (la : list A) (lb : list B) (lc : list C) (ld : list D) da db dc dd :
-    combine_extend4 la lb lc ld da db dc dd =
-    map (fun '(a, b, d, c) => (a, b, c, d)) (combine_extend4 la lb ld lc da db dd dc).
-  Proof. exact: combine_extend4_regroup3. Qed.
-
-  (* combine_extend3 grouped as ((a,b),c) -- this is the definition. *)
-  Lemma combine_extend3_splitr {A B C}
-    (la : list A) (lb : list B) (lc : list C) da db dc :
-    combine_extend3 la lb lc da db dc =
-    combine_extend2 (combine_extend2 la lb da db) lc (da, db) dc.
-  Proof. done. Qed.
-
-  (* combine_extend3 grouped as (a,(b,c)) -- zip-with-padding is associative. *)
-  Lemma combine_extend3_splitl {A B C}:
-    forall (la : list A) (lb : list B) (lc : list C) da db dc,
-    combine_extend3 la lb lc da db dc =
-    map (fun '(a, (b, c)) => (a, b, c))
-        (combine_extend2 la (combine_extend2 lb lc db dc) da (db, dc)).
-  Proof.  Admitted. (* TODO: associativity of combine_extend2-with-padding. *)
 
   (* Map fusion: a `map` on the first list pulls out of `combine_extend2`. *)
   Lemma combine_extend2_map_l {A A' B} (f : A -> A')
@@ -193,6 +153,7 @@ Module List.
     - rewrite map_cons !combine_extend2_consr map_cons IH //.
   Qed.
 
+  (* TODO: Delete these two  *)
   (* Second list is `map g` of the first: equal length, so defaults are dead. *)
   Lemma combine_extend2_map_self_r {A B} (g : A -> B) (X : list A) dX dY :
     combine_extend2 X (map g X) dX dY = map (fun x => (x, g x)) X.
@@ -256,6 +217,51 @@ Module List.
       + rewrite fg IH //.
       + rewrite IH //.
   Qed.
+
+
+  (* TODO: Add combine_extend2 things must come before this  *)
+
+  (* combine_extend3 grouped as ((a,b),c) -- this is the definition. *)
+  Lemma combine_extend3_splitr {A B C}
+    (la : list A) (lb : list B) (lc : list C) da db dc :
+    combine_extend3 la lb lc da db dc =
+    combine_extend2 (combine_extend2 la lb da db) lc (da, db) dc.
+  Proof. done. Qed.
+
+  (* combine_extend3 grouped as (a,(b,c)) -- zip-with-padding is associative. *)
+  Lemma combine_extend3_splitl {A B C}:
+    forall (la : list A) (lb : list B) (lc : list C) da db dc,
+    combine_extend3 la lb lc da db dc =
+    map (fun '(a, (b, c)) => (a, b, c))
+        (combine_extend2 la (combine_extend2 lb lc db dc) da (db, dc)).
+  Proof.  Admitted. (* TODO: associativity of combine_extend2-with-padding. *)
+
+  Lemma combine_extend4_regroup3 {A B C D}
+    (la : list A) (lb : list B) (lc : list C) (ld : list D)
+    da db dc dd :
+    combine_extend4 la lb lc ld da db dc dd =
+    map (fun '(a, b, d, c) => (a, b, c, d))
+        (combine_extend2 (combine_extend3 la lb ld da db dd) lc (da,db,dd) dc).
+  Admitted. (* TODO: combinatorial induction. *)
+
+  Lemma combine_extend3_regroup2 {A B C}
+    (la : list A) (lb : list B) (lc : list C) da db dc :
+    combine_extend3 la lb lc da db dc =
+    map (fun '(a, c, b) => (a, b, c))
+        (combine_extend2 (combine_extend2 la lc da dc) lb (da,dc) db).
+  Admitted. (* TODO: combinatorial induction. *)
+
+  Lemma combine_extend3_swap23 {A B C}
+    (la : list A) (lb : list B) (lc : list C) da db dc :
+    combine_extend3 la lb lc da db dc =
+    map (fun '(a, c, b) => (a, b, c)) (combine_extend3 la lc lb da dc db).
+  Proof. exact: combine_extend3_regroup2. Qed.
+
+  Lemma combine_extend4_swap34 {A B C D}
+    (la : list A) (lb : list B) (lc : list C) (ld : list D) da db dc dd :
+    combine_extend4 la lb lc ld da db dc dd =
+    map (fun '(a, b, d, c) => (a, b, c, d)) (combine_extend4 la lb ld lc da db dd dc).
+  Proof. exact: combine_extend4_regroup3. Qed.
 
   Lemma combine_extend3_nil1 {A B C}
     (l2 : list B) (l3 : list C) (d1 : A) (d2 : B) (d3 : C) :
@@ -354,7 +360,7 @@ Module List.
   Ltac Forall_inv_toph :=  (move=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _)).
   Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(Forall_inv_toph) "Forall_inv" old.
 
-  Section test_forall_inv_toph.
+  Section test.
     (* Direct invocation: does Forall_inv_toph itself run? *)
     Goal forall (P: nat -> Prop) (x: nat) l, Forall P (x :: l) -> P x.
     Proof. move=> P x l. Forall_inv_toph. done. Abort.
@@ -365,7 +371,7 @@ Module List.
     Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["Forall_inv"]) ().
     Goal forall (P: nat -> Prop) (x: nat) l, Forall P (x :: l) -> P x.
     Proof. move=> P x l. progress cook. Abort.
-  End test_forall_inv_toph.
+  End test.
 
 
   (* TODO: Test for these also *)
@@ -392,7 +398,7 @@ Module List.
     => [|->//])
     "eq_map_nil" old.
 
-  Section test_eq_app_nil.
+  Section test.
     Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["eq_app_nil"]) ().
     Goal forall A (y l: list A), y = l ++ y.
     Proof. move=> A y l. progress cook. Abort.
@@ -402,15 +408,15 @@ Module List.
     Proof. move=> A y l. progress cook. Abort.
     Goal forall A (y l: list A), y ++ l = y.
     Proof. move=> A y l. progress cook. Abort.
-  End test_eq_app_nil.
+  End test.
 
-  Section test_eq_map_nil.
+  Section test.
     Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["eq_map_nil"]) ().
     Goal forall A B (f: A -> B) (l: list A), map f l = [].
     Proof. move=> *. progress cook. Abort.
     Goal forall A B (f: A -> B) (l: list A), [] = map f l.
     Proof. move=> *. progress cook. Abort.
-  End test_eq_map_nil.
+  End test.
 
   Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(
     first
@@ -421,28 +427,28 @@ Module List.
     => [|->//])
     "eq_app_peel" old.
 
-  Section test_eq_app_peel.
+  Section test.
     Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["eq_app_peel"]) ().
     Goal forall A (a b y: list A), a ++ y = b ++ y.
     Proof. move=> A a b y. progress cook. Abort.
     Goal forall A (a b y: list A), y ++ a = y ++ b.
     Proof. move=> A a b y. progress cook. Abort.
-  End test_eq_app_peel.
+  End test.
 
   Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite length_map) "length_map" old.
   Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite repeat_length) "repeat_length" old.
 
-  Section test_length_map.
+  Section test.
     Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["length_map"]) ().
     Goal forall A B (f: A -> B) (l: list A), length (map f l) = length l.
     Proof. move=> *. progress cook. Abort.
-  End test_length_map.
+  End test.
 
-  Section test_repeat_length.
+  Section test.
     Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["repeat_length"]) ().
     Goal forall A (x: A) n, length (repeat x n) = n.
     Proof. move=> *. progress cook. Abort.
-  End test_repeat_length.
+  End test.
 
   Ltac2 this_cookbook () := this_cookbook_ ().
   Hint Extern 10 => lazymatch goal with _ =>  apply/Forall_forall end : trickbag.

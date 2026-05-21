@@ -356,6 +356,31 @@ Section extract_step_commute.
           1: cook; set l1 := filter _ _; set l2 := repeat true _.
           1: suff: map (fun '(_,i,_) => i) l1 = l2; [move: l1 l2=> > <-; rewrite map_map; apply: map_ext=> - [] [] //|subst l1 l2].  
           1-2: move: (if _ then _ else _) (map Some _)=> ? ?.
+          1: {
+              pattern_focus [combine_extend3 _ _ _ _ _ _]=> P.
+
+
+           rewrite combine_extend3_splitr [combine_extend2 _ (repeat _ _) _ _]combine_extend2_swap;
+           erewrite combine_extend2_map_l; [|instantiate (1 := (_,_)); reflexivity];
+           rewrite -combine_extend3_splitr combine_extend3_splitl !map_map;
+           erewrite map_ext; [|case=> ?; case=> *; instantiate (1 := fun '(_, (_,_))=> _); reflexivity ];
+
+           erewrite map_ext; [|
+            case=> ?; case=> *; 
+           instantiate (1 := (fun x => _ ((fun '(a,(b,c)) => (a,b,c)) x))); 
+           instantiate (1 := (fun '(_,_,_) => _)); reflexivity];
+           rewrite -map_map -combine_extend3_splitl.
+
+P (combine_extend3 _map1_ (repeat true _n_) _map_ None false None)
+
+P
+  (map (fun '(__b, __o0, __o) => (__o0, __b, __o))
+     (combine_extend3 (repeat true _n_) _map1_ _map_ false None None))
+
+           erewrite filter_ext; [|case=> ?;case=> *; instantiate (1 := fun '(_,_) => _); reflexivity];
+           erewrite map_ext; [|case=> ?;case=> *; instantiate (1 := fun '(_,_) => _); reflexivity];
+           move: (X in combine_extend2 _ X _ _)=> ?.
+
           1-2: rewrite combine_extend3_splitr [combine_extend2 _ (repeat _ _) _ _]combine_extend2_swap;
            erewrite combine_extend2_map_l; [|instantiate (1 := (_,_)); reflexivity];
            rewrite -combine_extend3_splitr combine_extend3_splitl !map_map filter_map_swap map_map;

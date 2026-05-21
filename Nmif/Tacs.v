@@ -67,6 +67,18 @@ Tactic Notation "pattern_eq" "[" ssrpatternarg(p1) "]" "with" uconstr(c) :=
   ssrpattern p1; move=> a;
   have: a = c; subst a.
 
+Tactic Notation "pattern_focus" "[" ssrpatternarg(p) "]" :=
+  let x := fresh "_x" in
+  ssrpattern p; move=> x;
+  pattern x;
+  ssrpattern (X in X _);
+  subst x.
+
+Section test.
+  Goal forall (l: list nat) (n: nat), length l = n.
+  Proof. move=> l n. pattern_focus [length _]=> P. Abort.
+End test.
+
 Tactic Notation "NAME_GOALS_AFTER" tactic0(t) ne_ident_list(l) :=
   let f := ltac2:(tt ll |-
     Ltac1.run tt;
