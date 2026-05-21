@@ -256,10 +256,10 @@ Section extract_step_commute.
       case: c. case=> rst ist simst atkst.
       case=> //. case=> rcmd isatk icmd pclbl restcmd inv.
       rewrite /= in inv. move: inv=> []. (Forall_inv_toph)=> i1 restinv i3.
-      rewrite /CmbCmdInv/CmbCmdCoreInv in i1. case: i1=> rwt iwt.
-      rewrite /StateInv in i3. case: i3=> treq pubeq.
-      move: pclbl rwt iwt.
-      (case=> - untr pub); cook=> rwt iwt. (* TODO: Remove iwt. We don't care *)
+      rewrite /CmbCmdInv/CmbCmdCoreInv in i1. case: i1=> rwt _.
+      rewrite /StateInv in i3. case: i3=> _ pubeq.
+      move: pclbl rwt.
+      (case=> - untr pub); cook=> rwt.
       rewrite/comb_step/cmbcmd_step {}/extract_2cfg; cook.
       rewrite /extract_2cfg; cook.
       rewrite/sim_active; cook.
@@ -275,10 +275,7 @@ Section extract_step_commute.
         set l1 := (map Some (optcmd_stp_cnt rcmd _)). set l2 := (map Some (optcmd_stp_cnt icmd _)). set l3 := (repeat true _).
         set c4l := (combine_extend4 _ _ _ _ _ _ _ _). set c3l := (combine_extend3 _ _ _ _ _ _).
         rewrite /cmd_map !map_map. 
-        erewrite map_ext; cycle 1.
-          { case. case. cbn. rewrite/sim_active. cbn=> *. 
-          instantiate (1  := fun '(_,_,_) => (_, _, _, _ )). (* Very cool. Like `refine`, I think *)
-          reflexivity. }
+        erewrite map_ext; [| case; case; cbn; rewrite/sim_active; cbn=> *; instantiate (1  := fun '(_,_,_) => (_, _, _, _ )); reflexivity].
         subst c4l c3l.
         set idlatkcont := (repeat true _). 
         rewrite combine_extend3_swap23 map_map.
@@ -299,8 +296,8 @@ Section extract_step_commute.
           move: idlatkcont=>idlatkcont. clear=> h.
           erewrite combine_extend2_map_snd; [apply: map_ext; case=> >; f_equal; instantiate (1:= fun '(_,_) => _); reflexivity|].
           rewrite h. apply: map_ext; case; case=> * //. }
-        clear l2 treq iwt.
-        subst new_pc l1 l3 idlatkcont. 
+        clear l2.
+        subst new_pc l1 l3 idlatkcont.
         case: sim_active'P=>[|_].
           { move=> -> [] e; rewrite -> e in *=> {e} //=.
           rewrite combine_extend3_splitr; cook. rewrite !map_map.
@@ -376,7 +373,6 @@ Section extract_step_commute.
           { erewrite filter_ext; [|case; case=> ? ? ?; rewrite /sim_active' /= Bool.orb_false_r; instantiate (1 := fun '(_,_,_) => _); reflexivity].
           case: pub in rwt newpce *.
           2: erewrite post_optcmd_stp_store_sec; [| eassumption]=> /=; cook.
-
           1: have ->: is_secret_guard rcmd = true by admit. (* I should be able to have an ssr variant *)
           1: rewrite combine_extend2_nil_l.
           1: cook; set l1 := filter _ _; set l2 := repeat true _.
@@ -404,7 +400,7 @@ Section extract_step_commute.
         move=> > ?; case=> /= *; [| f_equal; eauto].
         rewrite !filter_map_swap.
         erewrite filter_ext; [| move=> * /=; reflexivity]. 
-        repeat f_equal. rewrite filter_true //.
+        cnstrct_eq_gl. rewrite filter_true //.
     Admitted.
   End cook.
 
