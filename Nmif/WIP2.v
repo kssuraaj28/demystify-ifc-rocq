@@ -264,9 +264,8 @@ Section extract_step_commute.
       rewrite /extract_2cfg; cook.
       rewrite/sim_active; cook.
       rewrite/step; cook.
-      congr (_,_,_).
-      - congr (_ ++ _). cook. (* TODO: Forward reasoning *) 
-        set l1 := (X in map _ X = _). set l2 := (X in _ = map _ X).
+      congr (_,_,_); cook.
+      - set l1 := (X in map _ X = _). set l2 := (X in _ = map _ X).
         suff: l1 = map (fun c => (real_cmd c, real_atk_bit c,  ideal_cmd c, sim_active c)) l2;
           [move=> ->; rewrite map_map //| subst l1 l2]. (* TODO: This could be lemma / rewrite rule *)
         rewrite/zip.
@@ -295,47 +294,34 @@ Section extract_step_commute.
           move: idlatkcont=>idlatkcont. clear=> h.
           erewrite combine_extend2_map_snd; [apply: map_ext; case=> >; f_equal; instantiate (1:= fun '(_,_) => _); reflexivity|].
           rewrite h. apply: map_ext; case; case=> * //. }
-        clear l2.
-        subst new_pc l1 l3 idlatkcont.
+        rewrite {}/new_pc {}/l1 {}/l3 {}/idlatkcont {l2}.
         case: sim_active'P=>[|_].
           { move=> -> [] e; rewrite -> e in *=> {e} //=.
           rewrite combine_extend3_splitr; cook. rewrite !map_map.
           apply: map_ext=> *; cook. }
         cook. rewrite/sim_step. cook.
         set (public _) as x; case newpce: x; subst x; cycle 1. (* TODO: ssr version of this? *)
-          { case: pub in rwt newpce *; cycle 1. (* Maybe custom rewriting rule *)
-            { move=> /=; cook.
-            rewrite length_map repeat_length.
-            erewrite post_optcmd_stp_store_sec;[|eassumption]. 
-            cook. rewrite combine_extend3_splitl map_map. symmetry;
-            erewrite map_ext; [|case=> ? [] *; instantiate (1 := fun '(_,(_,_)) => _); reflexivity].
-            rewrite combine_extend2_same. set l := (map Some _).
-            erewrite combine_extend2_map_r; [|done]. rewrite map_map.
-            erewrite map_ext; [|case=> *; instantiate (1 := fun '(_,_)=> _);  reflexivity].
-            apply: map_ext; case=> *. rewrite /sim_active'; cook. }
-          have ->: is_secret_guard rcmd = true by admit. (* TODO: lots of same as before *)
-          rewrite /= length_map repeat_length. cook.
-
-          rewrite combine_extend3_splitl combine_extend2_same map_map; symmetry.
-          erewrite combine_extend2_map_r; [|done]. rewrite map_map.
-          erewrite map_ext; [|case=> ?; instantiate (1 := (fun '(_,_) => _)); reflexivity].
-          apply: map_ext. case=> *. rewrite/sim_active'. cook. }
+          { case: pub in rwt newpce *.          (* Maybe custom rewriting rule *)
+          1: have ->: is_secret_guard rcmd = true by admit. (* TODO: lots of same as before *)
+          2: erewrite post_optcmd_stp_store_sec;[|eassumption]. 
+          1-2: move=> /=; cook.
+          1-2: cook; rewrite combine_extend3_splitl combine_extend2_same map_map. 
+          1-2: erewrite combine_extend2_map_r; [|done]; rewrite map_map.
+          1-2: erewrite map_ext; [|case=> ?; instantiate (1 := (fun '(_,_) => _)); reflexivity].
+          1-2: apply: map_ext; case=> *; rewrite/sim_active'; cook. }
         case: pub in rwt newpce *; [| exfalso; do [cook] in newpce].
         have rcmd_grd: is_secret_guard rcmd = false by admit.
         rewrite rcmd_grd /=. cook.
         rewrite combine_extend3_splitr. 
-        set l:= combine_extend2 (map Some _) (repeat true _) _ _.
-        rewrite -map_const combine_extend2_map_self_r map_map. 
-        subst l. cook.
+        rewrite -map_const combine_extend2_map_self_r map_map.
         apply: map_ext_in; case; case=> [?|]; case=> //=.
         move: (optcmd_stp_cnt _ _)=> l. move: (if _ then _ else _)=> n. 
         clear=> contra; exfalso; move: contra.
         elim: l n=> //=; [elim=> //= ? ? [] //|]. (* Damn. I used induction in the base, but not  *)
         move=> > ?; case=> //=; [|move=> > [] //; eauto].
-        rewrite map_map; case=> // /in_map_iff [] ? [] []//.
+        rewrite map_map. case=> // /in_map_iff [] ? [] []//.
 
-      - congr (_,_); cook .
-        case: sim_active'P=>[-> |_]; [case=> e; rewrite -> e in *=> {e} //=; f_equal|]; cook.
+      - case: sim_active'P=>[-> |_]; [case=> e; rewrite -> e in *=> {e} //=; f_equal|]; cook.
         1-2: rewrite /zip cmd_map_sim_app; cook.
         1-2: rewrite/ cmd_map_sim filter_map_swap; cook.
           { erewrite filter_ext; cycle 1.

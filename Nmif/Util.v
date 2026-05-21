@@ -429,6 +429,21 @@ Module List.
     Proof. move=> A a b y. progress cook. Abort.
   End test_eq_app_peel.
 
+  Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite length_map) "length_map" old.
+  Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite repeat_length) "repeat_length" old.
+
+  Section test_length_map.
+    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["length_map"]) ().
+    Goal forall A B (f: A -> B) (l: list A), length (map f l) = length l.
+    Proof. move=> *. progress cook. Abort.
+  End test_length_map.
+
+  Section test_repeat_length.
+    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["repeat_length"]) ().
+    Goal forall A (x: A) n, length (repeat x n) = n.
+    Proof. move=> *. progress cook. Abort.
+  End test_repeat_length.
+
   Ltac2 this_cookbook () := this_cookbook_ ().
   Hint Extern 10 => lazymatch goal with _ =>  apply/Forall_forall end : trickbag.
 End List.
