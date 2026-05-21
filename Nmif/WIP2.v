@@ -355,41 +355,12 @@ Section extract_step_commute.
           1: rewrite combine_extend2_nil_l.
           1: cook; set l1 := filter _ _; set l2 := repeat true _.
           1: suff: map (fun '(_,i,_) => i) l1 = l2; [move: l1 l2=> > <-; rewrite map_map; apply: map_ext=> - [] [] //|subst l1 l2].  
-          1-2: move: (if _ then _ else _) (map Some _)=> ? ?.
-          1: {
-              pattern_focus [combine_extend3 _ _ _ _ _ _]=> P.
-
-
-           rewrite combine_extend3_splitr [combine_extend2 _ (repeat _ _) _ _]combine_extend2_swap;
-           erewrite combine_extend2_map_l; [|instantiate (1 := (_,_)); reflexivity];
-           rewrite -combine_extend3_splitr combine_extend3_splitl !map_map;
-           erewrite map_ext; [|case=> ?; case=> *; instantiate (1 := fun '(_, (_,_))=> _); reflexivity ];
-
-           erewrite map_ext; [|
-            case=> ?; case=> *; 
-           instantiate (1 := (fun x => _ ((fun '(a,(b,c)) => (a,b,c)) x))); 
-           instantiate (1 := (fun '(_,_,_) => _)); reflexivity];
-           rewrite -map_map -combine_extend3_splitl.
-
-P (combine_extend3 _map1_ (repeat true _n_) _map_ None false None)
-
-P
-  (map (fun '(__b, __o0, __o) => (__o0, __b, __o))
-     (combine_extend3 (repeat true _n_) _map1_ _map_ false None None))
-
-           erewrite filter_ext; [|case=> ?;case=> *; instantiate (1 := fun '(_,_) => _); reflexivity];
-           erewrite map_ext; [|case=> ?;case=> *; instantiate (1 := fun '(_,_) => _); reflexivity];
-           move: (X in combine_extend2 _ X _ _)=> ?.
-
-          1-2: rewrite combine_extend3_splitr [combine_extend2 _ (repeat _ _) _ _]combine_extend2_swap;
-           erewrite combine_extend2_map_l; [|instantiate (1 := (_,_)); reflexivity];
-           rewrite -combine_extend3_splitr combine_extend3_splitl !map_map filter_map_swap map_map;
-           erewrite filter_ext; [|case=> ?;case=> *; instantiate (1 := fun '(_,_) => _); reflexivity];
-           erewrite map_ext; [|case=> ?;case=> *; instantiate (1 := fun '(_,_) => _); reflexivity];
-           move: (X in combine_extend2 _ X _ _)=> ?.
-          1-2: enter (erewrite map_filter_combine_extend2_ind1; only 2,3: (move=> *; instantiate (1:= fun _ => _); reflexivity); only 2: done).
-          (* I would love to use 2 in 1. Or have a combined join lemma. open_constr fails when not focused *)
-          1-2: clear; revert_hyp_pat nat; elim=> //= *; f_equal=> //. }
+          1,2: move: (if _ then _ else _) (map Some _)=> ? ?.
+          1,2: rewrite combine_extend3_swap23 combine_extend3_splitr filter_map_swap map_map.
+          1,2: erewrite map_ext; [|case; case=> *; instantiate (1 := fun '(_, _,_)=> _); reflexivity ].
+          1,2: erewrite filter_ext; [|case; case=> *; instantiate (1 := fun '(_, _,_)=> _); reflexivity ].
+          1,2: enter (erewrite map_filter_combine_extend2_ind2;  only 2,3: (case=> *; instantiate (1:= fun _ => _); reflexivity); only 2: done).
+          1,2: clear; revert_hyp_pat nat; elim=> * /=; cook. }
         case: pub in rwt newpce *; [| exfalso; do [cook] in newpce].
         have rcmd_grd: is_secret_guard rcmd = false by admit. (* Copied!! *)
         rewrite rcmd_grd. cook.
@@ -402,7 +373,7 @@ P
         elim; [elim=> //= n ?; f_equal=> //|].
         move=> > ?; case=> /= *; [| f_equal; eauto].
         rewrite !filter_map_swap.
-        erewrite filter_ext; [| move=> * /=; reflexivity]. 
+        erewrite filter_ext; [| move=> * /=; reflexivity].
         cnstrct_eq_gl. rewrite filter_true //.
     Admitted.
   End cook.

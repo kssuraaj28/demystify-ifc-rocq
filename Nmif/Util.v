@@ -16,6 +16,71 @@ Set Mangle Names. Set Mangle Names Light.
 #[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
 Ltac2 Set this_cookbook_ := create_new_cookbook.
 
+(* 
+  Maybe it is not worth forcing goal count in cook.
+  This is certainly a very very good forward reasoning tactic.
+*)
+(* The is_constructor check below is delegated to Ltac1; it could equivalently
+   be written in Ltac2 by inspecting Constr.Unsafe.kind for a Constructor node. *)
+Ltac2 cnstrct_eq_gl () :=
+  let t := fun () =>
+    lazy_match! goal with
+    | [ |- ?a = ?b ] =>
+      let hl := head a in
+      let hr := head b in
+      if Constr.equal hl hr then
+        ltac1:(f |- is_constructor f; congr f) (Ltac1.of_constr hl)
+      else softfail_m "cnstrct_eq_gl" (fprintf "heads differ: %t vs %t" hl hr) 
+    end in
+  precise_harden t None false. 
+
+Ltac cnstrct_eq_gl := ltac2:(cnstrct_eq_gl ()).
+
+
+Section test.
+  Goal forall n m, S n = S m.
+  Proof. move=> *. cnstrct_eq_gl. Abort.
+
+  Goal forall (n1 n2 m1 m2: nat), (n1, n2) = (m1, m2).
+  Proof. move=> *. cnstrct_eq_gl. Abort.
+End test.
+
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(ensure_goals <= 1 (cnstrct_eq_gl => //)) "cnstr_eq_simpl" old.
+
+Section test.
+  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["cnstr_eq_simpl"]) ().
+  Goal forall n m, S n = S m.
+  Proof. move=> *. progress cook. Abort.
+  Goal forall A (x y: A) (l: list A), x :: l = y :: l.
+  Proof. move=> *. progress cook. Abort.
+  Goal forall A (x: A) (l1 l2: list A), x :: l1 = x :: l2.
+  Proof. move=> *. progress cook. Abort.
+  Goal forall A (x y: A), Some x = Some y.
+  Proof. move=> *. progress cook. Abort.
+  Goal forall (n1 n2 m1 m2: nat), (n1, n2) = (m1, m2).
+  Proof. move=> *. Fail progress cook. Abort.
+End test.
+
+(* You should automate some other way. TODO
+- Have a some eq tactic
+Ltac2 Set this_cookbook_ as old :=
+  add_stirstep 1 ltac1:(match goal with H : Some _ = Some _ |- _ => move:H; case=> H end) "some_eq_hyp" old.
+  *)
+
+
+(* TODO: This should be a tactic also
+Ltac2 Set this_cookbook_ as old := 
+  add_cookstep 1 
+    ltac1:(
+      match goal with 
+      |- context [match ?v with _ => _ end] =>  
+        is_var v;  
+        ensure_goals 1 (idtac; case: v) => * (* case: ensures that v does not appear anywhere else *)
+      end)
+   "single_break" old.
+   *)
+
+
 Module DecEq.
   (* 
     I got this from QuickChick.
@@ -92,6 +157,61 @@ Module List.
     (hd dX X, y) :: combine_extend2 (tl X) Y dX dY.
   Proof. case: X => [|x X'] //. Qed.
 
+  (* Zipping a list against itself is the diagonal. *)
+  Lemma combine_extend2_same {A} (l : list A) (d : A) :
+    combine_extend2 l l d d = map (fun x => (x, x)) l.
+  Proof. elim: l => [| h t IH] //=. rewrite IH //. Qed.
+
+  (* Map fusion: a `map` on the first list pulls out of `combine_extend2`. *)
+  Lemma combine_extend2_map_l {A A' B} (f : A -> A')
+    (X : list A) (Y : list B) (dX : A) (dX': A') (dY : B) :
+    dX' = f dX ->
+    combine_extend2 (map f X) Y dX' dY =
+    map (fun '(x, y) => (f x, y)) (combine_extend2 X Y dX dY).
+  Proof.
+    move=> ->; elim: X Y => [| x X' IH] Y.
+    - rewrite /= map_map //.
+    - rewrite map_cons !combine_extend2_consl map_cons IH //.
+  Qed.
+
+  (* Map fusion: a `map` on the second list pulls out of `combine_extend2`. *)
+  Lemma combine_extend2_map_r {A B B'} (g : B -> B')
+    (X : list A) (Y : list B) (dX : A) (dY': B') (dY : B) :
+    dY' = g dY ->
+    combine_extend2 X (map g Y) dX dY' =
+    map (fun '(x, y) => (x, g y)) (combine_extend2 X Y dX dY).
+  Proof.
+    move=> ->; elim: Y X => [| y Y' IH] X.
+    - rewrite /= !combine_extend2_nil_r map_map //.
+    - rewrite map_cons !combine_extend2_consr map_cons IH //.
+  Qed.
+
+  (* Swapping the two lists transposes the columns. *)
+  Lemma combine_extend2_swap {A B} (X : list A) (Y : list B) dX dY :
+    combine_extend2 X Y dX dY =
+    map (fun '(y, x) => (x, y)) (combine_extend2 Y X dY dX).
+  Proof.
+    elim: X Y => [| x X' IH] Y.
+    - rewrite combine_extend2_nil_l combine_extend2_nil_r map_map //.
+    - case: Y => [| y Y'].
+      + rewrite combine_extend2_nil_r combine_extend2_nil_l map_map //.
+      + rewrite /= IH //.
+  Qed.
+
+  (* Associativity with padding: the two ways to fold a 3-fold zip differ only
+     by the canonical retag from A*(B*C) to A*B*C. *)
+  Lemma combine_extend2_assoc {A B C}
+    (la : list A) (lb : list B) (lc : list C) da db dc :
+    combine_extend2 (combine_extend2 la lb da db) lc (da, db) dc =
+    map (fun '(a, (b, c)) => (a, b, c))
+        (combine_extend2 la (combine_extend2 lb lc db dc) da (db, dc)).
+  Proof.
+    elim: la lb lc => [|a la' IH] lb lc.
+    - rewrite combine_extend2_nil_l.
+      erewrite combine_extend2_map_l; [|reflexivity].
+      rewrite combine_extend2_nil_l map_map //.
+  Admitted.
+
   (* If the 2nd column of the zip is `map g X`, the zip is `map (x => (x, g x)) X`.
      (The hypothesis being a list equality also forces |Y| <= |X|.) *)
   Lemma combine_extend2_map_snd {A B} (X : list A) (Y : list B) dX dY (g : A -> B) :
@@ -123,37 +243,14 @@ Module List.
       + apply: IH. exact: Ht.
   Qed.
 
-  (* Zipping a list against itself is the diagonal. *)
-  Lemma combine_extend2_same {A} (l : list A) (d : A) :
-    combine_extend2 l l d d = map (fun x => (x, x)) l.
-  Proof. elim: l => [| h t IH] //=. rewrite IH //. Qed.
+  (* The two `_self_` sugar lemmas below cannot be factored cleanly through
+     `combine_extend2_map_r` / `_map_l`: those foundational lemmas require a
+     default-equality side condition (`dY' = g dY`), but the `_self_` lemmas
+     leave the irrelevant default as a free variable (defaults are never read
+     because the two lists have equal length). Proving via the foundational
+     map-fusion lemmas would require an extra "default irrelevance at equal
+     length" auxiliary; we use direct induction on the definition instead. *)
 
-
-  (* Map fusion: a `map` on the first list pulls out of `combine_extend2`. *)
-  Lemma combine_extend2_map_l {A A' B} (f : A -> A')
-    (X : list A) (Y : list B) (dX : A) (dX': A') (dY : B) :
-    dX' = f dX ->
-    combine_extend2 (map f X) Y dX' dY =
-    map (fun '(x, y) => (f x, y)) (combine_extend2 X Y dX dY).
-  Proof.
-    move=> ->; elim: X Y => [| x X' IH] Y.
-    - rewrite /= map_map //.
-    - rewrite map_cons !combine_extend2_consl map_cons IH //.
-  Qed.
-
-  (* Map fusion: a `map` on the second list pulls out of `combine_extend2`. *)
-  Lemma combine_extend2_map_r {A B B'} (g : B -> B')
-    (X : list A) (Y : list B) (dX : A) (dY': B') (dY : B) :
-    dY' = g dY ->
-    combine_extend2 X (map g Y) dX dY' =
-    map (fun '(x, y) => (x, g y)) (combine_extend2 X Y dX dY).
-  Proof.
-    move=> ->; elim: Y X => [| y Y' IH] X.
-    - rewrite /= !combine_extend2_nil_r map_map //.
-    - rewrite map_cons !combine_extend2_consr map_cons IH //.
-  Qed.
-
-  (* TODO: Delete these two  *)
   (* Second list is `map g` of the first: equal length, so defaults are dead. *)
   Lemma combine_extend2_map_self_r {A B} (g : A -> B) (X : list A) dX dY :
     combine_extend2 X (map g X) dX dY = map (fun x => (x, g x)) X.
@@ -163,18 +260,6 @@ Module List.
   Lemma combine_extend2_map_self_l {A B} (f : B -> A) (Y : list B) dX dY :
     combine_extend2 (map f Y) Y dX dY = map (fun y => (f y, y)) Y.
   Proof. elim: Y => [| h t IH] //=. rewrite IH //. Qed.
-
-  (* Swapping the two lists transposes the columns. *)
-  Lemma combine_extend2_swap {A B} (X : list A) (Y : list B) dX dY :
-    combine_extend2 X Y dX dY =
-    map (fun '(y, x) => (x, y)) (combine_extend2 Y X dY dX).
-  Proof.
-    elim: X Y => [| x X' IH] Y.
-    - rewrite combine_extend2_nil_l combine_extend2_nil_r map_map //.
-    - case: Y => [| y Y'].
-      + rewrite combine_extend2_nil_r combine_extend2_nil_l map_map //.
-      + rewrite /= IH //.
-  Qed.
 
   (* map o filter over combine_extend2 collapses to a single list when the
      filter predicate factors through one column and the map ignores the
@@ -219,50 +304,6 @@ Module List.
   Qed.
 
 
-  (* TODO: Add combine_extend2 things must come before this  *)
-
-  (* combine_extend3 grouped as ((a,b),c) -- this is the definition. *)
-  Lemma combine_extend3_splitr {A B C}
-    (la : list A) (lb : list B) (lc : list C) da db dc :
-    combine_extend3 la lb lc da db dc =
-    combine_extend2 (combine_extend2 la lb da db) lc (da, db) dc.
-  Proof. done. Qed.
-
-  (* combine_extend3 grouped as (a,(b,c)) -- zip-with-padding is associative. *)
-  Lemma combine_extend3_splitl {A B C}:
-    forall (la : list A) (lb : list B) (lc : list C) da db dc,
-    combine_extend3 la lb lc da db dc =
-    map (fun '(a, (b, c)) => (a, b, c))
-        (combine_extend2 la (combine_extend2 lb lc db dc) da (db, dc)).
-  Proof.  Admitted. (* TODO: associativity of combine_extend2-with-padding. *)
-
-  Lemma combine_extend4_regroup3 {A B C D}
-    (la : list A) (lb : list B) (lc : list C) (ld : list D)
-    da db dc dd :
-    combine_extend4 la lb lc ld da db dc dd =
-    map (fun '(a, b, d, c) => (a, b, c, d))
-        (combine_extend2 (combine_extend3 la lb ld da db dd) lc (da,db,dd) dc).
-  Admitted. (* TODO: combinatorial induction. *)
-
-  Lemma combine_extend3_regroup2 {A B C}
-    (la : list A) (lb : list B) (lc : list C) da db dc :
-    combine_extend3 la lb lc da db dc =
-    map (fun '(a, c, b) => (a, b, c))
-        (combine_extend2 (combine_extend2 la lc da dc) lb (da,dc) db).
-  Admitted. (* TODO: combinatorial induction. *)
-
-  Lemma combine_extend3_swap23 {A B C}
-    (la : list A) (lb : list B) (lc : list C) da db dc :
-    combine_extend3 la lb lc da db dc =
-    map (fun '(a, c, b) => (a, b, c)) (combine_extend3 la lc lb da dc db).
-  Proof. exact: combine_extend3_regroup2. Qed.
-
-  Lemma combine_extend4_swap34 {A B C D}
-    (la : list A) (lb : list B) (lc : list C) (ld : list D) da db dc dd :
-    combine_extend4 la lb lc ld da db dc dd =
-    map (fun '(a, b, d, c) => (a, b, c, d)) (combine_extend4 la lb ld lc da db dd dc).
-  Proof. exact: combine_extend4_regroup3. Qed.
-
   Lemma combine_extend3_nil1 {A B C}
     (l2 : list B) (l3 : list C) (d1 : A) (d2 : B) (d3 : C) :
     combine_extend3 [] l2 l3 d1 d2 d3 =
@@ -290,6 +331,48 @@ Module List.
     apply: map_ext. move=> [a b] //.
   Qed.
 
+
+  (* combine_extend3 grouped as ((a,b),c) -- this is the definition. *)
+  Lemma combine_extend3_splitr {A B C}
+    (la : list A) (lb : list B) (lc : list C) da db dc :
+    combine_extend3 la lb lc da db dc =
+    combine_extend2 (combine_extend2 la lb da db) lc (da, db) dc.
+  Proof. done. Qed.
+
+  (* combine_extend3 grouped as (a,(b,c)) -- zip-with-padding is associative. *)
+  Lemma combine_extend3_splitl {A B C}:
+    forall (la : list A) (lb : list B) (lc : list C) da db dc,
+    combine_extend3 la lb lc da db dc =
+    map (fun '(a, (b, c)) => (a, b, c))
+        (combine_extend2 la (combine_extend2 lb lc db dc) da (db, dc)).
+  Proof. exact: combine_extend2_assoc. Qed.
+
+  Lemma combine_extend3_regroup2 {A B C}
+    (la : list A) (lb : list B) (lc : list C) da db dc :
+    combine_extend3 la lb lc da db dc =
+    map (fun '(a, c, b) => (a, b, c))
+        (combine_extend2 (combine_extend2 la lc da dc) lb (da,dc) db).
+  Admitted. (* TODO: combinatorial induction. *)
+
+  Lemma combine_extend3_swap23 {A B C}
+    (la : list A) (lb : list B) (lc : list C) da db dc :
+    combine_extend3 la lb lc da db dc =
+    map (fun '(a, c, b) => (a, b, c)) (combine_extend3 la lc lb da dc db).
+  Proof. exact: combine_extend3_regroup2. Qed.
+
+  Lemma combine_extend4_regroup3 {A B C D}
+    (la : list A) (lb : list B) (lc : list C) (ld : list D)
+    da db dc dd :
+    combine_extend4 la lb lc ld da db dc dd =
+    map (fun '(a, b, d, c) => (a, b, c, d))
+        (combine_extend2 (combine_extend3 la lb ld da db dd) lc (da,db,dd) dc).
+  Admitted. (* TODO: combinatorial induction. *)
+
+  Lemma combine_extend4_swap34 {A B C D}
+    (la : list A) (lb : list B) (lc : list C) (ld : list D) da db dc dd :
+    combine_extend4 la lb lc ld da db dc dd =
+    map (fun '(a, b, d, c) => (a, b, c, d)) (combine_extend4 la lb ld lc da db dd dc).
+  Proof. exact: combine_extend4_regroup3. Qed.
 
   Lemma Forall_combine2_ind1 :
      forall {A B} P l1 l2 (d1:A) (d2:B) Q,
@@ -469,70 +552,6 @@ Section test.
   Proof. move=> ?. if_easy_goals. Abort.
 End test.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(if_easy_goals) "if_easy_goals" old.
-
-(* 
-  Maybe it is not worth forcing goal count in cook.
-  This is certainly a very very good forward reasoning tactic.
-*)
-(* The is_constructor check below is delegated to Ltac1; it could equivalently
-   be written in Ltac2 by inspecting Constr.Unsafe.kind for a Constructor node. *)
-Ltac2 cnstrct_eq_gl () :=
-  let t := fun () =>
-    lazy_match! goal with
-    | [ |- ?a = ?b ] =>
-      let hl := head a in
-      let hr := head b in
-      if Constr.equal hl hr then
-        ltac1:(f |- is_constructor f; congr f) (Ltac1.of_constr hl)
-      else softfail_m "cnstrct_eq_gl" (fprintf "heads differ: %t vs %t" hl hr) 
-    end in
-  precise_harden t None false. 
-
-Ltac cnstrct_eq_gl := ltac2:(cnstrct_eq_gl ()).
-
-
-Section test.
-  Goal forall n m, S n = S m.
-  Proof. move=> *. cnstrct_eq_gl. Abort.
-
-  Goal forall (n1 n2 m1 m2: nat), (n1, n2) = (m1, m2).
-  Proof. move=> *. cnstrct_eq_gl. Abort.
-End test.
-
-Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(ensure_goals <= 1 (cnstrct_eq_gl => //)) "cnstr_eq_simpl" old.
-
-Section test.
-  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["cnstr_eq_simpl"]) ().
-  Goal forall n m, S n = S m.
-  Proof. move=> *. progress cook. Abort.
-  Goal forall A (x y: A) (l: list A), x :: l = y :: l.
-  Proof. move=> *. progress cook. Abort.
-  Goal forall A (x: A) (l1 l2: list A), x :: l1 = x :: l2.
-  Proof. move=> *. progress cook. Abort.
-  Goal forall A (x y: A), Some x = Some y.
-  Proof. move=> *. progress cook. Abort.
-  Goal forall (n1 n2 m1 m2: nat), (n1, n2) = (m1, m2).
-  Proof. move=> *. Fail progress cook. Abort.
-End test.
-
-(* You should automate some other way. TODO
-- Have a some eq tactic
-Ltac2 Set this_cookbook_ as old :=
-  add_stirstep 1 ltac1:(match goal with H : Some _ = Some _ |- _ => move:H; case=> H end) "some_eq_hyp" old.
-  *)
-
-
-(* TODO: This should be a tactic also
-Ltac2 Set this_cookbook_ as old := 
-  add_cookstep 1 
-    ltac1:(
-      match goal with 
-      |- context [match ?v with _ => _ end] =>  
-        is_var v;  
-        ensure_goals 1 (idtac; case: v) => * (* case: ensures that v does not appear anywhere else *)
-      end)
-   "single_break" old.
-   *)
 
   
 Ltac2 Set this_cookbook_ as old := 
