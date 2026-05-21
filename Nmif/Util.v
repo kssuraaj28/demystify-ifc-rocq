@@ -376,6 +376,59 @@ Module List.
   Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite combine_extend2_nil_l) "combine_extend2_nil_l" old.
   Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite combine_extend2_nil_r) "combine_extend2_nil_r" old.
 
+  Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(
+    first
+      [ pattern_eq [(X in ?[y] = X ++ ?y)] with []
+      | pattern_eq [(X in X ++ ?[y] = ?y)] with []
+      | pattern_eq [(X in ?[y] = ?y ++ X)] with []
+      | pattern_eq [(X in ?[y] ++ X = ?y)] with [] ];
+    [ | move=> ->; rewrite ?app_nil_r // ]) (* The ? is an optional rewrite *)
+    "eq_app_nil" old.
+
+  Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(
+    first
+      [ pattern_eq [(X in map _ X = [])] with []
+      | pattern_eq [(X in [] = map _ X)] with [] ]
+    => [|->//])
+    "eq_map_nil" old.
+
+  Section test_eq_app_nil.
+    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["eq_app_nil"]) ().
+    Goal forall A (y l: list A), y = l ++ y.
+    Proof. move=> A y l. progress cook. Abort.
+    Goal forall A (y l: list A), l ++ y = y.
+    Proof. move=> A y l. progress cook. Abort.
+    Goal forall A (y l: list A), y = y ++ l.
+    Proof. move=> A y l. progress cook. Abort.
+    Goal forall A (y l: list A), y ++ l = y.
+    Proof. move=> A y l. progress cook. Abort.
+  End test_eq_app_nil.
+
+  Section test_eq_map_nil.
+    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["eq_map_nil"]) ().
+    Goal forall A B (f: A -> B) (l: list A), map f l = [].
+    Proof. move=> *. progress cook. Abort.
+    Goal forall A B (f: A -> B) (l: list A), [] = map f l.
+    Proof. move=> *. progress cook. Abort.
+  End test_eq_map_nil.
+
+  Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(
+    first
+      [ pattern_eq_2 [(X in X ++ ?[y] = _ ++ ?y)]
+                     [(X in _ ++ ?[y] = X ++ ?y)]
+      | pattern_eq_2 [(X in ?[y] ++ X = ?y ++ _)]
+                     [(X in ?[y] ++ _ = ?y ++ X)] ]
+    => [|->//])
+    "eq_app_peel" old.
+
+  Section test_eq_app_peel.
+    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["eq_app_peel"]) ().
+    Goal forall A (a b y: list A), a ++ y = b ++ y.
+    Proof. move=> A a b y. progress cook. Abort.
+    Goal forall A (a b y: list A), y ++ a = y ++ b.
+    Proof. move=> A a b y. progress cook. Abort.
+  End test_eq_app_peel.
+
   Ltac2 this_cookbook () := this_cookbook_ ().
   Hint Extern 10 => lazymatch goal with _ =>  apply/Forall_forall end : trickbag.
 End List.
@@ -423,6 +476,22 @@ Section test.
 
   Goal forall (n1 n2 m1 m2: nat), (n1, n2) = (m1, m2).
   Proof. move=> *. cnstrct_eq_gl. Abort.
+End test.
+
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(ensure_goals <= 1 (cnstrct_eq_gl => //)) "cnstr_eq_simpl" old.
+
+Section test.
+  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["cnstr_eq_simpl"]) ().
+  Goal forall n m, S n = S m.
+  Proof. move=> *. progress cook. Abort.
+  Goal forall A (x y: A) (l: list A), x :: l = y :: l.
+  Proof. move=> *. progress cook. Abort.
+  Goal forall A (x: A) (l1 l2: list A), x :: l1 = x :: l2.
+  Proof. move=> *. progress cook. Abort.
+  Goal forall A (x y: A), Some x = Some y.
+  Proof. move=> *. progress cook. Abort.
+  Goal forall (n1 n2 m1 m2: nat), (n1, n2) = (m1, m2).
+  Proof. move=> *. Fail progress cook. Abort.
 End test.
 
 (* You should automate some other way. TODO

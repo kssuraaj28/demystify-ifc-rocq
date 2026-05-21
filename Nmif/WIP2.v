@@ -266,8 +266,7 @@ Section extract_step_commute.
       rewrite/step; cook.
       congr (_,_,_).
       - congr (_ ++ _). cook. (* TODO: Forward reasoning *) 
-        set l1 := (X in map _ X = _).
-        set l2 := (X in _ = map _ X).
+        set l1 := (X in map _ X = _). set l2 := (X in _ = map _ X).
         suff: l1 = map (fun c => (real_cmd c, real_atk_bit c,  ideal_cmd c, sim_active c)) l2;
           [move=> ->; rewrite map_map //| subst l1 l2]. (* TODO: This could be lemma / rewrite rule *)
         rewrite/zip.
@@ -336,32 +335,25 @@ Section extract_step_commute.
         rewrite map_map; case=> // /in_map_iff [] ? [] []//.
 
       - congr (_,_); cook .
-        case: sim_active'P=>[-> |_]; [case=> e; rewrite -> e in *=> {e} /=; f_equal|]; cook.
-        1-2: rewrite /zip cmd_map_sim_app.
-        1-2: pattern_eq [X in _ = X ++ _] with [] => [|->//]. 
-        1-2: rewrite/ cmd_map_sim.
-        1-2: rewrite filter_map_swap map_map.
-        1-2: pattern_eq [X in map _ X] with [] => [|->//]. 
+        case: sim_active'P=>[-> |_]; [case=> e; rewrite -> e in *=> {e} //=; f_equal|]; cook.
+        1-2: rewrite /zip cmd_map_sim_app; cook.
+        1-2: rewrite/ cmd_map_sim filter_map_swap; cook.
           { erewrite filter_ext; cycle 1.
               { case; case=> * /=. 
               rewrite compute_new_pc_opt_secret /=.
               instantiate (1:= fun '(_,_,_)=> _); reflexivity. }
-            cook. 
-            rewrite combine_extend3_nil3 filter_map_swap.
-            pattern_eq [X in map _ X] with [] => [|->//].  (* This can be cook rule *)
+            cook. rewrite combine_extend3_nil3 filter_map_swap. cook.
             erewrite filter_ext; cycle 1.
               { case=> *. instantiate (1:= fun '(_,_)=> _); reflexivity. }
             unshelve erewrite filter_ext; [exact xpred0|apply filter_false|].
             case=> //. }
           { cook. erewrite filter_ext; [| case; case=> * /=; instantiate (1:= fun '(_,_,_)=> _); reflexivity].
-          rewrite combine_extend3_nil1 combine_extend2_nil_r !map_map filter_map_swap.
-          pattern_eq [X in map _ X] with [] => [|->//].  (* This can be cook rule *)
+          rewrite combine_extend3_nil1 combine_extend2_nil_r !map_map filter_map_swap. cook.
           unshelve erewrite filter_ext; [exact xpred0|apply filter_false|]. cook. }
         rewrite/sim_step; cook; cnstrct_eq_gl; cook.
           { case: pub rwt => rwt /=; [erewrite noninterfering_post_optcmd_pre; [reflexivity|eassumption|] | (* TODO: This should be automated *)
           erewrite post_optcmd_stp_store_sec; [|exact: rwt]; erewrite noninterfering_post_pre; [reflexivity|]]; done. }
-        rewrite cmd_map_sim_app. 
-        pattern_eq_2 [X in X ++ ?[y] = _ ++ ?y] [X in _ ++ ?[y] = X ++ ?y]=> [|->//].
+        rewrite cmd_map_sim_app. cook.
         rewrite/zip/cmd_map_sim filter_map_swap map_map. symmetry.
         erewrite map_ext; [|case; case=> * /=; instantiate (1:= fun '(_,_,_) => _); reflexivity].
         erewrite filter_ext; [|case; case=> *; rewrite /sim_active; cbn; instantiate (1:= fun '(_,_,_) => _); reflexivity].
