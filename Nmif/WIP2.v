@@ -88,23 +88,16 @@ Section comb_compile_simulator.
     Definition sim_active' (rcmd: option Cmd) (ratk: bool) (is_pubpc: bool) : bool :=
       ratk || (is_pubpc && if rcmd is None then false else true).
 
-    (* TODO: Learn more about this variant stuff. *)
-    Variant sim_active'_spec (rcmd: option Cmd) (ratk pub: bool) : bool -> Prop :=
-      | SimActiveFalse :
-          ratk = false -> (pub = false \/ rcmd = None) ->
-          sim_active'_spec rcmd ratk pub false
-      | SimActiveTrue :
-          (ratk = true \/ (pub = true /\ exists cmd, rcmd = Some cmd)) ->
-          sim_active'_spec rcmd ratk pub true.
-
-    
-    (* This is an ssr trick *)
-    Lemma sim_active'P rcmd ratk pub :
-      sim_active'_spec rcmd ratk pub (sim_active' rcmd ratk pub).
+    (* This is bidirectional; we only state/use the forward direction. *)
+    Lemma sim_active'_false rcmd ratk pub :
+      sim_active' rcmd ratk pub = false ->
+      ratk = false /\ (pub = false \/ rcmd = None).
     Proof.
       rewrite /sim_active'.
-      case: ratk; [do! constructor; done|].
-      case: pub; [case: rcmd => > | ]; do! constructor; eauto; done. 
+      case: ratk=> //=.
+      case: pub=> //=; [| move=> _; repeat constructor; done ].
+      case: rcmd=> [c | ] //=.
+      move=> _; repeat constructor; done.
     Qed.
 
     Definition sim_active (c: CmbCmd) : bool :=
@@ -341,8 +334,8 @@ Section extract_step_commute.
           erewrite combine_extend2_map_snd; [apply: map_ext; case=> >; f_equal; instantiate (1:= fun '(_,_) => _); reflexivity|].
           rewrite h. apply: map_ext; case; case=> * //. }
         rewrite {}/new_pc {}/l1 {}/l3 {}/idlatkcont {l2}.
-        case: sim_active'P=>[|_].
-          { move=> -> [] e; rewrite -> e in *=> {e} //=.
+        case e: (sim_active' _ _ _); cycle 1; [| clear e].
+          { move: (sim_active'_false _ _ _ e)=> [] -> [] -> //=.
           rewrite combine_extend3_splitr; cook. rewrite !map_map.
           apply: map_ext=> *; cook. }
         cook. rewrite/sim_step. cook.
@@ -367,7 +360,8 @@ Section extract_step_commute.
         move=> > ?; case=> //=; [|move=> > [] //; eauto].
         rewrite map_map. case=> // /in_map_iff [] ? [] []//.
 
-      - case: sim_active'P=>[-> |_]; [case=> e; rewrite -> e in *=> {e} //=; f_equal|]; cook.
+      - case e: (sim_active' _ _ _); cycle 1; 
+        [move: (sim_active'_false _ _ _ e)=> []  ->; case=> e'; rewrite -> e' in *=> {e'} //=; f_equal | clear e]; cook.
         1-2: rewrite /zip cmd_map_sim_app; cook.
         1-2: rewrite/ cmd_map_sim filter_map_swap; cook.
           { erewrite filter_ext; cycle 1.
