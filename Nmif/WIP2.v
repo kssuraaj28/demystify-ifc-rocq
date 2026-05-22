@@ -190,6 +190,53 @@ Section extract_step_commute.
 
   Import Util.List Combined VarValStore.Notations.
 
+  (* The attacker pre-state preserves public-equality: corruption (pre_cmd_action)
+     is public-noninterfering, and the `if isatk` just selects. *)
+  Lemma acmd_prestate_pubeq atkst isatk s1 s2 :
+    ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
+    ⟨ (if isatk then pre_cmd_action adv atkst s1 else s1) | is_public ⟩ =
+    ⟨ (if isatk then pre_cmd_action adv atkst s2 else s2) | is_public ⟩.
+  Proof. move=> pe. case: isatk. - apply: pre_cmd_wf_conf. exact: pe. - exact: pe. Qed.
+
+  (* Trick 1: post_cmd_action of the pre-state is invariant under rst<->simst. *)
+  Lemma post_acmd_pubeq atkst isatk s1 s2 :
+    ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
+    post_cmd_action adv atkst (if isatk then pre_cmd_action adv atkst s1 else s1) =
+    post_cmd_action adv atkst (if isatk then pre_cmd_action adv atkst s2 else s2).
+  Proof. move=> pe. apply: post_cmd_wf. exact: acmd_prestate_pubeq. Qed.
+
+  (* Trick 2: post_cmd_action of (well-typed optcmd applied to the pre-state)
+     is invariant under rst<->simst. *)
+  Lemma post_optcmd_acmd_pubeq atkst isatk l oc s1 s2 :
+    l ⊢ oc ->
+    ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
+    post_cmd_action adv atkst
+      (optcmd_stp_store oc (if isatk then pre_cmd_action adv atkst s1 else s1)) =
+    post_cmd_action adv atkst
+      (optcmd_stp_store oc (if isatk then pre_cmd_action adv atkst s2 else s2)).
+  Proof.
+    move=> wt pe. apply: post_cmd_wf.
+    move: (acmd_prestate_pubeq atkst isatk _ _ pe) => pe'.
+    case: oc wt => [c | ] wt /=.
+    - apply: (wt_cmd_st_conf _ _ _ _ wt). exact: pe'.
+    - exact: pe'.
+  Qed.
+
+  (* Trick 3: the substep count of (optcmd applied to the pre-state) is invariant
+     under rst<->simst, when the optcmd's guard is public. *)
+  Lemma cnt_acmd_pubeq atkst isatk oc s1 s2 :
+    is_secret_guard oc = false ->
+    ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
+    optcmd_stp_cnt oc (if isatk then pre_cmd_action adv atkst s1 else s1) =
+    optcmd_stp_cnt oc (if isatk then pre_cmd_action adv atkst s2 else s2).
+  Proof.
+    move=> nsg pe.
+    move: (acmd_prestate_pubeq atkst isatk _ _ pe) => pe'.
+    case: oc nsg => [c | ] nsg /=.
+    - apply: clean_cmd_stp_cnt_pub_nf => //.
+    - done.
+  Qed.
+
   Section cook.
     (* TODO: cook rules in foreign cookbooks reference lemmas by unqualified
        name (e.g. `rewrite -> WellFormedOptCmd_Some in *`). Joining the
@@ -227,23 +274,29 @@ Section extract_step_commute.
     Ltac2 Set curr_cookbook as old :=
       add_cookstep ltac1:(rewrite construct_simulator_post_cmd_cons ) "construct_simulator_post_cmd_cons" old.
 
-    (* TODO: These should really be rewrite rules. I'm too lazy *)
+    (* Each step finds a matched rst/simst subterm pair (so it only fires when
+       there is a genuine pair to unify), then discharges via the named lemma. *)
     Ltac2 Set curr_cookbook as old :=
-      add_cookstep 
-        ltac1:(match goal with
-            | isatk : bool ,rcmd: option Cmd , _ : ⟨ ?rst | is_public ⟩ = ⟨ ?simst | is_public ⟩ |- _ =>
-              (pattern_eq_2 [post_cmd_action _ _ (if isatk then _ else rst)] 
-                            [post_cmd_action _ _ (if isatk then _ else simst)]=> [|<-];
-                  [ case: isatk; [apply: noninterfering_post_pre| apply: post_cmd_wf];done|] )||
-
-              (pattern_eq_2 [post_cmd_action _ _ (_ _(if _ then _ else rst))] 
-                            [post_cmd_action _ _ (_ _(if _ then _ else simst))]=> [|<-]; 
-                  [case: isatk; eauto using noninterfering_post_optcmd_pre;  apply: post_cmd_wf; destruct rcmd=> //; eauto using wt_cmd_st_conf; done|] ) ||
-
-              (pattern_eq_2 [(optcmd_stp_cnt _ (if _ then _ else rst)) ]  
-                            [(optcmd_stp_cnt _ (if _ then _ else simst)) ]=> [| <-];  
-                  [destruct rcmd => //;apply: clean_cmd_stp_cnt_pub_nf=> //;case: isatk=> //; apply:pre_cmd_wf_conf; done|] )
-            end) "tricks" old.
+      add_cookstep ltac1:(match goal with
+        | _ : ⟨ ?rst | is_public ⟩ = ⟨ ?simst | is_public ⟩ |- _ =>
+          pattern_eq_2 [post_cmd_action _ _ (if _ then _ else rst)]
+                       [post_cmd_action _ _ (if _ then _ else simst)] => [|<-];
+            [apply: post_acmd_pubeq; eassumption|]
+        end) "post_acmd_pubeq" old.
+    Ltac2 Set curr_cookbook as old :=
+      add_cookstep ltac1:(match goal with
+        | _ : ⟨ ?rst | is_public ⟩ = ⟨ ?simst | is_public ⟩ |- _ =>
+          pattern_eq_2 [post_cmd_action _ _ (optcmd_stp_store _ (if _ then _ else rst))]
+                       [post_cmd_action _ _ (optcmd_stp_store _ (if _ then _ else simst))] => [|<-];
+            [apply: post_optcmd_acmd_pubeq; eassumption|]
+        end) "post_optcmd_acmd_pubeq" old.
+    Ltac2 Set curr_cookbook as old :=
+      add_cookstep ltac1:(match goal with
+        | _ : ⟨ ?rst | is_public ⟩ = ⟨ ?simst | is_public ⟩ |- _ =>
+          pattern_eq_2 [optcmd_stp_cnt _ (if _ then _ else rst)]
+                       [optcmd_stp_cnt _ (if _ then _ else simst)] => [|<-];
+            [apply: cnt_acmd_pubeq; eassumption|]
+        end) "cnt_acmd_pubeq" old.
 
 
     Ltac2 Set cook_debug := 1.
