@@ -274,29 +274,22 @@ Section extract_step_commute.
     Ltac2 Set curr_cookbook as old :=
       add_cookstep ltac1:(rewrite construct_simulator_post_cmd_cons ) "construct_simulator_post_cmd_cons" old.
 
-    (* Each step finds a matched rst/simst subterm pair (so it only fires when
-       there is a genuine pair to unify), then discharges via the named lemma. *)
+    (* Merge a matched rst/simst subterm pair (only fires when both halves are
+       present), discharging via the relevant acmd-pubeq lemma. *)
     Ltac2 Set curr_cookbook as old :=
       add_cookstep ltac1:(match goal with
         | _ : ⟨ ?rst | is_public ⟩ = ⟨ ?simst | is_public ⟩ |- _ =>
-          pattern_eq_2 [post_cmd_action _ _ (if _ then _ else rst)]
-                       [post_cmd_action _ _ (if _ then _ else simst)] => [|<-];
-            [apply: post_acmd_pubeq; eassumption|]
-        end) "post_acmd_pubeq" old.
-    Ltac2 Set curr_cookbook as old :=
-      add_cookstep ltac1:(match goal with
-        | _ : ⟨ ?rst | is_public ⟩ = ⟨ ?simst | is_public ⟩ |- _ =>
-          pattern_eq_2 [post_cmd_action _ _ (optcmd_stp_store _ (if _ then _ else rst))]
-                       [post_cmd_action _ _ (optcmd_stp_store _ (if _ then _ else simst))] => [|<-];
-            [apply: post_optcmd_acmd_pubeq; eassumption|]
-        end) "post_optcmd_acmd_pubeq" old.
-    Ltac2 Set curr_cookbook as old :=
-      add_cookstep ltac1:(match goal with
-        | _ : ⟨ ?rst | is_public ⟩ = ⟨ ?simst | is_public ⟩ |- _ =>
-          pattern_eq_2 [optcmd_stp_cnt _ (if _ then _ else rst)]
-                       [optcmd_stp_cnt _ (if _ then _ else simst)] => [|<-];
-            [apply: cnt_acmd_pubeq; eassumption|]
-        end) "cnt_acmd_pubeq" old.
+          first
+            [ pattern_eq_2 [post_cmd_action _ _ (if _ then _ else rst)]
+                           [post_cmd_action _ _ (if _ then _ else simst)] => [|<-];
+                [apply: post_acmd_pubeq; eassumption|]
+            | pattern_eq_2 [post_cmd_action _ _ (optcmd_stp_store _ (if _ then _ else rst))]
+                           [post_cmd_action _ _ (optcmd_stp_store _ (if _ then _ else simst))] => [|<-];
+                [apply: post_optcmd_acmd_pubeq; eassumption|]
+            | pattern_eq_2 [optcmd_stp_cnt _ (if _ then _ else rst)]
+                           [optcmd_stp_cnt _ (if _ then _ else simst)] => [|<-];
+                [apply: cnt_acmd_pubeq; eassumption|] ]
+        end) "acmd_pubeq" old.
 
 
     Ltac2 Set cook_debug := 1.
