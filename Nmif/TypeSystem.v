@@ -101,7 +101,7 @@ Section sa.
   Definition WellFormedOptCmd (pc: PcLbl) (ocmd : option Cmd): Prop :=
     if ocmd isn't Some cmd then True else WellFormedCmd pc cmd.
 
-  Lemma WellFormedOptCmd_Some pc c :
+  Fact WellFormedOptCmd_Some pc c :
     ltac2:(cbn_eq (WellFormedOptCmd pc (Some c))).
   Proof. done. Qed.
 
@@ -150,7 +150,7 @@ Section thms.
   Qed.
 
   (* In a secret context, the public view is constant *)
-  Lemma wt_cmd_st_conf_sec:
+  Fact wt_cmd_st_conf_sec:
     forall c i st, 
       WellFormedCmd (mk_lbl i false) c ->
       ⟨ clean_cmd_stp_store c st | is_public ⟩ =
@@ -181,7 +181,7 @@ Section thms.
     f_equal; eauto using storeview_eq.
   Qed.
 
-  Lemma wt_cmd_st_int_untr:
+  Fact wt_cmd_st_int_untr:
     forall p c st, 
     WellFormedCmd (mk_lbl true p) c ->
     ⟨ clean_cmd_stp_store c st | is_trusted ⟩ =
@@ -290,7 +290,7 @@ Section new_pc.
     if cmd isn't Some cmd then old_pc else
     compute_new_pc old_pc cmd.
 
-  Lemma compute_new_pc_opt_some pc cmd :
+  Fact compute_new_pc_opt_some pc cmd :
     ltac2:(cbn_eq (compute_new_pc_opt pc (Some cmd))).
   Proof. done. Qed.
 
@@ -303,7 +303,7 @@ Section new_pc.
     - cbn [compute_new_pc]. rewrite pub_join //.
   Qed.
 
-  Lemma compute_new_pc_opt_secret untr c :
+  Fact compute_new_pc_opt_secret untr c :
     public (compute_new_pc_opt (mk_lbl untr false) c) = false.
   Proof.
     rewrite /compute_new_pc_opt.
@@ -327,7 +327,7 @@ Section thms.
     1-2: exists (pg && p); case: u; done.
   Qed.
 
- Lemma untr_compute_new_pc p c: 
+ Fact untr_compute_new_pc p c: 
    untrusted (compute_new_pc (mk_lbl true p) c).
  Proof.
    case: c=> //=; case=> * ; rewrite untr_join //.

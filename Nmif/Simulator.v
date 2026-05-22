@@ -90,11 +90,11 @@ Section sim_constr.
       pre_cmd_action _ st :=  st ;  (* Ideal pre-cmd action is weak *)
     |}.
 
-  Lemma construct_simulator_pre_cmd ast st :
+  Fact construct_simulator_pre_cmd ast st :
     pre_cmd_action construct_simulator ast st = st.
   Proof. done. Qed.
 
-  Lemma construct_simulator_post_cmd_cons ocmd isatk rest ast sim_st st :
+  Fact construct_simulator_post_cmd_cons ocmd isatk rest ast sim_st st :
     post_cmd_action construct_simulator
       (mk_simstate ast sim_st ((ocmd, isatk) :: rest)) st =
       let: (sim_st', new_ast, cont) := sim_step ocmd isatk sim_st ast in

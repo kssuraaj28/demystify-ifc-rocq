@@ -35,7 +35,7 @@ Section acmd.  (* TODO: This needs to go to some place good *)
 
     (prog, (st, atk_st), steps).
 
-  Lemma acmd_step_atk cmd store atk_st :
+  Fact acmd_step_atk cmd store atk_st :
     acmd_step (mk_atkcmd true cmd) (store, atk_st) =
       let pre_st := pre_cmd_action adv atk_st store in
       let st'    := optcmd_stp_store cmd pre_st in
@@ -43,7 +43,7 @@ Section acmd.  (* TODO: This needs to go to some place good *)
       (optcmd_stp_cnt cmd pre_st, (st', pst.1), pst.2).
   Proof. done. Qed.
 
-  Lemma acmd_step_noatk cmd store atk_st :
+  Fact acmd_step_noatk cmd store atk_st :
     acmd_step (mk_atkcmd false cmd) (store, atk_st) =
       (optcmd_stp_cnt cmd store, (optcmd_stp_store cmd store, atk_st), 0).
   Proof. done. Qed.
@@ -133,13 +133,13 @@ Section comb_compile_simulator.
           (ocmd, real_atk_bit cmbcmd) in
       map mapfn (filter sim_active lst).
 
-    Lemma cmd_map_cons a l :
+    Fact cmd_map_cons a l :
       cmd_map (a :: l) =
         (mk_atkcmd (real_atk_bit a) (real_cmd a),
          mk_atkcmd (sim_active a) (ideal_cmd a)) :: cmd_map l.
     Proof. done. Qed.
 
-    Lemma cmd_map_sim_cons a l :
+    Fact cmd_map_sim_cons a l :
       cmd_map_sim (a :: l) =
         if sim_active a
         then ((if public (pc_lbl a) is false then None else real_cmd a),
@@ -147,7 +147,7 @@ Section comb_compile_simulator.
         else cmd_map_sim l.
     Proof. rewrite /cmd_map_sim /=. case: (sim_active a)=> //=. Qed.
 
-    Lemma cmd_map_app l1 l2 :
+    Fact cmd_map_app l1 l2 :
       cmd_map (l1 ++ l2) = cmd_map l1 ++ cmd_map l2.
     Proof. rewrite /cmd_map map_app. done. Qed.
 
@@ -199,7 +199,7 @@ Section extract_step_commute.
   Proof. move=> pe. case: isatk. - apply: pre_cmd_wf_conf. exact: pe. - exact: pe. Qed.
 
   (* Trick 1: post_cmd_action of the pre-state is invariant under rst<->simst. *)
-  Lemma post_acmd_pubeq atkst isatk s1 s2 :
+  Fact post_acmd_pubeq atkst isatk s1 s2 :
     ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
     post_cmd_action adv atkst (if isatk then pre_cmd_action adv atkst s1 else s1) =
     post_cmd_action adv atkst (if isatk then pre_cmd_action adv atkst s2 else s2).
@@ -207,7 +207,7 @@ Section extract_step_commute.
 
   (* Trick 2: post_cmd_action of (well-typed optcmd applied to the pre-state)
      is invariant under rst<->simst. *)
-  Lemma post_optcmd_acmd_pubeq atkst isatk l oc s1 s2 :
+  Fact post_optcmd_acmd_pubeq atkst isatk l oc s1 s2 :
     l ⊢ oc ->
     ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
     post_cmd_action adv atkst
@@ -224,7 +224,7 @@ Section extract_step_commute.
 
   (* Trick 3: the substep count of (optcmd applied to the pre-state) is invariant
      under rst<->simst, when the optcmd's guard is public. *)
-  Lemma cnt_acmd_pubeq atkst isatk oc s1 s2 :
+  Fact cnt_acmd_pubeq atkst isatk oc s1 s2 :
     is_secret_guard oc = false ->
     ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
     optcmd_stp_cnt oc (if isatk then pre_cmd_action adv atkst s1 else s1) =

@@ -133,11 +133,11 @@ Module List.
   Goal combine_extend2 [1; 3] [true; false; false] 10 false = [(1, true); (3, false); (10, false)].
   Proof. done. Qed.
 
-  Lemma combine_extend2_nil_l {A B} lb (da:A) (db:B) :
+  Fact combine_extend2_nil_l {A B} lb (da:A) (db:B) :
     combine_extend2 [] lb da db = map (fun b => (da, b)) lb.
   Proof. done. Qed.
 
-  Lemma combine_extend2_nil_r {A B} la (da:A) (db:B) :
+  Fact combine_extend2_nil_r {A B} la (da:A) (db:B) :
     combine_extend2 la [] da db = map (fun a => (a, db)) la.
   Proof. case: la; done. Qed.
 
@@ -580,21 +580,21 @@ End test.
 (* TODO: maybe better to have  
 Example map_nil_simpl {A B} (f: A -> B) := (erefl : ltac2:(cbn_eq (map f []))). 
 *)
-Lemma map_nil_simpl {A B} (f: A -> B) : ltac2:(cbn_eq (map f [])). Proof. done. Qed.
+Fact map_nil_simpl {A B} (f: A -> B) : ltac2:(cbn_eq (map f [])). Proof. done. Qed.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite  map_nil_simpl) "map_nil_simpl" old.
 
-Lemma if_same {T} (b : bool) (t: T) :
+Fact if_same {T} (b : bool) (t: T) :
   (if b then t else t) = t.
 Proof.  case: b; done. Qed.
 
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite if_same) "if_same" old.
 
-Lemma fst_pair {A B} (a : A) (b : B) : ltac2:(cbn_eq (a, b).1). Proof. done. Qed.
-Lemma snd_pair {A B} (a : A) (b : B) : ltac2:(cbn_eq (a, b).2). Proof. done. Qed.
+Fact fst_pair {A B} (a : A) (b : B) : ltac2:(cbn_eq (a, b).1). Proof. done. Qed.
+Fact snd_pair {A B} (a : A) (b : B) : ltac2:(cbn_eq (a, b).2). Proof. done. Qed.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite fst_pair) "fst_pair" old.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite snd_pair) "snd_pair" old.
 
-Lemma repeat_0 {A} (x : A) : repeat x 0 = []. Proof. done. Qed.
+Fact repeat_0 {A} (x : A) : repeat x 0 = []. Proof. done. Qed.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite repeat_0) "repeat_0" old.
 
 

@@ -22,10 +22,10 @@ Section var_lbl.
   Definition secret l := ~~ public l.
   Definition trusted l := ~~ untrusted l.
 
-  Lemma untrusted_mk u p : ltac2:(cbn_eq (untrusted (mk_lbl u p))).
+  Fact untrusted_mk u p : ltac2:(cbn_eq (untrusted (mk_lbl u p))).
   Proof. done. Qed.
 
-  Lemma public_mk u p : ltac2:(cbn_eq (public (mk_lbl u p))).
+  Fact public_mk u p : ltac2:(cbn_eq (public (mk_lbl u p))).
   Proof. done. Qed.
 End var_lbl.
 

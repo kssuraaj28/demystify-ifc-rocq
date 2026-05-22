@@ -75,14 +75,14 @@ Section cleanstep.
   (* TODO: Have examples below this *)
   Definition optcmd_evnt := oapp clean_cmd_evnt (fun _ => None).
 
-  Lemma optcmd_stp_store_simpl c s: ltac2:(cbn_eq (optcmd_stp_store (Some c) s)). Proof. done. Qed.
-  Lemma optcmd_stp_cnt_simpl c s: ltac2:(cbn_eq (optcmd_stp_cnt (Some c) s)). Proof. done. Qed.
+  Fact optcmd_stp_store_simpl c s: ltac2:(cbn_eq (optcmd_stp_store (Some c) s)). Proof. done. Qed.
+  Fact optcmd_stp_cnt_simpl c s: ltac2:(cbn_eq (optcmd_stp_cnt (Some c) s)). Proof. done. Qed.
 
   Lemma clean_cmd_stp_cnt_idem c s :
     clean_cmd_stp_cnt c (clean_cmd_stp_store c s) = clean_cmd_stp_cnt c s.
   Proof. case: c => //=. Qed.
 
-  Lemma optcmd_stp_cnd_idem c s : (* TODO: This should be rewrite step *)
+  Fact optcmd_stp_cnd_idem c s : (* TODO: This should be rewrite step *)
     optcmd_stp_cnt c (optcmd_stp_store c s) = optcmd_stp_cnt c s.
   Proof. case: c=> //= *. exact: clean_cmd_stp_cnt_idem. Qed.
 End cleanstep.

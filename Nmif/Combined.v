@@ -27,19 +27,19 @@ Section cmb_cmd.
     pc_lbl : PcLbl ;
   }.
 
-  Lemma real_cmd_mk rcmd ratk icmd pclbl :
+  Fact real_cmd_mk rcmd ratk icmd pclbl :
     ltac2:(cbn_eq (real_cmd (mk_cmbcmd rcmd ratk icmd pclbl))).
   Proof. done. Qed.
 
-  Lemma real_atk_bit_mk rcmd ratk icmd pclbl :
+  Fact real_atk_bit_mk rcmd ratk icmd pclbl :
     ltac2:(cbn_eq (real_atk_bit (mk_cmbcmd rcmd ratk icmd pclbl))).
   Proof. done. Qed.
 
-  Lemma ideal_cmd_mk rcmd ratk icmd pclbl :
+  Fact ideal_cmd_mk rcmd ratk icmd pclbl :
     ltac2:(cbn_eq (ideal_cmd (mk_cmbcmd rcmd ratk icmd pclbl))).
   Proof. done. Qed.
 
-  Lemma pc_lbl_mk rcmd ratk icmd pclbl :
+  Fact pc_lbl_mk rcmd ratk icmd pclbl :
     ltac2:(cbn_eq (pc_lbl (mk_cmbcmd rcmd ratk icmd pclbl))).
   Proof. done. Qed.
 End cmb_cmd.
