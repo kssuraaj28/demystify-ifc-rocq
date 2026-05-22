@@ -182,7 +182,6 @@ Section extract_step_commute.
   Notation step := (step adv (construct_simulator adv)).
 
   Import Util.List Combined VarValStore.Notations.
-
 (* This proof is sad *)
   (* The new pc is public iff the current pc-level is public and the command's
      guard is not secret. *)
@@ -351,7 +350,7 @@ Section extract_step_commute.
           { move: (sim_active'_false _ _ _ e)=> [] -> [] -> //=.
           rewrite combine_extend3_splitr; cook. rewrite !map_map.
           apply: map_ext=> *; cook. }
-        cook. rewrite/sim_step. cook. (* TODO: There is something wrong here *)
+        rewrite/sim_step. cook. (* TODO: There is something wrong here *)
         move newpce: (public _)=> newpc.
         rewrite public_compute_new_pc_opt in newpce. case: newpc in newpce *; cycle 1. (* TODO: Before ssr was a pain.  Why it change ?*)
           { do [move=> /negbT; rewrite negb_and negbK=> /orP] in newpce.
@@ -431,6 +430,7 @@ Section extract_step_commute.
         erewrite filter_ext; [| move=> * /=; reflexivity].
         cnstrct_eq_gl. rewrite filter_true //.
     Qed.
+    Print Assumptions extract_step_commute.
   End cook.
 
 End extract_step_commute.
