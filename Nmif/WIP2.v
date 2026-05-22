@@ -183,6 +183,19 @@ Section extract_step_commute.
 
   Import Util.List Combined VarValStore.Notations.
 
+(* This proof is sad *)
+  (* The new pc is public iff the current pc-level is public and the command's
+     guard is not secret. *)
+  Lemma public_compute_new_pc_opt untr pub rcmd :
+    public (compute_new_pc_opt (mk_lbl untr pub) rcmd) = ~~ is_secret_guard rcmd && pub.
+  Proof.
+    rewrite /compute_new_pc_opt /is_secret_guard.
+    case: rcmd => [c | ] //=.
+    case: c => [dst exp | [g cmp] b1 b2 | [g cmp] b] //=.
+    + rewrite /is_secret /is_public. case: (var_lbl g) => ug pg /=. rewrite negbK //.
+    + rewrite /is_secret /is_public. case: (var_lbl g) => ug pg /=. rewrite negbK //.
+  Qed.
+
   (* The attacker pre-state preserves public-equality: corruption (pre_cmd_action)
      is public-noninterfering, and the `if isatk` just selects. *)
   Lemma acmd_prestate_pubeq atkst isatk s1 s2 :
@@ -338,18 +351,19 @@ Section extract_step_commute.
           { move: (sim_active'_false _ _ _ e)=> [] -> [] -> //=.
           rewrite combine_extend3_splitr; cook. rewrite !map_map.
           apply: map_ext=> *; cook. }
-        cook. rewrite/sim_step. cook.
-        set (public _) as x; case newpce: x; subst x; cycle 1. (* TODO: ssr version of this? *)
-          { case: pub in rwt newpce *.          (* Maybe custom rewriting rule *)
-          1: have ->: is_secret_guard rcmd = true by admit. (* TODO: lots of same as before *)
+        cook. rewrite/sim_step. cook. (* TODO: There is something wrong here *)
+        move newpce: (public _)=> newpc.
+        rewrite public_compute_new_pc_opt in newpce. case: newpc in newpce *; cycle 1. (* TODO: Before ssr was a pain.  Why it change ?*)
+          { do [move=> /negbT; rewrite negb_and negbK=> /orP] in newpce.
+          case: pub in rwt newpce *; move=> /= in newpce. 
+          1: move: newpce=> [] // ->.
           2: erewrite post_optcmd_stp_store_sec;[|eassumption]. 
           1-2: move=> /=; cook.
           1-2: cook; rewrite combine_extend3_splitl combine_extend2_same map_map. 
           1-2: erewrite combine_extend2_map_r; [|done]; rewrite map_map.
           1-2: erewrite map_ext; [|case=> ?; instantiate (1 := (fun '(_,_) => _)); reflexivity].
           1-2: apply: map_ext; case=> *; rewrite/sim_active'; cook. }
-        case: pub in rwt newpce *; [| exfalso; do [cook] in newpce].
-        have rcmd_grd: is_secret_guard rcmd = false by admit.
+        move: newpce rwt=> /andP [] /negbTE rcmd_grd -> rwt.
         rewrite rcmd_grd /=. cook.
         rewrite combine_extend3_splitr. 
         rewrite -map_const combine_extend2_map_self_r map_map.
@@ -387,11 +401,13 @@ Section extract_step_commute.
         rewrite filter_map_swap map_map.
         erewrite map_ext; [|case; case=> * /=; instantiate (1:= fun '(_,_,_) => _); reflexivity].
         erewrite filter_ext; [|case; case=> *; cbn; instantiate (1:= fun '(_,_,_) => _); reflexivity].
-        set (public _) as x; case newpce: x; subst x; cycle 1. (* TODO: ssr version of this? *)
+        move newpce: (public _)=> newpc.
+        rewrite public_compute_new_pc_opt in newpce. case: newpc in newpce *; cycle 1. 
           { erewrite filter_ext; [|case; case=> ? ? ?; rewrite /sim_active' /= Bool.orb_false_r; instantiate (1 := fun '(_,_,_) => _); reflexivity].
-          case: pub in rwt newpce *.
+          do [move=> /negbT; rewrite negb_and negbK=> /orP] in newpce.
+          case: pub in rwt newpce *; move=> /= in newpce. 
           2: erewrite post_optcmd_stp_store_sec; [| eassumption]=> /=; cook.
-          1: have ->: is_secret_guard rcmd = true by admit. (* I should be able to have an ssr variant *)
+          1: move: newpce=> [] // ->.
           1: rewrite combine_extend2_nil_l.
           1: cook; set l1 := filter _ _; set l2 := repeat true _.
           1: suff: map (fun '(_,i,_) => i) l1 = l2; [move: l1 l2=> > <-; rewrite map_map; apply: map_ext=> - [] [] //|subst l1 l2].  
@@ -401,8 +417,7 @@ Section extract_step_commute.
           1,2: erewrite filter_ext; [|case; case=> *; instantiate (1 := fun '(_, _,_)=> _); reflexivity ].
           1,2: enter (erewrite map_filter_combine_extend2_ind2;  only 2,3: (case=> *; instantiate (1:= fun _ => _); reflexivity); only 2: done).
           1,2: clear; revert_hyp_pat nat; elim=> * /=; cook. }
-        case: pub in rwt newpce *; [| exfalso; do [cook] in newpce].
-        have rcmd_grd: is_secret_guard rcmd = false by admit. (* Copied!! *)
+        move: newpce rwt=> /andP [] /negbTE rcmd_grd -> rwt.
         rewrite rcmd_grd. cook.
         rewrite combine_extend3_splitr. 
         move: (X in (map Some X)) (X in (repeat true X))=> *.
@@ -415,7 +430,7 @@ Section extract_step_commute.
         rewrite !filter_map_swap.
         erewrite filter_ext; [| move=> * /=; reflexivity].
         cnstrct_eq_gl. rewrite filter_true //.
-    Admitted.
+    Qed.
   End cook.
 
 End extract_step_commute.
