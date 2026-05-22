@@ -1,5 +1,5 @@
-From Stdlib Require List ssreflect ssrfun ssrbool FunctionalExtensionality.
-Import List ListNotations ssreflect ssrfun ssrbool FunctionalExtensionality.
+From Stdlib Require List ssreflect ssrfun ssrbool.
+Import List ListNotations ssreflect ssrfun ssrbool.
 
 From Ltac2 Require Import Ltac2.
 
