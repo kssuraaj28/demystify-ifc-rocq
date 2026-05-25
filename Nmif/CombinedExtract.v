@@ -50,9 +50,6 @@ Section cmd_map.
         mk_atkcmd (sim_active cmbcmd) (ideal_cmd cmbcmd)) in
     map mapfn lst.
 
-  (* TODO: flat_map would fuse the filter+map into one traversal and
-     make reasoning slightly easier. Sticking with separate filter and
-     map for now to match the rest of the codebase. *)
   Definition cmd_map_sim (lst: list CmbCmd) : list (option Cmd * bool) :=
     let: mapfn :=
       fun cmbcmd =>
@@ -132,9 +129,7 @@ Section extract_step_commute.
   Ltac2 Set curr_cookbook as old := join_cookbooks Util.this_cookbook old.
   Ltac2 Set curr_cookbook as old := join_cookbooks Util.List.this_cookbook old.
   Ltac2 Set curr_cookbook as old := join_cookbooks Lattice4pt.this_cookbook old.
-(* This proof is sad *)
-  (* The new pc is public iff the current pc-level is public and the command's
-     guard is not secret. *)
+
   Lemma public_compute_new_pc_opt untr pub rcmd :
     public (compute_new_pc_opt (mk_lbl untr pub) rcmd) = ~~ is_secret_guard rcmd && pub.
   Proof.
@@ -145,23 +140,18 @@ Section extract_step_commute.
     + rewrite /is_secret /is_public. case: (var_lbl g) => ug pg /=. rewrite negbK //.
   Qed.
 
-  (* The attacker pre-state preserves public-equality: corruption (pre_cmd_action)
-     is public-noninterfering, and the `if isatk` just selects. *)
   Lemma acmd_prestate_pubeq atkst isatk s1 s2 :
     ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
     ⟨ (if isatk then pre_cmd_action adv atkst s1 else s1) | is_public ⟩ =
     ⟨ (if isatk then pre_cmd_action adv atkst s2 else s2) | is_public ⟩.
   Proof. move=> pe. case: isatk. - apply: pre_cmd_wf_conf. exact: pe. - exact: pe. Qed.
 
-  (* Trick 1: post_cmd_action of the pre-state is invariant under rst<->simst. *)
   Fact post_acmd_pubeq atkst isatk s1 s2 :
     ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
     post_cmd_action adv atkst (if isatk then pre_cmd_action adv atkst s1 else s1) =
     post_cmd_action adv atkst (if isatk then pre_cmd_action adv atkst s2 else s2).
   Proof. move=> pe. apply: post_cmd_wf. exact: acmd_prestate_pubeq. Qed.
 
-  (* Trick 2: post_cmd_action of (well-typed optcmd applied to the pre-state)
-     is invariant under rst<->simst. *)
   Fact post_optcmd_acmd_pubeq atkst isatk l oc s1 s2 :
     l ⊢ oc ->
     ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
@@ -177,8 +167,6 @@ Section extract_step_commute.
     - exact: pe'.
   Qed.
 
-  (* Trick 3: the substep count of (optcmd applied to the pre-state) is invariant
-     under rst<->simst, when the optcmd's guard is public. *)
   Fact cnt_acmd_pubeq atkst isatk oc s1 s2 :
     is_secret_guard oc = false ->
     ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
@@ -211,7 +199,7 @@ Section extract_step_commute.
       end) "acmd_pubeq" old.
 
 
-  Ltac2 Set cook_debug := 1.
+  Ltac2 Set cook_debug := 0.
 
 
   Theorem extract_step_commute c:
