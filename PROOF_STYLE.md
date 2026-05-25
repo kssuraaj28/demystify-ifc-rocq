@@ -37,8 +37,8 @@ on entry.
 It runs the registered tactics (the "cookbook") over the focused goals until
 every goal is solved or all tactics fail on it.
 
-- `cook` runs to completion (no gas).
-- `cook n` runs at most `n` outer iterations (gas). Goals are consumed depth-first.
+- `cook` runs to completion. Goals are consumed depth-first. Panics if no
+  registered step ever succeeds (so a cook that makes no progress fails loudly).
 - `cook_step` runs one pass over the registered chain on a single focused goal,
   applying the first tactic that succeeds.
 - `cook_debug : int` controls tracing (0 = silent; higher = more detail). Set
