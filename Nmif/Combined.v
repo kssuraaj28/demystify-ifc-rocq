@@ -168,13 +168,13 @@ Ltac2 Set this_cookbook_ as old :=
     "Forall_CmbCmd_zip" old.
 
 Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(rewrite real_cmd_mk ) "real_cmd_mk" old.
+  add_cookstep ltac1:(rewrite -> real_cmd_mk ) "real_cmd_mk" old.
 Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(rewrite real_atk_bit_mk ) "real_atk_bit_mk" old.
+  add_cookstep ltac1:(rewrite -> real_atk_bit_mk ) "real_atk_bit_mk" old.
 Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(rewrite ideal_cmd_mk) "ideal_cmd_mk" old.
+  add_cookstep ltac1:(rewrite -> ideal_cmd_mk) "ideal_cmd_mk" old.
 Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(rewrite pc_lbl_mk) "pc_lbl_mk" old.
+  add_cookstep ltac1:(rewrite -> pc_lbl_mk) "pc_lbl_mk" old.
 
 Ltac2 this_cookbook () := this_cookbook_ ().
 
