@@ -273,7 +273,7 @@ Ltac2 Set this_cookbook_ as old :=
   add_cookstep ltac1:(apply/wt_cmd_st_conf; [eassumption|]) "wt_cmd_st_conf" old.
 
 Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(rewrite WellFormedOptCmd_Some) "WellFormedOptCmd_Some" old.
+  add_cookstep ltac1:(rewrite -> WellFormedOptCmd_Some) "WellFormedOptCmd_Some" old.
 
 Section new_pc.
   Import Lattice4pt.Notations.
