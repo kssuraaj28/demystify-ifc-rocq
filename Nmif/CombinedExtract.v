@@ -85,6 +85,11 @@ Section cmd_map.
 
 End cmd_map.
 
+Ltac2 Set this_cookbook_ as old :=
+  add_cookstep ltac1:(rewrite -> cmd_map_cons) "cmd_map_cons" old.
+Ltac2 Set this_cookbook_ as old :=
+  add_cookstep ltac1:(rewrite -> cmd_map_app) "cmd_map_app" old.
+
 Section extract.
   Import Combined Simulator.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
@@ -184,10 +189,6 @@ Section extract_step_commute.
     Ltac2 Set curr_cookbook as old := join_cookbooks Util.this_cookbook old.
     Ltac2 Set curr_cookbook as old := join_cookbooks Util.List.this_cookbook old.
 
-    Ltac2 Set curr_cookbook as old :=
-      add_cookstep ltac1:(rewrite -> cmd_map_cons) "cmd_map_cons" old.
-    Ltac2 Set curr_cookbook as old :=
-      add_cookstep ltac1:(rewrite -> cmd_map_app) "cmd_map_app" old.
       (*
     Ltac2 Set curr_cookbook as old :=
       add_cookstep ltac1:(rewrite -> cmd_map_zip ) "cmd_map_zip" old.
