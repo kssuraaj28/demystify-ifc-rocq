@@ -35,6 +35,7 @@ Section cleanstep.
 
   Notation Continuation := Syntax.Prog.
 
+  (* TODO: Endorse and declassify.. *)
   Definition clean_cmd_stp_store (c: Cmd) (s: Store) : Store :=
     match c with
     | assign dst exp => 

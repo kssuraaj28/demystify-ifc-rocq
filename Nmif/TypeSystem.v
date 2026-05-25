@@ -296,12 +296,7 @@ Section new_pc.
 
   Lemma compute_new_pc_secret untr c :
     public (compute_new_pc (mk_lbl untr false) c) = false.
-  Proof.
-    case: c => [dst exp | [g cmp] b1 b2 | [g cmp] b].
-    - done.
-    - cbn [compute_new_pc]. rewrite pub_join //.
-    - cbn [compute_new_pc]. rewrite pub_join //.
-  Qed.
+  Proof. case: c=> // - []  *; rewrite pub_join //.  Qed.
 
   Fact compute_new_pc_opt_secret untr c :
     public (compute_new_pc_opt (mk_lbl untr false) c) = false.
@@ -318,12 +313,12 @@ Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite -> compute_new_p
 Section thms.
   Import VarValStore.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
-  Lemma compute_new_pc_untr:
-    forall p c, exists p',
+  Lemma compute_new_pc_untr p c:
+    exists p',
       compute_new_pc (mk_lbl true p) c = (mk_lbl true p').
   Proof.
-    move=> p [dst exp| [g cmp] b1 b2 | [g cmp] b]; cbn; eauto.
-    1-2: case: (var_lbl g) => u pg. (* TODO: This could be a lemma *)
+  case: c; eauto; cbn; case=> *.
+    1-2: case: (var_lbl _) => u pg. (* TODO: This could be a lemma *)
     1-2: exists (pg && p); case: u; done.
   Qed.
 

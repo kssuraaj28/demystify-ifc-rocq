@@ -135,9 +135,8 @@ Section extract_step_commute.
   Proof.
     rewrite /compute_new_pc_opt /is_secret_guard.
     case: rcmd => [c | ] //=.
-    case: c => [dst exp | [g cmp] b1 b2 | [g cmp] b] //=.
-    + rewrite /is_secret /is_public. case: (var_lbl g) => ug pg /=. rewrite negbK //.
-    + rewrite /is_secret /is_public. case: (var_lbl g) => ug pg /=. rewrite negbK //.
+    case: c => //=; case=> *.
+    1-2: rewrite /is_secret /is_public; case: var_lbl  => ug pg /=; rewrite negbK //.
   Qed.
 
   Lemma acmd_prestate_pubeq atkst isatk s1 s2 :
