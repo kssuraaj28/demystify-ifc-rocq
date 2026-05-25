@@ -257,27 +257,27 @@ Section extract_step_commute.
     Ltac2 Set curr_cookbook as old := join_cookbooks Util.List.this_cookbook old.
 
     Ltac2 Set curr_cookbook as old :=
-      add_cookstep ltac1:(rewrite cmd_map_cons) "cmd_map_cons" old.
+      add_cookstep ltac1:(rewrite -> cmd_map_cons) "cmd_map_cons" old.
     Ltac2 Set curr_cookbook as old :=
-      add_cookstep ltac1:(rewrite cmd_map_app) "cmd_map_app" old.
+      add_cookstep ltac1:(rewrite -> cmd_map_app) "cmd_map_app" old.
       (*
     Ltac2 Set curr_cookbook as old :=
       add_cookstep ltac1:(rewrite -> cmd_map_zip ) "cmd_map_zip" old.
       *)
     Ltac2 Set curr_cookbook as old :=
-      add_cookstep ltac1:(rewrite cmd_map_sim_cons ) "cmd_map_sim_cons" old.
+      add_cookstep ltac1:(rewrite -> cmd_map_sim_cons ) "cmd_map_sim_cons" old.
     Ltac2 Set curr_cookbook as old :=
-      add_cookstep ltac1:(rewrite untrusted_mk ) "untrusted_mk" old.
+      add_cookstep ltac1:(rewrite -> untrusted_mk ) "untrusted_mk" old.
     Ltac2 Set curr_cookbook as old :=
       add_cookstep ltac1:(rewrite -> public_mk ) "public_mk" old.
     Ltac2 Set curr_cookbook as old :=
-      add_cookstep ltac1:(rewrite acmd_step_atk ) "acmd_step_atk" old.
+      add_cookstep ltac1:(rewrite -> acmd_step_atk ) "acmd_step_atk" old.
     Ltac2 Set curr_cookbook as old :=
-      add_cookstep ltac1:(rewrite acmd_step_noatk ) "acmd_step_noatk" old.
+      add_cookstep ltac1:(rewrite -> acmd_step_noatk ) "acmd_step_noatk" old.
     Ltac2 Set curr_cookbook as old :=
-      add_cookstep ltac1:(rewrite construct_simulator_pre_cmd ) "construct_simulator_pre_cmd" old.
+      add_cookstep ltac1:(rewrite -> construct_simulator_pre_cmd ) "construct_simulator_pre_cmd" old.
     Ltac2 Set curr_cookbook as old :=
-      add_cookstep ltac1:(rewrite construct_simulator_post_cmd_cons ) "construct_simulator_post_cmd_cons" old.
+      add_cookstep ltac1:(rewrite -> construct_simulator_post_cmd_cons ) "construct_simulator_post_cmd_cons" old.
 
     (* Merge a matched rst/simst subterm pair (only fires when both halves are
        present), discharging via the relevant acmd-pubeq lemma. *)
