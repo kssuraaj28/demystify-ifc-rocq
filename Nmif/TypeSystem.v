@@ -312,8 +312,8 @@ Section new_pc.
   Qed.
 End new_pc.
 
-Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite compute_new_pc_opt_some) "compute_new_pc_opt_some" old.
-Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite compute_new_pc_opt_secret) "compute_new_pc_opt_secret" old.
+Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite -> compute_new_pc_opt_some) "compute_new_pc_opt_some" old.
+Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite -> compute_new_pc_opt_secret) "compute_new_pc_opt_secret" old.
 
 Section thms.
   Import VarValStore.Notations.

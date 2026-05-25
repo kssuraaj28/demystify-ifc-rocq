@@ -269,7 +269,7 @@ Section extract_step_commute.
     Ltac2 Set curr_cookbook as old :=
       add_cookstep ltac1:(rewrite untrusted_mk ) "untrusted_mk" old.
     Ltac2 Set curr_cookbook as old :=
-      add_cookstep ltac1:(rewrite public_mk ) "public_mk" old.
+      add_cookstep ltac1:(rewrite -> public_mk ) "public_mk" old.
     Ltac2 Set curr_cookbook as old :=
       add_cookstep ltac1:(rewrite acmd_step_atk ) "acmd_step_atk" old.
     Ltac2 Set curr_cookbook as old :=
@@ -349,10 +349,10 @@ Section extract_step_commute.
         case e: (sim_active' _ _ _); cycle 1; [| clear e].
           { move: (sim_active'_false _ _ _ e)=> [] -> [] -> //=.
           rewrite combine_extend3_splitr; cook. rewrite !map_map.
-          apply: map_ext=> *; cook. }
+          apply: map_ext. cook. }
         rewrite/sim_step. cook. (* TODO: There is something wrong here *)
-        move newpce: (public _)=> newpc.
-        rewrite public_compute_new_pc_opt in newpce. case: newpc in newpce *; cycle 1. (* TODO: Before ssr was a pain.  Why it change ?*)
+        set (public _) as x; move newpce: x=> newpc; subst x. (* TODO: ssr patterns are a pain *)
+        rewrite public_compute_new_pc_opt in newpce. case: newpc in newpce *; cycle 1. 
           { do [move=> /negbT; rewrite negb_and negbK=> /orP] in newpce.
           case: pub in rwt newpce *; move=> /= in newpce. 
           1: move: newpce=> [] // ->.
@@ -400,7 +400,7 @@ Section extract_step_commute.
         rewrite filter_map_swap map_map.
         erewrite map_ext; [|case; case=> * /=; instantiate (1:= fun '(_,_,_) => _); reflexivity].
         erewrite filter_ext; [|case; case=> *; cbn; instantiate (1:= fun '(_,_,_) => _); reflexivity].
-        move newpce: (public _)=> newpc.
+        move newpce: (public _)=> newpc. (* I don't know why ssr patterns succeed here. TODO *)
         rewrite public_compute_new_pc_opt in newpce. case: newpc in newpce *; cycle 1. 
           { erewrite filter_ext; [|case; case=> ? ? ?; rewrite /sim_active' /= Bool.orb_false_r; instantiate (1 := fun '(_,_,_) => _); reflexivity].
           do [move=> /negbT; rewrite negb_and negbK=> /orP] in newpce.
