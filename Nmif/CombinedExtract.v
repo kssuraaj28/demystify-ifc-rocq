@@ -117,6 +117,21 @@ Section extract_step_commute.
   Notation step := (step adv (construct_simulator adv)).
 
   Import Util.List Combined VarValStore.Notations.
+
+
+    (* TODO: cook rules in foreign cookbooks reference lemmas by unqualified
+       name (e.g. `rewrite -> WellFormedOptCmd_Some in *`). Joining the
+       cookbook is not enough — the importing file must also `Import` the
+       module so the bare name resolves at fire time, otherwise the rewrite
+       errors and `cook` silently drops the step. Figure out a cleaner fix. *)
+  Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()).
+  Ltac2 Set curr_cookbook as old := join_cookbooks Combined.this_cookbook old.
+  Ltac2 Set curr_cookbook as old := join_cookbooks Semantics.this_cookbook old.
+  Ltac2 Set curr_cookbook as old := join_cookbooks TypeSystem.this_cookbook old.
+  Ltac2 Set curr_cookbook as old := join_cookbooks Attacker.this_cookbook old.
+  Ltac2 Set curr_cookbook as old := join_cookbooks Util.this_cookbook old.
+  Ltac2 Set curr_cookbook as old := join_cookbooks Util.List.this_cookbook old.
+  Ltac2 Set curr_cookbook as old := join_cookbooks Lattice4pt.this_cookbook old.
 (* This proof is sad *)
   (* The new pc is public iff the current pc-level is public and the command's
      guard is not secret. *)
@@ -177,27 +192,6 @@ Section extract_step_commute.
     - done.
   Qed.
 
-    (* TODO: cook rules in foreign cookbooks reference lemmas by unqualified
-       name (e.g. `rewrite -> WellFormedOptCmd_Some in *`). Joining the
-       cookbook is not enough — the importing file must also `Import` the
-       module so the bare name resolves at fire time, otherwise the rewrite
-       errors and `cook` silently drops the step. Figure out a cleaner fix. *)
-  Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()).
-  Ltac2 Set curr_cookbook as old := join_cookbooks Combined.this_cookbook old.
-  Ltac2 Set curr_cookbook as old := join_cookbooks Semantics.this_cookbook old.
-  Ltac2 Set curr_cookbook as old := join_cookbooks TypeSystem.this_cookbook old.
-  Ltac2 Set curr_cookbook as old := join_cookbooks Attacker.this_cookbook old.
-  Ltac2 Set curr_cookbook as old := join_cookbooks Util.this_cookbook old.
-  Ltac2 Set curr_cookbook as old := join_cookbooks Util.List.this_cookbook old.
-
-    (*
-  Ltac2 Set curr_cookbook as old :=
-    add_cookstep ltac1:(rewrite -> cmd_map_zip ) "cmd_map_zip" old.
-    *)
-  Ltac2 Set curr_cookbook as old :=
-    add_cookstep ltac1:(rewrite -> untrusted_mk ) "untrusted_mk" old.
-  Ltac2 Set curr_cookbook as old :=
-    add_cookstep ltac1:(rewrite -> public_mk ) "public_mk" old.
 
   (* Merge a matched rst/simst subterm pair (only fires when both halves are
      present), discharging via the relevant acmd-pubeq lemma. *)

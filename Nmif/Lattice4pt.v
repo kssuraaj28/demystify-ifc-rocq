@@ -3,14 +3,17 @@ Import ssreflect ssrbool.
 
 From Ltac2 Require Import Ltac2.
 Require Tacs.
-Import Tacs.
+Import Tacs Tacs.Cook.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
-Open Scope bool_scope.
+#[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
+Ltac2 Set this_cookbook_ := create_new_cookbook.
+
+#[local] Open Scope bool_scope.
 
 Section var_lbl.
   #[local] Set Primitive Projections. (* TODO: All records need to have this? Maybe in prelude? *)
@@ -28,6 +31,9 @@ Section var_lbl.
   Fact public_mk u p : ltac2:(cbn_eq (public (mk_lbl u p))).
   Proof. done. Qed.
 End var_lbl.
+
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> untrusted_mk) "untrusted_mk" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> public_mk) "public_mk" old.
 
 Definition flows_to_conf (pubfrom pubto: bool) : bool :=
   match pubfrom, pubto with 
@@ -148,3 +154,4 @@ Lemma flows_to_pub:
     public l1.
 Proof. do 2 (case=> - [] [])=> //. Qed.
 
+Ltac2 this_cookbook () := this_cookbook_ ().
