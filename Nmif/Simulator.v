@@ -132,4 +132,7 @@ Section sim_constr.
   Qed.
 End sim_constr.
 
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> construct_simulator_pre_cmd) "construct_simulator_pre_cmd" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> construct_simulator_post_cmd_cons) "construct_simulator_post_cmd_cons" old.
+
 Ltac2 this_cookbook () := this_cookbook_ ().

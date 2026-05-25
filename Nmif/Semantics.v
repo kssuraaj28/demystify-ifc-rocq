@@ -87,7 +87,6 @@ Section cleanstep.
   Proof. case: c=> //= *. exact: clean_cmd_stp_cnt_idem. Qed.
 End cleanstep.
 
-(* TODO: All autorewrite-ish tactics should do rewrite -> in * *)
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> optcmd_stp_store_simpl) "optcmd_stp_store_simpl" old.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> optcmd_stp_cnt_simpl) "optcmd_stp_cnt_simpl" old.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> optcmd_stp_cnd_idem) "optcmd_stp_cnd_idem" old.
@@ -132,6 +131,9 @@ Section acmd.
   Proof. done. Qed.
 End acmd.
 
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> acmd_step_atk ) "acmd_step_atk" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> acmd_step_noatk ) "acmd_step_noatk" old.
+
 Section twocfg.
   Import Util.List.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates1 AtkStates2 : Type}.
@@ -155,6 +157,7 @@ Section twocfg.
     let: cont := map (fun '(oc1, a1, oc2, a2) => (mk_atkcmd a1 oc1, mk_atkcmd a2 oc2)) cont in
     (cont ++ rest, st1, st2).
 End twocfg.
+
 
 
 (*
