@@ -310,11 +310,11 @@ Section extract_step_commute.
       rewrite /CmbCmdInv/CmbCmdCoreInv in i1. case: i1=> rwt _.
       rewrite /StateInv in i3. case: i3=> _ pubeq.
       move: pclbl rwt.
-      (case=> - untr pub); cook=> rwt.
+      case=> untr pub => rwt.
       rewrite/comb_step/cmbcmd_step {}/extract_2cfg; cook.
-      rewrite /extract_2cfg; cook.
-      rewrite/sim_active; cook.
-      rewrite/step; cook.
+      rewrite /extract_2cfg.
+      rewrite/sim_active. cook.
+      rewrite/step.
       congr (_,_,_); cook.
       - set l1 := (X in map _ X = _). set l2 := (X in _ = map _ X).
         suff: l1 = map (fun c => (real_cmd c, real_atk_bit c,  ideal_cmd c, sim_active c)) l2;
@@ -358,7 +358,7 @@ Section extract_step_commute.
           1: move: newpce=> [] // ->.
           2: erewrite post_optcmd_stp_store_sec;[|eassumption]. 
           1-2: move=> /=; cook.
-          1-2: cook; rewrite combine_extend3_splitl combine_extend2_same map_map. 
+          1-2: rewrite combine_extend3_splitl combine_extend2_same map_map. 
           1-2: erewrite combine_extend2_map_r; [|done]; rewrite map_map.
           1-2: erewrite map_ext; [|case=> ?; instantiate (1 := (fun '(_,_) => _)); reflexivity].
           1-2: apply: map_ext; case=> *; rewrite/sim_active'; cook. }
@@ -381,15 +381,15 @@ Section extract_step_commute.
               { case; case=> * /=. 
               rewrite compute_new_pc_opt_secret /=.
               instantiate (1:= fun '(_,_,_)=> _); reflexivity. }
-            cook. rewrite combine_extend3_nil3 filter_map_swap. cook.
+            rewrite combine_extend3_nil3 filter_map_swap. cook.
             erewrite filter_ext; cycle 1.
               { case=> *. instantiate (1:= fun '(_,_)=> _); reflexivity. }
             unshelve erewrite filter_ext; [exact xpred0|apply filter_false|].
             case=> //. }
-          { cook. erewrite filter_ext; [| case; case=> * /=; instantiate (1:= fun '(_,_,_)=> _); reflexivity].
+          { erewrite filter_ext; [| case; case=> * /=; instantiate (1:= fun '(_,_,_)=> _); reflexivity].
           rewrite combine_extend3_nil1 combine_extend2_nil_r !map_map filter_map_swap. cook.
           unshelve erewrite filter_ext; [exact xpred0|apply filter_false|]. cook. }
-        rewrite/sim_step; cook; cnstrct_eq_gl; cook.
+        rewrite/sim_step; cnstrct_eq_gl; cook.
           { case: pub rwt => rwt /=; [erewrite noninterfering_post_optcmd_pre; [reflexivity|eassumption|] | (* TODO: This should be automated *)
           erewrite post_optcmd_stp_store_sec; [|exact: rwt]; erewrite noninterfering_post_pre; [reflexivity|]]; done. }
         rewrite cmd_map_sim_app. cook.

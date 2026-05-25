@@ -473,33 +473,25 @@ Module Cook.
   Create HintDb cook_step. (* TODO: Does #[local] help *)
   Hint Extern 100  => cook_step: cook_step.
 
-  (* For every focued goal, it runs cook_step one by one. (dfs strategy)  *)
-  #[local] Ltac2 cook (gas : int option) : unit :=
-    let rec go (gas : int option) : unit :=
-      (* Gas check *)
-      if match gas with Some n => Int.equal n 0 | None => false end then () else
-
+  (* For every focused goal, it runs cook_step one by one. (dfs strategy).
+     Panics if no cook_step ever succeeded. *)
+  #[local] Ltac2 cook () : unit :=
+    let rec go (acc : bool) : bool :=
       let gls := Control.numgoals () in
       cook_dbg 1 (fun () => printf "cook: numgoals = %i" gls);
-      (* Goals check: TODO: What happens if we throw or assert? *)
-      if Int.equal gls 0 then () else
+      if Int.equal gls 0 then acc else
 
-      (* Run the first goal *)
-      (Control.focus 1 1 (fun () =>
+      let this := Control.focus 1 1 (fun () =>
         match Control.case (fun () => cook_step ()) with
-        | Val ((), _) => ()
+        | Val ((), _) => true
         | Err _ =>
               cook_dbg 2 (fun () => printf "cook: cook_step failed, shelving goal");
-              Control.shelve ()
-        end);
-       let next_gas := match gas with | Some n => Some (Int.sub n 1) | None => None end in
-       go next_gas) in
-    unshelve (go gas).
+              Control.shelve (); false
+        end) in
+      go (Bool.or acc this) in
+    if unshelve (go false) then () else panic_s "cook" "no progress".
 
-  Tactic Notation "cook" := ltac2:(cook None).
-  Tactic Notation "cook" integer(n) :=
-    let f := ltac2:(nn |- cook (Some (Option.get (Ltac1.to_int nn)))) in
-    f n.
+  Tactic Notation "cook" := ltac2:(cook ()).
 
   (* TODO: You need to have a lot of tests here.. TODO: Maybe claude can help *)
 

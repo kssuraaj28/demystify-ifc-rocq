@@ -97,7 +97,7 @@ Section test.
   Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()). (* Maybe keep only 1 *)
 
   Goal forall (P: _ -> Prop) c s, P (optcmd_stp_store (Some c) s).
-  Proof. cook. Abort.
+  Proof. move=> *. cook. Abort.
 End test.
 
 

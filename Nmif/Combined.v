@@ -235,7 +235,7 @@ Section invprf.
         revert_hyp_pat [(option Cmd), (_ ⊢ _)]; case=> /= *; auto with trickbag.
 
       - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split; cook.
-          { revert_hyp_pat bool; case; cook.
+          { revert_hyp_pat bool; case.
           1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=. 
           2,4: auto with cook_step trickbag; fail.
           1-2: revert_hyp_pat (option _); case=> /= *; cook. }
