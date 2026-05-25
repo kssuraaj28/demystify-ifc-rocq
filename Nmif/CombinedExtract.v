@@ -89,6 +89,8 @@ Ltac2 Set this_cookbook_ as old :=
   add_cookstep ltac1:(rewrite -> cmd_map_cons) "cmd_map_cons" old.
 Ltac2 Set this_cookbook_ as old :=
   add_cookstep ltac1:(rewrite -> cmd_map_app) "cmd_map_app" old.
+Ltac2 Set this_cookbook_ as old :=
+  add_cookstep ltac1:(rewrite -> cmd_map_sim_cons ) "cmd_map_sim_cons" old.
 
 Section extract.
   Import Combined Simulator.
@@ -192,8 +194,6 @@ Section extract_step_commute.
   Ltac2 Set curr_cookbook as old :=
     add_cookstep ltac1:(rewrite -> cmd_map_zip ) "cmd_map_zip" old.
     *)
-  Ltac2 Set curr_cookbook as old :=
-    add_cookstep ltac1:(rewrite -> cmd_map_sim_cons ) "cmd_map_sim_cons" old.
   Ltac2 Set curr_cookbook as old :=
     add_cookstep ltac1:(rewrite -> untrusted_mk ) "untrusted_mk" old.
   Ltac2 Set curr_cookbook as old :=
