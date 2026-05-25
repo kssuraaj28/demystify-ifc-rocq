@@ -464,8 +464,8 @@ Module List.
     ltac1:(lazymatch goal with |- Forall _ (map _ _) => apply/Forall_map end)
     "Forall_map" old.
 
-  Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite combine_extend2_nil_l) "combine_extend2_nil_l" old.
-  Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite combine_extend2_nil_r) "combine_extend2_nil_r" old.
+  Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite -> combine_extend2_nil_l) "combine_extend2_nil_l" old.
+  Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite -> combine_extend2_nil_r) "combine_extend2_nil_r" old.
 
   Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(
     first
@@ -520,8 +520,8 @@ Module List.
     Proof. move=> A a b y. progress cook. Abort.
   End test.
 
-  Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite length_map) "length_map" old.
-  Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite repeat_length) "repeat_length" old.
+  Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> length_map) "length_map" old.
+  Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> repeat_length) "repeat_length" old.
 
   Section test.
     Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["length_map"]) ().
@@ -581,21 +581,21 @@ End test.
 Example map_nil_simpl {A B} (f: A -> B) := (erefl : ltac2:(cbn_eq (map f []))). 
 *)
 Fact map_nil_simpl {A B} (f: A -> B) : ltac2:(cbn_eq (map f [])). Proof. done. Qed.
-Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite  map_nil_simpl) "map_nil_simpl" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite ->  map_nil_simpl) "map_nil_simpl" old.
 
 Fact if_same {T} (b : bool) (t: T) :
   (if b then t else t) = t.
 Proof.  case: b; done. Qed.
 
-Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite if_same) "if_same" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> if_same) "if_same" old.
 
 Fact fst_pair {A B} (a : A) (b : B) : ltac2:(cbn_eq (a, b).1). Proof. done. Qed.
 Fact snd_pair {A B} (a : A) (b : B) : ltac2:(cbn_eq (a, b).2). Proof. done. Qed.
-Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite fst_pair) "fst_pair" old.
-Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite snd_pair) "snd_pair" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> fst_pair) "fst_pair" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> snd_pair) "snd_pair" old.
 
 Fact repeat_0 {A} (x : A) : repeat x 0 = []. Proof. done. Qed.
-Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite repeat_0) "repeat_0" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> repeat_0) "repeat_0" old.
 
 
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(progress cbn [andb orb]) "cbn_andb_orb" old.
@@ -606,10 +606,10 @@ Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(progress cbn [andb orb]) 
    "2 goals focused" crash during stir/cook. Not re-added here; if that error
    resurfaces, one of the four below (rewrite ... in * with no hit, or a
    leftover evar in a hyp) is the suspect — bisect by stir-step name. *)
-Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite andbF) "andbF" old.
-Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite andbT) "andbT" old.
-Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite orbF) "orbF" old.
-Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite orbT) "orbT" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> andbF) "andbF" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> andbT) "andbT" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> orbF) "orbF" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> orbT) "orbT" old.
 
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(done) "done" old.
 
