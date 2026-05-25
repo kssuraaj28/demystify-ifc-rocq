@@ -140,9 +140,9 @@ Section twocfg.
   Notation State1 := (State (AtkStates:=AtkStates1)).
   Notation State2 := (State (AtkStates:=AtkStates2)).
 
-  Definition Cfg := (list (AtkCmd * AtkCmd) * State1 * State2)%type.
+  Definition TwoCfg := (list (AtkCmd * AtkCmd) * State1 * State2)%type.
 
-  Definition step (c: Cfg): Cfg :=
+  Definition step (c: TwoCfg): TwoCfg :=
     let: (c2lst, s1, s2) := c in
     if c2lst isn't (ac1, ac2) :: rest then c else
     let: (p1, st1, steps1) := (acmd_step adv1 ac1 s1) in

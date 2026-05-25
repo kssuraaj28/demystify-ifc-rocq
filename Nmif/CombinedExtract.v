@@ -16,102 +16,88 @@ Set Mangle Names. Set Mangle Names Light.
 #[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
 Ltac2 Set this_cookbook_ := create_new_cookbook.
 
-Section comb_compile_simulator.
-  Import Simulator.
+Section sim_active.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Import Combined.
+
+  Definition sim_active' (rcmd: option Cmd) (ratk: bool) (is_pubpc: bool) : bool :=
+    ratk || (is_pubpc && if rcmd is None then false else true).
+
+  (* This is bidirectional; we only state/use the forward direction. *)
+  Lemma sim_active'_false rcmd ratk pub :
+    sim_active' rcmd ratk pub = false ->
+    ratk = false /\ (pub = false \/ rcmd = None).
+  Proof.
+    rewrite /sim_active'.
+    case: ratk=> //=.
+    case: pub=> //=; [| move=> _; repeat constructor; done ].
+    case: rcmd=> [c | ] //=.
+    move=> _; repeat constructor; done.
+  Qed.
+
+  Definition sim_active (c: CmbCmd) : bool :=
+    sim_active' (real_cmd c) (real_atk_bit c) (public (pc_lbl c)).
+End sim_active.
+
+Section cmd_map.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
+  Import Combined.
+
+  Definition cmd_map (lst: list CmbCmd) : list (AtkCmd * AtkCmd) :=
+    let: mapfn :=
+      fun cmbcmd => (
+        mk_atkcmd (real_atk_bit cmbcmd) (real_cmd cmbcmd),
+        mk_atkcmd (sim_active cmbcmd) (ideal_cmd cmbcmd)) in
+    map mapfn lst.
+
+  (* TODO: flat_map would fuse the filter+map into one traversal and
+     make reasoning slightly easier. Sticking with separate filter and
+     map for now to match the rest of the codebase. *)
+  Definition cmd_map_sim (lst: list CmbCmd) : list (option Cmd * bool) :=
+    let: mapfn :=
+      fun cmbcmd =>
+        let: ocmd := if (public (pc_lbl cmbcmd)) is false then None else
+                       (real_cmd cmbcmd) in
+        (ocmd, real_atk_bit cmbcmd) in
+    map mapfn (filter sim_active lst).
+
+  Fact cmd_map_cons a l :
+    cmd_map (a :: l) =
+      (mk_atkcmd (real_atk_bit a) (real_cmd a),
+       mk_atkcmd (sim_active a) (ideal_cmd a)) :: cmd_map l.
+  Proof. done. Qed.
+
+  Fact cmd_map_sim_cons a l :
+    cmd_map_sim (a :: l) =
+      if sim_active a
+      then ((if public (pc_lbl a) is false then None else real_cmd a),
+            real_atk_bit a) :: cmd_map_sim l
+      else cmd_map_sim l.
+  Proof. rewrite /cmd_map_sim /=. case: (sim_active a)=> //=. Qed.
+
+  Fact cmd_map_app l1 l2 :
+    cmd_map (l1 ++ l2) = cmd_map l1 ++ cmd_map l2.
+  Proof. rewrite /cmd_map map_app. done. Qed.
+
+  Lemma cmd_map_sim_app l1 l2 :
+    cmd_map_sim (l1 ++ l2) = cmd_map_sim l1 ++ cmd_map_sim l2.
+  Proof. rewrite /cmd_map_sim filter_app map_app. done. Qed.
+
+End cmd_map.
+
+Section extract.
+  Import Combined Simulator.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
 
-  Notation SimStates := (SimStates (AtkStates:=AtkStates)).
-
   Notation CombCfg := (Combined.Cfg (AtkStates:= AtkStates)).
-  Notation CfgTwo := (Cfg (AtkStates1:= AtkStates) (AtkStates2:= SimStates)).
+  Notation CfgTwo := (TwoCfg (AtkStates1:= AtkStates) (AtkStates2:= SimStates (AtkStates:=AtkStates))).
 
-  Section sim_active.
-    Import Combined.
-    Definition sim_active' (rcmd: option Cmd) (ratk: bool) (is_pubpc: bool) : bool :=
-      ratk || (is_pubpc && if rcmd is None then false else true).
-
-    (* This is bidirectional; we only state/use the forward direction. *)
-    Lemma sim_active'_false rcmd ratk pub :
-      sim_active' rcmd ratk pub = false ->
-      ratk = false /\ (pub = false \/ rcmd = None).
-    Proof.
-      rewrite /sim_active'.
-      case: ratk=> //=.
-      case: pub=> //=; [| move=> _; repeat constructor; done ].
-      case: rcmd=> [c | ] //=.
-      move=> _; repeat constructor; done.
-    Qed.
-
-    Definition sim_active (c: CmbCmd) : bool :=
-      sim_active' (real_cmd c) (real_atk_bit c) (public (pc_lbl c)).
-
-    
-  End sim_active.
-
-  Section cmd_map.
-    Import Combined.
-    Definition cmd_map (lst: list CmbCmd) : list (AtkCmd * AtkCmd) :=
-      let: mapfn :=
-        fun cmbcmd => (
-          mk_atkcmd (real_atk_bit cmbcmd) (real_cmd cmbcmd),
-          mk_atkcmd (sim_active cmbcmd) (ideal_cmd cmbcmd)) in
-      map mapfn lst.
-
-    (* TODO: flat_map would fuse the filter+map into one traversal and
-       make reasoning slightly easier. Sticking with separate filter and
-       map for now to match the rest of the codebase. *)
-    Definition cmd_map_sim (lst: list CmbCmd) : list (option Cmd * bool) :=
-      let: mapfn :=
-        fun cmbcmd =>
-          let: ocmd := if (public (pc_lbl cmbcmd)) is false then None else
-                         (real_cmd cmbcmd) in
-          (ocmd, real_atk_bit cmbcmd) in
-      map mapfn (filter sim_active lst).
-
-    Fact cmd_map_cons a l :
-      cmd_map (a :: l) =
-        (mk_atkcmd (real_atk_bit a) (real_cmd a),
-         mk_atkcmd (sim_active a) (ideal_cmd a)) :: cmd_map l.
-    Proof. done. Qed.
-
-    Fact cmd_map_sim_cons a l :
-      cmd_map_sim (a :: l) =
-        if sim_active a
-        then ((if public (pc_lbl a) is false then None else real_cmd a),
-              real_atk_bit a) :: cmd_map_sim l
-        else cmd_map_sim l.
-    Proof. rewrite /cmd_map_sim /=. case: (sim_active a)=> //=. Qed.
-
-    Fact cmd_map_app l1 l2 :
-      cmd_map (l1 ++ l2) = cmd_map l1 ++ cmd_map l2.
-    Proof. rewrite /cmd_map map_app. done. Qed.
-
-    Lemma cmd_map_sim_app l1 l2 :
-      cmd_map_sim (l1 ++ l2) = cmd_map_sim l1 ++ cmd_map_sim l2.
-    Proof. rewrite /cmd_map_sim filter_app map_app. done. Qed.
-
-
-    Lemma map_proj_map_mk pclbl l :
-      map (fun _c : CmbCmd =>
-             (real_cmd _c, real_atk_bit _c, ideal_cmd _c, sim_active _c))
-          (map (fun '(_rc, _ic, _abit) => mk_cmbcmd _rc _abit _ic pclbl) l) =
-      map (fun '(_rc, _ic, _abit) =>
-             (_rc, _abit, _ic,
-              _abit || (public pclbl && if _rc is None then false else true)))
-          l.
-    Proof. rewrite map_map. apply: map_ext. case=> -[rc ic] abit. rewrite /sim_active /=. done. Qed.
-
-  End cmd_map.
-
-  Section extract.
-    Import Combined.
-    Definition extract_2cfg (c: CombCfg): CfgTwo :=
-      let: (mk_cmbstate rst ist simst atkst, cmblst) := c in 
-      let: cfg2prog := cmd_map cmblst in
-      let: simprog := cmd_map_sim cmblst in 
-      (cfg2prog, (rst, atkst), (ist, mk_simstate atkst simst simprog)).
-  End extract.
-End comb_compile_simulator.
+  Definition extract_2cfg (c: CombCfg): CfgTwo :=
+    let: (mk_cmbstate rst ist simst atkst, cmblst) := c in
+    let: cfg2prog := cmd_map cmblst in
+    let: simprog := cmd_map_sim cmblst in
+    (cfg2prog, (rst, atkst), (ist, mk_simstate atkst simst simprog)).
+End extract.
 
 Section extract_step_commute.
   Import TypeSystem Simulator.
