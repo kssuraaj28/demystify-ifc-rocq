@@ -22,6 +22,8 @@ Section syntax.
 
     Unset Elimination Schemes.
     Inductive Cmd :=
+      | endorse (from to: Vars)
+      | declassify (from to: Vars)
       | assign (dst : Vars) (exp: ValExp)
       | cond (exp: BoolExp) (b1 b2: Prog' Cmd)
       | while (exp: BoolExp) (b: Prog' Cmd). 
@@ -33,6 +35,12 @@ Section syntax.
   Section cmd_ind.
     Generalizable All Variables.
     Variable P : Cmd -> Prop.
+
+    Hypothesis hyp_endorse : 
+      `(P (endorse v1 v2)).
+
+    Hypothesis hyp_declassify : 
+      `(P (declassify v1 v2)).
 
     Hypothesis hyp_assign : 
       `(P (assign dst exp)).
@@ -49,8 +57,7 @@ Section syntax.
 
     Fixpoint Cmd_ind : forall c, P c. 
     Proof.
-      case=> >.
-      1-3:  apply: hyp_assign || apply: hyp_while || apply: hyp_cond.
+      case=> >; [apply: hyp_endorse| apply: hyp_declassify| apply: hyp_assign | apply: hyp_cond | apply: hyp_while].
       1-3:  lazymatch goal with |- Forall _ ?l => elim: l end; auto.
     Qed.
   End cmd_ind.
