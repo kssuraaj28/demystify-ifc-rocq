@@ -16,7 +16,6 @@ Section store.
   Context `{!VarPrm, !ValPrm}.
 
   Definition Store := Vars -> Vals.
-  Definition get_from_store (st : Store) (v : Vars) : Vals := st v.
   Definition update_to_store (st : Store) (v : Vars) (vl : Vals) : Store := 
     fun v' => if (v =? v') is true then vl else st v'.  (* The double colon in vars_deceq is needed here. *)
 

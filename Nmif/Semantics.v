@@ -40,7 +40,9 @@ Section cleanstep.
     match c with
     | assign dst exp => 
       let: vl := eval_val_exp s exp in update_to_store s dst vl
-    | _ =>  s
+    | endorse src dst => update_to_store s dst (s src)
+    | declassify src dst => update_to_store s dst (s src)
+    | _ => s
     end.
   
   (* TODO: Have examples below this *)
