@@ -100,8 +100,61 @@ Section test.
   Proof. move=> *. cook. Abort.
 End test.
 
+Section acmd.
+  Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvLvlPrm} {AtkStates : Type}.
+  Variable (adv: AdvNextStep AtkStates).
+  Record AtkCmd := mk_atkcmd {is_attacked: bool; ocmd : option Cmd}.
+  Definition State := (Store * AtkStates)%type.
 
+  Definition acmd_step (ac: AtkCmd) (s: State): Prog * State * nat :=
+    let: mk_atkcmd isatk cmd := ac in
+    let: (store, atk_st) := s in
+    let: st := if isatk is true then pre_cmd_action adv atk_st store else store in
+    let: (prog, st) := (optcmd_stp_cnt cmd st,  optcmd_stp_store cmd st) in
 
+    let: atk_pst := (post_cmd_action adv atk_st st) in
+    let: atk_st := if isatk is true then atk_pst.1 else atk_st in
+    let: steps := if isatk is true then atk_pst.2 else 0 in
+
+    (prog, (st, atk_st), steps).
+
+  Fact acmd_step_atk cmd store atk_st :
+    acmd_step (mk_atkcmd true cmd) (store, atk_st) =
+      let pre_st := pre_cmd_action adv atk_st store in
+      let st'    := optcmd_stp_store cmd pre_st in
+      let pst    := post_cmd_action adv atk_st st' in
+      (optcmd_stp_cnt cmd pre_st, (st', pst.1), pst.2).
+  Proof. done. Qed.
+
+  Fact acmd_step_noatk cmd store atk_st :
+    acmd_step (mk_atkcmd false cmd) (store, atk_st) =
+      (optcmd_stp_cnt cmd store, (optcmd_stp_store cmd store, atk_st), 0).
+  Proof. done. Qed.
+End acmd.
+
+Section twocfg.
+  Import Util.List.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates1 AtkStates2 : Type}.
+  Variable (adv1: AdvNextStep AtkStates1) (adv2: AdvNextStep AtkStates2).
+
+  Notation State1 := (State (AtkStates:=AtkStates1)).
+  Notation State2 := (State (AtkStates:=AtkStates2)).
+
+  Definition Cfg := (list (AtkCmd * AtkCmd) * State1 * State2)%type.
+
+  Definition step (c: Cfg): Cfg :=
+    let: (c2lst, s1, s2) := c in
+    if c2lst isn't (ac1, ac2) :: rest then c else
+    let: (p1, st1, steps1) := (acmd_step adv1 ac1 s1) in
+    let: (p2, st2, steps2) := (acmd_step adv2 ac2 s2) in
+
+    let: cont := combine_extend4
+                   (map Some p1) (repeat true steps1)
+                   (map Some p2) (repeat true steps2)
+                   None false None false in
+    let: cont := map (fun '(oc1, a1, oc2, a2) => (mk_atkcmd a1 oc1, mk_atkcmd a2 oc2)) cont in
+    (cont ++ rest, st1, st2).
+End twocfg.
 
 
 (*
