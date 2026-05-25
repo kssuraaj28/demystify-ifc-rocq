@@ -56,20 +56,25 @@ Register with `add_cookstep ltac1:(<tactic>) "<name>" old`:
 
 ```coq
 Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(rewrite Forall_map) "Forall_map" old.
+  add_cookstep ltac1:(rewrite -> Forall_map) "Forall_map" old.
 ```
 
 - The description string should match the underlying lemma/tactic name so debug
   output is readable.
+- **Use `rewrite ->` (vanilla Rocq rewrite), not bare ssr `rewrite`, in rewrite-based cooksteps.** ssr's keyed matching can leave the
+  goal scarred — delta-unfolding the redex while still failing to substitute —
+  whereas the vanilla form is more predictable for cookbook use. Motivating case:
+  `rewrite public_mk` unfolding `compute_new_pc_opt` to look for `mk_lbl _ _`
+  inside, then leaving the unfold even though the substitution didn't fire.
 - Cookbook management: `create_new_cookbook`, `join_cookbooks`, `keep_only`,
   `delete`. `curr_cookbook` is the active chain; change it with
   `Ltac2 Set curr_cookbook`.
 
 When a step boils down to "rewrite a normalization equality", prefer writing a
-plain lemma and registering `rewrite <lemma>`. For lemmas whose RHS is just the
-`cbn`-normalized LHS, the `cbn_eq` Ltac2 notation builds the equality type for
-you. (Do not use `rewrite … in *` in a cookstep — it mutates hypotheses, which
-the cookstep guards forbid; see `Tacs.v`.)
+plain lemma and registering `rewrite -> <lemma>`. For lemmas whose RHS is just
+the `cbn`-normalized LHS, the `cbn_eq` Ltac2 notation builds the equality type
+for you. (Do not use `rewrite … in *` in a cookstep — it mutates hypotheses,
+which the cookstep guards forbid; see `Tacs.v`.)
 
 ### Cookbook re-Import
 
