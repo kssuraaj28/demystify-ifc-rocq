@@ -104,31 +104,18 @@ Section sim_constr.
   Lemma clean_cmd_stp_store_secret_guard c s :
     is_secret_guard (Some c) = true ->
     clean_cmd_stp_store c s = s.
-  Proof. case: c => [dst exp | [g cmp] b1 b2 | [g cmp] b] //=. Qed.
+  Proof. case: c=> * //=. Qed.
 
   Import VarValStore.Notations.
-  Lemma clean_cmd_stp_cnt_pub_nf c st1 st2:
+  Lemma clean_cmd_stp_cnt_pub_nf c st1 st2: (* This name is stupid *)
     is_secret_guard (Some c) = false ->
     ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
     clean_cmd_stp_cnt c st1 = clean_cmd_stp_cnt c st2.
   Proof.
-    case: c => [dst exp | [g cmp] b1 b2 | [g cmp] b] //=.
-    - move=> nsg pubeq.
-      rewrite /is_secret_guard /= /is_secret in nsg.
-      have gp : is_public g.
-      { move: nsg. case: (is_public g) => //. }
-      rewrite /eval_bool_exp /=.
-      have eqg : st1 g = st2 g.
-      { apply: storeview_eq; [exact: pubeq | exact: gp]. }
-      rewrite eqg. done.
-    - move=> nsg pubeq.
-      rewrite /is_secret_guard /= /is_secret in nsg.
-      have gp : is_public g.
-      { move: nsg. case: (is_public g) => //. }
-      rewrite /eval_bool_exp /=.
-      have eqg : st1 g = st2 g.
-      { apply: storeview_eq; [exact: pubeq | exact: gp]. }
-      rewrite eqg. done.
+    case: c=> //= - [g c] > nsg ?.
+    1-2: do [rewrite /is_secret_guard /= /is_secret; move/negbFE] in nsg.
+    1-2: rewrite /eval_bool_exp /=.
+    1-2: pattern_eq_2 [st1 _] [st2 _]; [eauto using storeview_eq| ]=> -> //.
   Qed.
 End sim_constr.
 
