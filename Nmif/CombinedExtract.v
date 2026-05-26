@@ -189,11 +189,9 @@ Section extract_step_commute.
           [ pattern_eq_2 [post_cmd_action _ _ (if _ then _ else rst)]
                          [post_cmd_action _ _ (if _ then _ else simst)] => [|<-];
               [apply: post_acmd_pubeq; eassumption|]
-              (*
           | pattern_eq_2 [post_cmd_action _ _ (optcmd_stp_store _ (if _ then _ else rst))]
                          [post_cmd_action _ _ (optcmd_stp_store _ (if _ then _ else simst))] => [|<-];
               [apply: post_optcmd_acmd_pubeq; eassumption|] (* TODO: This will be wrong? Maybe add tests?  *)
-              *)
           | pattern_eq_2 [optcmd_stp_cnt _ (if _ then _ else rst)]
                          [optcmd_stp_cnt _ (if _ then _ else simst)] => [|<-];
               [apply: cnt_acmd_pubeq; eassumption|] ]
@@ -218,6 +216,7 @@ Section extract_step_commute.
     rewrite /extract_2cfg.
     rewrite/sim_active. cook.
     rewrite/step.
+    have ?:  ~~ (oapp is_declassify false rcmd) by admit. (* This is obvious *)
     congr (_,_,_); cook.
     - set l1 := (X in map _ X = _). set l2 := (X in _ = map _ X).
       suff: l1 = map (fun c => (real_cmd c, real_atk_bit c,  ideal_cmd c, sim_active c)) l2;
@@ -261,17 +260,13 @@ Section extract_step_commute.
         1: move=> /=; move: newpce=> [] // ->.
         2: erewrite ni_sec_optcmd_st_conf_atk;[|eassumption]. 
         1-2: move=> /=; cook. 
-        1-2: admit. }
-        (*
         1-2: rewrite combine_extend3_splitl combine_extend2_same map_map. 
         1-2: erewrite combine_extend2_map_r; [|done]; rewrite map_map.
         1-2: erewrite map_ext; [|case=> ?; instantiate (1 := (fun '(_,_) => _)); reflexivity].
-        1-2: apply: map_ext; case=> *; rewrite/sim_active'; cook. } *)
+        1-2: apply: map_ext; case=> *; rewrite/sim_active'; cook. }
       move: newpce rwt=> /andP [] /negbTE rcmd_grd -> rwt.
       rewrite /= rcmd_grd /=. cook.
       rewrite combine_extend3_splitr. 
-      admit.
-      (*
       rewrite -map_const combine_extend2_map_self_r map_map.
       apply: map_ext_in; case; case=> [?|]; case=> //=.
       move: (optcmd_stp_cnt _ _)=> l. move: (if _ then _ else _)=> n. 
@@ -279,7 +274,6 @@ Section extract_step_commute.
       elim: l n=> //=; [elim=> //= ? ? [] //|]. (* Damn. I used induction in the base, but not  *)
       move=> > ?; case=> //=; [|move=> > [] //; eauto].
       rewrite map_map. case=> // /in_map_iff [] ? [] []//.
-      *)
 
     - case e: (sim_active' _ _ _); cycle 1; 
       [move: (sim_active'_false _ _ _ e)=> []  ->; case=> e'; rewrite -> e' in *=> {e'} //=; f_equal | clear e]; cook.
@@ -298,10 +292,10 @@ Section extract_step_commute.
         rewrite combine_extend3_nil1 combine_extend2_nil_r !map_map filter_map_swap. cook.
         unshelve erewrite filter_ext; [exact xpred0|apply filter_false|]. cook. }
       rewrite/sim_step /=; cnstrct_eq_gl; cook.
-        { admit. }
-        (*
-        { case: pub rwt => rwt /=; [erewrite ni_optcmd_st_conf_atk; [reflexivity|eassumption|] | (* TODO: This should be automated *)
-        erewrite ni_sec_optcmd_st_conf_atk; [|exact: rwt]; erewrite noninterfering_post_pre; [reflexivity|]]; done. } *)
+        { case: pub rwt => rwt /=. (* TODO: This should be automated *)
+           { erewrite ni_optcmd_st_conf_atk; [reflexivity|..]; eauto. }
+        erewrite ni_sec_optcmd_st_conf_atk; [|eassumption]. erewrite noninterfering_post_pre; [reflexivity|]. 
+        congruence. }
       rewrite cmd_map_sim_app. cook.
       rewrite/zip/cmd_map_sim filter_map_swap map_map. symmetry.
       erewrite map_ext; [|case; case=> * /=; instantiate (1:= fun '(_,_,_) => _); reflexivity].
@@ -318,8 +312,6 @@ Section extract_step_commute.
         2: erewrite ni_sec_optcmd_st_conf_atk; [| eassumption]=> /=; cook.
         1: move: newpce=> [] // ->.
         1: rewrite combine_extend2_nil_l.
-        1,2: admit. }
-        (*
         1: cook; set l1 := filter _ _; set l2 := repeat true _.
         1: suff: map (fun '(_,i,_) => i) l1 = l2; [move: l1 l2=> > <-; rewrite map_map; apply: map_ext=> - [] [] //|subst l1 l2].  
         1,2: move: (if _ then _ else _) (map Some _)=> ? ?.
@@ -327,7 +319,7 @@ Section extract_step_commute.
         1,2: erewrite map_ext; [|case; case=> *; instantiate (1 := fun '(_, _,_)=> _); reflexivity ].
         1,2: erewrite filter_ext; [|case; case=> *; instantiate (1 := fun '(_, _,_)=> _); reflexivity ].
         1,2: enter (erewrite map_filter_combine_extend2_ind2;  only 2,3: (case=> *; instantiate (1:= fun _ => _); reflexivity); only 2: done).
-        1,2: clear; revert_hyp_pat nat; elim=> * /=; cook. } *)
+        1,2: clear; revert_hyp_pat nat; elim=> * /=; cook. }
       move: newpce rwt=> /andP [] /negbTE rcmd_grd -> rwt.
       rewrite rcmd_grd. cook.
       rewrite combine_extend3_splitr. 
@@ -336,14 +328,11 @@ Section extract_step_commute.
       2,3: case=> *; instantiate (1:= fun '(_,_) => _); reflexivity; done. 2: done.
       clear. erewrite map_ext; [|instantiate (1 := id); case=> //]. rewrite map_id.
       revert_hyp_pat [Prog, nat].
-      admit.
-      (*
       elim; [elim=> //= n ?; f_equal=> //|].
       move=> > ?; case=> /= *; [| f_equal; eauto].
       rewrite !filter_map_swap.
       erewrite filter_ext; [| move=> * /=; reflexivity].
       cnstrct_eq_gl. rewrite filter_true //.
-      *)
   Admitted.
   Print Assumptions extract_step_commute.
 
