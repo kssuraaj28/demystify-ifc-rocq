@@ -315,7 +315,7 @@ End test.
 (* Revert hyp *)
 #[local] Ltac2 Type exn ::= [ RevertHypProbe ].
 
-Ltac2 revert_hyp_single_pat (pt : preterm) : unit :=
+Ltac2 pick_hyp_single_pat (pt : preterm) : ident :=
   let elaborate_thunk () :=
     Constr.Pretype.pretype
       Constr.Pretype.Flags.open_constr_flags_no_tc
@@ -328,18 +328,20 @@ Ltac2 revert_hyp_single_pat (pt : preterm) : unit :=
         Control.zero RevertHypProbe) with
     | Err RevertHypProbe => true
     | Err _ => false
-    | _ => panic_s "revert_hyp_single_pat" "Unexpected control flow"
+    | _ => panic_s "pick_hyp_single_pat" "Unexpected control flow"
     end in
   let hyps := List.filter (fun (_, _, hty) => matches hty) (Control.hyps ()) in
-  let revert_tac h :=
-    match Control.case (fun () => ltac1:(x |- revert x) (Ltac1.of_constr h)) with
-    | Val _ => ()
-    | Err e => Control.throw e
-    end in
   match hyps with
-  | [(h, _, _)] => revert_tac (Control.hyp h)
-  | [] => panic_s "revert_hyp_single_pat" "No matching hypothesis"
-  | _ => panic_s "revert_hyp_single_pat" "Multiple matching hypotheses"
+  | [(h, _, _)] => h
+  | [] => panic_s "pick_hyp_single_pat" "No matching hypothesis"
+  | _ => panic_s "pick_hyp_single_pat" "Multiple matching hypotheses"
+  end.
+
+Ltac2 revert_hyp_single_pat (pt : preterm) : unit :=
+  let h := pick_hyp_single_pat pt in
+  match Control.case (fun () => ltac1:(x |- revert x) (Ltac1.of_constr (Control.hyp h))) with
+  | Val _ => ()
+  | Err e => Control.throw e
   end.
 
 Ltac2 revert_hyp_pat (pts : preterm list) : unit :=
@@ -356,20 +358,30 @@ Tactic Notation "revert_hyp_pat" uconstr(ty) :=
   let f := ltac2:(ty |- revert_hyp_pat [Option.get (Ltac1.to_preterm ty)]) in
   f ty.
 
+(* I don't like this uconstr:(  ) *)
+Ltac pick_hyp_pat pat :=
+  let f := ltac2val:(pat |-
+    let h := pick_hyp_single_pat (Option.get (Ltac1.to_preterm pat)) in
+    Ltac1.of_constr (Control.hyp h)) in
+  f pat.
+
 Section test.
   Goal nat -> False. Proof. move=> *.  revert_hyp_pat nat. Abort.
   Goal nat -> nat -> False. Proof. move=> *.  Fail revert_hyp_pat nat. Abort.
   Variable P : nat -> Prop.
-  Goal forall n, P n -> False. 
-  Proof. 
-    Succeed move=> *; revert_hyp_pat [nat, (P _)]. 
-    Fail move=> *; revert_hyp_pat [ (P _), nat]. 
+  Goal forall n, P n -> False.
+  Proof.
+    Succeed move=> *; revert_hyp_pat [nat, (P _)].
+    Fail move=> *; revert_hyp_pat [ (P _), nat].
   Abort.
 
   Goal nat -> False. Proof. move=> n. revert_hyp_pat (_ -> Prop). Abort.
   Goal 1 = 2 -> True. Proof. move=> h. revert_hyp_pat (_ = _). Abort.
   Goal option nat -> True.  Proof. move=> a. revert_hyp_pat (option _). Abort.
   Goal option nat -> option bool -> True.  Proof. move=> a b. Fail revert_hyp_pat (option _). Abort.
+
+  Goal 1 = 2 -> True.
+  Proof. move=> *. let h := pick_hyp_pat uconstr:(_ = _) in move: h. Abort.
 End test.
 
 (* Using Constr.Unsafe.kind: the App node exposes the full n-ary application
