@@ -440,7 +440,7 @@ Section step_soundness.
     1-2: move: (X in if X then _ else _)=> ?; if_easy_goals.
     apply/Forall_app. split=> //.
     constructor 2=> //.
-    constructor (*5 *) 3. apply/Forall_impl; [| eassumption]; clear=> *.
+    apply/wf_while /Forall_impl; [| eassumption]; clear=> *.
     rewrite -join_assoc join_idem=> //.
   Qed.
 
