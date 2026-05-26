@@ -82,17 +82,14 @@ Section cmb_step.
       let: real_st := if real_atk_bit is true then pre_cmd_action atk_st real_st else real_st in 
       let: (real_cnt, real_st) := (optcmd_stp_cnt real_cmd real_st,  optcmd_stp_store real_cmd real_st) in (* TODO: The proof breaks when you update real_st before real_cnt. Why? *)
 
+      (* TODO: When there is downgrading, what happens? *) (* TODO: Need to make this also pair? *)
+      let: ideal_cnt :=  optcmd_stp_cnt ideal_cmd ideal_st in (* TODO: Does the order matter? *)
+      let: ideal_st := optcmd_stp_store ideal_cmd ideal_st in
+
       let: sim_st := if real_atk_bit is true then pre_cmd_action atk_st sim_st else sim_st in  
       (* If pc is secret, then there will not be any change to public vars, so this is okay!    The simulator will not have access to real_cmd in a secret branch *)
       let: sim_st := if (public pc_lbl) is false then sim_st else optcmd_stp_store real_cmd sim_st in  
     
-    
-    
-      (* Why is there no untrusted? Untrusted will show up when you have the invariant involved?? *)
-    
-      let: ideal_cnt :=  optcmd_stp_cnt ideal_cmd ideal_st in (* TODO: Does the order matter? *)
-      (* I think that this will change if there is downgrading.. TODO *)
-      let: ideal_st := optcmd_stp_store ideal_cmd ideal_st in
     
       let: atk_pst := (post_cmd_action atk_st real_st) in (* Not having this was quite painful. TODO *)
       let: atk_st := if real_atk_bit is true then atk_pst.1 else atk_st in
