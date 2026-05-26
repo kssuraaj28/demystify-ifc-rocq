@@ -104,14 +104,17 @@ Section sa.
   Fact WellFormedOptCmd_Some pc c :
     ltac2:(cbn_eq (WellFormedOptCmd pc (Some c))).
   Proof. done. Qed.
-
 End sa.
+
+Ltac2 Set this_cookbook_ as old :=
+  add_cookstep ltac1:(rewrite -> WellFormedOptCmd_Some) "WellFormedOptCmd_Some" old.
+
 Notation "pc ⊢ ocmd" := (WellFormedOptCmd pc ocmd) (at level 20).
 
-Section thms.
+(* TODO: Why are there so many sections? *)
+Section flow_to_subtype.
   Import VarValStore.Notations Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
-
 
   Lemma flows_to_subtype_cmd c l1 l2:
       l2 ⊑ l1 -> (* TODO: I don't know whether this is true *)
@@ -133,44 +136,91 @@ Section thms.
     apply/Forall_impl;[|eassumption].
     eauto using flows_to_subtype_cmd.
   Qed.
+End flow_to_subtype.
 
-  Lemma wt_cmd_st_conf c l st1 st2:
+Section ni_cmd_st.
+  Import VarValStore.Notations Lattice4pt.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+
+  Lemma ni_cmd_st_conf c l st1 st2:
       WellFormedCmd l c ->
       ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
       ⟨ clean_cmd_stp_store c st1 | is_public ⟩ = ⟨ clean_cmd_stp_store c st2 | is_public ⟩.
-  Proof. 
-    move=> [] // d s1 s2 ? ?. 
+  Proof.
+    move=> [] // d s1 s2 ? ?.
     case de: ([elaborate is_public d])=> fs1d fs2d _ pubeq /=; [| rewrite !update_storeview_nochange //].
     move: (flows_to_pub _ _ de fs1d)=> {fs1d} ps1. (* TODO: Tactic *)
     move: (flows_to_pub _ _ de fs2d)=> {fs2d} ps2.
     set v1 := (X in ⟨update_to_store _ _ X | _ ⟩ = _ ).
     set v2 := (X in _ = ⟨update_to_store _ _ X | _ ⟩).
     suff: v1 = v2; [move=> ->; apply/update_same_varval=> //|subst v1 v2].
-    f_equal; eauto using storeview_eq. 
+    f_equal; eauto using storeview_eq.
+  Qed.
+
+  Lemma ni_cmd_st_conf_atk {AtkStates} (adv : AdvNextStep AtkStates)
+    ast l c s1 s2 :
+    WellFormedCmd l c ->
+    ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
+    post_cmd_action adv ast (clean_cmd_stp_store c (pre_cmd_action adv ast s1)) =
+    post_cmd_action adv ast (clean_cmd_stp_store c (pre_cmd_action adv ast s2)).
+  Proof.
+    move=> wt hyp.
+    apply: post_cmd_wf.
+    apply: (ni_cmd_st_conf _ _ _ _ wt).
+    apply: pre_cmd_wf_conf.
+    exact: hyp.
+  Qed.
+
+  (* ni_cmd_st_conf_atk with an option-Cmd store-step. *)
+  Lemma ni_optcmd_st_conf_atk {AtkStates} (adv : AdvNextStep AtkStates)
+    ast l oc s1 s2 :
+    l ⊢ oc ->
+    ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
+    post_cmd_action adv ast (optcmd_stp_store oc (pre_cmd_action adv ast s1)) =
+    post_cmd_action adv ast (optcmd_stp_store oc (pre_cmd_action adv ast s2)).
+  Proof.
+    move=> wt hyp.
+    apply: post_cmd_wf.
+    case: oc wt => [c | ] wt.
+    - apply: (ni_cmd_st_conf _ _ _ _ wt). apply: pre_cmd_wf_conf. exact: hyp.
+    - apply: pre_cmd_wf_conf. exact: hyp.
   Qed.
 
   (* In a secret context, the public view is constant *)
-  Fact wt_cmd_st_conf_sec:
-    forall c i st, 
+  Lemma ni_sec_cmd_st_conf:
+    forall c i st,
       WellFormedCmd (mk_lbl i false) c ->
       ⟨ clean_cmd_stp_store c st | is_public ⟩ =
       ⟨ st | is_public ⟩.
-  Proof. 
-    move=> >; move e: (mk_lbl _ _)=> ?; move:e=> /[swap]. 
+  Proof.
+    move=> >; move e: (mk_lbl _ _)=> ?; move:e=> /[swap].
     case=> //= > +++e; rewrite -{}e=> _ _ flw.
     rewrite update_storeview_nochange=> //.
-    rewrite/is_public. 
+    rewrite/is_public.
     apply/negbTE/flows_from_sec; rewrite/secret; eauto; done.
   Qed.
 
-  Lemma wt_cmd_st_int c l st1 st2: 
+  (* In a secret context the command's store-step is invisible to post:
+     it can only move secret state, and post_cmd_action sees only the
+     public view. So `optcmd_stp_store oc` drops out entirely. *)
+  Lemma ni_sec_optcmd_st_conf_atk {AtkStates} (adv : AdvNextStep AtkStates)
+    ast i oc s :
+    mk_lbl i false ⊢ oc ->
+    post_cmd_action adv ast (optcmd_stp_store oc s) =
+    post_cmd_action adv ast s.
+  Proof.
+    case: oc => [? | ] ? //.
+    apply/post_cmd_wf /ni_sec_cmd_st_conf. eassumption.
+  Qed.
+
+  Lemma ni_cmd_st_int c l st1 st2:
       WellFormedCmd l c ->
       ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
       ⟨ clean_cmd_stp_store c st1 | is_trusted ⟩ = ⟨ clean_cmd_stp_store c st2 | is_trusted ⟩.
-  Proof.  
-    move=> [] // d s1 s2 ? ?. 
+  Proof.
+    move=> [] // d s1 s2 ? ?.
     case de: ([elaborate is_untrusted d])=> fs1d fs2d _ treq /=;
-      [do 2 (rewrite update_storeview_nochange{1}/is_trusted; [rewrite de //|])=> //|].  
+      [do 2 (rewrite update_storeview_nochange{1}/is_trusted; [rewrite de //|])=> //|].
     rewrite/is_trusted/is_untrusted/= in de.
     move: de=>/untrusted_false td. (* TODO: Automation *)
     move: (flows_to_tr _ _ td fs1d)=> {fs1d} ts1. (* TODO: Tactic *)
@@ -181,19 +231,22 @@ Section thms.
     f_equal; eauto using storeview_eq.
   Qed.
 
-  Fact wt_cmd_st_int_untr:
-    forall p c st, 
+  Lemma ni_untr_cmd_st_int:
+    forall p c st,
     WellFormedCmd (mk_lbl true p) c ->
     ⟨ clean_cmd_stp_store c st | is_trusted ⟩ =
     ⟨ st | is_trusted ⟩.
-  Proof. 
-    move=> >; move e: (mk_lbl _ _)=> ?; move:e=> /[swap]. 
+  Proof.
+    move=> >; move e: (mk_lbl _ _)=> ?; move:e=> /[swap].
     case=> //= > +++e; rewrite -{}e=> _ _ flw.
     rewrite update_storeview_nochange=> //.
     rewrite/is_trusted/is_untrusted negbF //.
     apply/flows_from_untr; eauto; done.
   Qed.
+End ni_cmd_st.
 
+Section todo.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
   Lemma pubuntr_wf_cont: 
     forall c st, 
       WellFormedCmd (mk_lbl true true) c -> 
@@ -209,71 +262,19 @@ Section thms.
     1-3: apply/flows_to_subtype_prog;[|eassumption].
     1-3: case: (var_lbl)=> [[] []]=> //. (* TODO: This should be lemma *)
   Qed.
-End thms.
-
-Section thms_atk.
-  Import VarValStore.Notations.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
-
-  Lemma noninterfering_post_clean_pre {AtkStates} (adv : AdvNextStep AtkStates)
-    ast l c s1 s2 :
-    WellFormedCmd l c ->
-    ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
-    post_cmd_action adv ast (clean_cmd_stp_store c (pre_cmd_action adv ast s1)) =
-    post_cmd_action adv ast (clean_cmd_stp_store c (pre_cmd_action adv ast s2)).
-  Proof.
-    move=> wt hyp.
-    apply: post_cmd_wf.
-    apply: (wt_cmd_st_conf _ _ _ _ wt).
-    apply: pre_cmd_wf_conf.
-    exact: hyp.
-  Qed.
-
-  (* In a secret context the command's store-step is invisible to post:
-     it can only move secret state, and post_cmd_action sees only the
-     public view. So `optcmd_stp_store oc` drops out entirely. *)
-  Lemma post_optcmd_stp_store_sec {AtkStates} (adv : AdvNextStep AtkStates)
-    ast i oc s :
-    mk_lbl i false ⊢ oc ->
-    post_cmd_action adv ast (optcmd_stp_store oc s) =
-    post_cmd_action adv ast s.
-  Proof.
-    case: oc => [c | ] wt.
-    - apply: post_cmd_wf. apply: wt_cmd_st_conf_sec. exact: wt.
-    - done.
-  Qed.
-
-  (* noninterfering_post_clean_pre with an option-Cmd store-step. *)
-  Lemma noninterfering_post_optcmd_pre {AtkStates} (adv : AdvNextStep AtkStates)
-    ast l oc s1 s2 :
-    l ⊢ oc ->
-    ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
-    post_cmd_action adv ast (optcmd_stp_store oc (pre_cmd_action adv ast s1)) =
-    post_cmd_action adv ast (optcmd_stp_store oc (pre_cmd_action adv ast s2)).
-  Proof.
-    move=> wt hyp.
-    apply: post_cmd_wf.
-    case: oc wt => [c | ] wt.
-    - apply: (wt_cmd_st_conf _ _ _ _ wt). apply: pre_cmd_wf_conf. exact: hyp.
-    - apply: pre_cmd_wf_conf. exact: hyp.
-  Qed.
-
-End thms_atk.
+End todo.
 
 Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(unshelve erewrite wt_cmd_st_int_untr;[..|eassumption]) "wt_cmd_st_int_untr" old.
+  add_cookstep ltac1:(unshelve erewrite ni_untr_cmd_st_int;[..|eassumption]) "ni_untr_cmd_st_int" old.
 
 Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(unshelve erewrite wt_cmd_st_conf_sec;[..|eassumption]) "wt_cmd_st_conf_sec" old.
+  add_cookstep ltac1:(unshelve erewrite ni_sec_cmd_st_conf;[..|eassumption]) "ni_sec_cmd_st_conf" old.
 
 Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(apply/wt_cmd_st_int; [eassumption|])  "wt_cmd_st_int" old.
+  add_cookstep ltac1:(apply/ni_cmd_st_int; [eassumption|])  "ni_cmd_st_int" old.
 
 Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(apply/wt_cmd_st_conf; [eassumption|]) "wt_cmd_st_conf" old.
-
-Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(rewrite -> WellFormedOptCmd_Some) "WellFormedOptCmd_Some" old.
+  add_cookstep ltac1:(apply/ni_cmd_st_conf; [eassumption|]) "ni_cmd_st_conf" old.
 
 Section new_pc.
   Import Lattice4pt.Notations.

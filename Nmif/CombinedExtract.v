@@ -162,7 +162,7 @@ Section extract_step_commute.
     move=> wt pe. apply: post_cmd_wf.
     move: (acmd_prestate_pubeq atkst isatk _ _ pe) => pe'.
     case: oc wt => [c | ] wt /=.
-    - apply: (wt_cmd_st_conf _ _ _ _ wt). exact: pe'.
+    - apply: (ni_cmd_st_conf _ _ _ _ wt). exact: pe'.
     - exact: pe'.
   Qed.
 
@@ -257,7 +257,7 @@ Section extract_step_commute.
         { do [move=> /negbT; rewrite negb_and negbK=> /orP] in newpce.
         case: pub in rwt newpce *; move=> /= in newpce. 
         1: move=> /=; move: newpce=> [] // ->.
-        2: erewrite post_optcmd_stp_store_sec;[|eassumption]. 
+        2: erewrite ni_sec_optcmd_st_conf_atk;[|eassumption]. 
         1-2: move=> /=; cook.
         1-2: rewrite combine_extend3_splitl combine_extend2_same map_map. 
         1-2: erewrite combine_extend2_map_r; [|done]; rewrite map_map.
@@ -291,8 +291,8 @@ Section extract_step_commute.
         rewrite combine_extend3_nil1 combine_extend2_nil_r !map_map filter_map_swap. cook.
         unshelve erewrite filter_ext; [exact xpred0|apply filter_false|]. cook. }
       rewrite/sim_step /=; cnstrct_eq_gl; cook.
-        { case: pub rwt => rwt /=; [erewrite noninterfering_post_optcmd_pre; [reflexivity|eassumption|] | (* TODO: This should be automated *)
-        erewrite post_optcmd_stp_store_sec; [|exact: rwt]; erewrite noninterfering_post_pre; [reflexivity|]]; done. }
+        { case: pub rwt => rwt /=; [erewrite ni_optcmd_st_conf_atk; [reflexivity|eassumption|] | (* TODO: This should be automated *)
+        erewrite ni_sec_optcmd_st_conf_atk; [|exact: rwt]; erewrite noninterfering_post_pre; [reflexivity|]]; done. }
       rewrite cmd_map_sim_app. cook.
       rewrite/zip/cmd_map_sim filter_map_swap map_map. symmetry.
       erewrite map_ext; [|case; case=> * /=; instantiate (1:= fun '(_,_,_) => _); reflexivity].
@@ -306,7 +306,7 @@ Section extract_step_commute.
         { erewrite filter_ext; [|case; case=> ? ? ?; rewrite /sim_active' /= Bool.orb_false_r; instantiate (1 := fun '(_,_,_) => _); reflexivity].
         do [move=> /negbT; rewrite negb_and negbK=> /orP] in newpce.
         case: pub in rwt newpce *; move=> /= in newpce. 
-        2: erewrite post_optcmd_stp_store_sec; [| eassumption]=> /=; cook.
+        2: erewrite ni_sec_optcmd_st_conf_atk; [| eassumption]=> /=; cook.
         1: move: newpce=> [] // ->.
         1: rewrite combine_extend2_nil_l.
         1: cook; set l1 := filter _ _; set l2 := repeat true _.
