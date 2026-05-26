@@ -234,7 +234,12 @@ Section invprf.
         revert_hyp_pat [(option Cmd), (_ ⊢ _)]; case=> /==> [|* //] >.
         apply: step_soundness_pubuntr=> //.
 
-      - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split; cook.
+      - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>].
+        let rcmd := pick_hyp_pat uconstr:(Cmd) in case: (is_endorse_declassify rcmd)=> [ | - []].
+          { admit. } (* Endorse *)
+          { admit. } (* Declassify *)
+        case=> noend nodecl.
+        repeat split; cook.
           { revert_hyp_pat bool; case.
           1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=. 
           2,4: auto with cook_step trickbag; fail.
@@ -243,8 +248,8 @@ Section invprf.
         move=> /=.  
         apply/Forall_and; cook; auto.
         revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)].
-        case=> [[] ?] /= >. {
-           move=> *; cook.
+        case=> [[] ?] /= >.
+           { move=> *; cook.
            revert_hyp_pat [(option _), (_ ⊢ _)]; case=> //= >.
            rewrite -/(WellFormedProg _ _).
            move=> /step_soundness=> snd.
@@ -255,11 +260,12 @@ Section invprf.
            1-2: cook; auto with trickbag. }
         cook.
         rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
+        move=> {noend} {nodecl}.
         revert_hyp_pat [Cmd, (WellFormedCmd _ _), (compute_new_pc _ _ = _)].
         move=> ? /step_soundness snd newpce.
         apply/flows_to_subtype_prog; [|apply/snd].
         auto with trickbag.
-    Qed. 
+    Admitted. 
   End cook.
 
   Theorem cfg_step_inv: forall c, Invariant c ->  Invariant (cfg_step c).

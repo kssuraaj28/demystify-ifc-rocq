@@ -361,38 +361,38 @@ Ltac2 Set this_cookbook_ as old :=
 Ltac2 Set this_cookbook_ as old :=
   add_cookstep ltac1:(erewrite ni_sec_cmd_st_conf;[..|eassumption]) "ni_sec_cmd_st_conf" old.
 
+(*
 Ltac2 Set this_cookbook_ as old := (* Maybe this should be unshelve erewrite also *)
   add_cookstep ltac1:(erewrite ni_cmd_st_int; only 2-4: eassumption)  "ni_cmd_st_int" old.
 
 Ltac2 Set this_cookbook_ as old :=
   add_cookstep ltac1:(erewrite ni_cmd_st_conf; only 2-4: eassumption) "ni_cmd_st_conf" old.
+  *)
 
-(*
 Ltac2 Set this_cookbook_ as old := (* Maybe this should be unshelve erewrite also *)
-  add_cookstep ltac1:(apply/ni_cmd_st_int; [eassumption|..])  "ni_cmd_st_int" old.
+  add_cookstep ltac1:(apply/ni_cmd_st_int; [eassumption| assumption|])  "ni_cmd_st_int" old.
 
 Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(apply/ni_cmd_st_conf; [eassumption|..]) "ni_cmd_st_conf" old.
-  *)
+  add_cookstep ltac1:(apply/ni_cmd_st_conf; [eassumption| assumption|]) "ni_cmd_st_conf" old.
 
 Section test.
   Import VarValStore.Notations Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
   Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["ni_cmd_st_conf"]) ().
-  Goal forall l c st1 st2 (P : _ -> Prop), WellFormedCmd l c ->
+  Goal forall l c st1 st2, WellFormedCmd l c ->
     ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->    ~~ is_declassify c ->
-    P ⟨ clean_cmd_stp_store c st1 | is_public ⟩.
-  Proof. move=> *. progress cook. Abort.
+    ⟨ clean_cmd_stp_store c st1 | is_public ⟩ = ⟨ clean_cmd_stp_store c st2 | is_public ⟩.
+  Proof. move=> *. cook. Abort.
 End test.
 
 Section test.
   Import VarValStore.Notations Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
   Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["ni_cmd_st_int"]) ().
-  Goal forall l c st1 st2 (P : _ -> Prop), WellFormedCmd l c ->
+  Goal forall l c st1 st2, WellFormedCmd l c ->
     ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->    ~~ is_endorse c ->
-    P ⟨ clean_cmd_stp_store c st1 | is_trusted ⟩.
-  Proof. move=> *. progress cook. Abort.
+    ⟨ clean_cmd_stp_store c st1 | is_trusted ⟩ = ⟨ clean_cmd_stp_store c st2 | is_trusted ⟩.
+  Proof. move=> *. cook. Abort.
 End test.
 
 Section test.
