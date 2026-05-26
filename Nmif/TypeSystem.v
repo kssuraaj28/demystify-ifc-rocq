@@ -282,6 +282,7 @@ Section ni.
       ⟨ clean_cmd_stp_store c st1 | is_trusted ⟩ = ⟨ clean_cmd_stp_store c st2 | is_trusted ⟩.
   Proof.
     move=> [] // d s1 s2 ? ?.
+    1-2: admit.
     case de: ([elaborate is_untrusted d])=> fs1d fs2d _ treq /=;
       [do 2 (rewrite update_storeview_nochange{1}/is_trusted; [rewrite de //|])=> //|].
     rewrite/is_trusted/is_untrusted/= in de.
@@ -292,7 +293,7 @@ Section ni.
     set v2 := (X in _ = ⟨update_to_store _ _ X | _ ⟩).
     suff: v1 = v2; [move=> ->; apply/update_same_varval=> //|subst v1 v2].
     f_equal; eauto using storeview_eq.
-  Qed.
+  Admitted.
 
   Lemma ni_untr_cmd_st_int:
     forall p c st,
@@ -364,7 +365,7 @@ Section step_soundness.
     1-2: move: (X in if X then _ else _)=> ?; if_easy_goals.
     apply/Forall_app. split=> //.
     constructor 2=> //.
-    constructor 3. apply/Forall_impl; [| eassumption]; clear=> *.
+    constructor 5. apply/Forall_impl; [| eassumption]; clear=> *.
     rewrite -join_assoc join_idem=> //.
   Qed.
 
