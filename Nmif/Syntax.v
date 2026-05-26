@@ -1,5 +1,5 @@
-From Stdlib Require List ssreflect.
-Import List ListNotations ssreflect.
+From Stdlib Require List ssreflect ssrbool.
+Import List ListNotations ssreflect ssrbool.
 
 Require VarValStore Tacs.
 Import VarValStore.
@@ -67,5 +67,9 @@ Section syntax.
 
   Definition is_declassify (c : Cmd) : bool :=
     match c with declassify _ _ => true | _ => false end.
+
+  Lemma is_endorse_declassify c:
+    is_endorse c \/ is_declassify c \/ (~~ is_endorse c /\ ~~ is_declassify c).
+  Proof. case: c=> /= *; intuition. Qed.
 
 End syntax.
