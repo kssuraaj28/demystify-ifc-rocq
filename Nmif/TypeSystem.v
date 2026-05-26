@@ -133,6 +133,13 @@ End sa.
 Ltac2 Set this_cookbook_ as old :=
   add_cookstep ltac1:(rewrite -> WellFormedOptCmd_Some) "WellFormedOptCmd_Some" old.
 
+Section test.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
+  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["WellFormedOptCmd_Some"]) ().
+  Goal forall pc c (P : _ -> Prop), P (WellFormedOptCmd pc (Some c)).
+  Proof. move=> *. progress cook. Abort.
+End test.
+
 Notation "pc ⊢ ocmd" := (WellFormedOptCmd pc ocmd) (at level 20).
 
 
@@ -170,6 +177,22 @@ End new_pc.
 
 Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite -> compute_new_pc_opt_some) "compute_new_pc_opt_some" old.
 Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite -> compute_new_pc_opt_secret) "compute_new_pc_opt_secret" old.
+
+Section test.
+  Import Lattice4pt.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
+  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["compute_new_pc_opt_some"]) ().
+  Goal forall pc c (P: _ -> Prop), P (compute_new_pc_opt pc (Some c)). 
+  Proof. move=> *. progress cook. Abort.
+End test.
+
+Section test.
+  Import Lattice4pt.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
+  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["compute_new_pc_opt_secret"]) ().
+  Goal forall untr c (P: _ -> Prop), P (public (compute_new_pc_opt (mk_lbl untr false) c)).
+  Proof. move=> *. progress cook. Abort.
+End test.
 
 Section flow_to_subtype.
   Import VarValStore.Notations Lattice4pt.Notations.
@@ -328,16 +351,62 @@ Section ni.
 End ni.
 
 Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(unshelve erewrite ni_untr_cmd_st_int;[..|eassumption]) "ni_untr_cmd_st_int" old.
+  add_cookstep ltac1:(erewrite ni_untr_cmd_st_int;[..|eassumption]) "ni_untr_cmd_st_int" old.
 
 Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(unshelve erewrite ni_sec_cmd_st_conf;[..|eassumption]) "ni_sec_cmd_st_conf" old.
+  add_cookstep ltac1:(erewrite ni_sec_cmd_st_conf;[..|eassumption]) "ni_sec_cmd_st_conf" old.
+
+Ltac2 Set this_cookbook_ as old := (* Maybe this should be unshelve erewrite also *)
+  add_cookstep ltac1:(erewrite ni_cmd_st_int; only 2-4: eassumption)  "ni_cmd_st_int" old.
 
 Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(apply/ni_cmd_st_int; [eassumption|])  "ni_cmd_st_int" old.
+  add_cookstep ltac1:(erewrite ni_cmd_st_conf; only 2-4: eassumption) "ni_cmd_st_conf" old.
+
+(*
+Ltac2 Set this_cookbook_ as old := (* Maybe this should be unshelve erewrite also *)
+  add_cookstep ltac1:(apply/ni_cmd_st_int; [eassumption|..])  "ni_cmd_st_int" old.
 
 Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(apply/ni_cmd_st_conf; [eassumption|]) "ni_cmd_st_conf" old.
+  add_cookstep ltac1:(apply/ni_cmd_st_conf; [eassumption|..]) "ni_cmd_st_conf" old.
+  *)
+
+Section test.
+  Import VarValStore.Notations Lattice4pt.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["ni_cmd_st_conf"]) ().
+  Goal forall l c st1 st2 (P : _ -> Prop), WellFormedCmd l c ->
+    ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->    ~~ is_declassify c ->
+    P ⟨ clean_cmd_stp_store c st1 | is_public ⟩.
+  Proof. move=> *. progress cook. Abort.
+End test.
+
+Section test.
+  Import VarValStore.Notations Lattice4pt.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["ni_cmd_st_int"]) ().
+  Goal forall l c st1 st2 (P : _ -> Prop), WellFormedCmd l c ->
+    ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->    ~~ is_endorse c ->
+    P ⟨ clean_cmd_stp_store c st1 | is_trusted ⟩.
+  Proof. move=> *. progress cook. Abort.
+End test.
+
+Section test.
+  Import VarValStore.Notations Lattice4pt.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["ni_sec_cmd_st_conf"]) ().
+  Goal forall i c st1 (P : _ -> Prop), WellFormedCmd (mk_lbl i false) c ->
+    P ⟨ clean_cmd_stp_store c st1 | is_public ⟩.
+  Proof. move=> *. progress cook. Abort.
+End test.
+
+Section test.
+  Import VarValStore.Notations Lattice4pt.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["ni_untr_cmd_st_int"]) ().
+  Goal forall p c st1 (P : _ -> Prop), WellFormedCmd (mk_lbl true p) c ->
+    P ⟨ clean_cmd_stp_store c st1 | is_trusted ⟩.
+  Proof. move=> *. progress cook. Abort.
+End test.
 
 Section step_soundness.
   Import VarValStore.Notations.
@@ -390,6 +459,14 @@ End step_soundness.
 
 (* TODO: rewrite -> vs rewrite  *)
 Ltac2 Set this_cookbook_ as old :=  add_cookstep  ltac1:(rewrite -> untr_compute_new_pc) "untr_compute_new_pc" old.
+
+Section test.
+  Import Lattice4pt.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
+  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["untr_compute_new_pc"]) ().
+  Goal forall p c (P : _ -> Prop), P (untrusted (compute_new_pc (mk_lbl true p) c)).
+  Proof. move=> *. progress cook. Abort.
+End test.
 
 
 Ltac2 this_cookbook () := this_cookbook_ ().
