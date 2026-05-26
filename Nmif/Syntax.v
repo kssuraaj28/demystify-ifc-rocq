@@ -62,11 +62,10 @@ Section syntax.
     Qed.
   End cmd_ind.
 
-  Definition is_downgrading (c : Cmd) : bool :=
-    match c with
-    | endorse _ _ => true
-    | declassify _ _ => true
-    | _ => false
-    end.
+  Definition is_endorse (c : Cmd) : bool :=
+    match c with endorse _ _ => true | _ => false end.
+
+  Definition is_declassify (c : Cmd) : bool :=
+    match c with declassify _ _ => true | _ => false end.
 
 End syntax.

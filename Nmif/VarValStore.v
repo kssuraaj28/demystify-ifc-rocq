@@ -76,4 +76,14 @@ Section thms.
     move: h=> /equal_f/(_ inp).
     rewrite/⟨_|_⟩ pe=> - [] //.
   Qed.
+
+  Lemma update_to_store_storeview_eq s1 s2 dst src (p: pred Vars):
+    p src ->
+    ⟨ s1 | p ⟩ = ⟨ s2 | p ⟩ ->
+    ⟨ update_to_store s1 dst (s1 src) | p ⟩ = ⟨ update_to_store s2 dst (s2 src) | p ⟩.
+  Proof.
+    move=> psrc pubeq.
+    have ->: s1 src = s2 src; [apply: storeview_eq; [exact: pubeq | exact: psrc] |].
+    exact: update_same_varval.
+  Qed.
 End thms.

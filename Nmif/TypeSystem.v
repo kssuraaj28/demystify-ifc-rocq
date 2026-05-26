@@ -29,6 +29,18 @@ Section sa.
   (* WellTyped? *)
   Unset Elimination Schemes.
   Inductive WellFormedCmd : PcLbl -> Cmd -> Prop := 
+  | wf_endorse: 
+     forall from to,
+       let: ptlbl := mk_lbl false true in let: pulbl := mk_lbl true true in
+       var_lbl from = pulbl -> var_lbl to = ptlbl ->
+       _ ptlbl (endorse from to) 
+
+  | wf_declassify: 
+     forall from to,
+       let: ptlbl := mk_lbl false true in let: stlbl := mk_lbl false false in
+       var_lbl from = stlbl -> var_lbl to = ptlbl ->
+       _ ptlbl (declassify from to)
+
   | wf_assign: 
      forall dst src1 src2 comp pclbl, 
        let: dstlbl := var_lbl dst in
@@ -51,17 +63,29 @@ Section sa.
        let: newpc := gvarlbl ⊔ pclbl in
        WellFormedProg' WellFormedCmd newpc wbody ->
        _ pclbl (while (gvar,comp) wbody).
+
   Set Elimination Schemes.
   
   Definition WellFormedProg pclbl prog := WellFormedProg' WellFormedCmd pclbl prog.
 
   Section ind.
     Variable P : PcLbl -> Cmd -> Prop.
-    (* This is the right IH, I think because I made another toy example without nested inductive types *)
+
     (* 
        However, do we even need induction? Maybe we don't need it at all.. 
        So, can we do something weaker than inductively defining this then?
     *)
+    Hypothesis hyp_endorse : 
+        forall from to,
+          let: ptlbl := mk_lbl false true in let: pulbl := mk_lbl true true in
+          var_lbl from = pulbl -> var_lbl to = ptlbl ->
+          P ptlbl (endorse from to). 
+
+    Hypothesis hyp_declassify : 
+        forall from to,
+          let: ptlbl := mk_lbl false true in let: stlbl := mk_lbl false false in
+          var_lbl from = stlbl -> var_lbl to = ptlbl ->
+          P ptlbl (declassify from to).
 
     Hypothesis hyp_assign : 
         forall dst src1 src2  comp pclbl,
@@ -90,7 +114,7 @@ Section sa.
     Fixpoint WellFormedCmd_ind :
       forall p c, WellFormedCmd p c -> P p c. 
     Proof.
-      move=> > []; [apply:hyp_assign|..]=> *.
+      move=> > []; [apply:hyp_endorse|apply:hyp_declassify|apply:hyp_assign|..]=> *.
       1-2: (apply: hyp_cond; clear hyp_cond) || (apply: hyp_while; clear hyp_while)=>//.
       1-3: lazymatch goal with
              H: Forall _ ?b |- Forall _ ?b => elim: H=> // *
@@ -157,7 +181,8 @@ Section flow_to_subtype.
       WellFormedCmd l2 c.
   Proof. 
     (* TODO: What does elim do? Is it just apply? *)  
-    move: l2=> ++ h; elim: h=> *; [constructor=> //; eauto using flows_to_trans|..].
+    move: l2=> ++ h. elim: h=> *; [| |constructor=> //; eauto using flows_to_trans|..].
+    1-2: revert_hyp_pat  (is_true (_ ⊑ _))=> /flows_to_pt ->; constructor=> //.
     1-2: constructor; (apply/Forall_impl;[ |eassumption])=> /= >; auto using join_mono_r.
   Qed.
 
@@ -179,11 +204,13 @@ Section ni.
 
   Lemma ni_cmd_st_conf c l st1 st2:
       WellFormedCmd l c ->
+      ~~ is_declassify c ->
       ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
       ⟨ clean_cmd_stp_store c st1 | is_public ⟩ = ⟨ clean_cmd_stp_store c st2 | is_public ⟩.
   Proof.
     move=> [] // d s1 s2 ? ?.
-    case de: ([elaborate is_public d])=> fs1d fs2d _ pubeq /=; [| rewrite !update_storeview_nochange //].
+      { apply: update_to_store_storeview_eq. rewrite /is_public s2 //. }
+    case de: ([elaborate is_public d])=> fs1d fs2d _ _ pubeq /=; [| rewrite !update_storeview_nochange //].
     move: (flows_to_pub _ _ de fs1d)=> {fs1d} ps1. (* TODO: Tactic *)
     move: (flows_to_pub _ _ de fs2d)=> {fs2d} ps2.
     set v1 := (X in ⟨update_to_store _ _ X | _ ⟩ = _ ).
@@ -195,30 +222,31 @@ Section ni.
   Lemma ni_cmd_st_conf_atk {AtkStates} (adv : AdvNextStep AtkStates)
     ast l c s1 s2 :
     WellFormedCmd l c ->
+    ~~ is_declassify c ->
     ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
     post_cmd_action adv ast (clean_cmd_stp_store c (pre_cmd_action adv ast s1)) =
     post_cmd_action adv ast (clean_cmd_stp_store c (pre_cmd_action adv ast s2)).
   Proof.
-    move=> wt hyp.
+    move=> *.
     apply: post_cmd_wf.
-    apply: (ni_cmd_st_conf _ _ _ _ wt).
-    apply: pre_cmd_wf_conf.
-    exact: hyp.
+    apply: ni_cmd_st_conf=> //; [eassumption|].
+    apply: pre_cmd_wf_conf=> //.
   Qed.
 
   (* ni_cmd_st_conf_atk with an option-Cmd store-step. *)
   Lemma ni_optcmd_st_conf_atk {AtkStates} (adv : AdvNextStep AtkStates)
     ast l oc s1 s2 :
     l ⊢ oc ->
+    ~~ oapp is_declassify false oc ->
     ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
     post_cmd_action adv ast (optcmd_stp_store oc (pre_cmd_action adv ast s1)) =
     post_cmd_action adv ast (optcmd_stp_store oc (pre_cmd_action adv ast s2)).
   Proof.
-    move=> wt hyp.
+    move=> wt nodecl ?.
     apply: post_cmd_wf.
-    case: oc wt => [c | ] wt.
-    - apply: (ni_cmd_st_conf _ _ _ _ wt). apply: pre_cmd_wf_conf. exact: hyp.
-    - apply: pre_cmd_wf_conf. exact: hyp.
+    case: oc wt nodecl => [c | ] wt /= ?.
+    - apply: (ni_cmd_st_conf _ _ _ _ wt)=> //. apply: pre_cmd_wf_conf=> //.
+    - apply: pre_cmd_wf_conf=> //.
   Qed.
 
   (* In a secret context, the public view is constant *)

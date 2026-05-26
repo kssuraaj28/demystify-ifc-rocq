@@ -154,4 +154,7 @@ Lemma flows_to_pub:
     public l1.
 Proof. do 2 (case=> - [] [])=> //. Qed.
 
+Lemma flows_to_pt l : l ⊑ mk_lbl false true -> l = mk_lbl false true.
+Proof. case: l=> - [] [] //. Qed.
+
 Ltac2 this_cookbook () := this_cookbook_ ().
