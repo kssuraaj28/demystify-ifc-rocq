@@ -278,12 +278,13 @@ Section ni.
 
   Lemma ni_cmd_st_int c l st1 st2:
       WellFormedCmd l c ->
+      ~~ is_endorse c ->
       ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
       ⟨ clean_cmd_stp_store c st1 | is_trusted ⟩ = ⟨ clean_cmd_stp_store c st2 | is_trusted ⟩.
   Proof.
     move=> [] // d s1 s2 ? ?.
-    1-2: admit.
-    case de: ([elaborate is_untrusted d])=> fs1d fs2d _ treq /=;
+      { apply: update_to_store_storeview_eq. rewrite /is_trusted /is_untrusted s2 //. }
+    case de: ([elaborate is_untrusted d])=> fs1d fs2d _ _ treq /=;
       [do 2 (rewrite update_storeview_nochange{1}/is_trusted; [rewrite de //|])=> //|].
     rewrite/is_trusted/is_untrusted/= in de.
     move: de=>/untrusted_false td. (* TODO: Automation *)
@@ -293,7 +294,7 @@ Section ni.
     set v2 := (X in _ = ⟨update_to_store _ _ X | _ ⟩).
     suff: v1 = v2; [move=> ->; apply/update_same_varval=> //|subst v1 v2].
     f_equal; eauto using storeview_eq.
-  Admitted.
+  Qed.
 
   Lemma ni_untr_cmd_st_int:
     forall p c st,
