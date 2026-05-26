@@ -204,7 +204,6 @@ Section invprf.
            |- context [compute_new_pc (mk_lbl true ?p) ?c] =>
               move: ([elaborate compute_new_pc_untr p c])=> [] + ->
            end: core.
-    Hint Extern 10 => lazymatch goal with |- _ => apply:pubuntr_wf_cont end: core.
     Hint Extern 10 => lazymatch goal with |- _ => apply:step_soundness end: core.
 
 (*    Hint Extern 100 => lazymatch goal with _ =>  cbn end : trickbag. *)
@@ -232,7 +231,8 @@ Section invprf.
         move=> /=. 
         apply/Forall_and; cook; auto with trickbag.
         rewrite-/(WellFormedProg _ _).
-        revert_hyp_pat [(option Cmd), (_ ⊢ _)]; case=> /= *; auto with trickbag.
+        revert_hyp_pat [(option Cmd), (_ ⊢ _)]; case=> /==> [|* //] >.
+        apply: step_soundness_pubuntr=> //.
 
       - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>]; repeat split; cook.
           { revert_hyp_pat bool; case.

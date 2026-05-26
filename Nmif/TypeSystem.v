@@ -247,7 +247,7 @@ End ni_cmd_st.
 
 Section todo.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
-  Lemma pubuntr_wf_cont: 
+  Lemma step_soundness_pubuntr: 
     forall c st, 
       WellFormedCmd (mk_lbl true true) c -> 
       WellFormedProg (mk_lbl true true) (clean_cmd_stp_cnt c st).
