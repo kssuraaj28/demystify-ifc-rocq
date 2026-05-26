@@ -111,32 +111,6 @@ Ltac2 Set this_cookbook_ as old :=
 
 Notation "pc ⊢ ocmd" := (WellFormedOptCmd pc ocmd) (at level 20).
 
-(* TODO: Why are there so many sections? *)
-Section flow_to_subtype.
-  Import VarValStore.Notations Lattice4pt.Notations.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
-
-  Lemma flows_to_subtype_cmd c l1 l2:
-      l2 ⊑ l1 -> (* TODO: I don't know whether this is true *)
-      WellFormedCmd l1 c ->
-      WellFormedCmd l2 c.
-  Proof. 
-    (* TODO: What does elim do? Is it just apply? *)  
-    move: l2=> ++ h; elim: h=> *; [constructor=> //; eauto using flows_to_trans|..].
-    1-2: constructor; (apply/Forall_impl;[ |eassumption])=> /= >; auto using join_mono_r.
-  Qed.
-
-  Lemma flows_to_subtype_prog :
-    forall p l1 l2,
-      l2 ⊑ l1 -> (* TODO: I don't know whether this is true *)
-      WellFormedProg l1 p ->
-      WellFormedProg l2 p.
-  Proof. 
-    rewrite/WellFormedProg=> *.
-    apply/Forall_impl;[|eassumption].
-    eauto using flows_to_subtype_cmd.
-  Qed.
-End flow_to_subtype.
 
 Section new_pc.
   Import Lattice4pt.Notations.
@@ -172,6 +146,32 @@ End new_pc.
 
 Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite -> compute_new_pc_opt_some) "compute_new_pc_opt_some" old.
 Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite -> compute_new_pc_opt_secret) "compute_new_pc_opt_secret" old.
+
+Section flow_to_subtype.
+  Import VarValStore.Notations Lattice4pt.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
+
+  Lemma flows_to_subtype_cmd c l1 l2:
+      l2 ⊑ l1 -> (* TODO: I don't know whether this is true *)
+      WellFormedCmd l1 c ->
+      WellFormedCmd l2 c.
+  Proof. 
+    (* TODO: What does elim do? Is it just apply? *)  
+    move: l2=> ++ h; elim: h=> *; [constructor=> //; eauto using flows_to_trans|..].
+    1-2: constructor; (apply/Forall_impl;[ |eassumption])=> /= >; auto using join_mono_r.
+  Qed.
+
+  Lemma flows_to_subtype_prog :
+    forall p l1 l2,
+      l2 ⊑ l1 -> (* TODO: I don't know whether this is true *)
+      WellFormedProg l1 p ->
+      WellFormedProg l2 p.
+  Proof. 
+    rewrite/WellFormedProg=> *.
+    apply/Forall_impl;[|eassumption].
+    eauto using flows_to_subtype_cmd.
+  Qed.
+End flow_to_subtype.
 
 Section ni.
   Import VarValStore.Notations Lattice4pt.Notations.
@@ -280,12 +280,11 @@ Section ni.
   Qed.
 
   Lemma ni_tr_cmd_cnt:
-    forall p c,
+    forall p c st1 st2,
       let: lbl := mk_lbl false p in
       let: new_lbl := (compute_new_pc lbl c) in
       WellFormedCmd lbl c ->
       untrusted new_lbl = false ->
-      forall st1 st2,
         ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
         clean_cmd_stp_cnt c st1 = clean_cmd_stp_cnt c st2.
   Proof.

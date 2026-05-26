@@ -61,4 +61,12 @@ Section syntax.
       1-3:  lazymatch goal with |- Forall _ ?l => elim: l end; auto.
     Qed.
   End cmd_ind.
+
+  Definition is_downgrading (c : Cmd) : bool :=
+    match c with
+    | endorse _ _ => true
+    | declassify _ _ => true
+    | _ => false
+    end.
+
 End syntax.
