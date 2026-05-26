@@ -138,7 +138,42 @@ Section flow_to_subtype.
   Qed.
 End flow_to_subtype.
 
-Section ni_cmd_st.
+Section new_pc.
+  Import Lattice4pt.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
+
+  Definition compute_new_pc (old_pc : PcLbl) (cmd: Cmd): PcLbl :=
+    match cmd with
+    | cond (gvar,_) _ _ => var_lbl gvar ⊔ old_pc (* Can this be refactored w/ static analysis? *)
+    | while (gvar,_) _ => var_lbl gvar ⊔ old_pc
+    | _ => old_pc
+    end.
+
+  Definition compute_new_pc_opt (old_pc : PcLbl) (cmd: option Cmd): PcLbl :=
+    if cmd isn't Some cmd then old_pc else
+    compute_new_pc old_pc cmd.
+
+  Fact compute_new_pc_opt_some pc cmd :
+    ltac2:(cbn_eq (compute_new_pc_opt pc (Some cmd))).
+  Proof. done. Qed.
+
+  Lemma compute_new_pc_secret untr c :
+    public (compute_new_pc (mk_lbl untr false) c) = false.
+  Proof. case: c=> // - []  *; rewrite pub_join //.  Qed.
+
+  Fact compute_new_pc_opt_secret untr c :
+    public (compute_new_pc_opt (mk_lbl untr false) c) = false.
+  Proof.
+    rewrite /compute_new_pc_opt.
+    case: c => [c | ] //.
+    rewrite compute_new_pc_secret //.
+  Qed.
+End new_pc.
+
+Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite -> compute_new_pc_opt_some) "compute_new_pc_opt_some" old.
+Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite -> compute_new_pc_opt_secret) "compute_new_pc_opt_secret" old.
+
+Section ni.
   Import VarValStore.Notations Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
@@ -243,93 +278,8 @@ Section ni_cmd_st.
     rewrite/is_trusted/is_untrusted negbF //.
     apply/flows_from_untr; eauto; done.
   Qed.
-End ni_cmd_st.
 
-Section todo.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
-  Lemma step_soundness_pubuntr: 
-    forall c st, 
-      WellFormedCmd (mk_lbl true true) c -> 
-      WellFormedProg (mk_lbl true true) (clean_cmd_stp_cnt c st).
-  Proof. 
-    rewrite/WellFormedProg=> >;  move l: (mk_lbl _ _)=> ?; move: l=> /[swap].
-    case=> //= >; rewrite  -!/(WellFormedProg _ _)=>>. 
-    1: move=> ++ e; rewrite -{}e => *.
-    2: move=> + e; rewrite -{}e => *.
-    1-2: case: (X in if X then _ else _) => //. (* all is antipattern *)
-    3: apply/Forall_app; split;[|repeat constructor=>//]; 
-        rewrite -/(WellFormedProg _ _).
-    1-3: apply/flows_to_subtype_prog;[|eassumption].
-    1-3: case: (var_lbl)=> [[] []]=> //. (* TODO: This should be lemma *)
-  Qed.
-End todo.
-
-Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(unshelve erewrite ni_untr_cmd_st_int;[..|eassumption]) "ni_untr_cmd_st_int" old.
-
-Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(unshelve erewrite ni_sec_cmd_st_conf;[..|eassumption]) "ni_sec_cmd_st_conf" old.
-
-Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(apply/ni_cmd_st_int; [eassumption|])  "ni_cmd_st_int" old.
-
-Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(apply/ni_cmd_st_conf; [eassumption|]) "ni_cmd_st_conf" old.
-
-Section new_pc.
-  Import Lattice4pt.Notations.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
-
-  Definition compute_new_pc (old_pc : PcLbl) (cmd: Cmd): PcLbl :=
-    match cmd with
-    | cond (gvar,_) _ _ => var_lbl gvar ⊔ old_pc (* Can this be refactored w/ static analysis? *)
-    | while (gvar,_) _ => var_lbl gvar ⊔ old_pc
-    | _ => old_pc
-    end.
-
-  Definition compute_new_pc_opt (old_pc : PcLbl) (cmd: option Cmd): PcLbl :=
-    if cmd isn't Some cmd then old_pc else
-    compute_new_pc old_pc cmd.
-
-  Fact compute_new_pc_opt_some pc cmd :
-    ltac2:(cbn_eq (compute_new_pc_opt pc (Some cmd))).
-  Proof. done. Qed.
-
-  Lemma compute_new_pc_secret untr c :
-    public (compute_new_pc (mk_lbl untr false) c) = false.
-  Proof. case: c=> // - []  *; rewrite pub_join //.  Qed.
-
-  Fact compute_new_pc_opt_secret untr c :
-    public (compute_new_pc_opt (mk_lbl untr false) c) = false.
-  Proof.
-    rewrite /compute_new_pc_opt.
-    case: c => [c | ] //.
-    rewrite compute_new_pc_secret //.
-  Qed.
-End new_pc.
-
-Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite -> compute_new_pc_opt_some) "compute_new_pc_opt_some" old.
-Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite -> compute_new_pc_opt_secret) "compute_new_pc_opt_secret" old.
-
-Section thms.
-  Import VarValStore.Notations.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
-  Lemma compute_new_pc_untr p c:
-    exists p',
-      compute_new_pc (mk_lbl true p) c = (mk_lbl true p').
-  Proof.
-  case: c; eauto; cbn; case=> *.
-    1-2: case: (var_lbl _) => u pg. (* TODO: This could be a lemma *)
-    1-2: exists (pg && p); case: u; done.
-  Qed.
-
- Fact untr_compute_new_pc p c: 
-   untrusted (compute_new_pc (mk_lbl true p) c).
- Proof.
-   case: c=> //=; case=> * ; rewrite untr_join //.
- Qed.
-
-  Lemma tr_cmd_cnt:
+  Lemma ni_tr_cmd_cnt:
     forall p c,
       let: lbl := mk_lbl false p in
       let: new_lbl := (compute_new_pc lbl c) in
@@ -346,20 +296,67 @@ Section thms.
     1-2: apply/storeview_eq; [eassumption|].
     1-2: move: untrg; rewrite Bool.orb_false_r /is_trusted/is_untrusted=> -> //.
   Qed.
+End ni.
+
+Ltac2 Set this_cookbook_ as old :=
+  add_cookstep ltac1:(unshelve erewrite ni_untr_cmd_st_int;[..|eassumption]) "ni_untr_cmd_st_int" old.
+
+Ltac2 Set this_cookbook_ as old :=
+  add_cookstep ltac1:(unshelve erewrite ni_sec_cmd_st_conf;[..|eassumption]) "ni_sec_cmd_st_conf" old.
+
+Ltac2 Set this_cookbook_ as old :=
+  add_cookstep ltac1:(apply/ni_cmd_st_int; [eassumption|])  "ni_cmd_st_int" old.
+
+Ltac2 Set this_cookbook_ as old :=
+  add_cookstep ltac1:(apply/ni_cmd_st_conf; [eassumption|]) "ni_cmd_st_conf" old.
+
+Section step_soundness.
+  Import VarValStore.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
+  Lemma compute_new_pc_untr p c:
+    exists p',
+      compute_new_pc (mk_lbl true p) c = (mk_lbl true p').
+  Proof.
+  case: c; eauto; cbn; case=> *.
+    1-2: case: (var_lbl _) => u pg. (* TODO: This could be a lemma *)
+    1-2: exists (pg && p); case: u; done.
+  Qed.
+
+ Fact untr_compute_new_pc p c:
+   untrusted (compute_new_pc (mk_lbl true p) c).
+ Proof.
+   case: c=> //=; case=> * ; rewrite untr_join //.
+ Qed.
 
   Lemma step_soundness c pc:
       WellFormedCmd pc c ->
       forall st,
         WellFormedProg (compute_new_pc pc c) (clean_cmd_stp_cnt c st).
   Proof.
-    move=> + > => - []=> * //=. 
+    move=> + > => - []=> * //=.
     1-2: move: (X in if X then _ else _)=> ?; if_easy_goals.
     apply/Forall_app. split=> //.
     constructor 2=> //.
     constructor 3. apply/Forall_impl; [| eassumption]; clear=> *.
     rewrite -join_assoc join_idem=> //.
   Qed.
-End thms.
+
+  Lemma step_soundness_pubuntr:
+    forall c st,
+      WellFormedCmd (mk_lbl true true) c ->
+      WellFormedProg (mk_lbl true true) (clean_cmd_stp_cnt c st).
+  Proof.
+    rewrite/WellFormedProg=> >;  move l: (mk_lbl _ _)=> ?; move: l=> /[swap].
+    case=> //= >; rewrite  -!/(WellFormedProg _ _)=>>.
+    1: move=> ++ e; rewrite -{}e => *.
+    2: move=> + e; rewrite -{}e => *.
+    1-2: case: (X in if X then _ else _) => //. (* all is antipattern *)
+    3: apply/Forall_app; split;[|repeat constructor=>//];
+        rewrite -/(WellFormedProg _ _).
+    1-3: apply/flows_to_subtype_prog;[|eassumption].
+    1-3: case: (var_lbl)=> [[] []]=> //. (* TODO: This should be lemma *)
+  Qed.
+End step_soundness.
 
 
 (* TODO: rewrite -> vs rewrite  *)

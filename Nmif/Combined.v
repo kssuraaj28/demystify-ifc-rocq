@@ -251,7 +251,7 @@ Section invprf.
            apply/flows_to_subtype_prog;[|apply/snd]; auto. }
         move=> /= ? <- /=.
         move ?: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. 
-           {erewrite tr_cmd_cnt; [apply/Forall_combine2_same/Forall_map/Forall_forall => // | eassumption |..]. 
+           {erewrite ni_tr_cmd_cnt; [apply/Forall_combine2_same/Forall_map/Forall_forall => // | eassumption |..].
            1-2: cook; auto with trickbag. }
         cook.
         rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
