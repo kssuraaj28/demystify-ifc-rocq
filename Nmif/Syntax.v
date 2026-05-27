@@ -1,5 +1,5 @@
-From Stdlib Require List ssreflect ssrbool.
-Import List ListNotations ssreflect ssrbool.
+From Stdlib Require List ssreflect ssrbool ssrfun.
+Import List ListNotations ssreflect ssrbool ssrfun.
 
 Require VarValStore Tacs.
 Import VarValStore.
@@ -71,5 +71,10 @@ Section syntax.
   Lemma is_endorse_declassify c:
     is_endorse c \/ is_declassify c \/ (~~ is_endorse c /\ ~~ is_declassify c).
   Proof. case: c=> /= *; intuition. Qed.
+
+  Lemma is_endorse_declassify_opt oc:
+    oapp is_endorse false oc \/ oapp is_declassify false oc
+    \/ (~~ oapp is_endorse false oc /\ ~~ oapp is_declassify false oc).
+  Proof. case: oc=> [c | ] /=; [exact: is_endorse_declassify | intuition]. Qed.
 
 End syntax.
