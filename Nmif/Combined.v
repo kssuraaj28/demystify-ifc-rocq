@@ -82,9 +82,8 @@ Section cmb_step.
       let: real_st := if real_atk_bit is true then pre_cmd_action atk_st real_st else real_st in 
       let: (real_cnt, real_st) := (optcmd_stp_cnt real_cmd real_st,  optcmd_stp_store real_cmd real_st) in (* TODO: The proof breaks when you update real_st before real_cnt. Why? *)
 
-      (* TODO: When there is downgrading, what happens? *) (* TODO: Need to make this also pair? *)
-      let: ideal_cnt :=  optcmd_stp_cnt ideal_cmd ideal_st in (* TODO: Does the order matter? *)
-      let: ideal_st := optcmd_stp_store ideal_cmd ideal_st in
+      (* TODO: When there is downgrading, what happens? *) 
+      let: (ideal_cnt, ideal_st) :=  (optcmd_stp_cnt ideal_cmd ideal_st, optcmd_stp_store ideal_cmd ideal_st) in
 
       let: sim_st := if real_atk_bit is true then pre_cmd_action atk_st sim_st else sim_st in  
       (* If pc is secret, then there will not be any change to public vars, so this is okay!    The simulator will not have access to real_cmd in a secret branch *)
