@@ -88,12 +88,13 @@ Parameter TODO: Store.
 
       let: sim_st := if real_atk_bit is false then sim_st else pre_cmd_action atk_st sim_st in
       (* If pc is secret, then there will not be any change to public vars, so this is okay!    The simulator will not have access to real_cmd in a secret branch *)
-      let: sim_st := if (public pc_lbl) is false then sim_st else optcmd_stp_store real_cmd sim_st in  
+      let: sim_st := if (public pc_lbl) is false then sim_st else 
+                     if real_cmd isn't Some (declassify from to) then optcmd_stp_store real_cmd sim_st  else
+                     TODO  in  
+(* TODO: When there is downgrading, what happens? *)
 
-      let: ideal_st :=       (* TODO: When there is downgrading, what happens? *)
-      (* If rcmd is an endorse, then *)
-        if real_cmd isn't  Some (endorse from to) then ideal_st else  TODO in
-
+      let: ideal_st :=  if real_cmd isn't  Some (endorse from to) then ideal_st else  
+                          TODO in
       let: (ideal_cnt, ideal_st) :=  (optcmd_stp_cnt ideal_cmd ideal_st, optcmd_stp_store ideal_cmd ideal_st) in
     
     
@@ -242,9 +243,12 @@ Section invprf.
           { admit. } (* Endorse *)
           { admit. } (* Declassify *)
         case=> noend nodecl.
-        pattern_focus [match _ with | endorse _ _ => _ | _  => _ end]=> P. 
-        set b := (X in match _ with endorse _ _ => _ | _ => X end).
-        suff: P b; [move: P b noend; clear; revert_hyp_pat Cmd; case=> //= |subst P b]. 
+        pattern_focus [match _ with | endorse _ _ => _ | _  => _ end]=> P;
+          set b := (X in match _ with endorse _ _ => _ | _ => X end);
+          suff: P b; [move: P b noend; clear; revert_hyp_pat Cmd; case=> //= |subst P b; cbv beta]. 
+        pattern_focus [match _ with | declassify _ _ => _ | _  => _ end]=> P;
+          set b := (X in match _ with declassify _ _ => _ | _ => X end);
+          suff: P b; [move: P b nodecl; clear; revert_hyp_pat Cmd; case=> //= |subst P b; cbv beta]. 
         repeat split; cook.
           { revert_hyp_pat bool; case.
           1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=. 
