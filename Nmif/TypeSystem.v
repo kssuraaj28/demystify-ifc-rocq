@@ -221,6 +221,25 @@ Section flow_to_subtype.
   Qed.
 End flow_to_subtype.
 
+Section downgrading.
+  Import Lattice4pt.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
+
+  Lemma wf_endorse_inv pc from to:
+    WellFormedCmd pc (endorse from to) ->
+    pc = mk_lbl false true /\
+    var_lbl from = mk_lbl true true /\
+    var_lbl to = mk_lbl false true.
+  Proof. inversion 1; subst; tauto. Qed.
+
+  Lemma wf_declassify_inv pc from to:
+    WellFormedCmd pc (declassify from to) ->
+    pc = mk_lbl false true /\
+    var_lbl from = mk_lbl false false /\
+    var_lbl to = mk_lbl false true.
+  Proof. inversion 1; subst; tauto. Qed.
+End downgrading.
+
 Section ni.
   Import VarValStore.Notations Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.

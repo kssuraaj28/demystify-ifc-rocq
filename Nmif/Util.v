@@ -92,13 +92,23 @@ Module DecEq.
   }.
 
   Module Notations.
-    Notation "x '=?' y" := 
+    Notation "x '=?' y" :=
         (match (dec_eq x y) with
            | left _ => true
            | right _ => false
          end) (at level 100).
 
   End Notations.
+
+  Import Notations.
+  Lemma dec_eq_refl {A} `{DecEq A} (x : A) : (x =? x) = true.
+  Proof. case: (dec_eq x x)=> //. Qed.
+
+  Lemma dec_eq_true {A} `{DecEq A} (x y : A) : (x =? y) = true -> x = y.
+  Proof. case: (dec_eq x y)=> //. Qed.
+
+  Lemma dec_eq_false {A} `{DecEq A} (x y : A) : (x =? y) = false -> x <> y.
+  Proof. case: (dec_eq x y)=> //. Qed.
 End DecEq.
 
 Module List.

@@ -47,11 +47,19 @@ Section thms.
   Context `{!VarPrm, !ValPrm}.
 
   Theorem storeview_eq s1 s2 p inp:
-      ⟨ s1 | p ⟩ = ⟨ s2 | p ⟩ -> p inp -> 
+      ⟨ s1 | p ⟩ = ⟨ s2 | p ⟩ -> p inp ->
       s1 inp = s2 inp.
   Proof.
     rewrite/⟨_|_⟩.
     move=> /equal_f/(_ inp)/[swap]->[] //.
+  Qed.
+
+  Lemma storeview_eq_ext s1 s2 (p: pred Vars):
+    (forall v, p v -> s1 v = s2 v) ->
+    ⟨ s1 | p ⟩ = ⟨ s2 | p ⟩.
+  Proof.
+    move=> H. apply: functional_extensionality=> v.
+    rewrite /store_to_view. case pe: (p v)=> //. f_equal. exact: H _ pe.
   Qed.
 
   Lemma update_storeview_nochange p st var val:

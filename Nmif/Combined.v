@@ -91,10 +91,10 @@ Parameter TODO: Store.
       let: sim_st := if (public pc_lbl) is false then sim_st else 
                      if real_cmd isn't Some (declassify from to) then optcmd_stp_store real_cmd sim_st  else
                      TODO  in  
-(* TODO: When there is downgrading, what happens? *)
 
+      (* Controlled ideal corruption *)
       let: ideal_st :=  if real_cmd isn't  Some (endorse from to) then ideal_st else  
-                          update_to_store ideal_st to (sim_st from) in (* get the value of from from sim_st, then update to ideal_st *)
+                          update_to_store ideal_st from (sim_st from) in (* get the value of from from sim_st, then update to ideal_st *)
       let: (ideal_cnt, ideal_st) :=  (optcmd_stp_cnt ideal_cmd ideal_st, optcmd_stp_store ideal_cmd ideal_st) in
     
     
@@ -200,6 +200,24 @@ Section invprf.
     Ltac2 Set curr_cookbook as old := join_cookbooks Util.this_cookbook old.
     Ltac2 Set curr_cookbook as old := join_cookbooks Util.List.this_cookbook old.
 
+    Ltac2 Set curr_cookbook as old := add_cookstep 
+      ltac1:(lazymatch goal with
+             |  noend : is_true (~~ is_endorse ?a) |- _ => 
+               let P := fresh in  let b := fresh in
+               pattern_focus [match _ with | endorse _ _ => _ | _  => _ end]=> P;
+                 set b := (X in match _ with endorse _ _ => _ | _ => X end);
+                 suff: P b; [move: P b noend; clear; revert_hyp_pat Cmd; case=> //= |subst P b; cbv beta] 
+             end) "no_endorse" old.
+
+    Ltac2 Set curr_cookbook as old := add_cookstep 
+      ltac1:(lazymatch goal with
+             |  nodecl : is_true (~~ is_declassify ?a) |- _ => 
+               let P := fresh in  let b := fresh in
+               pattern_focus [match _ with | declassify _ _ => _ | _  => _ end]=> P; (* TODO: This should be automated *)
+                 set b := (X in match _ with declassify _ _ => _ | _ => X end);
+                 suff: P b; [move: P b nodecl; clear; revert_hyp_pat Cmd; case=> //= |subst P b; cbv beta] 
+             end) "no_declassify" old.
+
 
     Ltac2 Eval print_cookbook curr_cookbook.
 
@@ -238,22 +256,28 @@ Section invprf.
         apply: step_soundness_pubuntr=> //.
 
       - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>].
-        let rcmd := pick_hyp_pat uconstr:(Cmd) in case: (is_endorse_declassify rcmd)=> [ | - []].
-          { admit. } (* Endorse *)
-          { admit. } (* Declassify *)
-        case=> noend nodecl.
-        pattern_focus [match _ with | endorse _ _ => _ | _  => _ end]=> P;
-          set b := (X in match _ with endorse _ _ => _ | _ => X end);
-          suff: P b; [move: P b noend; clear; revert_hyp_pat Cmd; case=> //= |subst P b; cbv beta]. 
-        pattern_focus [match _ with | declassify _ _ => _ | _  => _ end]=> P;
-          set b := (X in match _ with declassify _ _ => _ | _ => X end);
-          suff: P b; [move: P b nodecl; clear; revert_hyp_pat Cmd; case=> //= |subst P b; cbv beta]. 
         repeat split; cook.
-          { revert_hyp_pat bool; case.
-          1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=. 
+          { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_endorse rcmd))=> /orP [ | noend].
+            { move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e}.
+            revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] e; rewrite -> e in *=> {e} - [] * /=.
+            revert_hyp_pat (if _ then _ else _)=> /= <- /=.
+            Import DecEq DecEq.Notations.
+            apply/storeview_eq_ext=> *; rewrite /update_to_store; cook.
+            rewrite dec_eq_refl. (* TODO: Eventually this should be a rewrite rule also *)
+            case e1: (_ =? _). 
+            2: case e2: (_ =? _).
+            2: apply dec_eq_true in e2; rewrite -> e2 in *=> {e2}.
+            1,2: unshelve apply: storeview_eq; [exact: is_public|..]; cook.
+            1,2: rewrite/is_public; auto with trickbag; fail.
+            unshelve apply: storeview_eq; [exact: is_trusted|..]; cook. }
+          cook.
+          revert_hyp_pat bool; case.
+          1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=.
           2,4: auto with cook_step trickbag; fail.
-          1-2: revert_hyp_pat (option _); case=> /= *; cook. }
-          { revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [+ []] /==> *; cook. }
+          1-2: revert_hyp_pat (option _); case=> /= *; cook. } 
+          { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_declassify rcmd))=> /orP [ | nodecl].
+            { admit. }
+            revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [+ []] /==> *; cook. }
         move=> /=.  
         apply/Forall_and; cook; auto.
         revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)].
@@ -265,11 +289,14 @@ Section invprf.
            apply/flows_to_subtype_prog;[|apply/snd]; auto. }
         move=> /= ? <- /=.
         move ?: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. 
-           {erewrite ni_tr_cmd_cnt; [apply/Forall_combine2_same/Forall_map/Forall_forall => // | eassumption |..].
-           1-2: cook; auto with trickbag. }
+           { erewrite ni_tr_cmd_cnt; [apply/Forall_combine2_same/Forall_map/Forall_forall => // | eassumption |..]; auto with trickbag.
+           let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_endorse rcmd))=> /orP [ | noend]; cook.
+           move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e}.
+           revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] [] e; rewrite -> e in * => {e} - [] *.
+           rewrite update_storeview_nochange; cook. 
+           rewrite/is_trusted/is_untrusted; auto with trickbag. }
         cook.
         rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
-        move=> {noend} {nodecl}.
         revert_hyp_pat [Cmd, (WellFormedCmd _ _), (compute_new_pc _ _ = _)].
         move=> ? /step_soundness snd newpce.
         apply/flows_to_subtype_prog; [|apply/snd].
