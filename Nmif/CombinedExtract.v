@@ -219,6 +219,22 @@ Section extract_step_commute.
 
   Ltac2 Set cook_debug := 2.
 
+  Lemma extract_step_commute_endorse (st: CmbState) (c: CmbCmd) (restcmd: list CmbCmd):
+    Invariant (st, c :: restcmd) ->
+    oapp is_endorse false (real_cmd c) ->
+    step (extract_2cfg (st, c :: restcmd)) = extract_2cfg (comb_step (st, c :: restcmd)). 
+  Proof.
+    case: c=> >.  case: st=> >.
+    cook. rewrite/Invariant. case. cook.
+    rewrite/CmbCmdInv/StateInv=> ? ? [] ? ?.
+  Admitted.
+
+  Lemma extract_step_commute_declassify (st: CmbState) (c: CmbCmd) (restcmd: list CmbCmd):
+    Invariant (st, c :: restcmd) ->
+    oapp is_declassify false (real_cmd c) ->
+    step (extract_2cfg (st, c :: restcmd)) = extract_2cfg (comb_step (st, c :: restcmd)). 
+  Proof.
+  Admitted.
 
   Theorem extract_step_commute c:
     Invariant c ->
@@ -226,6 +242,8 @@ Section extract_step_commute.
   Proof.
     case: c. case=> rst ist simst atkst.
     case=> //. case=> rcmd isatk icmd pclbl restcmd inv.
+    case: (is_endorse_declassify_opt rcmd)=> [ | - []]; auto using extract_step_commute_endorse, extract_step_commute_declassify. 
+    case=> noend nodecl.
     rewrite /= in inv. move: inv=> []. (Forall_inv_toph)=> i1 restinv i3.
     rewrite /CmbCmdInv/CmbCmdCoreInv in i1. case: i1=> rwt _.
     rewrite /StateInv in i3. case: i3=> _ pubeq.
@@ -235,11 +253,6 @@ Section extract_step_commute.
     rewrite /extract_2cfg.
     rewrite/sim_active. cook.
     rewrite/step.
-    case: (is_endorse_declassify_opt rcmd)=> [ | - []].
-      { admit. } (* Endorse *)
-      { admit. } (* declassify *)
-    case=> noend nodecl.
-    cook.
 
     congr (_,_,_); cook.
     - set l1 := (X in map _ X = _). set l2 := (X in _ = map _ X).
@@ -357,7 +370,7 @@ Section extract_step_commute.
       rewrite !filter_map_swap.
       erewrite filter_ext; [| move=> * /=; reflexivity].
       cnstrct_eq_gl. rewrite filter_true //.
-  Admitted.
+  Qed.
   Print Assumptions extract_step_commute.
 
 End extract_step_commute.
