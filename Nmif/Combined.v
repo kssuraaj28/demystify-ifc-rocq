@@ -88,14 +88,16 @@ Parameter TODO: Store.
 
       let: sim_st := if real_atk_bit is false then sim_st else pre_cmd_action atk_st sim_st in
       (* If pc is secret, then there will not be any change to public vars, so this is okay!    The simulator will not have access to real_cmd in a secret branch *)
-      let: sim_st := if (public pc_lbl) is false then sim_st else 
-                     if real_cmd isn't Some (declassify from to) then optcmd_stp_store real_cmd sim_st  else
-                     TODO  in  
+      let: sim_st := if (public pc_lbl) is false then sim_st else optcmd_stp_store real_cmd sim_st  in
+
 
       (* Controlled ideal corruption *)
       let: ideal_st :=  if real_cmd isn't  Some (endorse from to) then ideal_st else  
                           update_to_store ideal_st from (sim_st from) in (* get the value of from from sim_st, then update to ideal_st *)
       let: (ideal_cnt, ideal_st) :=  (optcmd_stp_cnt ideal_cmd ideal_st, optcmd_stp_store ideal_cmd ideal_st) in
+
+
+      let: sim_st := if real_cmd isn't Some (declassify from to) then sim_st else update_to_store sim_st to (ideal_st to) in (* Controlled ideal read *)
     
     
       let: atk_pst := (post_cmd_action atk_st real_st) in (* Not having this was quite painful. TODO *)
@@ -191,6 +193,7 @@ Section invprf.
   Notation cmbcmd_step := (cmbcmd_step adv).
 
   Section cook.
+    Import DecEq DecEq.Notations.
     Import VarValStore.Notations.
 
     Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()).
@@ -242,8 +245,7 @@ Section invprf.
         StateInv st' /\ Forall CmbCmdInv clst'.
     Proof.
       case; rewrite {}/CmbCmdInv=> - []; cycle 1. 
-
-      - move=>>[]_; rewrite/StateInv=> + [].
+        { move=>>[]_; rewrite/StateInv=> + [].
         case pce: (untrusted _); cycle 1.
         1: move=> <- /= <- *.
         2: move=> * /=. 
@@ -253,55 +255,58 @@ Section invprf.
         apply/Forall_and; cook; auto with trickbag.
         rewrite-/(WellFormedProg _ _).
         revert_hyp_pat [(option Cmd), (_ ⊢ _)]; case=> /==> [|* //] >.
-        apply: step_soundness_pubuntr=> //.
-
-      - rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>].
-        repeat split; cook.
-          { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_endorse rcmd))=> /orP [ | noend].
-            { move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e}.
-            revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] e; rewrite -> e in *=> {e} - [] * /=.
-            revert_hyp_pat (if _ then _ else _)=> /= <- /=.
-            Import DecEq DecEq.Notations.
-            apply/storeview_eq_ext=> *; rewrite /update_to_store; cook.
-            rewrite dec_eq_refl. (* TODO: Eventually this should be a rewrite rule also *)
-            case e1: (_ =? _). 
-            2: case e2: (_ =? _).
-            2: apply dec_eq_true in e2; rewrite -> e2 in *=> {e2}.
-            1,2: unshelve apply: storeview_eq; [exact: is_public|..]; cook.
-            1,2: rewrite/is_public; auto with trickbag; fail.
-            unshelve apply: storeview_eq; [exact: is_trusted|..]; cook. }
-          cook.
-          revert_hyp_pat bool; case.
-          1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=.
-          2,4: auto with cook_step trickbag; fail.
-          1-2: revert_hyp_pat (option _); case=> /= *; cook. } 
-          { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_declassify rcmd))=> /orP [ | nodecl].
-            { admit. }
-            revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [+ []] /==> *; cook. }
-        move=> /=.  
-        apply/Forall_and; cook; auto.
-        revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)].
-        case=> [[] ?] /= >.
-           { move=> *; cook.
-           revert_hyp_pat [(option _), (_ ⊢ _)]; case=> //= >.
-           rewrite -/(WellFormedProg _ _).
-           move=> /step_soundness=> snd.
-           apply/flows_to_subtype_prog;[|apply/snd]; auto. }
-        move=> /= ? <- /=.
-        move ?: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. 
-           { erewrite ni_tr_cmd_cnt; [apply/Forall_combine2_same/Forall_map/Forall_forall => // | eassumption |..]; auto with trickbag.
-           let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_endorse rcmd))=> /orP [ | noend]; cook.
-           move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e}.
-           revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] [] e; rewrite -> e in * => {e} - [] *.
-           rewrite update_storeview_nochange; cook. 
-           rewrite/is_trusted/is_untrusted; auto with trickbag. }
-        cook.
-        rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
-        revert_hyp_pat [Cmd, (WellFormedCmd _ _), (compute_new_pc _ _ = _)].
-        move=> ? /step_soundness snd newpce.
-        apply/flows_to_subtype_prog; [|apply/snd].
-        auto with trickbag.
-    Admitted. 
+        apply: step_soundness_pubuntr=> //. }
+      rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>].
+      repeat split; cook.
+        { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_endorse rcmd))=> /orP [ | noend].
+          { move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e}. (* TODO: this branch is longer *)
+          revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] e; rewrite -> e in *=> {e} - [] * /=.
+          revert_hyp_pat (if _ then _ else _)=> /= <- /=.
+          apply/storeview_eq_ext=> *; rewrite /update_to_store; cook.
+          rewrite dec_eq_refl. (* TODO: Eventually this should be a rewrite rule also *)
+          case e1: (_ =? _). 
+          2: case e2: (_ =? _).
+          2: apply dec_eq_true in e2; rewrite -> e2 in *=> {e2}.
+          1,2: unshelve apply: storeview_eq; [exact: is_public|..]; cook.
+          1,2: rewrite/is_public; auto with trickbag; fail.
+          unshelve apply: storeview_eq; [exact: is_trusted|..]; cook. }
+        cook. revert_hyp_pat bool; case.
+        1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=.
+        2,4: auto with cook_step trickbag; fail.
+        1-2: revert_hyp_pat (option _); case=> /= *; cook. } 
+        { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_declassify rcmd))=> /orP [ | nodecl]; cycle 1.
+          { revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [+ []] /==> *; cook. } 
+        move/is_declassify_inv=> [] ? [] ? e; rewrite -> e in *=> {e}.
+        revert_hyp_pat (WellFormedCmd _ _)=> /wf_declassify_inv [] e; rewrite -> e in *=> {e} - [] * /=.
+        revert_hyp_pat (if _ then _ else _)=> /= <- /=.
+        apply/storeview_eq_ext=> *; rewrite /update_to_store. rewrite dec_eq_refl. (* TODO: Eventually this should be a rewrite rule also *)
+        case e1: (_ =? _). 
+          { unshelve apply: storeview_eq; [exact: is_trusted|..]; cook.
+          rewrite/is_trusted/is_untrusted; auto with trickbag; fail. }
+        apply/storeview_eq; [|eassumption]; cook. }
+      move=> /=.  
+      apply/Forall_and; cook; auto.
+      revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)].
+      case=> [[] ?] /= >.
+         { move=> *; cook.
+         revert_hyp_pat [(option _), (_ ⊢ _)]; case=> //= >.
+         rewrite -/(WellFormedProg _ _).
+         move=> /step_soundness=> snd.
+         apply/flows_to_subtype_prog;[|apply/snd]; auto. }
+      move=> /= ? <- /=.
+      move ?: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. 
+         { erewrite ni_tr_cmd_cnt; [apply/Forall_combine2_same/Forall_map/Forall_forall => // | eassumption |..]; auto with trickbag.
+         let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_endorse rcmd))=> /orP [ | noend]; cook.
+         move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e}.
+         revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] [] e; rewrite -> e in * => {e} - [] *.
+         rewrite update_storeview_nochange; cook. 
+         rewrite/is_trusted/is_untrusted; auto with trickbag. }
+      cook. rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
+      revert_hyp_pat [Cmd, (WellFormedCmd _ _), (compute_new_pc _ _ = _)].
+      move=> ? /step_soundness snd newpce.
+      apply/flows_to_subtype_prog; [|apply/snd].
+      auto with trickbag.
+    Qed. 
   End cook.
 
   Theorem cfg_step_inv: forall c, Invariant c ->  Invariant (cfg_step c).
