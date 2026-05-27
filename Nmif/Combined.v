@@ -204,21 +204,21 @@ Section invprf.
     Ltac2 Set curr_cookbook as old := join_cookbooks Util.List.this_cookbook old.
 
     Ltac2 Set curr_cookbook as old := add_cookstep 
-      ltac1:(lazymatch goal with
-             |  noend : is_true (~~ is_endorse ?a) |- _ => 
+      ltac1:(match goal with
+             |  noend : is_true (~~ is_endorse ?a), c : Cmd |- _ => 
                let P := fresh in  let b := fresh in
-               pattern_focus [match _ with | endorse _ _ => _ | _  => _ end]=> P;
-                 set b := (X in match _ with endorse _ _ => _ | _ => X end);
-                 suff: P b; [move: P b noend; clear; revert_hyp_pat Cmd; case=> //= |subst P b; cbv beta] 
+               pattern_focus [match c with | endorse _ _ => _ | _  => _ end]=> P;
+                 set b := (X in match _ with endorse _ _ => _ | _ => X end); (* Changing to c fails *)
+                 suff: P b; [move: P b noend; clear; case: c=> //= |subst P b; cbv beta] 
              end) "no_endorse" old.
 
     Ltac2 Set curr_cookbook as old := add_cookstep 
-      ltac1:(lazymatch goal with
-             |  nodecl : is_true (~~ is_declassify ?a) |- _ => 
+      ltac1:(match goal with
+             |  nodecl : is_true (~~ is_declassify ?a), c :Cmd |- _ => 
                let P := fresh in  let b := fresh in
-               pattern_focus [match _ with | declassify _ _ => _ | _  => _ end]=> P; (* TODO: This should be automated *)
+               pattern_focus [match c with | declassify _ _ => _ | _  => _ end]=> P; (* TODO: This should be automated *)
                  set b := (X in match _ with declassify _ _ => _ | _ => X end);
-                 suff: P b; [move: P b nodecl; clear; revert_hyp_pat Cmd; case=> //= |subst P b; cbv beta] 
+                 suff: P b; [move: P b nodecl; clear; case: c=> //= |subst P b; cbv beta] 
              end) "no_declassify" old.
 
 
@@ -244,7 +244,7 @@ Section invprf.
         let: (st', clst') := cmbcmd_step c st in
         StateInv st' /\ Forall CmbCmdInv clst'.
     Proof.
-      case; rewrite {}/CmbCmdInv=> - []; cycle 1. 
+      case; rewrite {}/CmbCmdInv=> - []; cycle 1.
         { move=>>[]_; rewrite/StateInv=> + [].
         case pce: (untrusted _); cycle 1.
         1: move=> <- /= <- *.
@@ -255,7 +255,7 @@ Section invprf.
         apply/Forall_and; cook; auto with trickbag.
         rewrite-/(WellFormedProg _ _).
         revert_hyp_pat [(option Cmd), (_ ⊢ _)]; case=> /==> [|* //] >.
-        apply: step_soundness_pubuntr=> //. }
+        apply: step_soundness_pubuntr=> //. } 
       rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>].
       repeat split; cook.
         { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_endorse rcmd))=> /orP [ | noend].
