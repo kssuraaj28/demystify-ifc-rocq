@@ -69,6 +69,9 @@ Section cmb_step.
   End comb_state.
 
 
+
+Parameter TODO: Store.
+
   Section step.
     Variable (adv: AdvNextStep AtkStates). 
     Notation pre_cmd_action := (pre_cmd_action adv).
@@ -79,20 +82,24 @@ Section cmb_step.
       let: mk_cmbstate real_st ideal_st sim_st atk_st := s in
     
       (* Corruption first. TODO: When there is endorsement, there will need to be an update to the ideal store as well *)
-      let: real_st := if real_atk_bit is true then pre_cmd_action atk_st real_st else real_st in 
+      let: real_st := if real_atk_bit is false then real_st else pre_cmd_action atk_st real_st in
       let: (real_cnt, real_st) := (optcmd_stp_cnt real_cmd real_st,  optcmd_stp_store real_cmd real_st) in (* TODO: The proof breaks when you update real_st before real_cnt. Why? *)
 
-      (* TODO: When there is downgrading, what happens? *) 
-      let: (ideal_cnt, ideal_st) :=  (optcmd_stp_cnt ideal_cmd ideal_st, optcmd_stp_store ideal_cmd ideal_st) in
 
-      let: sim_st := if real_atk_bit is true then pre_cmd_action atk_st sim_st else sim_st in  
+      let: sim_st := if real_atk_bit is false then sim_st else pre_cmd_action atk_st sim_st in
       (* If pc is secret, then there will not be any change to public vars, so this is okay!    The simulator will not have access to real_cmd in a secret branch *)
       let: sim_st := if (public pc_lbl) is false then sim_st else optcmd_stp_store real_cmd sim_st in  
+
+      let: ideal_st :=       (* TODO: When there is downgrading, what happens? *)
+      (* If rcmd is an endorse, then *)
+        if real_cmd isn't  Some (endorse from to) then ideal_st else  TODO in
+
+      let: (ideal_cnt, ideal_st) :=  (optcmd_stp_cnt ideal_cmd ideal_st, optcmd_stp_store ideal_cmd ideal_st) in
     
     
       let: atk_pst := (post_cmd_action atk_st real_st) in (* Not having this was quite painful. TODO *)
-      let: atk_st := if real_atk_bit is true then atk_pst.1 else atk_st in
-      let: atk_substeps := if real_atk_bit is true then atk_pst.2 else 0 in
+      let: atk_st := if real_atk_bit is false then atk_st else atk_pst.1 in
+      let: atk_substeps := if real_atk_bit is false then 0 else atk_pst.2 in
 
 
       let: new_pc := compute_new_pc_opt pc_lbl real_cmd in
@@ -235,6 +242,9 @@ Section invprf.
           { admit. } (* Endorse *)
           { admit. } (* Declassify *)
         case=> noend nodecl.
+        pattern_focus [match _ with | endorse _ _ => _ | _  => _ end]=> P. 
+        set b := (X in match _ with endorse _ _ => _ | _ => X end).
+        suff: P b; [move: P b noend; clear; revert_hyp_pat Cmd; case=> //= |subst P b]. 
         repeat split; cook.
           { revert_hyp_pat bool; case.
           1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=. 

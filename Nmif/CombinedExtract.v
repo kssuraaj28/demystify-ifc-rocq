@@ -216,7 +216,13 @@ Section extract_step_commute.
     rewrite /extract_2cfg.
     rewrite/sim_active. cook.
     rewrite/step.
-    have ?:  ~~ (oapp is_declassify false rcmd) by admit. (* This is obvious *)
+    case: (is_endorse_declassify_opt rcmd)=> [ | - []].
+      { admit. } (* Endorse *)
+      { admit. } (* declassify *)
+    case=> noend nodecl.
+    pattern_focus [match _ with | Some (endorse _ _) => _ | _  => _ end]=> P. 
+    set b := (X in match _ with Some (endorse _ _) => _ | _ => X end).
+    suff: P b;  [move: P b noend; clear; revert_hyp_pat (option Cmd); case=> //=; case=> //=| subst P b].
     congr (_,_,_); cook.
     - set l1 := (X in map _ X = _). set l2 := (X in _ = map _ X).
       suff: l1 = map (fun c => (real_cmd c, real_atk_bit c,  ideal_cmd c, sim_active c)) l2;
