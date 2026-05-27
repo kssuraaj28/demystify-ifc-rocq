@@ -231,11 +231,7 @@ Section extract_step_commute.
     rewrite /StateInv in i3. case: i3=> _ pubeq.
     move: pclbl rwt.
     case=> untr pub => rwt.
-    rewrite/comb_step/cmbcmd_step {}/extract_2cfg /=. 
-    cook_step.
-    cook_step.
-    cook_step.
-
+    rewrite/comb_step/cmbcmd_step {}/extract_2cfg. cook.
     rewrite /extract_2cfg.
     rewrite/sim_active. cook.
     rewrite/step.
