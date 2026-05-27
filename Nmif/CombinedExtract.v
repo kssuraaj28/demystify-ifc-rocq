@@ -197,8 +197,27 @@ Section extract_step_commute.
               [apply: cnt_acmd_pubeq; eassumption|] ]
       end) "acmd_pubeq" old.
 
+  Ltac2 Set curr_cookbook as old :=
+    add_cookstep 
+      ltac1:(match goal with
+       |  noend : is_true (~~ oapp is_endorse false ?c), c : option Cmd |- _ => 
+             let P := fresh in  let b := fresh in
+             pattern_focus [match c with | Some (endorse _ _) => _ | _  => _ end]=> P;
+             set b := (X in match _ with Some (endorse _ _) => _ | _ => X end);
+             suff: P b;  [move: P b noend; clear; case: c=> //=; case=> //=| subst P b;cbv beta]
+           end) "nodecl" old.
 
-  Ltac2 Set cook_debug := 0.
+  Ltac2 Set curr_cookbook as old :=
+    add_cookstep 
+    ltac1:( match goal with
+       |  nodecl : is_true (~~ oapp is_declassify false ?c), c : option Cmd |- _ => 
+             let P := fresh in  let b := fresh in
+             pattern_focus [match c with | Some (declassify _ _) => _ | _  => _ end]=> P;
+             set b := (X in match _ with Some (declassify _ _) => _ | _ => X end);
+             suff: P b;  [move: P b nodecl; clear; case: c=> //=; case=> //=| subst P b;cbv beta]
+           end) "noend" old.
+
+  Ltac2 Set cook_debug := 2.
 
 
   Theorem extract_step_commute c:
@@ -212,7 +231,11 @@ Section extract_step_commute.
     rewrite /StateInv in i3. case: i3=> _ pubeq.
     move: pclbl rwt.
     case=> untr pub => rwt.
-    rewrite/comb_step/cmbcmd_step {}/extract_2cfg; cook.
+    rewrite/comb_step/cmbcmd_step {}/extract_2cfg /=. 
+    cook_step.
+    cook_step.
+    cook_step.
+
     rewrite /extract_2cfg.
     rewrite/sim_active. cook.
     rewrite/step.
@@ -220,12 +243,8 @@ Section extract_step_commute.
       { admit. } (* Endorse *)
       { admit. } (* declassify *)
     case=> noend nodecl.
-    pattern_focus [match _ with | Some (endorse _ _) => _ | _  => _ end]=> P;
-      set b := (X in match _ with Some (endorse _ _) => _ | _ => X end);
-      suff: P b;  [move: P b noend; clear; revert_hyp_pat (option Cmd); case=> //=; case=> //=| subst P b;cbv beta].
-    pattern_focus [match _ with | Some (declassify _ _) => _ | _  => _ end]=> P;
-      set b := (X in match _ with Some (declassify _ _) => _ | _ => X end);
-      suff: P b;  [move: P b nodecl; clear; revert_hyp_pat (option Cmd); case=> //=; case=> //=| subst P b;cbv beta].
+    cook.
+
     congr (_,_,_); cook.
     - set l1 := (X in map _ X = _). set l2 := (X in _ = map _ X).
       suff: l1 = map (fun c => (real_cmd c, real_atk_bit c,  ideal_cmd c, sim_active c)) l2;
