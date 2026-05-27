@@ -94,14 +94,13 @@ Parameter TODO: Store.
 (* TODO: When there is downgrading, what happens? *)
 
       let: ideal_st :=  if real_cmd isn't  Some (endorse from to) then ideal_st else  
-                          TODO in
+                          update_to_store ideal_st to (sim_st from) in (* get the value of from from sim_st, then update to ideal_st *)
       let: (ideal_cnt, ideal_st) :=  (optcmd_stp_cnt ideal_cmd ideal_st, optcmd_stp_store ideal_cmd ideal_st) in
     
     
       let: atk_pst := (post_cmd_action atk_st real_st) in (* Not having this was quite painful. TODO *)
       let: atk_st := if real_atk_bit is false then atk_st else atk_pst.1 in
       let: atk_substeps := if real_atk_bit is false then 0 else atk_pst.2 in
-
 
       let: new_pc := compute_new_pc_opt pc_lbl real_cmd in
       (mk_cmbstate real_st ideal_st sim_st atk_st, zip real_cnt ideal_cnt atk_substeps new_pc). 
