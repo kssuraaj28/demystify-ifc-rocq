@@ -66,7 +66,6 @@ Section sim_constr.
     let: cont_atk := repeat true steps in
     let: cont_full := combine_extend2 cont_prog cont_atk None false in
 
-
     (sim_st, ast, cont_full).
 
   
@@ -81,14 +80,16 @@ Section sim_constr.
         
       pre_cmd_action st ist :=  
         let: (mk_simstate ast sim_st prg) :=  st in 
-      ist ;  (* Ideal pre-cmd action is weak *)
+        if prg isn't (ocmd, isatk) :: rest then ist else 
+        ist ;  (* Ideal pre-cmd action is weak *)
     |}.
-  Next Obligation. Admitted.
-  Next Obligation. Admitted.
+  Next Obligation. case=> ? ?; case=> * //=. Admitted.
+  Next Obligation. case=> ? ?; case=> * //=. Admitted.
 
+(*
   Fact construct_simulator_pre_cmd ast st :
     pre_cmd_action construct_simulator ast st = st.
-  Proof. case: ast. done. Qed.
+  Proof. case: ast=> ? ?. done. Qed.
 
   Fact construct_simulator_post_cmd_cons ocmd isatk rest ast sim_st st :
     post_cmd_action construct_simulator
@@ -96,6 +97,7 @@ Section sim_constr.
       let: (sim_st', new_ast, cont) := sim_step ocmd isatk sim_st ast in
       (mk_simstate new_ast sim_st' (cont ++ rest), length cont).
   Proof. rewrite /=; case isatk=>  //=. Qed.
+  *)
 
   Lemma clean_cmd_stp_store_secret_guard c s :
     is_secret_guard (Some c) = true ->
@@ -115,7 +117,9 @@ Section sim_constr.
   Qed.
 End sim_constr.
 
+(*
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> construct_simulator_pre_cmd) "construct_simulator_pre_cmd" old.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> construct_simulator_post_cmd_cons) "construct_simulator_post_cmd_cons" old.
+*)
 
 Ltac2 this_cookbook () := this_cookbook_ ().

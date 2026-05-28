@@ -15,6 +15,8 @@ Ltac2 softfail_m (fn_name: string) (m: message) :=
 Ltac2 panic_s (fn_name: string) (s: string) := panic_m fn_name (Message.of_string s).
 Ltac2 softfail_s (fn_name: string) (s: string) := softfail_m fn_name (Message.of_string s).
 
+Tactic Notation "throw" := ltac2:(panic_s "throw" "thrown").
+
 Ltac2 one_goal_assertion (fn_name: string) :=
   if (Int.equal (Control.numgoals()) 1) then () else
   panic_s fn_name "Needs to run with one goal".
