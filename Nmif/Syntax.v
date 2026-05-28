@@ -74,6 +74,14 @@ Section syntax.
   Lemma is_declassify_inv c: is_declassify c -> exists from to, c = declassify from to.
   Proof. case: c=> //= *; eauto. Qed.
 
+  Lemma is_endorse_inv_opt oc:
+    oapp is_endorse false oc -> exists from to, oc = Some (endorse from to).
+  Proof. case: oc=> //= c /is_endorse_inv [from [to ->]]; eauto. Qed.
+
+  Lemma is_declassify_inv_opt oc:
+    oapp is_declassify false oc -> exists from to, oc = Some (declassify from to).
+  Proof. case: oc=> //= c /is_declassify_inv [from [to ->]]; eauto. Qed.
+
   Lemma is_endorse_declassify c:
     is_endorse c \/ is_declassify c \/ (~~ is_endorse c /\ ~~ is_declassify c).
   Proof. case: c=> /= *; intuition. Qed.

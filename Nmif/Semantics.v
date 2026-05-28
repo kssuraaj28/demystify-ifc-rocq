@@ -93,6 +93,8 @@ End cleanstep.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> optcmd_stp_store_simpl) "optcmd_stp_store_simpl" old.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> optcmd_stp_cnt_simpl) "optcmd_stp_cnt_simpl" old.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> optcmd_stp_cnd_idem) "optcmd_stp_cnd_idem" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> update_shadow) "update_shadow" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> update_to_store_same) "update_to_store_same" old.
 
 Section test.
   Context `{!VarPrm, !ValPrm}.

@@ -85,6 +85,22 @@ Section thms.
     rewrite/⟨_|_⟩ pe=> - [] //.
   Qed.
 
+  Lemma update_to_store_ext s1 s2 v1 v2 vl1 vl2:
+    (forall v, update_to_store s1 v1 vl1 v = update_to_store s2 v2 vl2 v) ->
+    update_to_store s1 v1 vl1 = update_to_store s2 v2 vl2.
+  Proof. exact: functional_extensionality. Qed.
+
+  Lemma update_to_store_same s v val:
+    update_to_store s v val v = val.
+  Proof. rewrite /update_to_store dec_eq_refl. done. Qed.
+
+  Lemma update_shadow s v a b:
+    update_to_store (update_to_store s v a) v b = update_to_store s v b.
+  Proof.
+    apply: update_to_store_ext=> v'. rewrite /update_to_store.
+    case: (dec_eq v v')=> //.
+  Qed.
+
   Lemma update_to_store_storeview_eq s1 s2 dst src (p: pred Vars):
     p src ->
     ⟨ s1 | p ⟩ = ⟨ s2 | p ⟩ ->

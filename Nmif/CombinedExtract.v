@@ -89,6 +89,9 @@ Ltac2 Set this_cookbook_ as old :=
 Ltac2 Set this_cookbook_ as old :=
   add_cookstep ltac1:(rewrite -> cmd_map_sim_cons ) "cmd_map_sim_cons" old.
 
+Ltac2 Set this_cookbook_ as old :=
+  add_cookstep ltac1:(rewrite -> cmd_map_sim_app ) "cmd_map_sim_app" old.
+
 Section extract.
   Import Combined Simulator.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
@@ -225,15 +228,67 @@ Section extract_step_commute.
   Proof.
     case: c=> >.  case: st=> >.
     cook. rewrite/Invariant. case. cook.
-    rewrite/CmbCmdInv/StateInv=> ? ? [] ? ?.
-  Admitted.
+    rewrite/CmbCmdInv/StateInv=> + + [] + + endrs.
+    move: endrs=> /is_endorse_inv_opt [?] [?] ->.
+    rewrite/CmbCmdCoreInv=> - [] /wf_endorse_inv [->] [? ?]. 
+    dotop [cbn]=> <- _ ? ?. 
+    rewrite/comb_step/cmbcmd_step/extract_2cfg. cook.
+    rewrite/step/acmd_step /=. 
+    pattern_eq_2 [post_cmd_action _ _ (update_to_store _ _ _)] [post_cmd_action _ _ (update_to_store _ _ _)]=> [|<-].
+      { apply/post_cmd_wf/update_to_store_storeview_eq; cook.
+      rewrite/is_public. auto with trickbag. } (* TODO: Automate *)
+    move: (post_cmd_action _ _ (update_to_store _ _ _));case=> >; cook.
+    rewrite/zip.
+    set rhs := RHS.
+    rewrite combine_extend4_swap34 /combine_extend4 combine_extend3_splitl combine_extend2_nil_r.
+    rewrite combine_extend2_same combine_extend2_nil_l.
+    set lhs := LHS. subst rhs.
+    rewrite/cmd_map combine_extend3_splitl !combine_extend2_nil_l.
+    subst lhs. rewrite !map_map /cmd_map_sim.
+    rewrite/sim_active /= /sim_active'. cook.
+    congr (_,_,_); cook; clear.
+      { apply: map_ext=> ?. cook. }
+    rewrite filter_map_swap. 
+    erewrite filter_ext; [|move=> *; rewrite /= Bool.orb_false_r; reflexivity].
+    cook. rewrite map_map.
+    apply: map_ext; case=> //.
+  Qed.
 
   Lemma extract_step_commute_declassify (st: CmbState) (c: CmbCmd) (restcmd: list CmbCmd):
     Invariant (st, c :: restcmd) ->
     oapp is_declassify false (real_cmd c) ->
     step (extract_2cfg (st, c :: restcmd)) = extract_2cfg (comb_step (st, c :: restcmd)). 
   Proof.
-  Admitted.
+    case: c=> >.  case: st=> >.
+    cook. rewrite/Invariant. case. cook.
+    rewrite/CmbCmdInv/StateInv=> + + [] + + decl.
+    move: decl=> /is_declassify_inv_opt [?] [?] ->.
+    rewrite/CmbCmdCoreInv=> - [] /wf_declassify_inv [->] [? ?]. 
+    dotop [cbn]=> <- remove ? ?. 
+    rewrite/comb_step/cmbcmd_step/extract_2cfg. cook.
+    rewrite/step/acmd_step /=. 
+    pattern_eq_2 [post_cmd_action _ _ (update_to_store _ _ _)] [post_cmd_action _ _ (update_to_store _ _ _)]=> [|<-]; cook.
+      { apply/post_cmd_wf.  set a := (pre_cmd_action _ _ _). set b := (pre_cmd_action _ _ _).
+      have ?: ⟨ b | is_public ⟩ = ⟨ a | is_public ⟩; subst a b; cook. (* I don't like this *)
+      erewrite <- update_same_varval;[| eassumption]. repeat f_equal. 
+      erewrite storeview_eq; [ |apply: pre_cmd_wf_int | rewrite/is_trusted/is_untrusted; auto with trickbag]. 
+      apply:storeview_eq; eauto. rewrite/is_trusted/is_untrusted; auto with trickbag.  }
+    move: (post_cmd_action _ _ (update_to_store _ _ _));case=> >; cook. (* The rest of the proof is copied from the above. I feel a little sad *)
+    rewrite/zip.
+    set rhs := RHS.
+    rewrite combine_extend4_swap34 /combine_extend4 combine_extend3_splitl combine_extend2_nil_r.
+    rewrite combine_extend2_same combine_extend2_nil_l.
+    set lhs := LHS. subst rhs.
+    rewrite/cmd_map combine_extend3_splitl !combine_extend2_nil_l.
+    subst lhs. rewrite !map_map /cmd_map_sim.
+    rewrite/sim_active /= /sim_active'. cook.
+    congr (_,_,_); cook; clear.
+      { apply: map_ext=> ?. cook. }
+    rewrite filter_map_swap. 
+    erewrite filter_ext; [|move=> *; rewrite /= Bool.orb_false_r; reflexivity].
+    cook. rewrite map_map.
+    apply: map_ext; case=> //.
+  Qed.
 
   Theorem extract_step_commute c:
     Invariant c ->
@@ -253,7 +308,8 @@ Section extract_step_commute.
     rewrite/sim_active. cook.
     rewrite/step /acmd_step.  
     pattern_eq [if _ then pre_cmd_action (construct_simulator _) _ _ else ist] with ist; [| move=> ->]. (* Ninja repair *)
-      { case: sim_active'=> //=. admit. }
+      { case: sim_active'; destruct pub; destruct rcmd as [c| ]=> //.
+      destruct c=> //. }
     congr (_,_,_); cook.
     - set l1 := (X in map _ X = _). set l2 := (X in _ = map _ X).
       suff: l1 = map (fun c => (real_cmd c, real_atk_bit c,  ideal_cmd c, sim_active c)) l2;
@@ -314,7 +370,7 @@ Section extract_step_commute.
 
     - case e: (sim_active' _ _ _); cycle 1; 
       [move: (sim_active'_false _ _ _ e)=> []  ->; case=> e'; rewrite -> e' in *=> {e'} //=; f_equal | clear e]; cook.
-      1-2: rewrite /zip cmd_map_sim_app; cook.
+      1-2: rewrite /zip; cook.
       1-2: rewrite/ cmd_map_sim filter_map_swap; cook.
         { erewrite filter_ext; cycle 1.
             { case; case=> * /=. 
@@ -333,7 +389,6 @@ Section extract_step_commute.
            { erewrite ni_optcmd_st_conf_atk; [reflexivity|..]; eauto. }
         erewrite ni_sec_optcmd_st_conf_atk; [|eassumption]. erewrite noninterfering_post_pre; [reflexivity|]. 
         congruence. }
-      rewrite cmd_map_sim_app. cook.
       rewrite/zip/cmd_map_sim filter_map_swap map_map. symmetry.
       erewrite map_ext; [|case; case=> * /=; instantiate (1:= fun '(_,_,_) => _); reflexivity].
       erewrite filter_ext; [|case; case=> *; rewrite /sim_active; cbn; instantiate (1:= fun '(_,_,_) => _); reflexivity].
@@ -356,7 +411,7 @@ Section extract_step_commute.
         1,2: erewrite map_ext; [|case; case=> *; instantiate (1 := fun '(_, _,_)=> _); reflexivity ].
         1,2: erewrite filter_ext; [|case; case=> *; instantiate (1 := fun '(_, _,_)=> _); reflexivity ].
         1,2: enter (erewrite map_filter_combine_extend2_ind2;  only 2,3: (case=> *; instantiate (1:= fun _ => _); reflexivity); only 2: done).
-        1,2: clear; revert_hyp_pat nat; elim=> * /=; cook. }
+        1,2: clear; revert_hyp_pat nat; elim=> * /=; cook. rewrite map_id //. }
       move: newpce rwt=> /andP [] /negbTE rcmd_grd -> rwt.
       rewrite rcmd_grd. cook.
       rewrite combine_extend3_splitr. 
@@ -370,7 +425,7 @@ Section extract_step_commute.
       rewrite !filter_map_swap.
       erewrite filter_ext; [| move=> * /=; reflexivity].
       cnstrct_eq_gl. rewrite filter_true //.
-  Admitted.
+  Qed.
   Print Assumptions extract_step_commute.
 
 End extract_step_commute.

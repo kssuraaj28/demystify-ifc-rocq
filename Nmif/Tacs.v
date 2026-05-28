@@ -94,8 +94,16 @@ Section test.
   Proof. NAME_GOALS_AFTER split a b. Abort.
 End test.
 
-Tactic Notation "enter" tactic0(t) := 
+Tactic Notation "enter" tactic0(t) :=
   let f := ltac2:(tt |- Control.enter (fun () => Ltac1.run tt)) in  f t.
+
+Tactic Notation "dotop" "[" tactic(t) "]" :=
+  let x := fresh in move=> x; do [t] in x; move: x.
+
+Section test.
+  Goal forall (n: nat), 3 = 1 + 2 -> 3+1 = 0.
+  Proof. move=> n. dotop [cbn]. Abort.
+End test.
 
 
 (* Run `t`. If it succeeds, then check goals. TODO: Reconsider Control.enter. Maybe better to pull that out? *)

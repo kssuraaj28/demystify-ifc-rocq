@@ -545,6 +545,18 @@ Module List.
     Proof. move=> *. progress cook. Abort.
   End test.
 
+  Lemma filter_id_repeat_true n :
+    filter id (repeat true n) = repeat true n.
+  Proof. elim: n=> //= n ->. done. Qed.
+
+  Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> filter_id_repeat_true) "filter_id_repeat_true" old.
+
+  Section test.
+    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["filter_id_repeat_true"]) ().
+    Goal forall n, filter id (repeat true n) = repeat true n.
+    Proof. move=> *. progress cook. Abort.
+  End test.
+
   Ltac2 this_cookbook () := this_cookbook_ ().
   Hint Extern 10 => lazymatch goal with _ =>  apply/Forall_forall end : trickbag.
 End List.
