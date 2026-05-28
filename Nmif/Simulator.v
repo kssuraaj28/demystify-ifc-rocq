@@ -69,6 +69,7 @@ Section sim_constr.
     (sim_st, ast, cont_full).
 
   
+  Parameter TODO: Store.
   Obligation Tactic := try easy. (* TODO: Program cases or whatnot *)
   Program Definition construct_simulator : SimStateMachine := 
     {|
@@ -81,7 +82,7 @@ Section sim_constr.
       pre_cmd_action st ist :=  
         let: (mk_simstate ast sim_st prg) :=  st in 
         if prg isn't (ocmd, isatk) :: rest then ist else 
-        ist ;  (* Ideal pre-cmd action is weak *)
+        TODO ;  (* Ideal pre-cmd action is weak *)
     |}.
   Next Obligation. case=> ? ?; case=> * //=. Admitted.
   Next Obligation. case=> ? ?; case=> * //=. Admitted.
