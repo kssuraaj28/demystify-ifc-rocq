@@ -80,10 +80,12 @@ Section sim_constr.
         let: (sim_st, new_ast, cont) := sim_step ideal_st ocmd isatk sim_st ast in
         (mk_simstate new_ast sim_st (cont ++ rest), length cont);
         
-      pre_cmd_action st ist :=  
+      pre_cmd_action st ideal_st :=  
         let: (mk_simstate ast sim_st prg) :=  st in 
-        if prg isn't (ocmd, isatk) :: rest then ist else 
-        TODO ;  (* Ideal pre-cmd action is weak *)
+        if prg isn't (ocmd, isatk) :: rest then ideal_st else 
+        let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in (* There is repetition here *)
+        let: sim_st := optcmd_stp_store ocmd sim_st in 
+        if ocmd isn't Some (endorse from to) then ideal_st else  update_to_store ideal_st from (sim_st from);
     |}.
   Next Obligation. case=> ? ?; case=> * //=. Admitted.
   Next Obligation. case=> ? ?; case=> * //=. Admitted.
