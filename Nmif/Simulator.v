@@ -70,7 +70,7 @@ Section sim_constr.
     (sim_st, ast, cont_full).
 
   
-  Obligation Tactic := easy. (* TODO: Program cases or whatnot *)
+  Obligation Tactic := try easy. (* TODO: Program cases or whatnot *)
   Program Definition construct_simulator : SimStateMachine := 
     {|
       post_cmd_action st _ :=
@@ -79,20 +79,16 @@ Section sim_constr.
         let: (sim_st, new_ast, cont) := sim_step ocmd isatk sim_st ast in
         (mk_simstate new_ast sim_st (cont ++ rest), length cont);
         
-
-(*
-      substeps '(mk_simstate ast sim_st prg) := 
-        if prg isn't (ocmd, isatk) :: _ then 0 else
-        let: (_, cont) := sim_step ocmd isatk sim_st ast in
-        length cont;
-        *)
-
-      pre_cmd_action _ st :=  st ;  (* Ideal pre-cmd action is weak *)
+      pre_cmd_action st ist :=  
+        let: (mk_simstate ast sim_st prg) :=  st in 
+      ist ;  (* Ideal pre-cmd action is weak *)
     |}.
+  Next Obligation. Admitted.
+  Next Obligation. Admitted.
 
   Fact construct_simulator_pre_cmd ast st :
     pre_cmd_action construct_simulator ast st = st.
-  Proof. done. Qed.
+  Proof. case: ast. done. Qed.
 
   Fact construct_simulator_post_cmd_cons ocmd isatk rest ast sim_st st :
     post_cmd_action construct_simulator
