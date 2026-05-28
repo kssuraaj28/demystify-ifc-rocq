@@ -57,6 +57,7 @@ Section sim_constr.
 
     let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in
     let: sim_st := optcmd_stp_store ocmd sim_st in 
+    let: sim_st := if ocmd isn't Some (declassify from to) then sim_st else update_to_store sim_st to (ideal_st to) in (* Controlled ideal read *)
 
     let: post_atk := post_cmd_action atk ast sim_st in
     let: ast := if isatk is true then post_atk.1 else ast in
@@ -84,6 +85,7 @@ Section sim_constr.
         if prg isn't (ocmd, isatk) :: rest then ist else 
         TODO ;  (* Ideal pre-cmd action is weak *)
     |}.
+  Next Obligation. case=> ? ?; case=> * //=. Admitted.
   Next Obligation. case=> ? ?; case=> * //=. Admitted.
   Next Obligation. case=> ? ?; case=> * //=. Admitted.
 

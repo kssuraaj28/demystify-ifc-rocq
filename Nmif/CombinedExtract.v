@@ -196,7 +196,6 @@ Section extract_step_commute.
                          [optcmd_stp_cnt _ (if _ then _ else simst)] => [|<-];
               [apply: cnt_acmd_pubeq; eassumption|] ]
       end) "acmd_pubeq" old.
-
   Ltac2 Set curr_cookbook as old :=
     add_cookstep 
       ltac1:(match goal with
@@ -205,7 +204,7 @@ Section extract_step_commute.
              pattern_focus [match c with | Some (endorse _ _) => _ | _  => _ end]=> P;
              set b := (X in match _ with Some (endorse _ _) => _ | _ => X end);
              suff: P b;  [move: P b noend; clear; case: c=> //=; case=> //=| subst P b;cbv beta]
-           end) "nodecl" old.
+           end) "noend" old.
 
   Ltac2 Set curr_cookbook as old :=
     add_cookstep 
@@ -215,7 +214,7 @@ Section extract_step_commute.
              pattern_focus [match c with | Some (declassify _ _) => _ | _  => _ end]=> P;
              set b := (X in match _ with Some (declassify _ _) => _ | _ => X end);
              suff: P b;  [move: P b nodecl; clear; case: c=> //=; case=> //=| subst P b;cbv beta]
-           end) "noend" old.
+           end) "nodecl" old.
 
   Ltac2 Set cook_debug := 2.
 
@@ -330,7 +329,7 @@ Section extract_step_commute.
         rewrite combine_extend3_nil1 combine_extend2_nil_r !map_map filter_map_swap. cook.
         unshelve erewrite filter_ext; [exact xpred0|apply filter_false|]. cook. }
       rewrite/sim_step /=; cnstrct_eq_gl; cook.
-        { case: pub rwt => rwt /=. (* TODO: This should be automated *)
+        { case: pub rwt => rwt /=; cook. (* TODO: This should be automated *)
            { erewrite ni_optcmd_st_conf_atk; [reflexivity|..]; eauto. }
         erewrite ni_sec_optcmd_st_conf_atk; [|eassumption]. erewrite noninterfering_post_pre; [reflexivity|]. 
         congruence. }
