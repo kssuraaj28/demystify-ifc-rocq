@@ -52,7 +52,7 @@ Section sim_constr.
      Dropped along with the init_state field of AdvNextStep. *)
 
   Definition sim_step 
-    (ocmd: option Cmd) (isatk: bool) (sim_st : Store) (ast: AtkStates):
+    (ideal_st : Store) (ocmd: option Cmd) (isatk: bool) (sim_st : Store) (ast: AtkStates):
     (Store (* sim_st *) * AtkStates *  list ((option Cmd) * bool)) :=
 
     let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in
@@ -73,10 +73,10 @@ Section sim_constr.
   Obligation Tactic := try easy. (* TODO: Program cases or whatnot *)
   Program Definition construct_simulator : SimStateMachine := 
     {|
-      post_cmd_action st _ :=
+      post_cmd_action st ideal_st :=
         let: (mk_simstate ast sim_st prg) :=  st in 
         if prg isn't (ocmd, isatk) :: rest then (st, 0) else
-        let: (sim_st, new_ast, cont) := sim_step ocmd isatk sim_st ast in
+        let: (sim_st, new_ast, cont) := sim_step ideal_st ocmd isatk sim_st ast in
         (mk_simstate new_ast sim_st (cont ++ rest), length cont);
         
       pre_cmd_action st ist :=  

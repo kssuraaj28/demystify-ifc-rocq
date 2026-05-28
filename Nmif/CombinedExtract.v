@@ -254,7 +254,7 @@ Section extract_step_commute.
     rewrite/sim_active. cook.
     rewrite/step /acmd_step.  
     pattern_eq [if _ then pre_cmd_action (construct_simulator _) _ _ else ist] with ist; [| move=> ->]. (* Ninja repair *)
-        { case: sim_active'=> //=. admit. }
+      { case: sim_active'=> //=. admit. }
     congr (_,_,_); cook.
     - set l1 := (X in map _ X = _). set l2 := (X in _ = map _ X).
       suff: l1 = map (fun c => (real_cmd c, real_atk_bit c,  ideal_cmd c, sim_active c)) l2;
