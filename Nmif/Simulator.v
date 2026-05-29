@@ -55,7 +55,7 @@ Section sim_constr.
 
     let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in
     let: sim_st := optcmd_stp_store ocmd sim_st in 
-    let: sim_st := if ocmd isn't Some (declassify from to) then sim_st else 
+    let: sim_st := if ocmd isn't Some (assign (declassify from to)) then sim_st else
                    if (is_public to) is false then sim_st else
                    update_to_store sim_st to (ideal_st to) in (* Controlled ideal read *)
 
@@ -81,7 +81,7 @@ Section sim_constr.
         if prg isn't (ocmd, isatk) :: rest then ideal_st else 
         let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in (* There is repetition here *)
         let: sim_st := optcmd_stp_store ocmd sim_st in 
-        if ocmd isn't Some (endorse from to) then ideal_st else  
+        if ocmd isn't Some (assign (endorse from to)) then ideal_st else
         if (is_public from  &&  is_untrusted from) is false then ideal_st else
         update_to_store ideal_st from (sim_st from).
 
@@ -92,7 +92,7 @@ Section sim_constr.
       pre_cmd_action := sim_pre;
     |}. (* TODO: Why 11 obligations. *)
   Next Obligation. 
-    case=> ? ?; case=> [] //= [] [] // [] //= ? ? *.
+    case=> ? ?; case=> [] //= [] [] // [] //= [] // ? ? *.
     case e1: is_untrusted=> //;[|rewrite Bool.andb_false_r]=> //.
     rewrite Bool.andb_true_r.
     case: is_public=> //.
@@ -103,16 +103,17 @@ Import VarValStore.Notations.
   Next Obligation. 
     case=> ? ?; case=> // - []. 
     rewrite/sim_pre /Noninterference.Noninterfering; case; try easy.
-    case=> *; try easy.
+    case; try easy. case=> // *.
     case e1: is_untrusted=> //; [|rewrite Bool.andb_false_r]=> //.
     rewrite Bool.andb_true_r.
     case e2: is_public=> //=.
+    rewrite/clean_assign_stp_store.
     move: (update_to_store (if _ then _ else _) _ _ _)=> ?.
     auto using update_same_varval.
   Qed.
 
   Next Obligation. 
-    case=> ? ?; case=> // - [] [] // [] //.  
+    case=> ? ?; case=> // - [] [] // [] // [] //.  
     rewrite/sim_post /Noninterference.Noninterfering=> from to ? ? i1 i2 *.
     pattern_eq_2 [sim_step _ _ _ _ _] [sim_step _ _ _ _ _]=> [| ->] //.
     rewrite/sim_step.

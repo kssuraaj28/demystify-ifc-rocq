@@ -33,13 +33,13 @@ Section sa.
      forall from to,
        let: ptlbl := mk_lbl false true in let: pulbl := mk_lbl true true in
        var_lbl from = pulbl -> var_lbl to = ptlbl ->
-       _ ptlbl (endorse from to) 
+       _ ptlbl (assign (endorse from to))
 
   | wf_declassify: 
      forall from to,
        let: ptlbl := mk_lbl false true in let: stlbl := mk_lbl false false in
        var_lbl from = stlbl -> var_lbl to = ptlbl ->
-       _ ptlbl (declassify from to)
+       _ ptlbl (assign (declassify from to))
 
   | wf_assign: 
      forall dst src1 src2 comp pclbl, 
@@ -47,7 +47,7 @@ Section sa.
        let: s1lbl := var_lbl src1 in
        let: s2lbl := var_lbl src2 in
        s1lbl ⊑ dstlbl -> s2lbl ⊑ dstlbl -> pclbl ⊑ dstlbl -> (* Using ssrbool coercion *)
-       _ pclbl (assign (src1, src2, comp) dst)
+       _ pclbl (assign (exp_assign (src1, src2, comp) dst))
 
   | wf_cond: 
      forall gvar comp pclbl b1 b2, 
@@ -79,13 +79,13 @@ Section sa.
         forall from to,
           let: ptlbl := mk_lbl false true in let: pulbl := mk_lbl true true in
           var_lbl from = pulbl -> var_lbl to = ptlbl ->
-          P ptlbl (endorse from to). 
+          P ptlbl (assign (endorse from to)).
 
     Hypothesis hyp_declassify : 
         forall from to,
           let: ptlbl := mk_lbl false true in let: stlbl := mk_lbl false false in
           var_lbl from = stlbl -> var_lbl to = ptlbl ->
-          P ptlbl (declassify from to).
+          P ptlbl (assign (declassify from to)).
 
     Hypothesis hyp_assign : 
         forall dst src1 src2  comp pclbl,
@@ -93,7 +93,7 @@ Section sa.
           let: s1lbl := var_lbl src1 in
           let: s2lbl := var_lbl src2 in
           s1lbl ⊑ dstlbl -> s2lbl ⊑ dstlbl -> pclbl ⊑ dstlbl ->
-          P pclbl (assign (src1, src2, comp) dst).
+          P pclbl (assign (exp_assign (src1, src2, comp) dst)).
 
     (* I have no idea whether this is the right thing *)
     Hypothesis hyp_cond : 
@@ -226,14 +226,14 @@ Section downgrading.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
 
   Lemma wf_endorse_inv pc from to:
-    WellFormedCmd pc (endorse from to) ->
+    WellFormedCmd pc (assign (endorse from to)) ->
     pc = mk_lbl false true /\
     var_lbl from = mk_lbl true true /\
     var_lbl to = mk_lbl false true.
   Proof. inversion 1; subst; tauto. Qed.
 
   Lemma wf_declassify_inv pc from to:
-    WellFormedCmd pc (declassify from to) ->
+    WellFormedCmd pc (assign (declassify from to)) ->
     pc = mk_lbl false true /\
     var_lbl from = mk_lbl false false /\
     var_lbl to = mk_lbl false true.
@@ -251,13 +251,14 @@ Section ni.
       ⟨ clean_cmd_stp_store c st1 | is_public ⟩ = ⟨ clean_cmd_stp_store c st2 | is_public ⟩.
   Proof.
     move=> [] // d s1 s2 ? ?.
-      { apply: update_to_store_storeview_eq. rewrite /is_public s2 //. } 
+      { apply: update_to_store_storeview_eq. rewrite /is_public s2 //. }
     case de: ([elaborate is_public d])=> fs1d fs2d _ _ pubeq /=; [| rewrite !update_storeview_nochange //].
     move: (flows_to_pub _ _ de fs1d)=> {fs1d} ps1. (* TODO: Tactic *)
     move: (flows_to_pub _ _ de fs2d)=> {fs2d} ps2.
     set v1 := (X in ⟨update_to_store _ _ X | _ ⟩ = _ ).
     set v2 := (X in _ = ⟨update_to_store _ _ X | _ ⟩).
     suff: v1 = v2; [move=> ->; apply/update_same_varval=> //|subst v1 v2].
+    rewrite /get_assign_val /eval_val_exp /=.
     f_equal; eauto using storeview_eq.
   Qed.
 
@@ -335,6 +336,7 @@ Section ni.
     set v1 := (X in ⟨update_to_store _ _ X | _ ⟩ = _ ).
     set v2 := (X in _ = ⟨update_to_store _ _ X | _ ⟩).
     suff: v1 = v2; [move=> ->; apply/update_same_varval=> //|subst v1 v2].
+    rewrite /get_assign_val /eval_val_exp /=.
     f_equal; eauto using storeview_eq.
   Qed.
 

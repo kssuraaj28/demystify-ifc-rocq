@@ -92,12 +92,12 @@ Parameter TODO: Store.
 
 
       (* Controlled ideal corruption *)
-      let: ideal_st :=  if real_cmd isn't  Some (endorse from to) then ideal_st else  
+      let: ideal_st :=  if real_cmd isn't  Some (assign (endorse from to)) then ideal_st else
                           update_to_store ideal_st from (sim_st from) in (* get the value of from from sim_st, then update to ideal_st *)
       let: (ideal_cnt, ideal_st) :=  (optcmd_stp_cnt ideal_cmd ideal_st, optcmd_stp_store ideal_cmd ideal_st) in
 
 
-      let: sim_st := if real_cmd isn't Some (declassify from to) then sim_st else update_to_store sim_st to (ideal_st to) in (* Controlled ideal read *)
+      let: sim_st := if real_cmd isn't Some (assign (declassify from to)) then sim_st else update_to_store sim_st to (ideal_st to) in (* Controlled ideal read *)
     
     
       let: atk_pst := (post_cmd_action atk_st real_st) in (* Not having this was quite painful. TODO *)
@@ -207,18 +207,18 @@ Section invprf.
       ltac1:(match goal with
              |  noend : is_true (~~ is_endorse ?a), c : Cmd |- _ => 
                let P := fresh in  let b := fresh in
-               pattern_focus [match c with | endorse _ _ => _ | _  => _ end]=> P;
-                 set b := (X in match _ with endorse _ _ => _ | _ => X end); (* Changing to c fails *)
-                 suff: P b; [move: P b noend; clear; case: c=> //= |subst P b; cbv beta] 
+               pattern_focus [match c with | assign (endorse _ _) => _ | _  => _ end]=> P;
+                 set b := (X in match _ with assign (endorse _ _) => _ | _ => X end); (* Changing to c fails *)
+                 suff: P b; [move: P b noend; clear; case: c=> [[]| |] //= |subst P b; cbv beta]
              end) "no_endorse" old.
 
     Ltac2 Set curr_cookbook as old := add_cookstep 
       ltac1:(match goal with
              |  nodecl : is_true (~~ is_declassify ?a), c :Cmd |- _ => 
                let P := fresh in  let b := fresh in
-               pattern_focus [match c with | declassify _ _ => _ | _  => _ end]=> P; (* TODO: This should be automated *)
-                 set b := (X in match _ with declassify _ _ => _ | _ => X end);
-                 suff: P b; [move: P b nodecl; clear; case: c=> //= |subst P b; cbv beta] 
+               pattern_focus [match c with | assign (declassify _ _) => _ | _  => _ end]=> P; (* TODO: This should be automated *)
+                 set b := (X in match _ with assign (declassify _ _) => _ | _ => X end);
+                 suff: P b; [move: P b nodecl; clear; case: c=> [[]| |] //= |subst P b; cbv beta]
              end) "no_declassify" old.
 
 
@@ -262,8 +262,8 @@ Section invprf.
           { move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e}. (* TODO: this branch is longer *)
           revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] e; rewrite -> e in *=> {e} - [] * /=.
           revert_hyp_pat (if _ then _ else _)=> /= <- /=.
-          apply/storeview_eq_ext=> *; rewrite /update_to_store; cook.
-          rewrite dec_eq_refl. (* TODO: Eventually this should be a rewrite rule also *)
+          apply/storeview_eq_ext=> *; rewrite /clean_assign_stp_store /update_to_store; cook.
+          rewrite/get_assign_val/get_assign_dest dec_eq_refl. (* TODO: Eventually this should be a rewrite rule also *)
           case e1: (_ =? _). 
           2: case e2: (_ =? _).
           2: apply dec_eq_true in e2; rewrite -> e2 in *=> {e2}.
@@ -278,7 +278,7 @@ Section invprf.
         move/is_declassify_inv=> [] ? [] ? e; rewrite -> e in *=> {e}.
         revert_hyp_pat (WellFormedCmd _ _)=> /wf_declassify_inv [] e; rewrite -> e in *=> {e} - [] * /=.
         revert_hyp_pat (if _ then _ else _)=> /= <- /=.
-        apply/storeview_eq_ext=> *; rewrite /update_to_store. rewrite dec_eq_refl. (* TODO: Eventually this should be a rewrite rule also *)
+        apply/storeview_eq_ext=> *; rewrite /clean_assign_stp_store /update_to_store /=. rewrite dec_eq_refl. (* TODO: Eventually this should be a rewrite rule also *)
         case e1: (_ =? _). 
           { unshelve apply: storeview_eq; [exact: is_trusted|..]; cook. }
         apply/storeview_eq; [|eassumption]; cook. }

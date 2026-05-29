@@ -133,6 +133,57 @@ Section extract_step_commute.
   Ltac2 Set curr_cookbook as old := join_cookbooks Util.List.this_cookbook old.
   Ltac2 Set curr_cookbook as old := join_cookbooks Lattice4pt.this_cookbook old.
 
+
+
+
+  Ltac2 Set cook_debug := 0.
+
+  Lemma extract_step_commute_downgrade (st: CmbState) (c: CmbCmd) (restcmd: list CmbCmd):
+    oapp is_endorse false (real_cmd c) \/ oapp is_declassify false (real_cmd c) ->
+    Invariant (st, c :: restcmd) ->
+    step (extract_2cfg (st, c :: restcmd)) = extract_2cfg (comb_step (st, c :: restcmd)). 
+  Proof.
+    case: c=> >.  case: st=> >.
+    cook. rewrite/Invariant=> downgrade. case. cook.
+    rewrite/CmbCmdInv/StateInv=> + + [].
+    case: downgrade=> downgrade.
+    1: move: downgrade=> /is_endorse_inv_opt.
+    2: move: downgrade=> /is_declassify_inv_opt.
+    1,2: move=> [?] [?] ->.
+    1,2: rewrite/CmbCmdCoreInv=> - []. 
+    1: move/wf_endorse_inv. 2: move/wf_declassify_inv. 
+    1,2: move=> [->] [? ?]. 
+    1,2: dotop [cbn]=> <- _ ? ?. 
+    1,2: rewrite/comb_step/cmbcmd_step/extract_2cfg; cook.
+    1,2: pattern_eq [sim_active  _] with true=>[| ->]; [simpl; cook|].
+    1,2: rewrite/step/acmd_step /=. 
+    1,2: assert_fails (pattern_focus [construct_simulator _]). (* Checkpoint. TODO: Think about checkpoint practices *)
+    1,2: rewrite/clean_assign_stp_store/get_assign_val/get_assign_dest.
+    1: pattern_eq [is_untrusted _] with true=>[| ->]; cook.
+    1,2: pattern_eq [is_public _] with true=>[| ->]; cook.
+    1,2: pattern_eq_2 [post_cmd_action _ _ (update_to_store _ _ _)] [post_cmd_action _ _ (update_to_store _ _ _)]=> [|<-]; swap 2 3.
+        { apply/post_cmd_wf/update_to_store_storeview_eq; cook. }
+        { apply/post_cmd_wf.  set a := (pre_cmd_action _ _ _). set b := (pre_cmd_action _ _ _).
+        have ?: ⟨ b | is_public ⟩ = ⟨ a | is_public ⟩; subst a b; cook. (* I don't like this *)
+        erewrite <- update_same_varval;[| eassumption]. repeat f_equal.
+        erewrite storeview_eq; [ |apply: pre_cmd_wf_int| ]; cook.
+        apply:storeview_eq; eauto. cook. }
+    1,2: move: (post_cmd_action _ _ (update_to_store _ _ _));case=> >; cook.
+    1,2: rewrite/zip.
+    1,2: set rhs := RHS.
+    1,2: rewrite combine_extend4_swap34 /combine_extend4 combine_extend3_splitl combine_extend2_nil_r.
+    1,2: rewrite combine_extend2_same combine_extend2_nil_l.
+    1,2: set lhs := LHS; subst rhs.
+    1,2: rewrite/cmd_map combine_extend3_splitl !combine_extend2_nil_l.
+    1,2: subst lhs; rewrite !map_map /cmd_map_sim.
+    1,2: rewrite/sim_active /= /sim_active'; cook.
+    1,2: enter (cnstrct_eq_gl; cook; clear; [apply: map_ext=> ?; cook|]).
+    1,2: rewrite filter_map_swap. 
+    1,2: erewrite filter_ext; [|move=> *; rewrite /= Bool.orb_false_r; reflexivity].
+    1,2: cook; rewrite map_map.
+    1,2: apply: map_ext; case=> //.
+  Qed.
+
   Lemma public_compute_new_pc_opt untr pub rcmd :
     public (compute_new_pc_opt (mk_lbl untr pub) rcmd) = ~~ is_secret_guard rcmd && pub.
   Proof.
@@ -182,7 +233,6 @@ Section extract_step_commute.
     - done.
   Qed.
 
-
   (* Merge a matched rst/simst subterm pair (only fires when both halves are
      present), discharging via the relevant acmd-pubeq lemma. *)
   Ltac2 Set curr_cookbook as old :=
@@ -199,72 +249,26 @@ Section extract_step_commute.
                          [optcmd_stp_cnt _ (if _ then _ else simst)] => [|<-];
               [apply: cnt_acmd_pubeq; eassumption|] ]
       end) "acmd_pubeq" old.
+
   Ltac2 Set curr_cookbook as old :=
-    add_cookstep 
+    add_cookstep
       ltac1:(match goal with
-       |  noend : is_true (~~ oapp is_endorse false ?c), c : option Cmd |- _ => 
+       |  noend : is_true (~~ oapp is_endorse false ?c), c : option Cmd |- _ =>
              let P := fresh in  let b := fresh in
-             pattern_focus [match c with | Some (endorse _ _) => _ | _  => _ end]=> P;
-             set b := (X in match _ with Some (endorse _ _) => _ | _ => X end);
-             suff: P b;  [move: P b noend; clear; case: c=> //=; case=> //=| subst P b;cbv beta]
+             pattern_focus [match c with | Some (assign (endorse _ _)) => _ | _  => _ end]=> P;
+             set b := (X in match _ with Some (assign (endorse _ _)) => _ | _ => X end);
+             suff: P b;  [move: P b noend; clear; case: c=> //=; case=> //=; case=> //=| subst P b;cbv beta]
            end) "noend" old.
 
   Ltac2 Set curr_cookbook as old :=
-    add_cookstep 
-    ltac1:( match goal with
-       |  nodecl : is_true (~~ oapp is_declassify false ?c), c : option Cmd |- _ => 
+    add_cookstep
+      ltac1:(match goal with
+       |  nodecl : is_true (~~ oapp is_declassify false ?c), c : option Cmd |- _ =>
              let P := fresh in  let b := fresh in
-             pattern_focus [match c with | Some (declassify _ _) => _ | _  => _ end]=> P;
-             set b := (X in match _ with Some (declassify _ _) => _ | _ => X end);
-             suff: P b;  [move: P b nodecl; clear; case: c=> //=; case=> //=| subst P b;cbv beta]
+             pattern_focus [match c with | Some (assign (declassify _ _)) => _ | _  => _ end]=> P;
+             set b := (X in match _ with Some (assign (declassify _ _)) => _ | _ => X end);
+             suff: P b;  [move: P b nodecl; clear; case: c=> //=; case=> //=; case=> //=| subst P b;cbv beta]
            end) "nodecl" old.
-
-  Ltac2 Set cook_debug := 0.
-
-  Lemma extract_step_commute_downgrade (st: CmbState) (c: CmbCmd) (restcmd: list CmbCmd):
-    oapp is_endorse false (real_cmd c) \/ oapp is_declassify false (real_cmd c) ->
-    Invariant (st, c :: restcmd) ->
-    step (extract_2cfg (st, c :: restcmd)) = extract_2cfg (comb_step (st, c :: restcmd)). 
-  Proof.
-    case: c=> >.  case: st=> >.
-    cook. rewrite/Invariant=> downgrade. case. cook.
-    rewrite/CmbCmdInv/StateInv=> + + [].
-    case: downgrade=> downgrade.
-    1: move: downgrade=> /is_endorse_inv_opt.
-    2: move: downgrade=> /is_declassify_inv_opt.
-    1,2: move=> [?] [?] ->.
-    1,2: rewrite/CmbCmdCoreInv=> - []. 
-    1: move/wf_endorse_inv. 2: move/wf_declassify_inv. 
-    1,2: move=> [->] [? ?]. 
-    1,2: dotop [cbn]=> <- _ ? ?. 
-    1,2: rewrite/comb_step/cmbcmd_step/extract_2cfg; cook.
-    1,2: pattern_eq [sim_active  _] with true=>[| ->]; [simpl; cook|].
-    1,2: rewrite/step/acmd_step /=. 
-    1,2: assert_fails (pattern_focus [construct_simulator _]). (* Checkpoint. TODO: Think about checkpoint practices *)
-    1: pattern_eq [is_untrusted _] with true=>[| ->]; cook.
-    1,2: pattern_eq [is_public _] with true=>[| ->]; cook.
-    1,2: pattern_eq_2 [post_cmd_action _ _ (update_to_store _ _ _)] [post_cmd_action _ _ (update_to_store _ _ _)]=> [|<-]; swap 2 3.
-        { apply/post_cmd_wf/update_to_store_storeview_eq; cook. }
-        { apply/post_cmd_wf.  set a := (pre_cmd_action _ _ _). set b := (pre_cmd_action _ _ _).
-        have ?: ⟨ b | is_public ⟩ = ⟨ a | is_public ⟩; subst a b; cook. (* I don't like this *)
-        erewrite <- update_same_varval;[| eassumption]. repeat f_equal. 
-        erewrite storeview_eq; [ |apply: pre_cmd_wf_int| ]; cook.
-        apply:storeview_eq; eauto. cook. }
-    1,2: move: (post_cmd_action _ _ (update_to_store _ _ _));case=> >; cook.
-    1,2: rewrite/zip.
-    1,2: set rhs := RHS.
-    1,2: rewrite combine_extend4_swap34 /combine_extend4 combine_extend3_splitl combine_extend2_nil_r.
-    1,2: rewrite combine_extend2_same combine_extend2_nil_l.
-    1,2: set lhs := LHS; subst rhs.
-    1,2: rewrite/cmd_map combine_extend3_splitl !combine_extend2_nil_l.
-    1,2: subst lhs; rewrite !map_map /cmd_map_sim.
-    1,2: rewrite/sim_active /= /sim_active'; cook.
-    1,2: enter (cnstrct_eq_gl; cook; clear; [apply: map_ext=> ?; cook|]).
-    1,2: rewrite filter_map_swap. 
-    1,2: erewrite filter_ext; [|move=> *; rewrite /= Bool.orb_false_r; reflexivity].
-    1,2: cook; rewrite map_map.
-    1,2: apply: map_ext; case=> //.
-  Qed.
 
   Theorem extract_step_commute c:
     Invariant c ->
@@ -285,7 +289,7 @@ Section extract_step_commute.
     rewrite/step /acmd_step.  
     pattern_eq [if _ then pre_cmd_action (construct_simulator _) _ _ else ist] with ist; [| move=> ->]. (* Ninja repair *)
       { case: sim_active'; destruct pub; destruct rcmd as [c| ]=> //.
-      destruct c=> //. }
+      destruct c as [a | | ]=> //; destruct a=> //. }
     congr (_,_,_); cook.
     - set l1 := (X in map _ X = _). set l2 := (X in _ = map _ X).
       suff: l1 = map (fun c => (real_cmd c, real_atk_bit c,  ideal_cmd c, sim_active c)) l2;

@@ -16,6 +16,11 @@ Section syntax.
 
   Definition BoolExp : Type := 
     Vars * (Vals -> bool).
+  
+  Variant Assignment :=
+  | endorse (src dst : Vars)
+  | declassify (src dst : Vars)
+  | exp_assign (exp: ValExp) (dst : Vars).
 
 
   Section cmd.
@@ -23,9 +28,7 @@ Section syntax.
 
     Unset Elimination Schemes.
     Inductive Cmd :=
-      | endorse (from to: Vars)
-      | declassify (from to: Vars)
-      | assign (exp: ValExp) (dst : Vars) 
+      | assign (_ : Assignment)
       | cond (exp: BoolExp) (b1 b2: Prog' Cmd)
       | while (exp: BoolExp) (b: Prog' Cmd). 
     Set Elimination Schemes.
@@ -37,14 +40,8 @@ Section syntax.
     Generalizable All Variables.
     Variable P : Cmd -> Prop.
 
-    Hypothesis hyp_endorse : 
-      `(P (endorse v1 v2)).
-
-    Hypothesis hyp_declassify : 
-      `(P (declassify v1 v2)).
-
     Hypothesis hyp_assign : 
-      `(P (assign dst exp)).
+      `(P (assign ass)).
 
     Hypothesis hyp_cond : 
       `(Forall P b1 ->
@@ -58,34 +55,34 @@ Section syntax.
 
     Fixpoint Cmd_ind : forall c, P c. 
     Proof.
-      case=> >; [apply: hyp_endorse| apply: hyp_declassify| apply: hyp_assign | apply: hyp_cond | apply: hyp_while].
+      case=> >; [apply: hyp_assign| apply: hyp_cond | apply: hyp_while].
       1-3:  lazymatch goal with |- Forall _ ?l => elim: l end; auto.
     Qed.
   End cmd_ind.
 
   Definition is_endorse (c : Cmd) : bool :=
-    match c with endorse _ _ => true | _ => false end.
+    match c with assign (endorse _ _) => true | _ => false end.
 
   Definition is_declassify (c : Cmd) : bool :=
-    match c with declassify _ _ => true | _ => false end.
+    match c with assign (declassify _ _) => true | _ => false end.
 
-  Lemma is_endorse_inv c: is_endorse c -> exists from to, c = endorse from to.
-  Proof. case: c=> //= *; eauto. Qed.
+  Lemma is_endorse_inv c: is_endorse c -> exists from to, c = assign (endorse from to).
+  Proof. case: c=> [[]| |] //= *; eauto. Qed.
 
-  Lemma is_declassify_inv c: is_declassify c -> exists from to, c = declassify from to.
-  Proof. case: c=> //= *; eauto. Qed.
+  Lemma is_declassify_inv c: is_declassify c -> exists from to, c = assign (declassify from to).
+  Proof. case: c=> [[]| |] //= *; eauto. Qed.
 
   Lemma is_endorse_inv_opt oc:
-    oapp is_endorse false oc -> exists from to, oc = Some (endorse from to).
+    oapp is_endorse false oc -> exists from to, oc = Some (assign (endorse from to)).
   Proof. case: oc=> //= c /is_endorse_inv [from [to ->]]; eauto. Qed.
 
   Lemma is_declassify_inv_opt oc:
-    oapp is_declassify false oc -> exists from to, oc = Some (declassify from to).
+    oapp is_declassify false oc -> exists from to, oc = Some (assign (declassify from to)).
   Proof. case: oc=> //= c /is_declassify_inv [from [to ->]]; eauto. Qed.
 
   Lemma is_endorse_declassify c:
     is_endorse c \/ is_declassify c \/ (~~ is_endorse c /\ ~~ is_declassify c).
-  Proof. case: c=> /= *; intuition. Qed.
+  Proof. case: c=> [[]| |] /= *; intuition. Qed.
 
   Lemma is_endorse_declassify_opt oc:
     oapp is_endorse false oc \/ oapp is_declassify false oc

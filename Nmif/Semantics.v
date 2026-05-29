@@ -25,10 +25,35 @@ Section exp.
     comp vl1 vl2.
 
   Definition eval_bool_exp (st: Store) (e: BoolExp) : bool :=
-    let: (v, comp) := e in 
+    let: (v, comp) := e in
     let: vl := st v in
     comp vl.
 End exp.
+
+Section assignstep.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
+
+  Definition get_assign_dest (a: Assignment) : Vars :=
+    match a with
+    | exp_assign _ dst => dst
+    | endorse _ dst    => dst
+    | declassify _ dst => dst
+    end.
+
+  Definition get_assign_val (s: Store) (a: Assignment) : Vals :=
+    match a with
+    | exp_assign exp _ => eval_val_exp s exp
+    | endorse src _    => s src
+    | declassify src _ => s src
+    end.
+
+  Definition clean_assign_stp_store (a: Assignment) (s: Store) : Store :=
+    update_to_store s (get_assign_dest a) (get_assign_val s a).
+
+  Definition clean_assign_evnt (a: Assignment) (s: Store) : option (Vars * Vals) :=
+    let: dst := get_assign_dest a in
+    if (is_trusted dst) is false then None else Some (dst, get_assign_val s a).
+End assignstep.
 
 Section cleanstep.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
@@ -36,13 +61,7 @@ Section cleanstep.
   Notation Continuation := Syntax.Prog.
 
   Definition clean_cmd_stp_store (c: Cmd) (s: Store) : Store :=
-    match c with
-    | assign exp dst => 
-      let: vl := eval_val_exp s exp in update_to_store s dst vl
-    | endorse src dst => update_to_store s dst (s src)
-    | declassify src dst => update_to_store s dst (s src)
-    | _ => s
-    end.
+    if c isn't assign a then s else clean_assign_stp_store a s.
   
   Definition optcmd_stp_store := oapp clean_cmd_stp_store id.
 
@@ -63,13 +82,7 @@ Section cleanstep.
   Definition CmdEvent := option (Vars * Vals).
 
   Definition clean_cmd_evnt (c: Cmd) (s: Store) : CmdEvent :=
-    match c with
-    | assign exp dst => 
-      let: vl := eval_val_exp s exp in
-      if (is_trusted dst) is false then None else
-      Some (dst, vl) 
-    | _ => None
-    end.
+    if c isn't assign a then None else clean_assign_evnt a s.
 
   (* TODO: Have examples below this *)
   Definition optcmd_evnt := oapp clean_cmd_evnt (fun _ => None).
