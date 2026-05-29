@@ -81,15 +81,15 @@ End test.
 Section test.
   Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["cnstr_eq_simpl"]) ().
   Goal forall n m, S n = S m.
-  Proof. move=> *. progress cook. Abort.
+  Proof. move=> *. cook. Abort.
   Goal forall A (x y: A) (l: list A), x :: l = y :: l.
-  Proof. move=> *. progress cook. Abort.
+  Proof. move=> *. cook. Abort.
   Goal forall A (x: A) (l1 l2: list A), x :: l1 = x :: l2.
-  Proof. move=> *. progress cook. Abort.
+  Proof. move=> *. cook. Abort.
   Goal forall A (x y: A), Some x = Some y.
-  Proof. move=> *. progress cook. Abort.
+  Proof. move=> *. cook. Abort.
   Goal forall (n1 n2 m1 m2: nat), (n1, n2) = (m1, m2).
-  Proof. move=> *. Fail progress cook. Abort.
+  Proof. move=> *. Fail cook. Abort.
 End test.
 
 (* You should automate some other way. TODO
@@ -487,16 +487,12 @@ Module List.
   Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(Forall_inv_toph) "Forall_inv" old.
 
   Section test.
-    (* Direct invocation: does Forall_inv_toph itself run? *)
     Goal forall (P: nat -> Prop) (x: nat) l, Forall P (x :: l) -> P x.
     Proof. move=> P x l. Forall_inv_toph. done. Abort.
 
-    (* Cookbook integration: does cook accept it under assert_no_hyp_change?
-       `progress cook` distinguishes "cook ran the step" from "cook silently
-       no-op'd because the step failed the hyp guard." *)
     Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["Forall_inv"]) ().
     Goal forall (P: nat -> Prop) (x: nat) l, Forall P (x :: l) -> P x.
-    Proof. move=> P x l. progress cook. Abort.
+    Proof. move=> P x l. cook. Abort.
   End test.
 
 
@@ -527,21 +523,21 @@ Module List.
   Section test.
     Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["eq_app_nil"]) ().
     Goal forall A (y l: list A), y = l ++ y.
-    Proof. move=> A y l. progress cook. Abort.
+    Proof. move=> A y l. cook. Abort.
     Goal forall A (y l: list A), l ++ y = y.
-    Proof. move=> A y l. progress cook. Abort.
+    Proof. move=> A y l. cook. Abort.
     Goal forall A (y l: list A), y = y ++ l.
-    Proof. move=> A y l. progress cook. Abort.
+    Proof. move=> A y l. cook. Abort.
     Goal forall A (y l: list A), y ++ l = y.
-    Proof. move=> A y l. progress cook. Abort.
+    Proof. move=> A y l. cook. Abort.
   End test.
 
   Section test.
     Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["eq_map_nil"]) ().
     Goal forall A B (f: A -> B) (l: list A), map f l = [].
-    Proof. move=> *. progress cook. Abort.
+    Proof. move=> *. cook. Abort.
     Goal forall A B (f: A -> B) (l: list A), [] = map f l.
-    Proof. move=> *. progress cook. Abort.
+    Proof. move=> *. cook. Abort.
   End test.
 
   Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(
@@ -556,9 +552,9 @@ Module List.
   Section test.
     Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["eq_app_peel"]) ().
     Goal forall A (a b y: list A), a ++ y = b ++ y.
-    Proof. move=> A a b y. progress cook. Abort.
+    Proof. move=> A a b y. cook. Abort.
     Goal forall A (a b y: list A), y ++ a = y ++ b.
-    Proof. move=> A a b y. progress cook. Abort.
+    Proof. move=> A a b y. cook. Abort.
   End test.
 
   Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> length_map) "length_map" old.
@@ -567,13 +563,13 @@ Module List.
   Section test.
     Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["length_map"]) ().
     Goal forall A B (f: A -> B) (l: list A), length (map f l) = length l.
-    Proof. move=> *. progress cook. Abort.
+    Proof. move=> *. cook. Abort.
   End test.
 
   Section test.
     Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["repeat_length"]) ().
     Goal forall A (x: A) n, length (repeat x n) = n.
-    Proof. move=> *. progress cook. Abort.
+    Proof. move=> *. cook. Abort.
   End test.
 
   Lemma filter_id_repeat_true n :
@@ -585,7 +581,7 @@ Module List.
   Section test.
     Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["filter_id_repeat_true"]) ().
     Goal forall n, filter id (repeat true n) = repeat true n.
-    Proof. move=> *. progress cook. Abort.
+    Proof. move=> *. cook. Abort.
   End test.
 
   Ltac2 this_cookbook () := this_cookbook_ ().

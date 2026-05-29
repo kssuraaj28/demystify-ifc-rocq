@@ -137,7 +137,7 @@ Section test.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
   Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["WellFormedOptCmd_Some"]) ().
   Goal forall pc c (P : _ -> Prop), P (WellFormedOptCmd pc (Some c)).
-  Proof. move=> *. progress cook. Abort.
+  Proof. move=> *. cook. Abort.
 End test.
 
 Notation "pc ⊢ ocmd" := (WellFormedOptCmd pc ocmd) (at level 20).
@@ -183,7 +183,7 @@ Section test.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
   Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["compute_new_pc_opt_some"]) ().
   Goal forall pc c (P: _ -> Prop), P (compute_new_pc_opt pc (Some c)). 
-  Proof. move=> *. progress cook. Abort.
+  Proof. move=> *. cook. Abort.
 End test.
 
 Section test.
@@ -191,7 +191,7 @@ Section test.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
   Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["compute_new_pc_opt_secret"]) ().
   Goal forall untr c (P: _ -> Prop), P (public (compute_new_pc_opt (mk_lbl untr false) c)).
-  Proof. move=> *. progress cook. Abort.
+  Proof. move=> *. cook. Abort.
 End test.
 
 Section flow_to_subtype.
@@ -415,7 +415,7 @@ Section test.
   Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["ni_sec_cmd_st_conf"]) ().
   Goal forall i c st1 (P : _ -> Prop), WellFormedCmd (mk_lbl i false) c ->
     P ⟨ clean_cmd_stp_store c st1 | is_public ⟩.
-  Proof. move=> *. progress cook. Abort.
+  Proof. move=> *. cook. Abort.
 End test.
 
 Section test.
@@ -424,7 +424,7 @@ Section test.
   Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["ni_untr_cmd_st_int"]) ().
   Goal forall p c st1 (P : _ -> Prop), WellFormedCmd (mk_lbl true p) c ->
     P ⟨ clean_cmd_stp_store c st1 | is_trusted ⟩.
-  Proof. move=> *. progress cook. Abort.
+  Proof. move=> *. cook. Abort.
 End test.
 
 Section step_soundness.
@@ -484,7 +484,7 @@ Section test.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
   Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["untr_compute_new_pc"]) ().
   Goal forall p c (P : _ -> Prop), P (untrusted (compute_new_pc (mk_lbl true p) c)).
-  Proof. move=> *. progress cook. Abort.
+  Proof. move=> *. cook. Abort.
 End test.
 
 
