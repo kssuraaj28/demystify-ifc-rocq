@@ -221,72 +221,48 @@ Section extract_step_commute.
 
   Ltac2 Set cook_debug := 2.
 
-  Lemma extract_step_commute_endorse (st: CmbState) (c: CmbCmd) (restcmd: list CmbCmd):
+  Lemma extract_step_commute_downgrade (st: CmbState) (c: CmbCmd) (restcmd: list CmbCmd):
+    oapp is_endorse false (real_cmd c) \/ oapp is_declassify false (real_cmd c) ->
     Invariant (st, c :: restcmd) ->
-    oapp is_endorse false (real_cmd c) ->
     step (extract_2cfg (st, c :: restcmd)) = extract_2cfg (comb_step (st, c :: restcmd)). 
   Proof.
     case: c=> >.  case: st=> >.
-    cook. rewrite/Invariant. case. cook.
-    rewrite/CmbCmdInv/StateInv=> + + [] + + endrs.
-    move: endrs=> /is_endorse_inv_opt [?] [?] ->.
-    rewrite/CmbCmdCoreInv=> - [] /wf_endorse_inv [->] [? ?]. 
-    dotop [cbn]=> <- _ ? ?. 
-    rewrite/comb_step/cmbcmd_step/extract_2cfg. cook.
-    rewrite/step/acmd_step /=. 
-    pattern_eq_2 [post_cmd_action _ _ (update_to_store _ _ _)] [post_cmd_action _ _ (update_to_store _ _ _)]=> [|<-].
-      { apply/post_cmd_wf/update_to_store_storeview_eq; cook. }
-    move: (post_cmd_action _ _ (update_to_store _ _ _));case=> >; cook.
-    rewrite/zip.
-    set rhs := RHS.
-    rewrite combine_extend4_swap34 /combine_extend4 combine_extend3_splitl combine_extend2_nil_r.
-    rewrite combine_extend2_same combine_extend2_nil_l.
-    set lhs := LHS. subst rhs.
-    rewrite/cmd_map combine_extend3_splitl !combine_extend2_nil_l.
-    subst lhs. rewrite !map_map /cmd_map_sim.
-    rewrite/sim_active /= /sim_active'. cook.
-    congr (_,_,_); cook; clear.
-      { apply: map_ext=> ?. cook. }
-    rewrite filter_map_swap. 
-    erewrite filter_ext; [|move=> *; rewrite /= Bool.orb_false_r; reflexivity].
-    cook. rewrite map_map.
-    apply: map_ext; case=> //.
-  Qed.
-
-  Lemma extract_step_commute_declassify (st: CmbState) (c: CmbCmd) (restcmd: list CmbCmd):
-    Invariant (st, c :: restcmd) ->
-    oapp is_declassify false (real_cmd c) ->
-    step (extract_2cfg (st, c :: restcmd)) = extract_2cfg (comb_step (st, c :: restcmd)). 
-  Proof.
-    case: c=> >.  case: st=> >.
-    cook. rewrite/Invariant. case. cook.
-    rewrite/CmbCmdInv/StateInv=> + + [] + + decl.
-    move: decl=> /is_declassify_inv_opt [?] [?] ->.
-    rewrite/CmbCmdCoreInv=> - [] /wf_declassify_inv [->] [? ?]. 
-    dotop [cbn]=> <- remove ? ?. 
-    rewrite/comb_step/cmbcmd_step/extract_2cfg. cook.
-    rewrite/step/acmd_step /=. 
-    pattern_eq_2 [post_cmd_action _ _ (update_to_store _ _ _)] [post_cmd_action _ _ (update_to_store _ _ _)]=> [|<-]; cook.
-      { apply/post_cmd_wf.  set a := (pre_cmd_action _ _ _). set b := (pre_cmd_action _ _ _).
-      have ?: ⟨ b | is_public ⟩ = ⟨ a | is_public ⟩; subst a b; cook. (* I don't like this *)
-      erewrite <- update_same_varval;[| eassumption]. repeat f_equal. 
-      erewrite storeview_eq; [ |apply: pre_cmd_wf_int| ]; cook.
-      apply:storeview_eq; eauto. cook. }
-    move: (post_cmd_action _ _ (update_to_store _ _ _));case=> >; cook. (* The rest of the proof is copied from the above. I feel a little sad *)
-    rewrite/zip.
-    set rhs := RHS.
-    rewrite combine_extend4_swap34 /combine_extend4 combine_extend3_splitl combine_extend2_nil_r.
-    rewrite combine_extend2_same combine_extend2_nil_l.
-    set lhs := LHS. subst rhs.
-    rewrite/cmd_map combine_extend3_splitl !combine_extend2_nil_l.
-    subst lhs. rewrite !map_map /cmd_map_sim.
-    rewrite/sim_active /= /sim_active'. cook.
-    congr (_,_,_); cook; clear.
-      { apply: map_ext=> ?. cook. }
-    rewrite filter_map_swap. 
-    erewrite filter_ext; [|move=> *; rewrite /= Bool.orb_false_r; reflexivity].
-    cook. rewrite map_map.
-    apply: map_ext; case=> //.
+    cook. rewrite/Invariant=> downgrade. case. cook.
+    rewrite/CmbCmdInv/StateInv=> + + [].
+    case: downgrade=> downgrade.
+    1: move: downgrade=> /is_endorse_inv_opt.
+    2: move: downgrade=> /is_declassify_inv_opt.
+    1,2: move=> [?] [?] ->.
+    1,2: rewrite/CmbCmdCoreInv=> - []. 
+    1: move/wf_endorse_inv. 2: move/wf_declassify_inv. 
+    1,2: move=> [->] [? ?]. 
+    1,2: dotop [cbn]=> <- _ ? ?. 
+    1,2: rewrite/comb_step/cmbcmd_step/extract_2cfg; cook.
+    1,2: pattern_eq [sim_active  _] with true=>[| ->]; [simpl; cook|].
+    1,2: rewrite/step/acmd_step /=. 
+    1,2: assert_fails (pattern_focus [construct_simulator _]). (* Checkpoint. TODO: Think about checkpoint practices *)
+    1: pattern_eq [is_untrusted _] with true=>[| ->]; cook.
+    1,2: pattern_eq_2 [post_cmd_action _ _ (update_to_store _ _ _)] [post_cmd_action _ _ (update_to_store _ _ _)]=> [|<-]; swap 2 3.
+        { apply/post_cmd_wf/update_to_store_storeview_eq; cook. }
+        { apply/post_cmd_wf.  set a := (pre_cmd_action _ _ _). set b := (pre_cmd_action _ _ _).
+        have ?: ⟨ b | is_public ⟩ = ⟨ a | is_public ⟩; subst a b; cook. (* I don't like this *)
+        erewrite <- update_same_varval;[| eassumption]. repeat f_equal. 
+        erewrite storeview_eq; [ |apply: pre_cmd_wf_int| ]; cook.
+        apply:storeview_eq; eauto. cook. }
+    1,2: move: (post_cmd_action _ _ (update_to_store _ _ _));case=> >; cook.
+    1,2: rewrite/zip.
+    1,2: set rhs := RHS.
+    1,2: rewrite combine_extend4_swap34 /combine_extend4 combine_extend3_splitl combine_extend2_nil_r.
+    1,2: rewrite combine_extend2_same combine_extend2_nil_l.
+    1,2: set lhs := LHS; subst rhs.
+    1,2: rewrite/cmd_map combine_extend3_splitl !combine_extend2_nil_l.
+    1,2: subst lhs; rewrite !map_map /cmd_map_sim.
+    1,2: rewrite/sim_active /= /sim_active'; cook.
+    1,2: enter (idtac;cnstrct_eq_gl; cook; clear; [apply: map_ext=> ?; cook|]).
+    1,2: rewrite filter_map_swap. 
+    1,2: erewrite filter_ext; [|move=> *; rewrite /= Bool.orb_false_r; reflexivity].
+    1,2: cook; rewrite map_map.
+    1,2: apply: map_ext; case=> //.
   Qed.
 
   Theorem extract_step_commute c:
@@ -295,7 +271,7 @@ Section extract_step_commute.
   Proof.
     case: c. case=> rst ist simst atkst.
     case=> //. case=> rcmd isatk icmd pclbl restcmd inv.
-    case: (is_endorse_declassify_opt rcmd)=> [ | - []]; auto using extract_step_commute_endorse, extract_step_commute_declassify. 
+    case: (is_endorse_declassify_opt rcmd)=> [ | - []]; auto using extract_step_commute_downgrade.
     case=> noend nodecl.
     rewrite /= in inv. move: inv=> []. (Forall_inv_toph)=> i1 restinv i3.
     rewrite /CmbCmdInv/CmbCmdCoreInv in i1. case: i1=> rwt _.

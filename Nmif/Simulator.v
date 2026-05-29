@@ -81,7 +81,9 @@ Section sim_constr.
         if prg isn't (ocmd, isatk) :: rest then ideal_st else 
         let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in (* There is repetition here *)
         let: sim_st := optcmd_stp_store ocmd sim_st in 
-        if ocmd isn't Some (endorse from to) then ideal_st else  update_to_store ideal_st from (sim_st from).
+        if ocmd isn't Some (endorse from to) then ideal_st else  
+        if (is_untrusted from) is false then  ideal_st else
+        update_to_store ideal_st from (sim_st from).
 
   Obligation Tactic := try easy. (* Program cases *)
   Program Definition construct_simulator : SimStateMachine := 
