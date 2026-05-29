@@ -70,8 +70,7 @@ Section sim_constr.
     (sim_st, ast, cont_full).
 
   
-  Parameter TODO: Store.
-  Obligation Tactic := try easy. (* TODO: Program cases or whatnot *)
+  Obligation Tactic := try easy. (* Program cases *)
   Program Definition construct_simulator : SimStateMachine := 
     {|
       post_cmd_action st ideal_st :=
@@ -86,11 +85,14 @@ Section sim_constr.
         let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in (* There is repetition here *)
         let: sim_st := optcmd_stp_store ocmd sim_st in 
         if ocmd isn't Some (endorse from to) then ideal_st else  update_to_store ideal_st from (sim_st from);
-    |}.
+    |}. (* TODO: Why 11 obligations. *)
+  Next Obligation. 
+    case=> ? ?; case=> [] //= [] [] // [] //= ? ? [] *.
+    + admit.
+    + admit.
+  Admitted.
   Next Obligation. case=> ? ?; case=> * //=. Admitted.
   Next Obligation. case=> ? ?; case=> * //=. Admitted.
-  Next Obligation. case=> ? ?; case=> * //=. Admitted.
-
 (*
   Fact construct_simulator_pre_cmd ast st :
     pre_cmd_action construct_simulator ast st = st.

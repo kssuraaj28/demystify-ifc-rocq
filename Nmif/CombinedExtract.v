@@ -235,8 +235,7 @@ Section extract_step_commute.
     rewrite/comb_step/cmbcmd_step/extract_2cfg. cook.
     rewrite/step/acmd_step /=. 
     pattern_eq_2 [post_cmd_action _ _ (update_to_store _ _ _)] [post_cmd_action _ _ (update_to_store _ _ _)]=> [|<-].
-      { apply/post_cmd_wf/update_to_store_storeview_eq; cook.
-      rewrite/is_public. auto with trickbag. } (* TODO: Automate *)
+      { apply/post_cmd_wf/update_to_store_storeview_eq; cook. }
     move: (post_cmd_action _ _ (update_to_store _ _ _));case=> >; cook.
     rewrite/zip.
     set rhs := RHS.

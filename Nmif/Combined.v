@@ -268,7 +268,6 @@ Section invprf.
           2: case e2: (_ =? _).
           2: apply dec_eq_true in e2; rewrite -> e2 in *=> {e2}.
           1,2: unshelve apply: storeview_eq; [exact: is_public|..]; cook.
-          1,2: rewrite/is_public; auto with trickbag; fail.
           unshelve apply: storeview_eq; [exact: is_trusted|..]; cook. }
         cook. revert_hyp_pat bool; case.
         1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=.
@@ -281,8 +280,7 @@ Section invprf.
         revert_hyp_pat (if _ then _ else _)=> /= <- /=.
         apply/storeview_eq_ext=> *; rewrite /update_to_store. rewrite dec_eq_refl. (* TODO: Eventually this should be a rewrite rule also *)
         case e1: (_ =? _). 
-          { unshelve apply: storeview_eq; [exact: is_trusted|..]; cook.
-          rewrite/is_trusted/is_untrusted; auto with trickbag; fail. }
+          { unshelve apply: storeview_eq; [exact: is_trusted|..]; cook. }
         apply/storeview_eq; [|eassumption]; cook. }
       move=> /=.  
       apply/Forall_and; cook; auto.

@@ -1,8 +1,8 @@
 From Stdlib Require Program ssreflect ssrbool.
 Import ssreflect ssrbool.
 
-Require VarValStore Util Noninterference Lattice4pt Tacs. 
-Import VarValStore Noninterference VarValStore.Notations Tacs Tacs.Cook. 
+Require VarValStore Util Noninterference Lattice4pt Tacs.
+Import VarValStore Noninterference VarValStore.Notations Lattice4pt Tacs Tacs.Cook.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
@@ -90,14 +90,44 @@ Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> pre_cmd_wf_int
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(unshelve erewrite pre_cmd_wf_conf;[|reflexivity|]) "pre_cmd_wf_conf" old.
   (* TODO: I think maybe apply is better? TODO *)
 
+Ltac2 Set this_cookbook_ as old :=
+  add_cookstep
+    ltac1:(match goal with
+      | H: var_lbl ?x = mk_lbl _ _ |- _ =>
+        lazymatch goal with
+        | |- is_true (is_public x)    => rewrite/is_public
+        | |- is_true (is_secret x)    => rewrite/is_secret /is_public
+        | |- is_true (is_trusted x)   => rewrite/is_trusted /is_untrusted
+        | |- is_true (is_untrusted x) => rewrite/is_untrusted
+        end; rewrite H; done
+    end) "label_unfold" old.
+
 Ltac2 this_cookbook () := this_cookbook_ ().
 Ltac2 Eval print_cookbook this_cookbook.
 
 Section test.
   Context `{!VarPrm,!ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
   Generalizable All Variables.
-  Ltac2 Set curr_cookbook := this_cookbook. 
+  Ltac2 Set curr_cookbook := this_cookbook.
 
   Goal `(forall P, P ⟨ pre_cmd_action (AtkStates := A) adv ast st  | is_trusted ⟩).
   Proof.   move=> *.  cook.  Abort.
+
+  Goal forall x, var_lbl x = mk_lbl true true -> is_public x.
+  Proof. move=> x H. cook. Abort.
+
+  Goal forall x, var_lbl x = mk_lbl false false -> is_secret x.
+  Proof. move=> x H. cook. Abort.
+
+  Goal forall x, var_lbl x = mk_lbl false true -> is_trusted x.
+  Proof. move=> x H. cook. Abort.
+
+  Goal forall x, var_lbl x = mk_lbl true false -> is_untrusted x.
+  Proof. move=> x H. cook. Abort.
+
+  Goal forall x y, var_lbl x = mk_lbl true false -> var_lbl y = mk_lbl false true -> is_public y.
+  Proof. move=> x y Hx Hy. cook. Abort.
+
+  Goal forall x, var_lbl x = mk_lbl true true -> is_secret x -> False.
+  Proof. move=> x H. Fail cook. Abort.
 End test.
