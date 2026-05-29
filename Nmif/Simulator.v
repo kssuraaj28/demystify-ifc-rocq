@@ -13,8 +13,6 @@ Set Mangle Names. Set Mangle Names Light.
 #[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
 Ltac2 Set this_cookbook_ := create_new_cookbook.
 
-(* How is the simulator constructed? *)
-
 Section sim_st.
   Context `{!VarPrm, !ValPrm} {AtkStates: Type}.
 
@@ -87,7 +85,7 @@ Section sim_constr.
         if (is_public from  &&  is_untrusted from) is false then ideal_st else
         update_to_store ideal_st from (sim_st from).
 
-  Obligation Tactic := try easy. (* Program cases *)
+  Obligation Tactic := idtac. (* Program cases *)
   Program Definition construct_simulator : SimStateMachine := 
     {|
       post_cmd_action := sim_post;
@@ -120,7 +118,7 @@ Import VarValStore.Notations.
     rewrite/sim_step.
     case e: is_public=> //=.
     suff: (i1 to = i2 to)=> [-> //|].
-    apply: storeview_eq; eauto.
+    eauto using storeview_eq.
   Qed.
 
   Lemma clean_cmd_stp_store_secret_guard c s :
