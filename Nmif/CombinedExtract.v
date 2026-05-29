@@ -219,7 +219,7 @@ Section extract_step_commute.
              suff: P b;  [move: P b nodecl; clear; case: c=> //=; case=> //=| subst P b;cbv beta]
            end) "nodecl" old.
 
-  Ltac2 Set cook_debug := 2.
+  Ltac2 Set cook_debug := 0.
 
   Lemma extract_step_commute_downgrade (st: CmbState) (c: CmbCmd) (restcmd: list CmbCmd):
     oapp is_endorse false (real_cmd c) \/ oapp is_declassify false (real_cmd c) ->
@@ -258,7 +258,7 @@ Section extract_step_commute.
     1,2: rewrite/cmd_map combine_extend3_splitl !combine_extend2_nil_l.
     1,2: subst lhs; rewrite !map_map /cmd_map_sim.
     1,2: rewrite/sim_active /= /sim_active'; cook.
-    1,2: enter (idtac;cnstrct_eq_gl; cook; clear; [apply: map_ext=> ?; cook|]).
+    1,2: enter (cnstrct_eq_gl; cook; clear; [apply: map_ext=> ?; cook|]).
     1,2: rewrite filter_map_swap. 
     1,2: erewrite filter_ext; [|move=> *; rewrite /= Bool.orb_false_r; reflexivity].
     1,2: cook; rewrite map_map.
