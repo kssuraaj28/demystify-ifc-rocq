@@ -101,25 +101,27 @@ Section sim_constr.
     apply: update_storeview_nochange. rewrite /is_trusted e1 //.
   Qed.
 
+Import VarValStore.Notations.
   Next Obligation. 
     case=> ? ?; case=> // - []. 
     rewrite/sim_pre /Noninterference.Noninterfering; case; try easy.
     case=> *; try easy.
-    case e: is_untrusted=> //.
-    Admitted.
-  Next Obligation. case=> ? ?; case=> * //=. Admitted.
-(*
-  Fact construct_simulator_pre_cmd ast st :
-    pre_cmd_action construct_simulator ast st = st.
-  Proof. case: ast=> ? ?. done. Qed.
+    case e1: is_untrusted=> //; [|rewrite Bool.andb_false_r]=> //.
+    rewrite Bool.andb_true_r.
+    case e2: is_public=> //=.
+    move: (update_to_store (if _ then _ else _) _ _ _)=> ?.
+    auto using update_same_varval.
+  Qed.
 
-  Fact construct_simulator_post_cmd_cons ocmd isatk rest ast sim_st st :
-    post_cmd_action construct_simulator
-      (mk_simstate ast sim_st ((ocmd, isatk) :: rest)) st =
-      let: (sim_st', new_ast, cont) := sim_step ocmd isatk sim_st ast in
-      (mk_simstate new_ast sim_st' (cont ++ rest), length cont).
-  Proof. rewrite /=; case isatk=>  //=. Qed.
-  *)
+  Next Obligation. 
+    case=> ? ?; case=> // - [] [] // [] //.  
+    rewrite/sim_post /Noninterference.Noninterfering=> from to ? ? i1 i2 *.
+    pattern_eq_2 [sim_step _ _ _ _ _] [sim_step _ _ _ _ _]=> [| ->] //.
+    rewrite/sim_step.
+    case e: is_public=> //=.
+    suff: (i1 to = i2 to)=> [-> //|].
+    apply: storeview_eq; eauto.
+  Qed.
 
   Lemma clean_cmd_stp_store_secret_guard c s :
     is_secret_guard (Some c) = true ->
