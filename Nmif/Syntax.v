@@ -17,6 +17,7 @@ Section syntax.
   Definition BoolExp : Type := 
     Vars * (Vals -> bool).
 
+
   Section cmd.
     Notation Prog' Cmd := (list Cmd) (only parsing).
 
@@ -24,7 +25,7 @@ Section syntax.
     Inductive Cmd :=
       | endorse (from to: Vars)
       | declassify (from to: Vars)
-      | assign (dst : Vars) (exp: ValExp)
+      | assign (exp: ValExp) (dst : Vars) 
       | cond (exp: BoolExp) (b1 b2: Prog' Cmd)
       | while (exp: BoolExp) (b: Prog' Cmd). 
     Set Elimination Schemes.

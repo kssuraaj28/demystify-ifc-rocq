@@ -47,7 +47,7 @@ Section sa.
        let: s1lbl := var_lbl src1 in
        let: s2lbl := var_lbl src2 in
        s1lbl ⊑ dstlbl -> s2lbl ⊑ dstlbl -> pclbl ⊑ dstlbl -> (* Using ssrbool coercion *)
-       _ pclbl (assign dst (src1, src2, comp))
+       _ pclbl (assign (src1, src2, comp) dst)
 
   | wf_cond: 
      forall gvar comp pclbl b1 b2, 
@@ -93,7 +93,7 @@ Section sa.
           let: s1lbl := var_lbl src1 in
           let: s2lbl := var_lbl src2 in
           s1lbl ⊑ dstlbl -> s2lbl ⊑ dstlbl -> pclbl ⊑ dstlbl ->
-          P pclbl (assign dst (src1, src2, comp)).
+          P pclbl (assign (src1, src2, comp) dst).
 
     (* I have no idea whether this is the right thing *)
     Hypothesis hyp_cond : 

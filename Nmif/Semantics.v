@@ -35,19 +35,16 @@ Section cleanstep.
 
   Notation Continuation := Syntax.Prog.
 
-  (* TODO: Endorse and declassify.. *)
   Definition clean_cmd_stp_store (c: Cmd) (s: Store) : Store :=
     match c with
-    | assign dst exp => 
+    | assign exp dst => 
       let: vl := eval_val_exp s exp in update_to_store s dst vl
     | endorse src dst => update_to_store s dst (s src)
     | declassify src dst => update_to_store s dst (s src)
     | _ => s
     end.
   
-  (* TODO: Have examples below this *)
   Definition optcmd_stp_store := oapp clean_cmd_stp_store id.
-
 
   Definition clean_cmd_stp_cnt (c: Cmd) (s: Store) : Continuation :=
     match c with
@@ -60,7 +57,6 @@ Section cleanstep.
     | _ =>  []
     end.
 
-  (* TODO: Have examples below this *)
   Definition optcmd_stp_cnt := oapp clean_cmd_stp_cnt (fun _ => []).
 
   (* The option is epsilon  *)
@@ -68,7 +64,7 @@ Section cleanstep.
 
   Definition clean_cmd_evnt (c: Cmd) (s: Store) : CmdEvent :=
     match c with
-    | assign dst exp => 
+    | assign exp dst => 
       let: vl := eval_val_exp s exp in
       if (is_trusted dst) is false then None else
       Some (dst, vl) 
