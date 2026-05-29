@@ -297,8 +297,7 @@ Section invprf.
          let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_endorse rcmd))=> /orP [ | noend]; cook.
          move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e}.
          revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] [] e; rewrite -> e in * => {e} - [] *.
-         rewrite update_storeview_nochange; cook. 
-         rewrite/is_trusted/is_untrusted; auto with trickbag. }
+         rewrite update_storeview_nochange; cook. } 
       cook. rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
       revert_hyp_pat [Cmd, (WellFormedCmd _ _), (compute_new_pc _ _ = _)].
       move=> ? /step_soundness snd newpce.

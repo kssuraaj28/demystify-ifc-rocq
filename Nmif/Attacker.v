@@ -95,10 +95,18 @@ Ltac2 Set this_cookbook_ as old :=
     ltac1:(match goal with
       | H: var_lbl ?x = mk_lbl _ _ |- _ =>
         lazymatch goal with
-        | |- is_true (is_public x)    => rewrite/is_public
-        | |- is_true (is_secret x)    => rewrite/is_secret /is_public
-        | |- is_true (is_trusted x)   => rewrite/is_trusted /is_untrusted
-        | |- is_true (is_untrusted x) => rewrite/is_untrusted
+        | |- is_true (is_public x)         => rewrite/is_public
+        | |- is_public x = _               => rewrite/is_public
+        | |- is_true (~~ is_public x)      => rewrite/is_public
+        | |- is_true (is_secret x)         => rewrite/is_secret /is_public
+        | |- is_secret x = _               => rewrite/is_secret /is_public
+        | |- is_true (~~ is_secret x)      => rewrite/is_secret /is_public
+        | |- is_true (is_trusted x)        => rewrite/is_trusted /is_untrusted
+        | |- is_trusted x = _              => rewrite/is_trusted /is_untrusted
+        | |- is_true (~~ is_trusted x)     => rewrite/is_trusted /is_untrusted
+        | |- is_true (is_untrusted x)      => rewrite/is_untrusted
+        | |- is_untrusted x = _            => rewrite/is_untrusted
+        | |- is_true (~~ is_untrusted x)   => rewrite/is_untrusted
         end; rewrite H; done
     end) "label_unfold" old.
 
@@ -130,4 +138,22 @@ Section test.
 
   Goal forall x, var_lbl x = mk_lbl true true -> is_secret x -> False.
   Proof. move=> x H. Fail cook. Abort.
+
+  Goal forall x, var_lbl x = mk_lbl true true -> is_public x = true.
+  Proof. move=> x H. cook. Abort.
+
+  Goal forall x, var_lbl x = mk_lbl true false -> is_public x = false.
+  Proof. move=> x H. cook. Abort.
+
+  Goal forall x, var_lbl x = mk_lbl true false -> ~~ is_public x.
+  Proof. move=> x H. cook. Abort.
+
+  Goal forall x, var_lbl x = mk_lbl false true -> is_trusted x = true.
+  Proof. move=> x H. cook. Abort.
+
+  Goal forall x, var_lbl x = mk_lbl true true -> is_trusted x = false.
+  Proof. move=> x H. cook. Abort.
+
+  Goal forall x, var_lbl x = mk_lbl true true -> ~~ is_trusted x.
+  Proof. move=> x H. cook. Abort.
 End test.

@@ -270,8 +270,8 @@ Section extract_step_commute.
       { apply/post_cmd_wf.  set a := (pre_cmd_action _ _ _). set b := (pre_cmd_action _ _ _).
       have ?: ⟨ b | is_public ⟩ = ⟨ a | is_public ⟩; subst a b; cook. (* I don't like this *)
       erewrite <- update_same_varval;[| eassumption]. repeat f_equal. 
-      erewrite storeview_eq; [ |apply: pre_cmd_wf_int | rewrite/is_trusted/is_untrusted; auto with trickbag]. 
-      apply:storeview_eq; eauto. rewrite/is_trusted/is_untrusted; auto with trickbag.  }
+      erewrite storeview_eq; [ |apply: pre_cmd_wf_int| ]; cook.
+      apply:storeview_eq; eauto. cook. }
     move: (post_cmd_action _ _ (update_to_store _ _ _));case=> >; cook. (* The rest of the proof is copied from the above. I feel a little sad *)
     rewrite/zip.
     set rhs := RHS.
