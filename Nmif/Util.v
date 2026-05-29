@@ -47,6 +47,37 @@ End test.
 
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(ensure_goals <= 1 (cnstrct_eq_gl => //)) "cnstr_eq_simpl" old.
 
+Ltac2 Set this_cookbook_ as old :=
+  add_cookstep
+    ltac1:(match goal with
+      | |- ?b = true  => change (is_true b)
+      | |- ?b = false => apply: negbTE
+      | |- true = ?b  => symmetry; change (is_true b)
+      | |- false = ?b => symmetry; apply: negbTE
+    end) "bool_canonicalize" old.
+
+Section test.
+  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["bool_canonicalize"]) ().
+
+  Goal forall b, b = true -> b = true.
+  Proof. move=> b H. cook. exact: H. Abort.
+
+  Goal forall b, ~~ b -> b = false.
+  Proof. move=> b H. cook. exact: H. Abort.
+
+  Goal forall b, b = true -> true = b.
+  Proof. move=> b H. cook. exact: H. Abort.
+
+  Goal forall b, ~~ b -> false = b.
+  Proof. move=> b H. cook. exact: H. Abort.
+
+  Goal true = true.
+  Proof. cook. done. Abort.
+
+  Goal false = false.
+  Proof. cook. done. Abort.
+End test.
+
 Section test.
   Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["cnstr_eq_simpl"]) ().
   Goal forall n m, S n = S m.
