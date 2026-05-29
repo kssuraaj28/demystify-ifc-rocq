@@ -242,7 +242,7 @@ Section extract_step_commute.
     1,2: rewrite/step/acmd_step /=. 
     1,2: assert_fails (pattern_focus [construct_simulator _]). (* Checkpoint. TODO: Think about checkpoint practices *)
     1: pattern_eq [is_untrusted _] with true=>[| ->]; cook.
-    2: pattern_eq [is_public _] with true=>[| ->]; cook.
+    1,2: pattern_eq [is_public _] with true=>[| ->]; cook.
     1,2: pattern_eq_2 [post_cmd_action _ _ (update_to_store _ _ _)] [post_cmd_action _ _ (update_to_store _ _ _)]=> [|<-]; swap 2 3.
         { apply/post_cmd_wf/update_to_store_storeview_eq; cook. }
         { apply/post_cmd_wf.  set a := (pre_cmd_action _ _ _). set b := (pre_cmd_action _ _ _).

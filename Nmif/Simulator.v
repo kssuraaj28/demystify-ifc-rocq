@@ -84,7 +84,7 @@ Section sim_constr.
         let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in (* There is repetition here *)
         let: sim_st := optcmd_stp_store ocmd sim_st in 
         if ocmd isn't Some (endorse from to) then ideal_st else  
-        if (is_untrusted from) is false then  ideal_st else
+        if (is_public from  &&  is_untrusted from) is false then ideal_st else
         update_to_store ideal_st from (sim_st from).
 
   Obligation Tactic := try easy. (* Program cases *)
@@ -94,11 +94,19 @@ Section sim_constr.
       pre_cmd_action := sim_pre;
     |}. (* TODO: Why 11 obligations. *)
   Next Obligation. 
-    case=> ? ?; case=> [] //= [] [] // [] //= ? ? [] *.
-    + admit.
-    + admit.
-  Admitted.
-  Next Obligation. case=> ? ?; case=> * //=. Admitted.
+    case=> ? ?; case=> [] //= [] [] // [] //= ? ? *.
+    case e1: is_untrusted=> //;[|rewrite Bool.andb_false_r]=> //.
+    rewrite Bool.andb_true_r.
+    case: is_public=> //.
+    apply: update_storeview_nochange. rewrite /is_trusted e1 //.
+  Qed.
+
+  Next Obligation. 
+    case=> ? ?; case=> // - []. 
+    rewrite/sim_pre /Noninterference.Noninterfering; case; try easy.
+    case=> *; try easy.
+    case e: is_untrusted=> //.
+    Admitted.
   Next Obligation. case=> ? ?; case=> * //=. Admitted.
 (*
   Fact construct_simulator_pre_cmd ast st :
