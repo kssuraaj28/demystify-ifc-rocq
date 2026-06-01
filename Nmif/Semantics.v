@@ -116,6 +116,7 @@ Section acmd.
   Record AtkCmd := mk_atkcmd {is_attacked: bool; ocmd : option Cmd}.
   Definition State := (Store * AtkStates)%type.
   Record Event := mk_acmd_evnt { cevnt : CmdEvent ; aevnt : AdvEvent }.
+  Definition blank_event := mk_acmd_evnt None None.
 
   Definition acmd_step (ac: AtkCmd) (s: State): Prog * State * Event * nat :=
     let: mk_atkcmd isatk cmd := ac in
@@ -155,7 +156,7 @@ Section twocfg.
 
   Definition step (c: TwoCfg): TwoCfg * Event * Event :=
     let: (c2lst, s1, s2) := c in
-    if c2lst isn't (ac1, ac2) :: rest then (c, mk_acmd_evnt None None, mk_acmd_evnt None None) else
+    if c2lst isn't (ac1, ac2) :: rest then (c, blank_event, blank_event) else
     let: (p1, st1, ev1, steps1) := (acmd_step adv1 ac1 s1) in
     let: (p2, st2, ev2, steps2) := (acmd_step adv2 ac2 s2) in
 

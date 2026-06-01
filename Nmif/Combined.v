@@ -74,16 +74,17 @@ Parameter TODO: Store.
 
   Section step.
     Variable (adv: AdvNextStep AtkStates). 
+    Notation AcmdEvent := (Semantics.Event).
     Notation pre_cmd_action := (pre_cmd_action adv).
     Notation post_cmd_action := (post_cmd_action adv).
 
-    Definition cmbcmd_step (c: CmbCmd) (s: CmbState) : Cfg :=
+    Definition cmbcmd_step (c: CmbCmd) (s: CmbState) : Cfg * AcmdEvent :=
       let: mk_cmbcmd real_cmd real_atk_bit ideal_cmd pc_lbl := c in
       let: mk_cmbstate real_st ideal_st sim_st atk_st := s in
     
       (* Corruption first. TODO: When there is endorsement, there will need to be an update to the ideal store as well *)
       let: real_st := if real_atk_bit is false then real_st else pre_cmd_action atk_st real_st in
-      let: (real_cnt, real_st) := (optcmd_stp_cnt real_cmd real_st,  optcmd_stp_store real_cmd real_st) in (* TODO: The proof breaks when you update real_st before real_cnt. Why? *)
+      let: (real_cnt, real_st, real_event) := (optcmd_stp_cnt real_cmd real_st,  optcmd_stp_store real_cmd real_st, optcmd_evnt real_cmd real_st) in (* TODO: The proof breaks when you update real_st before real_cnt. Why? *)
 
 
       let: sim_st := if real_atk_bit is false then sim_st else pre_cmd_action atk_st sim_st in
@@ -102,16 +103,17 @@ Parameter TODO: Store.
     
       let: atk_pst := (post_cmd_action atk_st real_st) in (* Not having this was quite painful. TODO *)
       let: atk_st := if real_atk_bit is false then atk_st else atk_pst.1.1 in
+      let: atk_event := if real_atk_bit is false then None else atk_pst.1.2 in
       let: atk_substeps := if real_atk_bit is false then 0 else atk_pst.2 in
 
       let: new_pc := compute_new_pc_opt pc_lbl real_cmd in
-      (mk_cmbstate real_st ideal_st sim_st atk_st, zip real_cnt ideal_cnt atk_substeps new_pc). 
+      ((mk_cmbstate real_st ideal_st sim_st atk_st, zip real_cnt ideal_cnt atk_substeps new_pc), mk_acmd_evnt real_event atk_event). 
 
-    Definition cfg_step (cfg: Cfg) : Cfg := 
+    Definition cfg_step (cfg: Cfg) : Cfg * AcmdEvent := 
       let: (st, cmdlst) := cfg in
-      if cmdlst isn't (cmd :: cmdlst') then cfg else
-      let: (st', cmdlst'') := cmbcmd_step cmd st in
-      (st', cmdlst'' ++ cmdlst').
+      if cmdlst isn't (cmd :: cmdlst') then (cfg, blank_event) else
+      let: (st', cmdlst'', evnt) := cmbcmd_step cmd st in
+      (st', cmdlst'' ++ cmdlst', evnt).
   End step.
 End cmb_step.
 
@@ -224,7 +226,7 @@ Section invprf.
       forall c st,
         CmbCmdInv c ->
         StateInv st ->
-        let: (st', clst') := cmbcmd_step c st in
+        let: ((st', clst'),_) := cmbcmd_step c st in
         StateInv st' /\ Forall CmbCmdInv clst'.
     Proof.
       case; rewrite {}/CmbCmdInv=> - []; cycle 1.
@@ -289,12 +291,14 @@ Section invprf.
     Qed. 
   End cook.
 
-  Theorem cfg_step_inv: forall c, Invariant c ->  Invariant (cfg_step c).
+  Theorem cfg_step_inv: forall c, Invariant c ->  Invariant ((cfg_step c).1).
   Proof.
     case=> + [] //.
     rewrite/Invariant/cfg_step=> > []. Forall_inv_toph.
-    case e: (cmbcmd_step _ _)=> h1 ? h2. 
-    move: (cmbcmd_step_inv _ _ h1 h2); rewrite {}e=> - [] *.
+    rewrite [cmbcmd_step _ _]surjective_pairing.
+    case e: ((cmbcmd_step _ _).1)=> h1 ? h2. 
+    rewrite fst_pair. move: (cmbcmd_step_inv _ _ h1 h2).
+    rewrite [cmbcmd_step _ _]surjective_pairing e=>-  [] *.
     split=> //; apply/Forall_app=> //.
   Qed.
 
