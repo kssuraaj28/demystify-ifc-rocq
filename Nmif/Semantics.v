@@ -123,7 +123,7 @@ Section acmd.
     let: (prog, st) := (optcmd_stp_cnt cmd st,  optcmd_stp_store cmd st) in
 
     let: atk_pst := (post_cmd_action adv atk_st st) in
-    let: atk_st := if isatk is true then atk_pst.1 else atk_st in
+    let: atk_st := if isatk is true then atk_pst.1.1 else atk_st in
     let: steps := if isatk is true then atk_pst.2 else 0 in
 
     (prog, (st, atk_st), steps).
@@ -134,7 +134,7 @@ Section acmd.
       let pre_st := pre_cmd_action adv atk_st store in
       let st'    := optcmd_stp_store cmd pre_st in
       let pst    := post_cmd_action adv atk_st st' in
-      (optcmd_stp_cnt cmd pre_st, (st', pst.1), pst.2).
+      (optcmd_stp_cnt cmd pre_st, (st', pst.1.1), pst.2).
   Proof. done. Qed.
 
   Fact acmd_step_noatk cmd store atk_st :

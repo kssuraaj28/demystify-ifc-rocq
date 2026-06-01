@@ -60,7 +60,7 @@ Section sim_constr.
                    update_to_store sim_st to (ideal_st to) in (* Controlled ideal read *)
 
     let: post_atk := post_cmd_action atk ast sim_st in
-    let: ast := if isatk is true then post_atk.1 else ast in
+    let: ast := if isatk is true then post_atk.1.1 else ast in
     let: steps := if isatk is true then post_atk.2 else 0 in
 
     let: cont_prog := if is_secret_guard ocmd is true then [] else map Some (optcmd_stp_cnt ocmd sim_st) in 
@@ -72,9 +72,9 @@ Section sim_constr.
   
   Definition sim_post st ideal_st :=
     let: (mk_simstate ast sim_st prg) :=  st in 
-    if prg isn't (ocmd, isatk) :: rest then (st, 0) else
+    if prg isn't (ocmd, isatk) :: rest then (st, None, 0) else
     let: (sim_st, new_ast, cont) := sim_step ideal_st ocmd isatk sim_st ast in
-    (mk_simstate new_ast sim_st (cont ++ rest), length cont).
+    (mk_simstate new_ast sim_st (cont ++ rest), (None :> AdvEvent), length cont).
 
   Definition sim_pre st ideal_st :=
     let: (mk_simstate ast sim_st prg) :=  st in 
@@ -85,18 +85,11 @@ Section sim_constr.
     if (is_public from  &&  is_untrusted from) is false then ideal_st else
     update_to_store ideal_st from (sim_st from).
 
-  Definition sim_evnt st :=
-    let: (mk_simstate ast _ prg) := st in 
-    if prg isn't (_, isatk) :: rest then None else 
-    if isatk is false then None else
-    post_cmd_event atk ast.
-
   Obligation Tactic := idtac. (* Program cases *)
   Program Definition construct_simulator : SimStateMachine := 
     {|
       pre_cmd_action := sim_pre;
       post_cmd_action := sim_post;
-      post_cmd_event := sim_evnt;
     |}. (* TODO: Why 11 obligations. *)
   Next Obligation. 
     case=> ? ?; case=> [] //= [] [] // [] //= [] // ? ? *.

@@ -101,7 +101,7 @@ Parameter TODO: Store.
     
     
       let: atk_pst := (post_cmd_action atk_st real_st) in (* Not having this was quite painful. TODO *)
-      let: atk_st := if real_atk_bit is false then atk_st else atk_pst.1 in
+      let: atk_st := if real_atk_bit is false then atk_st else atk_pst.1.1 in
       let: atk_substeps := if real_atk_bit is false then 0 else atk_pst.2 in
 
       let: new_pc := compute_new_pc_opt pc_lbl real_cmd in
