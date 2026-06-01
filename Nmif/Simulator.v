@@ -49,9 +49,10 @@ Section sim_constr.
          mk_simstate (init_state atk init_sv) store (map (fun c => (Some c, true)) prog).
      Dropped along with the init_state field of AdvNextStep. *)
 
+Parameter TODO: AdvEvent.
   Definition sim_step 
     (ideal_st : Store) (ocmd: option Cmd) (isatk: bool) (sim_st : Store) (ast: AtkStates):
-    (Store (* sim_st *) * AtkStates *  list ((option Cmd) * bool)) :=
+    (Store (* sim_st *) * AtkStates * AdvEvent * list ((option Cmd) * bool)) :=
 
     let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in
     let: sim_st := optcmd_stp_store ocmd sim_st in 
@@ -67,14 +68,14 @@ Section sim_constr.
     let: cont_atk := repeat true steps in
     let: cont_full := combine_extend2 cont_prog cont_atk None false in
 
-    (sim_st, ast, cont_full).
+    (sim_st, ast, TODO, cont_full).
 
   
   Definition sim_post st ideal_st :=
     let: (mk_simstate ast sim_st prg) :=  st in 
     if prg isn't (ocmd, isatk) :: rest then (st, None, 0) else
-    let: (sim_st, new_ast, cont) := sim_step ideal_st ocmd isatk sim_st ast in
-    (mk_simstate new_ast sim_st (cont ++ rest), (None :> AdvEvent), length cont).
+    let: (sim_st, new_ast, evnt, cont) := sim_step ideal_st ocmd isatk sim_st ast in
+    (mk_simstate new_ast sim_st (cont ++ rest), evnt, length cont).
 
   Definition sim_pre st ideal_st :=
     let: (mk_simstate ast sim_st prg) :=  st in 
