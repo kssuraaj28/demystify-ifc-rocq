@@ -115,31 +115,28 @@ Section acmd.
   Variable (adv: AdvNextStep AtkStates).
   Record AtkCmd := mk_atkcmd {is_attacked: bool; ocmd : option Cmd}.
   Definition State := (Store * AtkStates)%type.
+  Record Event := mk_acmd_evnt { cevnt : CmdEvent ; aevnt : AdvEvent }.
 
-  Definition acmd_step (ac: AtkCmd) (s: State): Prog * State * nat :=
+  Definition acmd_step (ac: AtkCmd) (s: State): Prog * State * Event * nat :=
     let: mk_atkcmd isatk cmd := ac in
     let: (store, atk_st) := s in
     let: st := if isatk is true then pre_cmd_action adv atk_st store else store in
-    let: (prog, st) := (optcmd_stp_cnt cmd st,  optcmd_stp_store cmd st) in
+    let: (prog, st, cevnt) := (optcmd_stp_cnt cmd st,  optcmd_stp_store cmd st, optcmd_evnt cmd st) in
 
     let: atk_pst := (post_cmd_action adv atk_st st) in
     let: atk_st := if isatk is true then atk_pst.1.1 else atk_st in
+    let: aevnt := if isatk is true then atk_pst.1.2 else None in
     let: steps := if isatk is true then atk_pst.2 else 0 in
 
-    (prog, (st, atk_st), steps).
+    (prog, (st, atk_st), mk_acmd_evnt cevnt aevnt ,steps).
   
 
   Fact acmd_step_atk cmd store atk_st :
-    acmd_step (mk_atkcmd true cmd) (store, atk_st) =
-      let pre_st := pre_cmd_action adv atk_st store in
-      let st'    := optcmd_stp_store cmd pre_st in
-      let pst    := post_cmd_action adv atk_st st' in
-      (optcmd_stp_cnt cmd pre_st, (st', pst.1.1), pst.2).
-  Proof. done. Qed.
+    ltac2:(cbn_eq (acmd_step (mk_atkcmd true cmd) (store, atk_st))). 
+  Proof. done. Qed. 
 
   Fact acmd_step_noatk cmd store atk_st :
-    acmd_step (mk_atkcmd false cmd) (store, atk_st) =
-      (optcmd_stp_cnt cmd store, (optcmd_stp_store cmd store, atk_st), 0).
+    ltac2:(cbn_eq (acmd_step (mk_atkcmd false cmd) (store, atk_st))).
   Proof. done. Qed.
 End acmd.
 
@@ -156,18 +153,18 @@ Section twocfg.
 
   Definition TwoCfg := (list (AtkCmd * AtkCmd) * State1 * State2)%type.
 
-  Definition step (c: TwoCfg): TwoCfg :=
+  Definition step (c: TwoCfg): TwoCfg * Event * Event :=
     let: (c2lst, s1, s2) := c in
-    if c2lst isn't (ac1, ac2) :: rest then c else
-    let: (p1, st1, steps1) := (acmd_step adv1 ac1 s1) in
-    let: (p2, st2, steps2) := (acmd_step adv2 ac2 s2) in
+    if c2lst isn't (ac1, ac2) :: rest then (c, mk_acmd_evnt None None, mk_acmd_evnt None None) else
+    let: (p1, st1, ev1, steps1) := (acmd_step adv1 ac1 s1) in
+    let: (p2, st2, ev2, steps2) := (acmd_step adv2 ac2 s2) in
 
     let: cont := combine_extend4
                    (map Some p1) (repeat true steps1)
                    (map Some p2) (repeat true steps2)
                    None false None false in
     let: cont := map (fun '(oc1, a1, oc2, a2) => (mk_atkcmd a1 oc1, mk_atkcmd a2 oc2)) cont in
-    (cont ++ rest, st1, st2).
+    ((cont ++ rest, st1, st2), ev1, ev2).
 End twocfg.
 
 

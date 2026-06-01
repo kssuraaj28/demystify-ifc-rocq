@@ -143,7 +143,7 @@ Section extract_step_commute.
   Lemma extract_step_commute_downgrade (st: CmbState) (c: CmbCmd) (restcmd: list CmbCmd):
     oapp is_endorse false (real_cmd c) \/ oapp is_declassify false (real_cmd c) ->
     Invariant (st, c :: restcmd) ->
-    step (extract_2cfg (st, c :: restcmd)) = extract_2cfg (comb_step (st, c :: restcmd)). 
+    (step (extract_2cfg (st, c :: restcmd))).1.1 = extract_2cfg (comb_step (st, c :: restcmd)). 
   Proof.
     case: c=> >.  case: st=> >.
     cook. rewrite/Invariant=> downgrade. case. cook.
@@ -254,7 +254,7 @@ Section extract_step_commute.
 
   Theorem extract_step_commute c:
     Invariant c ->
-    step (extract_2cfg c) = extract_2cfg (comb_step c).
+    (step (extract_2cfg c)).1.1 = extract_2cfg (comb_step c).
   Proof.
     case: c. case=> rst ist simst atkst.
     case=> //. case=> rcmd isatk icmd pclbl restcmd inv.
