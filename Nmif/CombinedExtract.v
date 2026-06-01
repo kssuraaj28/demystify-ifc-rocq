@@ -132,6 +132,8 @@ Section extract_step_commute.
   Ltac2 Set curr_cookbook as old := join_cookbooks Util.this_cookbook old.
   Ltac2 Set curr_cookbook as old := join_cookbooks Util.List.this_cookbook old.
   Ltac2 Set curr_cookbook as old := join_cookbooks Lattice4pt.this_cookbook old.
+  Ltac2 Set curr_cookbook as old := join_cookbooks VarValStore.this_cookbook old.
+  Ltac2 Set curr_cookbook as old := join_cookbooks Syntax.this_cookbook old.
 
 
 
@@ -249,26 +251,6 @@ Section extract_step_commute.
                          [optcmd_stp_cnt _ (if _ then _ else simst)] => [|<-];
               [apply: cnt_acmd_pubeq; eassumption|] ]
       end) "acmd_pubeq" old.
-
-  Ltac2 Set curr_cookbook as old :=
-    add_cookstep
-      ltac1:(match goal with
-       |  noend : is_true (~~ oapp is_endorse false ?c), c : option Cmd |- _ =>
-             let P := fresh in  let b := fresh in
-             pattern_focus [match c with | Some (assign (endorse _ _)) => _ | _  => _ end]=> P;
-             set b := (X in match _ with Some (assign (endorse _ _)) => _ | _ => X end);
-             suff: P b;  [move: P b noend; clear; case: c=> //=; case=> //=; case=> //=| subst P b;cbv beta]
-           end) "noend" old.
-
-  Ltac2 Set curr_cookbook as old :=
-    add_cookstep
-      ltac1:(match goal with
-       |  nodecl : is_true (~~ oapp is_declassify false ?c), c : option Cmd |- _ =>
-             let P := fresh in  let b := fresh in
-             pattern_focus [match c with | Some (assign (declassify _ _)) => _ | _  => _ end]=> P;
-             set b := (X in match _ with Some (assign (declassify _ _)) => _ | _ => X end);
-             suff: P b;  [move: P b nodecl; clear; case: c=> //=; case=> //=; case=> //=| subst P b;cbv beta]
-           end) "nodecl" old.
 
   Theorem extract_step_commute c:
     Invariant c ->

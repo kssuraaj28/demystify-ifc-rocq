@@ -202,25 +202,8 @@ Section invprf.
     Ltac2 Set curr_cookbook as old := join_cookbooks Attacker.this_cookbook old.
     Ltac2 Set curr_cookbook as old := join_cookbooks Util.this_cookbook old.
     Ltac2 Set curr_cookbook as old := join_cookbooks Util.List.this_cookbook old.
-
-    Ltac2 Set curr_cookbook as old := add_cookstep 
-      ltac1:(match goal with
-             |  noend : is_true (~~ is_endorse ?a), c : Cmd |- _ => 
-               let P := fresh in  let b := fresh in
-               pattern_focus [match c with | assign (endorse _ _) => _ | _  => _ end]=> P;
-                 set b := (X in match _ with assign (endorse _ _) => _ | _ => X end); (* Changing to c fails *)
-                 suff: P b; [move: P b noend; clear; case: c=> [[]| |] //= |subst P b; cbv beta]
-             end) "no_endorse" old.
-
-    Ltac2 Set curr_cookbook as old := add_cookstep 
-      ltac1:(match goal with
-             |  nodecl : is_true (~~ is_declassify ?a), c :Cmd |- _ => 
-               let P := fresh in  let b := fresh in
-               pattern_focus [match c with | assign (declassify _ _) => _ | _  => _ end]=> P; (* TODO: This should be automated *)
-                 set b := (X in match _ with assign (declassify _ _) => _ | _ => X end);
-                 suff: P b; [move: P b nodecl; clear; case: c=> [[]| |] //= |subst P b; cbv beta]
-             end) "no_declassify" old.
-
+    Ltac2 Set curr_cookbook as old := join_cookbooks VarValStore.this_cookbook old.
+    Ltac2 Set curr_cookbook as old := join_cookbooks Syntax.this_cookbook old.
 
     Ltac2 Eval print_cookbook curr_cookbook.
 

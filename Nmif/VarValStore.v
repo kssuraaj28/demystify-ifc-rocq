@@ -1,12 +1,17 @@
-From Stdlib Require ssreflect ssrbool FunctionalExtensionality. 
+From Stdlib Require ssreflect ssrbool FunctionalExtensionality.
 Import ssreflect ssrbool FunctionalExtensionality.
 
+From Ltac2 Require Import Ltac2.
 Require Util Tacs.
-Import Util.DecEq.
+Import Util.DecEq Tacs.Cook.
 
+Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
+
+#[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
+Ltac2 Set this_cookbook_ := create_new_cookbook.
 
 Class VarPrm := {Vars : Type ; vars_deceq :: DecEq Vars}. 
 Class ValPrm := {Vals : Type; val_ne : Vals}.
@@ -111,3 +116,7 @@ Section thms.
     exact: update_same_varval.
   Qed.
 End thms.
+
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> update_shadow) "update_shadow" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> update_to_store_same) "update_to_store_same" old.
+Ltac2 this_cookbook () := this_cookbook_ ().
