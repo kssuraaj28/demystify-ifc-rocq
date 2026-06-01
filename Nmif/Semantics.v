@@ -84,7 +84,6 @@ Section cleanstep.
   Definition clean_cmd_evnt (c: Cmd) (s: Store) : CmdEvent :=
     if c isn't assign a then None else clean_assign_evnt a s.
 
-  (* TODO: Have examples below this *)
   Definition optcmd_evnt := oapp clean_cmd_evnt (fun _ => None).
 
   Fact optcmd_stp_store_simpl c s: ltac2:(cbn_eq (optcmd_stp_store (Some c) s)). Proof. done. Qed.
@@ -128,6 +127,7 @@ Section acmd.
     let: steps := if isatk is true then atk_pst.2 else 0 in
 
     (prog, (st, atk_st), steps).
+  
 
   Fact acmd_step_atk cmd store atk_st :
     acmd_step (mk_atkcmd true cmd) (store, atk_st) =

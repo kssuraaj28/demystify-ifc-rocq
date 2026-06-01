@@ -71,25 +71,32 @@ Section sim_constr.
 
   
   Definition sim_post st ideal_st :=
-        let: (mk_simstate ast sim_st prg) :=  st in 
-        if prg isn't (ocmd, isatk) :: rest then (st, 0) else
-        let: (sim_st, new_ast, cont) := sim_step ideal_st ocmd isatk sim_st ast in
-        (mk_simstate new_ast sim_st (cont ++ rest), length cont).
+    let: (mk_simstate ast sim_st prg) :=  st in 
+    if prg isn't (ocmd, isatk) :: rest then (st, 0) else
+    let: (sim_st, new_ast, cont) := sim_step ideal_st ocmd isatk sim_st ast in
+    (mk_simstate new_ast sim_st (cont ++ rest), length cont).
 
   Definition sim_pre st ideal_st :=
-        let: (mk_simstate ast sim_st prg) :=  st in 
-        if prg isn't (ocmd, isatk) :: rest then ideal_st else 
-        let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in (* There is repetition here *)
-        let: sim_st := optcmd_stp_store ocmd sim_st in 
-        if ocmd isn't Some (assign (endorse from to)) then ideal_st else
-        if (is_public from  &&  is_untrusted from) is false then ideal_st else
-        update_to_store ideal_st from (sim_st from).
+    let: (mk_simstate ast sim_st prg) :=  st in 
+    if prg isn't (ocmd, isatk) :: rest then ideal_st else 
+    let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in (* There is repetition here *)
+    let: sim_st := optcmd_stp_store ocmd sim_st in 
+    if ocmd isn't Some (assign (endorse from to)) then ideal_st else
+    if (is_public from  &&  is_untrusted from) is false then ideal_st else
+    update_to_store ideal_st from (sim_st from).
+
+  Definition sim_evnt st :=
+    let: (mk_simstate ast _ prg) := st in 
+    if prg isn't (_, isatk) :: rest then None else 
+    if isatk is false then None else
+    post_cmd_event atk ast.
 
   Obligation Tactic := idtac. (* Program cases *)
   Program Definition construct_simulator : SimStateMachine := 
     {|
-      post_cmd_action := sim_post;
       pre_cmd_action := sim_pre;
+      post_cmd_action := sim_post;
+      post_cmd_event := sim_evnt;
     |}. (* TODO: Why 11 obligations. *)
   Next Obligation. 
     case=> ? ?; case=> [] //= [] [] // [] //= [] // ? ? *.
@@ -140,9 +147,5 @@ Import VarValStore.Notations.
   Qed.
 End sim_constr.
 
-(*
-Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> construct_simulator_pre_cmd) "construct_simulator_pre_cmd" old.
-Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> construct_simulator_post_cmd_cons) "construct_simulator_post_cmd_cons" old.
-*)
 
 Ltac2 this_cookbook () := this_cookbook_ ().
