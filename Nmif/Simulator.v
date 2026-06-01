@@ -49,7 +49,6 @@ Section sim_constr.
          mk_simstate (init_state atk init_sv) store (map (fun c => (Some c, true)) prog).
      Dropped along with the init_state field of AdvNextStep. *)
 
-Parameter TODO: AdvEvent.
   Definition sim_step 
     (ideal_st : Store) (ocmd: option Cmd) (isatk: bool) (sim_st : Store) (ast: AtkStates):
     (Store (* sim_st *) * AtkStates * AdvEvent * list ((option Cmd) * bool)) :=
@@ -62,13 +61,15 @@ Parameter TODO: AdvEvent.
 
     let: post_atk := post_cmd_action atk ast sim_st in
     let: ast := if isatk is true then post_atk.1.1 else ast in
+    let: event := if isatk is true then post_atk.1.2 else None in
     let: steps := if isatk is true then post_atk.2 else 0 in
+
 
     let: cont_prog := if is_secret_guard ocmd is true then [] else map Some (optcmd_stp_cnt ocmd sim_st) in 
     let: cont_atk := repeat true steps in
     let: cont_full := combine_extend2 cont_prog cont_atk None false in
 
-    (sim_st, ast, TODO, cont_full).
+    (sim_st, ast, event, cont_full).
 
   
   Definition sim_post st ideal_st :=
