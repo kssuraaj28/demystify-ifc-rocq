@@ -79,17 +79,6 @@ Record AdvNextStep `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
 Arguments AdvNextStep: clear implicits.
 Arguments AdvNextStep {_ _ _ _} AtkStates.
 
-Lemma noninterfering_post_pre `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
-  {AtkStates} (adv : AdvNextStep AtkStates) ast s1 s2 :
-  ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
-  post_cmd_action adv ast (pre_cmd_action adv ast s1) =
-  post_cmd_action adv ast (pre_cmd_action adv ast s2).
-Proof.  move=> hyp.  apply: post_cmd_wf.  apply: pre_cmd_wf_conf. done. Qed.
-
-Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> pre_cmd_wf_int) "pre_cmd_wf_int" old.
-Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(unshelve erewrite pre_cmd_wf_conf;[|reflexivity|]) "pre_cmd_wf_conf" old.
-  (* TODO: I think maybe apply is better? TODO *)
-
 (* Instead, we could do uniform unfold. cbn.  *)
 Ltac2 Set this_cookbook_ as old :=
   add_cookstep
@@ -114,9 +103,6 @@ Section test.
   Context `{!VarPrm,!ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
   Generalizable All Variables.
   Ltac2 Set curr_cookbook := this_cookbook.
-
-  Goal `(forall P, P ⟨ pre_cmd_action (AtkStates := A) adv ast st  | is_trusted ⟩).
-  Proof.   move=> *.  cook.  Abort.
 
   Goal forall x, var_lbl x = mk_lbl true true -> is_public x.
   Proof. move=> x H. cook. Abort.

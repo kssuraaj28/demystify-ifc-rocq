@@ -3,8 +3,8 @@ Import List ListNotations ssreflect ssrfun ssrbool FunctionalExtensionality.
 
 From Ltac2 Require Import Ltac2.
 
-Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem.
-Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem Tacs.Cook.
+Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem WfFinisher.
+Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem WfFinisher Tacs.Cook.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
@@ -234,8 +234,10 @@ Section invprf.
         case pce: (untrusted _); cycle 1.
         1: move=> <- /= <- *.
         2: move=> * /=. 
-        1-2: repeat split; cook.
-          { revert_hyp_pat [(option Cmd), (_ ⊢ _)]; case=> /= *; cook. }
+        1,2: repeat split; cook.
+        1,2,4: enter wf_finisher.
+          { let v := open_constr:(_) in pattern_eq [RHS] with v; [wf_finisher|move=> ->]. cook.  (* Simulating rewrite with apply:. I'm a god *)
+          let v := open_constr:(_) in pattern_eq [LHS] with v; [wf_finisher|move=> ->]. cook. }
         move=> /=. 
         apply/Forall_and; cook; auto with trickbag.
         rewrite-/(WellFormedProg _ _).
@@ -247,26 +249,36 @@ Section invprf.
           { move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e}. (* TODO: this branch is longer *)
           revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] e; rewrite -> e in *=> {e} - [] * /=.
           revert_hyp_pat (if _ then _ else _)=> /= <- /=.
-          apply/storeview_eq_ext=> *; rewrite /clean_assign_stp_store /update_to_store; cook.
+          rewrite /clean_assign_stp_store/get_assign_val/get_assign_dest. cook.
+          admit.
+          (* This should go elsewhere 
+
+          apply/storeview_eq_ext=> *; 
           rewrite/get_assign_val/get_assign_dest dec_eq_refl. (* TODO: Eventually this should be a rewrite rule also *)
           case e1: (_ =? _). 
           2: case e2: (_ =? _).
           2: apply dec_eq_true in e2; rewrite -> e2 in *=> {e2}.
           1,2: unshelve apply: storeview_eq; [exact: is_public|..]; cook.
-          unshelve apply: storeview_eq; [exact: is_trusted|..]; cook. }
+          unshelve apply: storeview_eq; [exact: is_trusted|..]; cook. *)}
         cook. revert_hyp_pat bool; case.
         1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=.
-        2,4: auto with cook_step trickbag; fail.
-        1-2: revert_hyp_pat (option _); case=> /= *; cook. } 
+        2,4: move=> ? <- /=; enter wf_finisher.
+        1-2: revert_hyp_pat (option _); case=> /= *. 
+        1-4: let v := open_constr:(_) in pattern_eq [RHS] with v; [wf_finisher|move=> ->]. 
+        1-4: let v := open_constr:(_) in pattern_eq [LHS] with v; [wf_finisher|move=> ->]=> //. 
+        1-2: enter wf_finisher. (* TODO: Better automation *) }
         { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_declassify rcmd))=> /orP [ | nodecl]; cycle 1.
-          { revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [+ []] /==> *; cook. } 
-        move/is_declassify_inv=> [] ? [] ? e; rewrite -> e in *=> {e}.
+          { revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [+ []] /==> *; cook. 
+            { case: (X in if X then _ else _); try wf_finisher.
+            admit. }
+        move/is_declassify_inv=> [] ? [] ? e; rewrite -> e in *=> {e}. (* This needs to be cleaned up as well *)
         revert_hyp_pat (WellFormedCmd _ _)=> /wf_declassify_inv [] e; rewrite -> e in *=> {e} - [] * /=.
         revert_hyp_pat (if _ then _ else _)=> /= <- /=.
         apply/storeview_eq_ext=> *; rewrite /clean_assign_stp_store /update_to_store /=. rewrite dec_eq_refl. (* TODO: Eventually this should be a rewrite rule also *)
         case e1: (_ =? _). 
-          { unshelve apply: storeview_eq; [exact: is_trusted|..]; cook. }
-        apply/storeview_eq; [|eassumption]; cook. }
+          { unshelve apply: storeview_eq; [exact: is_trusted|..]; cook.
+          let v := open_constr:(_) in pattern_eq [LHS] with v; [wf_finisher|move=> ->]. cook. }
+        apply/storeview_eq; [|eassumption]; cook. wf_finisher. }
       move=> /=.  
       apply/Forall_and; cook; auto.
       revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)].
@@ -278,11 +290,11 @@ Section invprf.
          apply/flows_to_subtype_prog;[|apply/snd]; auto. }
       move=> /= ? <- /=.
       move ?: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. 
-         { erewrite ni_tr_cmd_cnt; [apply/Forall_combine2_same/Forall_map/Forall_forall => // | eassumption |..]; auto with trickbag.
-         let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_endorse rcmd))=> /orP [ | noend]; cook.
-         move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e}.
-         revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] [] e; rewrite -> e in * => {e} - [] *.
-         rewrite update_storeview_nochange; cook. } 
+         { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_endorse rcmd))=> /orP [ | noend]; cook; cycle 1.
+           { pattern_eq_2  [clean_cmd_stp_cnt _ _] [clean_cmd_stp_cnt _ _]; [|move=>->; cook; apply Forall_forall=> //].
+           let v := open_constr:(_) in pattern_eq [RHS] with v; [wf_finisher|move=> ->]. cook.
+           wf_finisher. }
+         move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e} //. }
       cook. rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
       revert_hyp_pat [Cmd, (WellFormedCmd _ _), (compute_new_pc _ _ = _)].
       move=> ? /step_soundness snd newpce.

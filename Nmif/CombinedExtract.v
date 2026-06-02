@@ -412,7 +412,7 @@ Section extract_step_commute.
       move: (orbN (oapp is_endorse false rcmd))=> /orP [isend | noend]. 
       case e: (sim_active' _ _ _); cycle 1; [| clear e].
         {
-        { apply: ni_optcmd_evnt_endorse; eauto. 
+        { apply: ni_optcmd_evnt_endorse; eauto.
             admit. }
       cook.
         { move: (sim_active'_false _ _ _ e)=> [] -> [] _;
