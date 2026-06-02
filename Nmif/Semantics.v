@@ -154,9 +154,9 @@ Section twocfg.
 
   Definition TwoCfg := (list (AtkCmd * AtkCmd) * State1 * State2)%type.
 
-  Definition step (c: TwoCfg): TwoCfg * Event * Event :=
+  Definition step (c: TwoCfg): TwoCfg * (Event * Event) :=
     let: (c2lst, s1, s2) := c in
-    if c2lst isn't (ac1, ac2) :: rest then (c, blank_event, blank_event) else
+    if c2lst isn't (ac1, ac2) :: rest then (c, (blank_event, blank_event)) else
     let: (p1, st1, ev1, steps1) := (acmd_step adv1 ac1 s1) in
     let: (p2, st2, ev2, steps2) := (acmd_step adv2 ac2 s2) in
 
@@ -165,7 +165,7 @@ Section twocfg.
                    (map Some p2) (repeat true steps2)
                    None false None false in
     let: cont := map (fun '(oc1, a1, oc2, a2) => (mk_atkcmd a1 oc1, mk_atkcmd a2 oc2)) cont in
-    ((cont ++ rest, st1, st2), ev1, ev2).
+    ((cont ++ rest, st1, st2), (ev1, ev2)).
 End twocfg.
 
 

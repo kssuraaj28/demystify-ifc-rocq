@@ -143,7 +143,7 @@ Section extract_step_commute.
   Lemma extract_step_commute_downgrade (st: CmbState) (c: CmbCmd) (restcmd: list CmbCmd):
     oapp is_endorse false (real_cmd c) \/ oapp is_declassify false (real_cmd c) ->
     Invariant (st, c :: restcmd) ->
-    (step (extract_2cfg (st, c :: restcmd))).1.1 = extract_2cfg ((comb_step (st, c :: restcmd)).1). 
+    (step (extract_2cfg (st, c :: restcmd))).1 = extract_2cfg ((comb_step (st, c :: restcmd)).1). 
   Proof.
     case: c=> >.  case: st=> >.
     cook. rewrite/Invariant=> downgrade. case. cook.
@@ -253,7 +253,7 @@ Section extract_step_commute.
 
   Theorem extract_step_commute c:
     Invariant c ->
-    (step (extract_2cfg c)).1.1 = extract_2cfg ((comb_step c).1).
+    (step (extract_2cfg c)).1 = extract_2cfg ((comb_step c).1).
   Proof.
     case: c. case=> rst ist simst atkst.
     case=> //. case=> rcmd isatk icmd pclbl restcmd inv.
@@ -388,5 +388,53 @@ Section extract_step_commute.
       cnstrct_eq_gl. rewrite filter_true //.
   Qed.
   Print Assumptions extract_step_commute.
+(*
+  Theorem extract_step_commute_event c:
+    Invariant c ->
+    let: comb_evnt := (comb_step c).2 in
+    let: two_evnt := (step (extract_2cfg c)).2 in
+    two_evnt = (comb_evnt, comb_evnt).
+  Proof.
+    case: c. case. rewrite/Invariant=> ? ? ? ?.
+    case=> // - [] rcmd ratk icmd pclbl ? []. Forall_inv_toph. rewrite/CmbCmdInv/CmbCmdCoreInv. 
+    case=> rwt iwt _. rewrite/StateInv. case=> treq pubeq.
+    pattern_focus [LHS]=> P.
+    rewrite /extract_2cfg cmd_map_cons. cook.
+    rewrite/step/acmd_step. cook.
+    subst P. cbn beta.
+    pattern_focus [RHS]=> P.
+    rewrite/comb_step/cmbcmd_step. cook.
+    subst P. cbn beta.
+    cnstrct_eq_gl. cnstrct_eq_gl.
+    + case pcuntr: (untrusted _) iwt rwt; [| move=> <-]=> *.
+        { do 2 (erewrite ni_untr_optcmd_evnt; [| | eassumption]=> //). }
+      rewrite/pre_cmd_action/construct_simulator/sim_pre/sim_active. cook.
+      move: (orbN (oapp is_endorse false rcmd))=> /orP [isend | noend]. 
+      case e: (sim_active' _ _ _); cycle 1; [| clear e].
+        {
+        { apply: ni_optcmd_evnt_endorse; eauto. 
+            admit. }
+      cook.
+        { move: (sim_active'_false _ _ _ e)=> [] -> [] _;
+        eauto using ni_optcmd_evnt_int. } (* I don't like this *)
+      apply: ni_optcmd_evnt_int; eauto.
+      case pcpub: public; cycle 1.
+        { admit. }
+      cook.
+      destruct rcmd=> //=.
+      rewrite/optcmd_evnt/oapp/clean.
+      admit.
+      idtac. }
+        { 
+          rewrite/pre_cmd_action/construct_simulator/sim_pre/sim_active/sim_active'. 
+      admi
+      rewrite/optcmd_evnt/clean_cmd_evnt/oapp. cook.
+
+        admit. }
+    { admit. }
+
+    
+  Admitted.
+  *)
 
 End extract_step_commute.
