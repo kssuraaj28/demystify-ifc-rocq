@@ -206,6 +206,7 @@ Section invprf.
     Ltac2 Set curr_cookbook as old := join_cookbooks Util.List.this_cookbook old.
     Ltac2 Set curr_cookbook as old := join_cookbooks VarValStore.this_cookbook old.
     Ltac2 Set curr_cookbook as old := join_cookbooks Syntax.this_cookbook old.
+    Ltac2 Set curr_cookbook as old := join_cookbooks Lattice4pt.this_cookbook old.
 
     Ltac2 Eval print_cookbook curr_cookbook.
 
@@ -247,10 +248,11 @@ Section invprf.
       repeat split; cook.
         { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_endorse rcmd))=> /orP [ | noend].
           { move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e}. (* TODO: this branch is longer *)
-          revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] e; rewrite -> e in *=> {e} - [] * /=.
-          revert_hyp_pat (if _ then _ else _)=> /= <- /=.
-          rewrite /clean_assign_stp_store/get_assign_val/get_assign_dest. cook.
-          admit.
+          revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] e; rewrite -> e in *=> {e} - [] *.
+          revert_hyp_pat (if _ then _ else _)=> <-.
+          case: (X in if X then _ else _); cook.
+            { admit. }
+            { admit. } }
           (* This should go elsewhere 
 
           apply/storeview_eq_ext=> *; 
@@ -259,18 +261,21 @@ Section invprf.
           2: case e2: (_ =? _).
           2: apply dec_eq_true in e2; rewrite -> e2 in *=> {e2}.
           1,2: unshelve apply: storeview_eq; [exact: is_public|..]; cook.
-          unshelve apply: storeview_eq; [exact: is_trusted|..]; cook. *)}
+          unshelve apply: storeview_eq; [exact: is_trusted|..]; cook. *)
         cook. revert_hyp_pat bool; case.
         1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=.
-        2,4: move=> ? <- /=; enter wf_finisher.
+        2,4: move=> ? <- /=; wf_finisher_guess [RHS]=> ->; wf_finisher.
         1-2: revert_hyp_pat (option _); case=> /= *. 
-        1-4: let v := open_constr:(_) in pattern_eq [RHS] with v; [wf_finisher|move=> ->]. 
-        1-4: let v := open_constr:(_) in pattern_eq [LHS] with v; [wf_finisher|move=> ->]=> //. 
-        1-2: enter wf_finisher. (* TODO: Better automation *) }
+        1-4: wf_finisher_guess [LHS]=> ->.  (* I don't know what is happening *)
+        1-2: wf_finisher_guess [LHS]=> ->. 
+        1,3: wf_finisher_guess [RHS]=> ->. 
+        (* TODO: Maybe I can use big brain backtracking?  do ! wf_finisher_guess [LHS]; do! wf_finisher [RHS]; wf_finisher.*)
+        1-4: wf_finisher. }
+
         { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_declassify rcmd))=> /orP [ | nodecl]; cycle 1.
           { revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [+ []] /==> *; cook. 
-            { case: (X in if X then _ else _); try wf_finisher.
-            admit. }
+          2: wf_finisher_guess [LHS]=> ->. 
+          1,2: case: (X in if X then _ else _); wf_finisher. }
         move/is_declassify_inv=> [] ? [] ? e; rewrite -> e in *=> {e}. (* This needs to be cleaned up as well *)
         revert_hyp_pat (WellFormedCmd _ _)=> /wf_declassify_inv [] e; rewrite -> e in *=> {e} - [] * /=.
         revert_hyp_pat (if _ then _ else _)=> /= <- /=.

@@ -58,7 +58,7 @@ Section ni.
       ⟨ clean_cmd_stp_store c st1 | is_trusted ⟩ = ⟨ clean_cmd_stp_store c st2 | is_trusted ⟩.
   Proof.
     move=> [] // d s1 s2 ? ?.
-      { apply: update_to_store_storeview_eq. rewrite /is_trusted /is_untrusted s2 //. }
+      { apply: update_to_store_storeview_eq. rewrite /is_trusted /is_untrusted s2 //. } (* declassify *)
     case de: ([elaborate is_untrusted d])=> fs1d fs2d _ _ treq /=;
       [do 2 (rewrite update_storeview_nochange{1}/is_trusted; [rewrite de //|])=> //|].
     rewrite/is_trusted/is_untrusted/= in de.
@@ -73,7 +73,7 @@ Section ni.
   Qed.
 
 
-  Lemma wf_optcmd_st_conf_ni l oc st1 st2:
+  Fact wf_optcmd_st_conf_ni l oc st1 st2:
       l ⊢ oc ->
       ~~ oapp is_declassify false oc ->
       ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
@@ -83,7 +83,7 @@ Section ni.
     exact: wf_cmd_st_conf_ni wf nodecl pubeq.
   Qed.
 
-  Lemma wf_sec_optcmd_st_conf_ni i oc s:
+  Fact wf_sec_optcmd_st_conf_ni i oc s:
     mk_lbl i false ⊢ oc ->
     ⟨ optcmd_stp_store oc s | is_public ⟩ = ⟨ s | is_public ⟩.
   Proof. case: oc => //= c wf. exact: wf_sec_cmd_st_conf_ni wf. Qed.
@@ -100,7 +100,7 @@ Section ni.
     apply/flows_from_untr; eauto; done.
   Qed.
 
-  Lemma wf_untr_optcmd_st_int_ni p oc s:
+  Fact wf_untr_optcmd_st_int_ni p oc s:
     mk_lbl true p ⊢ oc ->
     ⟨ optcmd_stp_store oc s | is_trusted ⟩ = ⟨ s | is_trusted ⟩.
   Proof. case: oc => //= c wf. exact: wf_untr_cmd_st_int_ni wf. Qed.
@@ -123,18 +123,6 @@ Section ni.
     1-2: move: untrg; rewrite Bool.orb_false_r /is_trusted/is_untrusted=> -> //.
   Qed.
 
-  Lemma wf_tr_cmd_cnt_atk_ni {AtkStates} (adv : AdvNextStep AtkStates)
-    ast p p' c s1 s2:
-      WellFormedCmd (mk_lbl false p) c ->
-      compute_new_pc (mk_lbl false p) c = mk_lbl false p' ->
-      ⟨ s1 | is_trusted ⟩ = ⟨ s2 | is_trusted ⟩ ->
-      clean_cmd_stp_cnt c (pre_cmd_action adv ast s1) = clean_cmd_stp_cnt c s2.
-  Proof.
-    move=> wf hyp treq.
-    apply: wf_tr_cmd_cnt_ni; [exact: wf | exact: hyp |].
-    rewrite pre_cmd_wf_int //.
-  Qed.
-
   Lemma wf_untr_cmd_evnt_ni pc c s:
     untrusted pc -> WellFormedCmd pc c -> clean_cmd_evnt c s = None.
   Proof.
@@ -145,7 +133,7 @@ Section ni.
     erewrite flows_from_untr; eauto.
   Qed.
 
-  Lemma wf_untr_optcmd_evnt_ni pc oc s:
+  Fact wf_untr_optcmd_evnt_ni pc oc s:
     untrusted pc -> pc ⊢ oc -> optcmd_evnt oc s = None.
   Proof. case: oc=> //= c untr wf.   eauto using wf_untr_cmd_evnt_ni. Qed.
 
@@ -174,7 +162,7 @@ Section ni.
       done.
   Qed.
 
-  Lemma wf_optcmd_evnt_int_ni l oc st1 st2:
+  Fact wf_optcmd_evnt_int_ni l oc st1 st2:
       l ⊢ oc ->
       ~~ oapp is_endorse false oc ->
       ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
@@ -200,7 +188,7 @@ Section ni.
     done.
   Qed.
 
-  Lemma wf_optcmd_evnt_end l oc st1 st2:
+  Fact wf_optcmd_evnt_end l oc st1 st2:
       l ⊢ oc ->
       oapp is_endorse false oc ->
       ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
@@ -226,7 +214,7 @@ Section ni.
     done.
   Qed.
 
-  Lemma wf_optcmd_evnt_decl l oc st1 st2:
+  Fact wf_optcmd_evnt_decl l oc st1 st2:
       l ⊢ oc ->
       oapp is_declassify false oc ->
       ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
@@ -248,7 +236,6 @@ Ltac wf_finisher_arms :=
    + apply: wf_untr_cmd_st_int_ni
    + apply: wf_untr_optcmd_st_int_ni
    + apply: wf_tr_cmd_cnt_ni
-   + apply: wf_tr_cmd_cnt_atk_ni
    + apply: wf_untr_cmd_evnt_ni
    + apply: wf_untr_optcmd_evnt_ni
    + apply: wf_cmd_evnt_int_ni
@@ -266,11 +253,13 @@ Ltac wf_finisher_close := first[eassumption| symmetry; eassumption |lazymatch go
 (* TODO: We don't need n I think *)
 Ltac wf_finisher_rec n :=
   lazymatch n with
-  | 0 => fail
+  | 0 => throw (* We really don't want to recurse so much*)
   | S ?m =>
-    lazymatch goal with | |- _ = _ => idtac | |- _ => fail end;
-            wf_finisher_arms;
-            first [wf_finisher_close | wf_finisher_rec m]
+    first [
+      wf_finisher_close |
+      lazymatch goal with |- _ = _ => idtac | |- _ => fail end; 
+        wf_finisher_arms; 
+        wf_finisher_rec m]
   end.
 
 Ltac wf_finisher :=
@@ -279,7 +268,7 @@ Ltac wf_finisher :=
 Tactic Notation "wf_finisher_guess" "[" ssrpatternarg(p) "]" :=  let v := open_constr:(_) in  pattern_eq [p] with v; [wf_finisher |]. 
 
 
-Goal 5 = 5. assert_fails wf_finisher. Abort. (* Do we want this to succeed? *)
+Goal 5 = 5. wf_finisher.  Abort.  (* TODO!!!  assert_fails also succeeds!!  WHAT *)
 
 Section test.
   Import VarValStore.Notations Lattice4pt.Notations.
@@ -343,6 +332,13 @@ Section test.
     ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
     clean_cmd_stp_cnt c st1 = clean_cmd_stp_cnt c st2.
   Proof. move=> *. wf_finisher. Qed.
+
+  Goal forall {AtkStates} (adv : AdvNextStep AtkStates) ast p p' c s1 s2,
+    WellFormedCmd (mk_lbl false p) c ->
+    compute_new_pc (mk_lbl false p) c = mk_lbl false p' ->
+    ⟨ s1 | is_trusted ⟩ = ⟨ s2 | is_trusted ⟩ ->
+    clean_cmd_stp_cnt c (pre_cmd_action adv ast s1) = clean_cmd_stp_cnt c s2.
+  Proof. move=> *. wf_finisher_guess [RHS]=> ->. wf_finisher. Qed.
 
   Goal forall pc c s, untrusted pc -> WellFormedCmd pc c -> clean_cmd_evnt c s = None.
   Proof. move=> *. wf_finisher. Qed.
