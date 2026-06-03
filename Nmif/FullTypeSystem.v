@@ -185,7 +185,7 @@ Section ts.
       + rewrite proj_adv_var /to4pt -Hie (negbTE Hftr) Htopub //.
       *)
     - (* assign *)
-    admit.
+    admit. (* TODO *)
     (*
       move=> dst src1 src2 comp pc' Hs1 Hs2 Hpc _.
       apply: wf_assign; rewrite !proj_adv_var.
@@ -194,7 +194,7 @@ Section ts.
       + exact: (to4pt_mono _ _ _ Hpc).
       *)
     - (* cond *)
-    admit.
+    admit. (* TODO *)
     (*
       move=> gvar comp pc' b1 b2 _ IH1 _ IH2 /AtkCompat_cond_inv [C1 C2].
       apply: wf_cond.
@@ -204,7 +204,7 @@ Section ts.
         exact: (Forall_modus IH2 C2).
     *)
     - (* while *)
-    admit.
+    admit. (* TODO *)
     (*
       move=> gvar comp pc' wbody _ IH /AtkCompat_while_inv C.
       apply: wf_while.
@@ -218,7 +218,7 @@ Section ts.
     FullWellFormedProg pc p ->
     @WellFormedProg _ _ (proj_adv A) (to4pt A pc) p.
   Proof.
-  admit.
+  admit. (* TODO *)
   (*
     rewrite /FullWellFormedProg /WellFormedProg => Hwf Hc.
     apply: (Forall_modus _ Hc).
