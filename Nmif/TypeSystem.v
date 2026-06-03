@@ -135,7 +135,7 @@ Ltac2 Set this_cookbook_ as old :=
 
 Section test.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
-  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["WellFormedOptCmd_Some"]) ().
+  Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["WellFormedOptCmd_Some"])).
   Goal forall pc c (P : _ -> Prop), P (WellFormedOptCmd pc (Some c)).
   Proof. move=> *. cook. Abort.
 End test.
@@ -181,7 +181,7 @@ Ltac2 Set this_cookbook_ as old :=  add_cookstep ltac1:(rewrite -> compute_new_p
 Section test.
   Import Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
-  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["compute_new_pc_opt_some"]) ().
+  Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["compute_new_pc_opt_some"])).
   Goal forall pc c (P: _ -> Prop), P (compute_new_pc_opt pc (Some c)). 
   Proof. move=> *. cook. Abort.
 End test.
@@ -189,7 +189,7 @@ End test.
 Section test.
   Import Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
-  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["compute_new_pc_opt_secret"]) ().
+  Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["compute_new_pc_opt_secret"])).
   Goal forall untr c (P: _ -> Prop), P (public (compute_new_pc_opt (mk_lbl untr false) c)).
   Proof. move=> *. cook. Abort.
 End test.
@@ -295,7 +295,7 @@ Ltac2 Set this_cookbook_ as old :=  add_cookstep  ltac1:(rewrite -> untr_compute
 Section test.
   Import Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
-  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["untr_compute_new_pc"]) ().
+  Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["untr_compute_new_pc"])).
   Goal forall p c (P : _ -> Prop), P (untrusted (compute_new_pc (mk_lbl true p) c)).
   Proof. move=> *. cook. Abort.
 End test.

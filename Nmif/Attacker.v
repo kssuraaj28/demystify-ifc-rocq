@@ -102,7 +102,7 @@ Ltac2 Eval print_cookbook this_cookbook.
 Section test.
   Context `{!VarPrm,!ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
   Generalizable All Variables.
-  Ltac2 Set curr_cookbook := this_cookbook.
+  Ltac cook := ltac2:(cook this_cookbook).
 
   Goal forall x, var_lbl x = mk_lbl true true -> is_public x.
   Proof. move=> x H. cook. Abort.

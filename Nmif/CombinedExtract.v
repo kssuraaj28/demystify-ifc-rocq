@@ -124,7 +124,7 @@ Section extract_step_commute.
        cookbook is not enough — the importing file must also `Import` the
        module so the bare name resolves at fire time, otherwise the rewrite
        errors and `cook` silently drops the step. Figure out a cleaner fix. *)
-  Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()).
+  Ltac2 mutable curr_cookbook () := this_cookbook_ (). Ltac cook := ltac2:(cook curr_cookbook).
   Ltac2 Set curr_cookbook as old := join_cookbooks Combined.this_cookbook old.
   Ltac2 Set curr_cookbook as old := join_cookbooks Semantics.this_cookbook old.
   Ltac2 Set curr_cookbook as old := join_cookbooks TypeSystem.this_cookbook old.
@@ -134,8 +134,6 @@ Section extract_step_commute.
   Ltac2 Set curr_cookbook as old := join_cookbooks Lattice4pt.this_cookbook old.
   Ltac2 Set curr_cookbook as old := join_cookbooks VarValStore.this_cookbook old.
   Ltac2 Set curr_cookbook as old := join_cookbooks Syntax.this_cookbook old.
-
-
 
 
   Ltac2 Set cook_debug := 0.
@@ -347,9 +345,7 @@ Section extract_step_commute.
         unshelve erewrite filter_ext; [exact xpred0|apply filter_false|]. cook. }
       rewrite/sim_step /=; cnstrct_eq_gl; cook.
         { case: pub rwt => rwt /=; cook; congr (_.1.1); [wf_finisher|].
-        wf_finisher_guess [LHS] with _=> ->.
-        wf_finisher_guess [RHS] with (post_cmd_action _ _ (pre_cmd_action _ _ _))=> -> //. } (* So many questions, *)
-
+        wf_finisher_guess [LHS] with (post_cmd_action _ _ (_ _ _ rst))=> ->. wf_finisher. } (* Classic transitivity *)
       rewrite/zip/cmd_map_sim filter_map_swap map_map. symmetry.
       erewrite map_ext; [|case; case=> * /=; instantiate (1:= fun '(_,_,_) => _); reflexivity].
       erewrite filter_ext; [|case; case=> *; rewrite /sim_active; cbn; instantiate (1:= fun '(_,_,_) => _); reflexivity].

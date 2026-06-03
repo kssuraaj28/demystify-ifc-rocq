@@ -267,7 +267,7 @@ Ltac wf_finisher_rec n :=
     first [
       wf_finisher_close |
       lazymatch goal with |- _ = _ => idtac | |- _ => fail end; 
-        (*(idtac + symmetry); (* TODO *) *)
+        (idtac + symmetry);
         wf_finisher_arms; 
         wf_finisher_rec m]
   end.

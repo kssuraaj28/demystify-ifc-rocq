@@ -112,7 +112,7 @@ Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> clean_cmd_stp_
 
 Section test.
   Context `{!VarPrm, !ValPrm}.
-  Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()). (* Maybe keep only 1 *)
+  Ltac cook := ltac2:(cook this_cookbook_).
 
   Goal forall (P: _ -> Prop) c s, P (optcmd_stp_store (Some c) s).
   Proof. move=> *. cook. Abort.

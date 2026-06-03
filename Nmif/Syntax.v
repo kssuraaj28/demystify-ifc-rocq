@@ -140,7 +140,7 @@ Ltac2 this_cookbook () := this_cookbook_ ().
 
 Section test.
   Context `{!VarPrm, !ValPrm}.
-  Ltac2 Set curr_cookbook := this_cookbook.
+  Ltac cook := ltac2:(cook this_cookbook).
 
   Goal forall (c: option Cmd) (X Y: nat),
     ~~ oapp is_endorse false c ->

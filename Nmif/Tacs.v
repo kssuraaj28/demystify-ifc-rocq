@@ -416,20 +416,24 @@ Module Cook.
   #[abstract] Ltac2 Type cook_tac := ((unit -> unit) * (string)).
   #[abstract] Ltac2 Type cookbook := cook_tac list.
 
-  Ltac2 create_new_cookbook () : cookbook := [].
-  Ltac2 mutable curr_cookbook () : cookbook := [].
+  Ltac2 create_new_cookbook () : cookbook := []. (* I don't  *)
 
-  Ltac2 mutable cook_debug : int := 0.
+  (* TODO: Maybe check that there is no name duplication in the future? Throw a warning if this is the case *)
+  #[local] Ltac2 add_cookstep0 (t: unit -> unit) (desc: string) (l : cookbook) : cookbook :=
+    let hardened := fun () => precise_harden t (Some (1, true)) false in
+    (hardened, desc) :: l.
 
-  (* Print [msg ()] when cook_debug is at least [lvl]. *)
-  #[local] Ltac2 cook_dbg (lvl : int) (msg : unit -> unit) : unit :=
-    if Int.ge cook_debug lvl then msg () else ().
+  (* TODO: This desc() is sus *)
+  Ltac2 Notation "add_cookstep" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
+    fun () => add_cookstep0 t (desc ()) (l ()).
+
+  #[local] Ltac2 join_cookbooks0 (l1: cookbook)(l2 : cookbook) : cookbook := List.append l1 l2.
+  Ltac2 Notation "join_cookbooks" l1(tactic(0)) l2(tactic(0)) := fun () => join_cookbooks0 (l1 ()) (l2 ()).
 
   #[local] Ltac2 print_cookbook0 (l : cookbook) : unit :=
     List.iteri (fun i p =>
       let (_, desc) := p in
       printf "%i: %s" i desc) (l).
-
   Ltac2 Notation "print_cookbook" l(tactic(0)) :=  print_cookbook0 (l ()).
 
   #[local] Ltac2 check_all_present (fn_name : string) (l : cookbook) (names : string list) : unit :=
@@ -456,21 +460,13 @@ Module Cook.
     fun () => delete0 (l ()) (names ()).
 
 
-  (* TODO: Maybe check that there is no name duplication in the future? Throw a warning if this is the case *)
-  #[local] Ltac2 append_tac0 (t: unit -> unit) (desc: string) (l : cookbook) : cookbook :=
-    let hardened := fun () => precise_harden t (Some (1, true)) false in
-    (hardened, desc) :: l.
 
-  (* TODO: This desc() is sus *)
-  Ltac2 Notation "add_cookstep" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
-    fun () => append_tac0 t (desc ()) (l ()).
+  Ltac2 mutable cook_debug : int := 0.
+  (* Print [msg ()] when cook_debug is at least [lvl]. *)
+  #[local] Ltac2 cook_dbg (lvl : int) (msg : unit -> unit) : unit :=
+    if Int.ge cook_debug lvl then msg () else ().
 
-  (* TODO: PROOF_STYLE.md is going to be very different *)
-  #[local] Ltac2 join_cookbooks0 (l1: cookbook)(l2 : cookbook) : cookbook := List.append l1 l2.
-
-  Ltac2 Notation "join_cookbooks" l1(tactic(0)) l2(tactic(0)) := fun () => join_cookbooks0 (l1 ()) (l2 ()).
-
-  #[local] Ltac2 cook_step () : unit :=
+  Ltac2 cook_step0 (cb : cookbook) : unit :=
     one_goal_assertion "cook_step";
     let rec go i l :=
       match l with
@@ -484,27 +480,18 @@ Module Cook.
             go (Int.add i 1) rest
         end
       end in
-    go 0 (curr_cookbook ()).
-
-  Tactic Notation "cook_step" := ltac2:(cook_step ()).
-
-  (* 
-    - Singleton hintdatabase with cook_step. 
-    Clients are not allowed to touch this database
-  *)
-  Create HintDb cook_step. (* TODO: Does #[local] help *)
-  Hint Extern 100  => cook_step: cook_step.
+    go 0 cb.
 
   (* For every focused goal, it runs cook_step one by one. (dfs strategy).
      Panics if no cook_step ever succeeded. *)
-  #[local] Ltac2 cook () : unit :=
+  Ltac2 cook0 (cb : cookbook) : unit :=
     let rec go (acc : bool) : bool :=
       let gls := Control.numgoals () in
       cook_dbg 1 (fun () => printf "cook: numgoals = %i" gls);
       if Int.equal gls 0 then acc else
 
       let this := Control.focus 1 1 (fun () =>
-        match Control.case (fun () => cook_step ()) with
+        match Control.case (fun () => cook_step0 cb) with
         | Val ((), _) => true
         | Err _ =>
               cook_dbg 2 (fun () => printf "cook: cook_step failed, shelving goal");
@@ -513,9 +500,8 @@ Module Cook.
       go (Bool.or acc this) in
     if unshelve (go false) then () else panic_s "cook" "no progress".
 
-  Tactic Notation "cook" := ltac2:(cook ()).
-
-  (* TODO: You need to have a lot of tests here.. TODO: Maybe claude can help *)
+  Ltac2 Notation "cook_step" cb(tactic(0)) := cook_step0 (cb ()).
+  Ltac2 Notation "cook" cb(tactic(0)) := cook0 (cb ()).
 
 End Cook.
 
@@ -532,17 +518,14 @@ Section test.
   Import Cook.
 
   Section progfail.
-    Ltac2 this_cookbook_ :=
-      add_cookstep ltac1:(idtac) "dummy" create_new_cookbook.
-    Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()). (* Maybe keep only 1 *)
-    Goal False. Proof. Fail cook.  Abort.
+    Ltac2 this_cookbook_ :=  add_cookstep ltac1:(idtac) "dummy" create_new_cookbook.
+    Goal False. Proof. Fail ltac2:(cook (this_cookbook_ )).  Abort.
   End progfail.
 
   (* clears hyp *)
   Section bad_cook.
     Ltac2 this_cookbook_ :=
       add_cookstep ltac1:(lazymatch goal with H: True |- _ => clear H end ) "dummy" create_new_cookbook.
-    Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()). (* Maybe keep only 1 *)
-    Goal True -> False. Proof. move=> *. Fail cook.  Abort.
+    Goal True -> False. Proof. move=> *. Fail ltac2:(cook this_cookbook_). Abort.
   End bad_cook.
 End test.

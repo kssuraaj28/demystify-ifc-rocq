@@ -57,7 +57,7 @@ Ltac2 Set this_cookbook_ as old :=
     end) "bool_canonicalize" old.
 
 Section test.
-  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["bool_canonicalize"]) ().
+  Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["bool_canonicalize"]) ).
 
   Goal forall b, b = true -> b = true.
   Proof. move=> b H. cook. exact: H. Abort.
@@ -79,7 +79,7 @@ Section test.
 End test.
 
 Section test.
-  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["cnstr_eq_simpl"]) ().
+  Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["cnstr_eq_simpl"])).
   Goal forall n m, S n = S m.
   Proof. move=> *. cook. Abort.
   Goal forall A (x y: A) (l: list A), x :: l = y :: l.
@@ -490,7 +490,7 @@ Module List.
     Goal forall (P: nat -> Prop) (x: nat) l, Forall P (x :: l) -> P x.
     Proof. move=> P x l. Forall_inv_toph. done. Abort.
 
-    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["Forall_inv"]) ().
+    Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["Forall_inv"])).
     Goal forall (P: nat -> Prop) (x: nat) l, Forall P (x :: l) -> P x.
     Proof. move=> P x l. cook. Abort.
   End test.
@@ -521,7 +521,7 @@ Module List.
     "eq_map_nil" old.
 
   Section test.
-    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["eq_app_nil"]) ().
+    Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["eq_app_nil"])).
     Goal forall A (y l: list A), y = l ++ y.
     Proof. move=> A y l. cook. Abort.
     Goal forall A (y l: list A), l ++ y = y.
@@ -533,7 +533,7 @@ Module List.
   End test.
 
   Section test.
-    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["eq_map_nil"]) ().
+    Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["eq_map_nil"])).
     Goal forall A B (f: A -> B) (l: list A), map f l = [].
     Proof. move=> *. cook. Abort.
     Goal forall A B (f: A -> B) (l: list A), [] = map f l.
@@ -550,7 +550,7 @@ Module List.
     "eq_app_peel" old.
 
   Section test.
-    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["eq_app_peel"]) ().
+    Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["eq_app_peel"])).
     Goal forall A (a b y: list A), a ++ y = b ++ y.
     Proof. move=> A a b y. cook. Abort.
     Goal forall A (a b y: list A), y ++ a = y ++ b.
@@ -561,13 +561,13 @@ Module List.
   Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> repeat_length) "repeat_length" old.
 
   Section test.
-    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["length_map"]) ().
+    Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["length_map"])).
     Goal forall A B (f: A -> B) (l: list A), length (map f l) = length l.
     Proof. move=> *. cook. Abort.
   End test.
 
   Section test.
-    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["repeat_length"]) ().
+    Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["repeat_length"])).
     Goal forall A (x: A) n, length (repeat x n) = n.
     Proof. move=> *. cook. Abort.
   End test.
@@ -579,7 +579,7 @@ Module List.
   Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> filter_id_repeat_true) "filter_id_repeat_true" old.
 
   Section test.
-    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["filter_id_repeat_true"]) ().
+    Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["filter_id_repeat_true"])).
     Goal forall n, filter id (repeat true n) = repeat true n.
     Proof. move=> *. cook. Abort.
   End test.
@@ -614,9 +614,7 @@ Ltac2 Set this_cookbook_ as old :=
     "if_w_hyp_eq" old.
 
 Section test.
-  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["if_w_hyp_eq"]) ().
-  Ltac2 Eval print_cookbook curr_cookbook.
-  Ltac2 Set cook_debug := 2.
+  Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["if_w_hyp_eq"])).
   Goal forall b, b = true -> if b then True else False.
   Proof. 
     move=> *.

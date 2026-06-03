@@ -198,7 +198,7 @@ Section invprf.
     Import DecEq DecEq.Notations.
     Import VarValStore.Notations.
 
-    Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()).
+    Ltac2 mutable curr_cookbook () :=  this_cookbook_ ().
     Ltac2 Set curr_cookbook as old := join_cookbooks Semantics.this_cookbook old.
     Ltac2 Set curr_cookbook as old := join_cookbooks TypeSystem.this_cookbook old.
     Ltac2 Set curr_cookbook as old := join_cookbooks Attacker.this_cookbook old.
@@ -222,6 +222,8 @@ Section invprf.
     Ltac2 Set cook_debug := 0. (* TODO: Why can't I access this? *)
     (* TODO: Why does cook make this extremely slow? *)
     (* TODO: Set Ltac Profiling *)
+
+    Ltac cook := ltac2:(cook curr_cookbook).
 
     Lemma cmbcmd_step_inv:
       forall c st,
