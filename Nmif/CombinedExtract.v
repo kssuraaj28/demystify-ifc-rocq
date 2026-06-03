@@ -347,9 +347,9 @@ Section extract_step_commute.
         unshelve erewrite filter_ext; [exact xpred0|apply filter_false|]. cook. }
       rewrite/sim_step /=; cnstrct_eq_gl; cook.
         { case: pub rwt => rwt /=; cook; congr (_.1.1); [wf_finisher|].
-        admit. 
-        (*erewrite ni_sec_optcmd_st_conf_atk; [|eassumption]. erewrite noninterfering_post_pre; [reflexivity|]. 
-        congruence. *) }
+        wf_finisher_guess [LHS] with _=> ->.
+        wf_finisher_guess [RHS] with (post_cmd_action _ _ (pre_cmd_action _ _ _))=> -> //. } (* So many questions, *)
+
       rewrite/zip/cmd_map_sim filter_map_swap map_map. symmetry.
       erewrite map_ext; [|case; case=> * /=; instantiate (1:= fun '(_,_,_) => _); reflexivity].
       erewrite filter_ext; [|case; case=> *; rewrite /sim_active; cbn; instantiate (1:= fun '(_,_,_) => _); reflexivity].
