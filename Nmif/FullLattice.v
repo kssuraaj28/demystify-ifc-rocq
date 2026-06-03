@@ -33,16 +33,12 @@ Class PrincipalLatticePrm := {
   leqP_top : forall x, leqP x topP;
 }.
 
-(* Bridges between the 4-point primitives and boolean implication: they keep the
-   projection proofs short. flows_to_int / flows_to_conf live at the top level of
-   Lattice4pt. 
-   Should be in Lattice4pt
-   *)
-Lemma flows_to_intE u1 u2 : flows_to_int u1 u2 = (u1 ==> u2).
-Proof. case: u1; case: u2=> //. Qed.
+(* "Acts for" / "at least as powerful as": since more powerful principals are
+   lower in P, A acts for B exactly when A ≤_P B. The glyph looks reversed but
+   matches the standard decentralised-label notation (A ⪰ B = A speaks for B). *)
+Notation "A ≽ B" := (leqP A B) (at level 70, no associativity).
 
-Lemma flows_to_confE p1 p2 : flows_to_conf p1 p2 = (p2 ==> p1).
-Proof. case: p1; case: p2=> //. Qed.
+(* flows_to_intE / flows_to_confE now live in Lattice4pt and arrive via Import. *)
 
 Section full_lattice.
   Context `{!PrincipalLatticePrm}.
@@ -59,10 +55,9 @@ Section full_lattice.
   Definition fjoin (l1 l2 : FLabel) : FLabel :=
     (meetP (conf l1) (conf l2), joinP (integ l1) (integ l2)).
 
-  (* A label is uncompromised when its writers are at least as powerful
-     as its readers: integ ≤_P conf. *)
-  (* TODO: Notation for leqP. *)
-  Definition uncompromised (l : FLabel) : bool := leqP (integ l) (conf l).
+  (* A label is uncompromised when its writers are at least as powerful as its
+     readers: the integrity principal acts for the confidentiality principal. *)
+  Definition uncompromised (l : FLabel) : bool := integ l ≽ conf l.
 
   (* Meet / join bounds, derived from the lub/glb characterisations. *)
   Lemma meet_le_l x y : leqP (meetP x y) x.
@@ -116,21 +111,16 @@ Section full_lattice.
     fflows_to l2 l1 -> uncompromised (fjoin x l1) -> uncompromised (fjoin x l2).
   Proof. move=> Hl. apply: uncompromised_mono. exact: fjoin_mono_r. Qed.
 
-  (* Attacker: a pair of principals with a_c ≤_P a_i (confidentiality at least as
-     powerful as integrity). a_c <_P a_i is the semi-honest / passive attacker. *)
-  (*TODO:
-   - Change name to AttackerLabel 
-   - the name atk_le should be different. TODO
-   - leqP should be acts for
-  *)
-  Record Attacker := { atk_c : P; atk_i : P; atk_le : leqP atk_c atk_i }.
+  (* Attacker label: a pair of principals with a_c acting for a_i (confidentiality
+     at least as powerful as integrity). a_c <_P a_i is the semi-honest / passive
+     attacker — it can read more than it can write. *)
+  Record AttackerLabel := { atk_c : P; atk_i : P; reasonable_atk : atk_c ≽ atk_i }.
 
   (* Componentwise projection of a full label to the 4-point lattice: visible iff
      the attacker controls the confidentiality principal; corruptible iff it
      controls the integrity principal. *)
-  (* TODO: Maybe change mk_lbl to mk_4ptlbl *)
-  Definition to4pt (A : Attacker) (l : FLabel) : Lattice4pt.Label :=
-    mk_lbl (leqP (atk_i A) (integ l)) (leqP (atk_c A) (conf l)).
+  Definition to4pt (A : AttackerLabel) (l : FLabel) : Lattice4pt.Label :=
+    mk_4ptlbl (atk_i A ≽ integ l) (atk_c A ≽ conf l).
 
   Lemma to4pt_mono A l1 l2 :
     fflows_to l1 l2 -> flows_to (to4pt A l1) (to4pt A l2).
@@ -153,11 +143,11 @@ Section full_lattice.
   Qed.
 End full_lattice.
 
+(* ⊑ / ⊔ deliberately reuse the 4-point glyphs but live in a separate Notations
+   module, so a client imports at most one of Lattice4pt.Notations /
+   FullLattice.Notations and there is no genuine clash. *)
 Module Notations.
-(* TODO: You are overloading notations here. Will this hurt? *)
-(* TODO: remove the ⊒ *)
   Notation "from ⊑ to" := (fflows_to from to) (at level 20).
-  Notation "to ⊒ from" := (fflows_to from to) (at level 20, only parsing).
   Infix "⊔" := fjoin (at level 20).
 End Notations.
 
@@ -167,7 +157,6 @@ End Notations.
    With a confidentiality principal more powerful than the integrity one
    (false ≤ true), this is exactly the semi-honest attacker. *)
 Section sanity.
-(* Can be made cleaner, but okay *)
   Definition bool_plat : PrincipalLatticePrm.
   Proof.
     refine {| P := bool; leqP := implb; meetP := andb; joinP := orb;
@@ -181,11 +170,11 @@ Section sanity.
     - case=> //.
   Defined.
 
-  Definition semihonest : @Attacker bool_plat.
-  Proof. refine (@Build_Attacker bool_plat false true _). exact: erefl. Defined.
+  Definition semihonest : @AttackerLabel bool_plat.
+  Proof. refine (@Build_AttackerLabel bool_plat false true _). exact: erefl. Defined.
 
   (* The projection of a public-untrusted label (true public conf, true
      untrusted integ) lands on the 4-point public-untrusted point. *)
-  Goal @to4pt bool_plat semihonest (true, true) = mk_lbl true true.
+  Goal @to4pt bool_plat semihonest (true, true) = mk_4ptlbl true true.
   Proof. exact: erefl. Qed.
 End sanity.

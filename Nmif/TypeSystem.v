@@ -31,13 +31,13 @@ Section sa.
   Inductive WellFormedCmd : PcLbl -> Cmd -> Prop := 
   | wf_endorse: 
      forall from to,
-       let: ptlbl := mk_lbl false true in let: pulbl := mk_lbl true true in
+       let: ptlbl := mk_4ptlbl false true in let: pulbl := mk_4ptlbl true true in
        var_lbl from = pulbl -> var_lbl to = ptlbl ->
        _ ptlbl (assign (endorse from to))
 
   | wf_declassify: 
      forall from to,
-       let: ptlbl := mk_lbl false true in let: stlbl := mk_lbl false false in
+       let: ptlbl := mk_4ptlbl false true in let: stlbl := mk_4ptlbl false false in
        var_lbl from = stlbl -> var_lbl to = ptlbl ->
        _ ptlbl (assign (declassify from to))
 
@@ -77,13 +77,13 @@ Section sa.
     *)
     Hypothesis hyp_endorse : 
         forall from to,
-          let: ptlbl := mk_lbl false true in let: pulbl := mk_lbl true true in
+          let: ptlbl := mk_4ptlbl false true in let: pulbl := mk_4ptlbl true true in
           var_lbl from = pulbl -> var_lbl to = ptlbl ->
           P ptlbl (assign (endorse from to)).
 
     Hypothesis hyp_declassify : 
         forall from to,
-          let: ptlbl := mk_lbl false true in let: stlbl := mk_lbl false false in
+          let: ptlbl := mk_4ptlbl false true in let: stlbl := mk_4ptlbl false false in
           var_lbl from = stlbl -> var_lbl to = ptlbl ->
           P ptlbl (assign (declassify from to)).
 
@@ -163,11 +163,11 @@ Section new_pc.
   Proof. done. Qed.
 
   Lemma compute_new_pc_secret untr c :
-    public (compute_new_pc (mk_lbl untr false) c) = false.
+    public (compute_new_pc (mk_4ptlbl untr false) c) = false.
   Proof. case: c=> // - []  *; rewrite pub_join //.  Qed.
 
   Fact compute_new_pc_opt_secret untr c :
-    public (compute_new_pc_opt (mk_lbl untr false) c) = false.
+    public (compute_new_pc_opt (mk_4ptlbl untr false) c) = false.
   Proof.
     rewrite /compute_new_pc_opt.
     case: c => [c | ] //.
@@ -190,7 +190,7 @@ Section test.
   Import Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
   Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["compute_new_pc_opt_secret"]) ().
-  Goal forall untr c (P: _ -> Prop), P (public (compute_new_pc_opt (mk_lbl untr false) c)).
+  Goal forall untr c (P: _ -> Prop), P (public (compute_new_pc_opt (mk_4ptlbl untr false) c)).
   Proof. move=> *. cook. Abort.
 End test.
 
@@ -227,16 +227,16 @@ Section downgrading.
 
   Lemma wf_endorse_inv pc from to:
     WellFormedCmd pc (assign (endorse from to)) ->
-    pc = mk_lbl false true /\
-    var_lbl from = mk_lbl true true /\
-    var_lbl to = mk_lbl false true.
+    pc = mk_4ptlbl false true /\
+    var_lbl from = mk_4ptlbl true true /\
+    var_lbl to = mk_4ptlbl false true.
   Proof. inversion 1; subst; tauto. Qed.
 
   Lemma wf_declassify_inv pc from to:
     WellFormedCmd pc (assign (declassify from to)) ->
-    pc = mk_lbl false true /\
-    var_lbl from = mk_lbl false false /\
-    var_lbl to = mk_lbl false true.
+    pc = mk_4ptlbl false true /\
+    var_lbl from = mk_4ptlbl false false /\
+    var_lbl to = mk_4ptlbl false true.
   Proof. inversion 1; subst; tauto. Qed.
 End downgrading.
 
@@ -295,11 +295,11 @@ Section ni.
   (* In a secret context, the public view is constant *)
   Lemma ni_sec_cmd_st_conf:
     forall c i st,
-      WellFormedCmd (mk_lbl i false) c ->
+      WellFormedCmd (mk_4ptlbl i false) c ->
       ⟨ clean_cmd_stp_store c st | is_public ⟩ =
       ⟨ st | is_public ⟩.
   Proof.
-    move=> >; move e: (mk_lbl _ _)=> ?; move:e=> /[swap].
+    move=> >; move e: (mk_4ptlbl _ _)=> ?; move:e=> /[swap].
     case=> //= > +++e; rewrite -{}e=> _ _ flw.
     rewrite update_storeview_nochange=> //.
     rewrite/is_public.
@@ -311,7 +311,7 @@ Section ni.
      public view. So `optcmd_stp_store oc` drops out entirely. *)
   Lemma ni_sec_optcmd_st_conf_atk {AtkStates} (adv : AdvNextStep AtkStates)
     ast i oc s :
-    mk_lbl i false ⊢ oc ->
+    mk_4ptlbl i false ⊢ oc ->
     post_cmd_action adv ast (optcmd_stp_store oc s) =
     post_cmd_action adv ast s.
   Proof.
@@ -342,11 +342,11 @@ Section ni.
 
   Lemma ni_untr_cmd_st_int:
     forall p c st,
-    WellFormedCmd (mk_lbl true p) c ->
+    WellFormedCmd (mk_4ptlbl true p) c ->
     ⟨ clean_cmd_stp_store c st | is_trusted ⟩ =
     ⟨ st | is_trusted ⟩.
   Proof.
-    move=> >; move e: (mk_lbl _ _)=> ?; move:e=> /[swap].
+    move=> >; move e: (mk_4ptlbl _ _)=> ?; move:e=> /[swap].
     case=> //= > +++e; rewrite -{}e=> _ _ flw.
     rewrite update_storeview_nochange=> //.
     rewrite/is_trusted/is_untrusted negbF //.
@@ -355,14 +355,14 @@ Section ni.
 
   Lemma ni_tr_cmd_cnt:
     forall p c st1 st2,
-      let: lbl := mk_lbl false p in
+      let: lbl := mk_4ptlbl false p in
       let: new_lbl := (compute_new_pc lbl c) in
       WellFormedCmd lbl c ->
       untrusted new_lbl = false ->
         ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
         clean_cmd_stp_cnt c st1 = clean_cmd_stp_cnt c st2.
   Proof.
-    move=> >. move e: (mk_lbl _ _)=> l; move: e=> /[swap].
+    move=> >. move e: (mk_4ptlbl _ _)=> l; move: e=> /[swap].
     case=> //= > => [_ _| _] <- untrg *.
     1-2: set gr := (X in _ = (if X then _ else _)); set gl := (X in (if X then _ else _) = _).
     1-2: suff: gl = gr; [move=> -> //|subst gl gr]; congr (_ _).
@@ -415,7 +415,7 @@ Section test.
   Import VarValStore.Notations Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
   Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["ni_sec_cmd_st_conf"]) ().
-  Goal forall i c st1 (P : _ -> Prop), WellFormedCmd (mk_lbl i false) c ->
+  Goal forall i c st1 (P : _ -> Prop), WellFormedCmd (mk_4ptlbl i false) c ->
     P ⟨ clean_cmd_stp_store c st1 | is_public ⟩.
   Proof. move=> *. cook. Abort.
 End test.
@@ -424,7 +424,7 @@ Section test.
   Import VarValStore.Notations Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
   Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["ni_untr_cmd_st_int"]) ().
-  Goal forall p c st1 (P : _ -> Prop), WellFormedCmd (mk_lbl true p) c ->
+  Goal forall p c st1 (P : _ -> Prop), WellFormedCmd (mk_4ptlbl true p) c ->
     P ⟨ clean_cmd_stp_store c st1 | is_trusted ⟩.
   Proof. move=> *. cook. Abort.
 End test.
@@ -434,7 +434,7 @@ Section step_soundness.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
   Lemma compute_new_pc_untr p c:
     exists p',
-      compute_new_pc (mk_lbl true p) c = (mk_lbl true p').
+      compute_new_pc (mk_4ptlbl true p) c = (mk_4ptlbl true p').
   Proof.
   case: c; eauto; cbn; case=> *.
     1-2: case: (var_lbl _) => u pg. (* TODO: This could be a lemma *)
@@ -442,7 +442,7 @@ Section step_soundness.
   Qed.
 
  Fact untr_compute_new_pc p c:
-   untrusted (compute_new_pc (mk_lbl true p) c).
+   untrusted (compute_new_pc (mk_4ptlbl true p) c).
  Proof.
    case: c=> //=; case=> * ; rewrite untr_join //.
  Qed.
@@ -462,10 +462,10 @@ Section step_soundness.
 
   Lemma step_soundness_pubuntr:
     forall c st,
-      WellFormedCmd (mk_lbl true true) c ->
-      WellFormedProg (mk_lbl true true) (clean_cmd_stp_cnt c st).
+      WellFormedCmd (mk_4ptlbl true true) c ->
+      WellFormedProg (mk_4ptlbl true true) (clean_cmd_stp_cnt c st).
   Proof.
-    rewrite/WellFormedProg=> >;  move l: (mk_lbl _ _)=> ?; move: l=> /[swap].
+    rewrite/WellFormedProg=> >;  move l: (mk_4ptlbl _ _)=> ?; move: l=> /[swap].
     case=> //= >; rewrite  -!/(WellFormedProg _ _)=>>.
     1: move=> ++ e; rewrite -{}e => *.
     2: move=> + e; rewrite -{}e => *.
@@ -485,7 +485,7 @@ Section test.
   Import Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
   Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["untr_compute_new_pc"]) ().
-  Goal forall p c (P : _ -> Prop), P (untrusted (compute_new_pc (mk_lbl true p) c)).
+  Goal forall p c (P : _ -> Prop), P (untrusted (compute_new_pc (mk_4ptlbl true p) c)).
   Proof. move=> *. cook. Abort.
 End test.
 

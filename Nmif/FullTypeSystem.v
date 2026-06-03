@@ -16,8 +16,9 @@ Set Mangle Names. Set Mangle Names Light.
 
 
 (* A small modus-ponens combinator over Forall, used to push the per-element
-   translation through a list. *)
-(* TODO: I think that there is a stdlib thing for this *)
+   translation through a list. (Stdlib has Forall_impl for weakening a single
+   predicate and Forall_and for pairing two, but no direct pointwise modus
+   ponens, so we spell it out.) *)
 Lemma Forall_modus {X} {f g : X -> Prop} {l} :
   Forall (fun x => f x -> g x) l -> Forall f l -> Forall g l.
 Proof.
@@ -29,11 +30,10 @@ Proof.
 Qed.
 
 (* Each variable carries a full label (c, i) ∈ P × P; attacker-independent. *)
-(* TODO: This name is wrong. Should be VarFullLblPrm *)
-Class FullAdvLvlPrm `{!VarPrm, !PrincipalLatticePrm} := fvar_lbl : Vars -> FLabel.
+Class VarFullLblPrm `{!VarPrm, !PrincipalLatticePrm} := fvar_lbl : Vars -> FLabel.
 
 Section ts.
-  Context `{!VarPrm, !ValPrm, !PrincipalLatticePrm, !FullAdvLvlPrm}.
+  Context `{!VarPrm, !ValPrm, !PrincipalLatticePrm, !VarFullLblPrm}.
   Import FullLattice.Notations.
 
   Notation FullWellFormedProg' FullWellFormedCmd pclbl prog :=
@@ -48,14 +48,14 @@ Section ts.
   | wff_endorse :
      forall pc from to,
        conf (fvar_lbl from) = conf (fvar_lbl to) ->
-       leqP (integ (fvar_lbl to)) (integ (fvar_lbl from)) ->
+       integ (fvar_lbl to) ≽ integ (fvar_lbl from) ->
        uncompromised (fjoin (fvar_lbl from) pc) ->
        FullWellFormedCmd pc (assign (endorse from to))
 
   | wff_declassify :
      forall pc from to,
        integ (fvar_lbl from) = integ (fvar_lbl to) ->
-       leqP (conf (fvar_lbl from)) (conf (fvar_lbl to)) ->
+       conf (fvar_lbl from) ≽ conf (fvar_lbl to) ->
        uncompromised (fjoin (fvar_lbl from) pc) ->
        FullWellFormedCmd pc (assign (declassify from to))
 
@@ -86,14 +86,14 @@ Section ts.
     Hypothesis hyp_endorse :
       forall pc from to,
         conf (fvar_lbl from) = conf (fvar_lbl to) ->
-        leqP (integ (fvar_lbl to)) (integ (fvar_lbl from)) ->
+        integ (fvar_lbl to) ≽ integ (fvar_lbl from) ->
         uncompromised (fjoin (fvar_lbl from) pc) ->
         Pr pc (assign (endorse from to)).
 
     Hypothesis hyp_declassify :
       forall pc from to,
         integ (fvar_lbl from) = integ (fvar_lbl to) ->
-        leqP (conf (fvar_lbl from)) (conf (fvar_lbl to)) ->
+        conf (fvar_lbl from) ≽ conf (fvar_lbl to) ->
         uncompromised (fjoin (fvar_lbl from) pc) ->
         Pr pc (assign (declassify from to)).
 
@@ -155,29 +155,31 @@ Section ts.
       + move: IH; apply/Forall_impl => co Hco. exact: (Hco _ (fjoin_mono_r _ _ _ Hl2)).
   Qed.
 
-(* TODO: Not used anywhere *)
-  Lemma fflows_to_subtype_prog p l1 l2 :
-    l2 ⊑ l1 -> FullWellFormedProg l1 p -> FullWellFormedProg l2 p.
-  Proof.
-    rewrite /FullWellFormedProg => Hl2. apply/Forall_impl => co Hco.
-    exact: (fflows_to_subtype_cmd _ _ Hco _ Hl2).
-  Qed.
+  (* TODO: This does not look like what we want.  Is it to make sure that
+     endorses and declassifies in the full type system remain valid endorses and
+     declassifies in the 4-point system?
 
-  (* TODO: This does not look like what we want.   I have no idea what this means  *)
+     One idea is to try to change the 4-point system so that harmless endorses
+     and declassifies are allowed. Not clear is that will break the simulator
+     construction, however. Another idea is to translate away endorses and
+     declassifies that are harmless wrt to the current attacker, but then we
+     have two different programs and need to show that they generate the same
+     events (trusted assignments).
+  *)
   (* Per-attacker compatibility: the side conditions needed so that the
      projection of a full derivation lands on valid 4-point points. Indexed by
      pc, threaded like the type system. *)
-  Inductive AtkCompat (A : Attacker) : FLabel -> Cmd -> Prop :=
+  Inductive AtkCompat (A : AttackerLabel) : FLabel -> Cmd -> Prop :=
   | compat_endorse :
      forall pc from to,
-       to4pt A pc = mk_lbl false true ->
+       to4pt A pc = mk_4ptlbl false true ->
        leqP (atk_c A) (conf (fvar_lbl from)) ->
        leqP (atk_i A) (integ (fvar_lbl from)) ->
        ~~ leqP (atk_i A) (integ (fvar_lbl to)) ->
        AtkCompat A pc (assign (endorse from to))
   | compat_declassify :
      forall pc from to,
-       to4pt A pc = mk_lbl false true ->
+       to4pt A pc = mk_4ptlbl false true ->
        ~~ leqP (atk_c A) (conf (fvar_lbl from)) ->
        ~~ leqP (atk_i A) (integ (fvar_lbl from)) ->
        leqP (atk_c A) (conf (fvar_lbl to)) ->
@@ -197,7 +199,7 @@ Section ts.
 
   Lemma AtkCompat_endorse_inv A pc from to :
     AtkCompat A pc (assign (endorse from to)) ->
-    to4pt A pc = mk_lbl false true /\
+    to4pt A pc = mk_4ptlbl false true /\
     leqP (atk_c A) (conf (fvar_lbl from)) /\
     leqP (atk_i A) (integ (fvar_lbl from)) /\
     ~~ leqP (atk_i A) (integ (fvar_lbl to)).
@@ -205,7 +207,7 @@ Section ts.
 
   Lemma AtkCompat_declassify_inv A pc from to :
     AtkCompat A pc (assign (declassify from to)) ->
-    to4pt A pc = mk_lbl false true /\
+    to4pt A pc = mk_4ptlbl false true /\
     ~~ leqP (atk_c A) (conf (fvar_lbl from)) /\
     ~~ leqP (atk_i A) (integ (fvar_lbl from)) /\
     leqP (atk_c A) (conf (fvar_lbl to)).
@@ -223,14 +225,14 @@ Section ts.
   Proof. inversion 1; subst; tauto. Qed.
 
   (* The 4-point variable labelling induced by an attacker. *)
-  Definition proj_adv (A : Attacker) : AdvLvlPrm := fun v => to4pt A (fvar_lbl v).
+  Definition proj_adv (A : AttackerLabel) : AdvLvlPrm := fun v => to4pt A (fvar_lbl v).
 
-  Lemma proj_adv_var (A : Attacker) v : @var_lbl _ (proj_adv A) v = to4pt A (fvar_lbl v).
+  Lemma proj_adv_var (A : AttackerLabel) v : @var_lbl _ (proj_adv A) v = to4pt A (fvar_lbl v).
   Proof. exact: erefl. Qed.
 
   (* Headline result: a full typing derivation, for any compatible attacker,
      projects to a 4-point derivation. *)
-  Theorem full_to_4pt_cmd (A : Attacker) pc c :
+  Theorem full_to_4pt_cmd (A : AttackerLabel) pc c :
     FullWellFormedCmd pc c -> AtkCompat A pc c ->
     @WellFormedCmd _ _ (proj_adv A) (to4pt A pc) c.
   Proof.
@@ -265,7 +267,7 @@ Section ts.
       exact: (Forall_modus IH C).
   Qed.
 
-  Theorem full_to_4pt_prog (A : Attacker) pc p :
+  Theorem full_to_4pt_prog (A : AttackerLabel) pc p :
     FullWellFormedProg pc p -> Forall (AtkCompat A pc) p ->
     @WellFormedProg _ _ (proj_adv A) (to4pt A pc) p.
   Proof.
@@ -275,7 +277,7 @@ Section ts.
     move=> c Hc'. exact: (full_to_4pt_cmd A pc c Hc').
   Qed.
 
-  Theorem full_to_4pt_optcmd (A : Attacker) pc oc :
+  Theorem full_to_4pt_optcmd (A : AttackerLabel) pc oc :
     FullWellFormedOptCmd pc oc -> (if oc is Some c then AtkCompat A pc c else True) ->
     @WellFormedOptCmd _ _ (proj_adv A) (to4pt A pc) oc.
   Proof.

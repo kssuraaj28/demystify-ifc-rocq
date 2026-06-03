@@ -18,17 +18,17 @@ Ltac2 Set this_cookbook_ := create_new_cookbook.
 Section var_lbl.
   #[local] Set Primitive Projections. (* TODO: All records need to have this? Maybe in prelude? *)
   (* 4 point lattice *) (* TODO: Maybe this should go elsewhere  *)
-  Record Label: Type := mk_lbl {
+  Record Label: Type := mk_4ptlbl {
     untrusted : bool;  (* The variable is maulable *)
     public: bool
   }.
   Definition secret l := ~~ public l.
   Definition trusted l := ~~ untrusted l.
 
-  Fact untrusted_mk u p : ltac2:(cbn_eq (untrusted (mk_lbl u p))).
+  Fact untrusted_mk u p : ltac2:(cbn_eq (untrusted (mk_4ptlbl u p))).
   Proof. done. Qed.
 
-  Fact public_mk u p : ltac2:(cbn_eq (public (mk_lbl u p))).
+  Fact public_mk u p : ltac2:(cbn_eq (public (mk_4ptlbl u p))).
   Proof. done. Qed.
 End var_lbl.
 
@@ -48,13 +48,21 @@ Definition flows_to_int (untrfrom untrto: bool) : bool :=
   end.
 
 Definition flows_to (lfrom lto: Label) : bool :=
-  let: mk_lbl untrfrom pubfrom := lfrom in 
-  let: mk_lbl untrto pubto := lto in 
+  let: mk_4ptlbl untrfrom pubfrom := lfrom in 
+  let: mk_4ptlbl untrto pubto := lto in 
   (flows_to_int untrfrom untrto) && (flows_to_conf pubfrom pubto).
-Definition join (l1 l2: Label) : Label := 
-  let: mk_lbl untr1 pub1 := l1 in
-  let: mk_lbl untr2 pub2 := l2 in
-  mk_lbl (untr1 || untr2) (pub1 && pub2). (* Is this correct?*)
+Definition join (l1 l2: Label) : Label :=
+  let: mk_4ptlbl untr1 pub1 := l1 in
+  let: mk_4ptlbl untr2 pub2 := l2 in
+  mk_4ptlbl (untr1 || untr2) (pub1 && pub2). (* Is this correct?*)
+
+(* The per-component flow checks are just boolean implications. These bridges let
+   clients reason about flows_to through ==>. *)
+Lemma flows_to_intE u1 u2 : flows_to_int u1 u2 = (u1 ==> u2).
+Proof. case: u1; case: u2=> //. Qed.
+
+Lemma flows_to_confE p1 p2 : flows_to_conf p1 p2 = (p2 ==> p1).
+Proof. case: p1; case: p2=> //. Qed.
 
 Module Notations.
   Notation "from ⊑ to"  := (flows_to from to) (at level 20). (* TODO: Why does || in Init.Datatypes not have this level?  *)
@@ -68,13 +76,13 @@ End Notations.
 Import Notations.
 (* TODO: Maybe automation here as well *)
 Lemma untr_join x p:
-    untrusted (x ⊔ (mk_lbl true p)) = true.
+    untrusted (x ⊔ (mk_4ptlbl true p)) = true.
 Proof.
   case: p; case: x=> - [] [] //.
 Qed.
 
 Lemma pub_join x u:
-    public (x ⊔ (mk_lbl u false)) = false.
+    public (x ⊔ (mk_4ptlbl u false)) = false.
 Proof. case: x=> - [] [] //. Qed.
 
 Lemma join_flow:
@@ -154,7 +162,7 @@ Lemma flows_to_pub:
     public l1.
 Proof. do 2 (case=> - [] [])=> //. Qed.
 
-Lemma flows_to_pt l : l ⊑ mk_lbl false true -> l = mk_lbl false true.
+Lemma flows_to_pt l : l ⊑ mk_4ptlbl false true -> l = mk_4ptlbl false true.
 Proof. case: l=> - [] [] //. Qed.
 
 Ltac2 this_cookbook () := this_cookbook_ ().
