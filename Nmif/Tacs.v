@@ -17,9 +17,9 @@ Ltac2 softfail_s (fn_name: string) (s: string) := softfail_m fn_name (Message.of
 
 Tactic Notation "throw" := ltac2:(panic_s "throw" "thrown").
 
-Ltac2 one_goal_assertion (fn_name: string) :=
-  if (Int.equal (Control.numgoals()) 1) then () else
-  panic_s fn_name "Needs to run with one goal".
+Ltac2 goal_assertion (numgoals) (fn_name: string) :=
+  if (Int.equal (Control.numgoals()) numgoals) then () else
+  panic_s fn_name "Goal assertion failed". (* TODO: More information *)
  
 
 (* TODO: This file structure is ugly *)
@@ -109,7 +109,7 @@ End test.
 (* Run `t`. If it succeeds, then check goals. TODO: Reconsider Control.enter. Maybe better to pull that out? *)
 (* TODO: Is Ltac1.run tt the same as ltac1:(x |- x) tt ?*)
 #[local] Ltac2 goals_check (t : unit -> unit) (n: int) (is_le: bool) (is_hard: bool) : unit :=
-  one_goal_assertion "goals_check";
+  goal_assertion 1 "goals_check";
   t ();
   let m := Control.numgoals () in
   let tst := if is_le then (Int.le m n) else (Int.equal m n) in
@@ -247,7 +247,7 @@ End test.
   [ProgressWrap (exn)].
 
 #[local] Ltac2 once_hard_progress (t: unit -> unit) : unit :=
-  one_goal_assertion "once_hard_progress";
+  goal_assertion 1 "once_hard_progress";
   let t := fun () => match Control.case t with | Err e => Control.zero (ProgressWrap e) | _ => () end in
   let t := fun () => Control.progress t in
   match Control.case t with
@@ -265,7 +265,7 @@ Section test.
 End test.
 
 #[local] Ltac2 assert_no_hyp_change (t:unit -> unit) : unit :=
-  one_goal_assertion "assert_no_hyp_change";
+  goal_assertion 1 "assert_no_hyp_change";
   let hyp_eq (n1, b1, t1) (n2, b2, t2) :=
     Bool.and (Ident.equal n1 n2)
     (Bool.and
@@ -325,7 +325,7 @@ End test.
 *)
 (* TODO: This type could be made into a record  *)
 Ltac2 precise_harden (t: unit -> unit) (goals: (int * bool) option) (allow_hyps_change : bool): unit :=
-    one_goal_assertion "precise_harden";
+    goal_assertion 1 "precise_harden";
     let t := fun () => once_hard_progress t in  (* TODO: What is the correct order? *)
     let t := fun () => Control.unshelve t in  
     let t := match goals with | Some (n, b) (* is_le*) =>  fun () => goals_check t n b true | None => t end in
@@ -540,7 +540,7 @@ Module Cook.
     if Int.ge cook_debug lvl then msg () else ().
 
   Ltac2 cook_step0 (cb : cookbook) : unit :=
-    one_goal_assertion "cook_step";
+    goal_assertion 1 "cook_step";
     let rec go i l :=
       match l with
       | [] => softfail_s "cook_step" "all tactics failed"

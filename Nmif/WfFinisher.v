@@ -298,7 +298,8 @@ Ltac2 wf_finisher_guess_aux (pat : Ltac1.t) (u : preterm) : unit :=
       if List.exist (Constr.equal c) acc then acc else c :: acc) (acc.(contents)) [] in
     match dedup with
     | [v_single] =>
-       wf_partial_tac (Ltac1.of_constr v_single); Control.focus 1 1 (fun () => ltac1:(wf_finisher)) (* This should definitely succeed. Assert ? TODO *)
+       wf_partial_tac (Ltac1.of_constr v_single); 
+       Control.focus 1 1 (fun () => ltac1:(wf_finisher))
     | _ =>
       Message.print (Message.of_string "Guess list");
       List.iter (fun c => Message.print (Message.of_constr c)) dedup;

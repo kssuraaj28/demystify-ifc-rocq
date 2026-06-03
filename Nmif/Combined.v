@@ -256,13 +256,17 @@ Section invprf.
           Require Import TODO. (* TODO: This should be automated. But how to automate? *)
           apply: wf_endorse_st_int; cook.
             { symmetry. apply: endorse_pre_read_eq; cook. wf_finisher. }
-          apply: update_untr_keep_view; cook. wf_finisher_guess [RHS] with _=> ->. wf_finisher. }
+          apply: update_untr_keep_view; cook. 
+          wf_finisher_guess [LHS] with ⟨ real_store _ | _ ⟩=> ->. wf_finisher. } (* TODO: Why does RHS not work? *)
 
         cook. revert_hyp_pat bool; case.
         1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=.
         2,4: move=> ? <- /=; wf_finisher_guess [RHS] with ⟨clean_cmd_stp_store _ _ | is_trusted ⟩=> ->; wf_finisher.
         1-2: revert_hyp_pat (option _); case=> /= *. 
-        1-4: wf_finisher_guess [LHS] with ⟨clean_cmd_stp_store _ _ | is_trusted ⟩=> ->.
+        1: wf_finisher_guess [LHS] with ⟨clean_cmd_stp_store _ (real_store _) | is_trusted ⟩=> ->.
+        1: wf_finisher_guess [LHS] with ⟨clean_cmd_stp_store _ (ideal_store _) | is_trusted ⟩=> ->.
+        1: wf_finisher.
+        1-4: wf_finisher_guess [LHS] with ⟨clean_cmd_stp_store _ (real_store _) | is_trusted ⟩=> ->.
         1-2: wf_finisher_guess [LHS] with ⟨clean_cmd_stp_store _ (ideal_store _) | is_trusted ⟩=> ->.
         1,3: wf_finisher_guess [RHS] with ⟨ideal_store _ | is_trusted ⟩=> ->. 
         (* TODO: Maybe I can use big brain backtracking?  do ! wf_finisher_guess [LHS]; do! wf_finisher [RHS]; wf_finisher.*)
