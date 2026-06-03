@@ -257,7 +257,13 @@ Ltac wf_finisher_arms :=
    + apply: pre_cmd_wf_conf
    + apply: post_cmd_wf).
 
-Ltac wf_finisher_close := first[eassumption| symmetry; eassumption |lazymatch goal with |- ?x = ?x => reflexivity end].
+Ltac wf_finisher_close := 
+  lazymatch goal with
+  |- ?G => 
+    tryif has_evar G then 
+      first [eassumption | symmetry; eassumption] else
+      first [assumption | reflexivity]
+  end; enter (throw). (* Should never come here. TODO: Message *)
 
 (* TODO: We don't need n I think *)
 Ltac wf_finisher_rec n :=
