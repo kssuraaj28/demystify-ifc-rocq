@@ -57,12 +57,26 @@ Section sa.
        WellFormedProg' WellFormedCmd newpc b2 ->
        _ pclbl (cond (gvar,comp) b1 b2)
 
-  | wf_while: 
+  | wf_while:
      forall gvar comp pclbl wbody,
        let: gvarlbl := var_lbl gvar in
        let: newpc := gvarlbl ⊔ pclbl in
        WellFormedProg' WellFormedCmd newpc wbody ->
-       _ pclbl (while (gvar,comp) wbody).
+       _ pclbl (while (gvar,comp) wbody)
+
+  (* A "harmless" endorse / declassify whose projected flow is the ordinary
+     assignment flow (from ⊑ to and pc ⊑ to). These do not actually cross the
+     attacker (the real downgrade is wf_endorse / wf_declassify, where from ⋢ to).
+     They let every full-lattice downgrade project to the 4-point system. *)
+  | wf_endorse_safe:
+     forall from to pclbl,
+       var_lbl from ⊑ var_lbl to -> pclbl ⊑ var_lbl to ->
+       _ pclbl (assign (endorse from to))
+
+  | wf_declassify_safe:
+     forall from to pclbl,
+       var_lbl from ⊑ var_lbl to -> pclbl ⊑ var_lbl to ->
+       _ pclbl (assign (declassify from to)).
 
   Set Elimination Schemes.
   
@@ -104,22 +118,39 @@ Section sa.
          Forall (WellFormedCmd newpc) b2 -> Forall (P newpc) b2 ->
          P pclbl (cond (gvar, comp) b1 b2).
 
-    Hypothesis hyp_while : 
+    Hypothesis hyp_while :
         forall gvar comp pclbl wbody,
          let: gvarlbl := var_lbl gvar in
          let: newpc := gvarlbl ⊔ pclbl in
          Forall (WellFormedCmd newpc) wbody -> Forall (P newpc) wbody ->
          P pclbl (while (gvar, comp) wbody).
 
-    Fixpoint WellFormedCmd_ind :
-      forall p c, WellFormedCmd p c -> P p c. 
+    Hypothesis hyp_endorse_safe :
+        forall from to pclbl,
+          var_lbl from ⊑ var_lbl to -> pclbl ⊑ var_lbl to ->
+          P pclbl (assign (endorse from to)).
+
+    Hypothesis hyp_declassify_safe :
+        forall from to pclbl,
+          var_lbl from ⊑ var_lbl to -> pclbl ⊑ var_lbl to ->
+          P pclbl (assign (declassify from to)).
+
+    Fixpoint WellFormedCmd_ind p c (H : WellFormedCmd p c) {struct H} : P p c.
     Proof.
-      move=> > []; [apply:hyp_endorse|apply:hyp_declassify|apply:hyp_assign|..]=> *.
-      1-2: (apply: hyp_cond; clear hyp_cond) || (apply: hyp_while; clear hyp_while)=>//.
-      1-3: lazymatch goal with
-             H: Forall _ ?b |- Forall _ ?b => elim: H=> // *
-            end.
-      1-3: constructor 2=> //; auto.
+      case: H.
+      - exact: hyp_endorse.
+      - exact: hyp_declassify.
+      - exact: hyp_assign.
+      - move=> gvar comp pclbl b1 b2 H1 H2. apply: hyp_cond.
+        + exact: H1.
+        + elim: H1 => // *; constructor 2 => //; auto.
+        + exact: H2.
+        + elim: H2 => // *; constructor 2 => //; auto.
+      - move=> gvar comp pclbl wbody H1. apply: hyp_while.
+        + exact: H1.
+        + elim: H1 => // *; constructor 2 => //; auto.
+      - exact: hyp_endorse_safe.
+      - exact: hyp_declassify_safe.
     Qed.
   End ind.
   Definition WellFormedOptCmd (pc: PcLbl) (ocmd : option Cmd): Prop :=
@@ -202,11 +233,21 @@ Section flow_to_subtype.
       l2 ⊑ l1 -> (* TODO: I don't know whether this is true *)
       WellFormedCmd l1 c ->
       WellFormedCmd l2 c.
-  Proof. 
-    (* TODO: What does elim do? Is it just apply? *)  
-    move: l2=> ++ h. elim: h=> *; [ | | constructor=> //; eauto using flows_to_trans|..].
-    1-2: revert_hyp_pat  (is_true (_ ⊑ _))=> /flows_to_pt ->; constructor=> //. 
-    1-2: constructor; (apply/Forall_impl;[ |eassumption])=> /= >; auto using join_mono_r.
+  Proof.
+    move=> Hl2 H; move: l2 Hl2; elim: H.
+    - move=> from to Hfrom Hto l2 /flows_to_pt ->. exact: (wf_endorse _ _ Hfrom Hto).
+    - move=> from to Hfrom Hto l2 /flows_to_pt ->. exact: (wf_declassify _ _ Hfrom Hto).
+    - move=> dst src1 src2 comp pclbl Hs1 Hs2 Hpc l2 Hl2.
+      apply: wf_assign; [exact: Hs1 | exact: Hs2 | exact: (flows_to_trans _ _ _ Hl2 Hpc)].
+    - move=> gvar comp pclbl b1 b2 _ IH1 _ IH2 l2 Hl2. apply: wf_cond.
+      + move: IH1; apply/Forall_impl => co Hco. exact: (Hco _ (join_mono_r _ _ _ Hl2)).
+      + move: IH2; apply/Forall_impl => co Hco. exact: (Hco _ (join_mono_r _ _ _ Hl2)).
+    - move=> gvar comp pclbl wbody _ IH l2 Hl2. apply: wf_while.
+      + move: IH; apply/Forall_impl => co Hco. exact: (Hco _ (join_mono_r _ _ _ Hl2)).
+    - move=> from to pclbl Hfrom Hpc l2 Hl2.
+      apply: wf_endorse_safe; [exact: Hfrom | exact: (flows_to_trans _ _ _ Hl2 Hpc)].
+    - move=> from to pclbl Hfrom Hpc l2 Hl2.
+      apply: wf_declassify_safe; [exact: Hfrom | exact: (flows_to_trans _ _ _ Hl2 Hpc)].
   Qed.
 
   Lemma flows_to_subtype_prog :
@@ -225,18 +266,23 @@ Section downgrading.
   Import Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
 
+  (* An endorse is now typed either by the real rule (canonical PU→PT, pc=PT) or
+     by the harmless rule (ordinary assignment flow). Inversion gives the
+     disjunction. *)
   Lemma wf_endorse_inv pc from to:
     WellFormedCmd pc (assign (endorse from to)) ->
-    pc = mk_4ptlbl false true /\
-    var_lbl from = mk_4ptlbl true true /\
-    var_lbl to = mk_4ptlbl false true.
+    (pc = mk_4ptlbl false true /\
+     var_lbl from = mk_4ptlbl true true /\
+     var_lbl to = mk_4ptlbl false true)
+    \/ (var_lbl from ⊑ var_lbl to /\ pc ⊑ var_lbl to).
   Proof. inversion 1; subst; tauto. Qed.
 
   Lemma wf_declassify_inv pc from to:
     WellFormedCmd pc (assign (declassify from to)) ->
-    pc = mk_4ptlbl false true /\
-    var_lbl from = mk_4ptlbl false false /\
-    var_lbl to = mk_4ptlbl false true.
+    (pc = mk_4ptlbl false true /\
+     var_lbl from = mk_4ptlbl false false /\
+     var_lbl to = mk_4ptlbl false true)
+    \/ (var_lbl from ⊑ var_lbl to /\ pc ⊑ var_lbl to).
   Proof. inversion 1; subst; tauto. Qed.
 End downgrading.
 
@@ -250,16 +296,31 @@ Section ni.
       ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
       ⟨ clean_cmd_stp_store c st1 | is_public ⟩ = ⟨ clean_cmd_stp_store c st2 | is_public ⟩.
   Proof.
-    move=> [] // d s1 s2 ? ?.
-      { apply: update_to_store_storeview_eq. rewrite /is_public s2 //. }
-    case de: ([elaborate is_public d])=> fs1d fs2d _ _ pubeq /=; [| rewrite !update_storeview_nochange //].
-    move: (flows_to_pub _ _ de fs1d)=> {fs1d} ps1. (* TODO: Tactic *)
-    move: (flows_to_pub _ _ de fs2d)=> {fs2d} ps2.
-    set v1 := (X in ⟨update_to_store _ _ X | _ ⟩ = _ ).
-    set v2 := (X in _ = ⟨update_to_store _ _ X | _ ⟩).
-    suff: v1 = v2; [move=> ->; apply/update_same_varval=> //|subst v1 v2].
-    rewrite /get_assign_val /eval_val_exp /=.
-    f_equal; eauto using storeview_eq.
+    move=> H; case: H.
+    - (* endorse (canonical PU→PT) *)
+      move=> from to Hfrom _ _ peq /=.
+      apply: update_to_store_storeview_eq; [rewrite /is_public Hfrom // | exact: peq].
+    - (* declassify : excluded by ~~ is_declassify *)
+      move=> from to _ _ Hd _; discriminate Hd.
+    - (* assign *)
+      move=> dst src1 src2 comp pclbl Hs1 Hs2 _ _ peq /=.
+      case dp: ([elaborate is_public dst]); [| rewrite !update_storeview_nochange //].
+      move: (flows_to_pub _ _ dp Hs1)=> ps1.
+      move: (flows_to_pub _ _ dp Hs2)=> ps2.
+      set v1 := (X in ⟨update_to_store _ _ X | _ ⟩ = _ ).
+      set v2 := (X in _ = ⟨update_to_store _ _ X | _ ⟩).
+      suff: v1 = v2; [move=> ->; apply/update_same_varval; exact: peq | subst v1 v2].
+      rewrite /get_assign_val /eval_val_exp /=.
+      f_equal; eauto using storeview_eq.
+    - (* cond *) move=> gvar comp pclbl b1 b2 _ _ _ peq /=; exact: peq.
+    - (* while *) move=> gvar comp pclbl wbody _ _ peq /=; exact: peq.
+    - (* endorse_safe (harmless: from ⊑ to) *)
+      move=> from to pclbl Hft _ _ peq /=.
+      rewrite /clean_assign_stp_store /get_assign_dest /get_assign_val /=.
+      case dp: ([elaborate is_public to]); [| rewrite !update_storeview_nochange //].
+      apply: update_to_store_storeview_eq; [exact: (flows_to_pub _ _ dp Hft) | exact: peq].
+    - (* declassify_safe : excluded by ~~ is_declassify *)
+      move=> from to pclbl _ _ Hd _; discriminate Hd.
   Qed.
 
   Lemma ni_cmd_st_conf_atk {AtkStates} (adv : AdvNextStep AtkStates)
@@ -299,11 +360,24 @@ Section ni.
       ⟨ clean_cmd_stp_store c st | is_public ⟩ =
       ⟨ st | is_public ⟩.
   Proof.
-    move=> >; move e: (mk_4ptlbl _ _)=> ?; move:e=> /[swap].
-    case=> //= > +++e; rewrite -{}e=> _ _ flw.
-    rewrite update_storeview_nochange=> //.
-    rewrite/is_public.
-    apply/negbTE/flows_from_sec; rewrite/secret; eauto; done.
+    move=> c i st H.
+    move E: (mk_4ptlbl i false) H => p H.
+    move: E; case: H => //=.
+    - (* assign *) move=> dst src1 src2 comp pclbl _ _ Hpc E.
+      have Hsec : is_public dst = false.
+      { rewrite /is_public; apply/negbTE; apply: (flows_from_sec pclbl _ _ Hpc).
+        rewrite -E /secret /= //. }
+      rewrite /clean_assign_stp_store /get_assign_dest /= update_storeview_nochange //.
+    - (* endorse_safe *) move=> from to pclbl _ Hpc E.
+      have Hsec : is_public to = false.
+      { rewrite /is_public; apply/negbTE; apply: (flows_from_sec pclbl _ _ Hpc).
+        rewrite -E /secret /= //. }
+      rewrite /clean_assign_stp_store /get_assign_dest /= update_storeview_nochange //.
+    - (* declassify_safe *) move=> from to pclbl _ Hpc E.
+      have Hsec : is_public to = false.
+      { rewrite /is_public; apply/negbTE; apply: (flows_from_sec pclbl _ _ Hpc).
+        rewrite -E /secret /= //. }
+      rewrite /clean_assign_stp_store /get_assign_dest /= update_storeview_nochange //.
   Qed.
 
   (* In a secret context the command's store-step is invisible to post:
@@ -325,19 +399,31 @@ Section ni.
       ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
       ⟨ clean_cmd_stp_store c st1 | is_trusted ⟩ = ⟨ clean_cmd_stp_store c st2 | is_trusted ⟩.
   Proof.
-    move=> [] // d s1 s2 ? ?.
-      { apply: update_to_store_storeview_eq. rewrite /is_trusted /is_untrusted s2 //. }
-    case de: ([elaborate is_untrusted d])=> fs1d fs2d _ _ treq /=;
-      [do 2 (rewrite update_storeview_nochange{1}/is_trusted; [rewrite de //|])=> //|].
-    rewrite/is_trusted/is_untrusted/= in de.
-    move: de=>/untrusted_false td. (* TODO: Automation *)
-    move: (flows_to_tr _ _ td fs1d)=> {fs1d} ts1. (* TODO: Tactic *)
-    move: (flows_to_tr _ _ td fs2d)=> {fs2d} ts2.
-    set v1 := (X in ⟨update_to_store _ _ X | _ ⟩ = _ ).
-    set v2 := (X in _ = ⟨update_to_store _ _ X | _ ⟩).
-    suff: v1 = v2; [move=> ->; apply/update_same_varval=> //|subst v1 v2].
-    rewrite /get_assign_val /eval_val_exp /=.
-    f_equal; eauto using storeview_eq.
+    move=> H; case: H.
+    - (* endorse : excluded by ~~ is_endorse *)
+      move=> from to _ _ He _; discriminate He.
+    - (* declassify (canonical ST→PT) *)
+      move=> from to Hfrom _ _ treq /=.
+      apply: update_to_store_storeview_eq; [rewrite /is_trusted /is_untrusted Hfrom // | exact: treq].
+    - (* assign *)
+      move=> dst src1 src2 comp pclbl Hs1 Hs2 _ _ treq /=.
+      case dt: ([elaborate is_trusted dst]); [| rewrite !update_storeview_nochange //].
+      move: (flows_to_tr _ _ dt Hs1)=> ts1.
+      move: (flows_to_tr _ _ dt Hs2)=> ts2.
+      set v1 := (X in ⟨update_to_store _ _ X | _ ⟩ = _ ).
+      set v2 := (X in _ = ⟨update_to_store _ _ X | _ ⟩).
+      suff: v1 = v2; [move=> ->; apply/update_same_varval; exact: treq | subst v1 v2].
+      rewrite /get_assign_val /eval_val_exp /=.
+      f_equal; eauto using storeview_eq.
+    - (* cond *) move=> gvar comp pclbl b1 b2 _ _ _ treq /=; exact: treq.
+    - (* while *) move=> gvar comp pclbl wbody _ _ treq /=; exact: treq.
+    - (* endorse_safe : excluded by ~~ is_endorse *)
+      move=> from to pclbl _ _ He _; discriminate He.
+    - (* declassify_safe (harmless: from ⊑ to) *)
+      move=> from to pclbl Hft _ _ treq /=.
+      rewrite /clean_assign_stp_store /get_assign_dest /get_assign_val /=.
+      case dt: ([elaborate is_trusted to]); [| rewrite !update_storeview_nochange //].
+      apply: update_to_store_storeview_eq; [exact: (flows_to_tr _ _ dt Hft) | exact: treq].
   Qed.
 
   Lemma ni_untr_cmd_st_int:
@@ -346,11 +432,27 @@ Section ni.
     ⟨ clean_cmd_stp_store c st | is_trusted ⟩ =
     ⟨ st | is_trusted ⟩.
   Proof.
-    move=> >; move e: (mk_4ptlbl _ _)=> ?; move:e=> /[swap].
-    case=> //= > +++e; rewrite -{}e=> _ _ flw.
-    rewrite update_storeview_nochange=> //.
-    rewrite/is_trusted/is_untrusted negbF //.
-    apply/flows_from_untr; eauto; done.
+    move=> p c st H.
+    move E: (mk_4ptlbl true p) H => l H.
+    move: E; case: H => //=.
+    - (* assign *) move=> dst src1 src2 comp pclbl _ _ Hpc E.
+      have Hut : is_trusted dst = false.
+      { have Hu : is_untrusted dst.
+        { rewrite /is_untrusted; apply: (flows_from_untr pclbl _ _ Hpc); rewrite -E /= //. }
+        rewrite /is_trusted Hu //. }
+      rewrite /clean_assign_stp_store /get_assign_dest /= update_storeview_nochange //.
+    - (* endorse_safe *) move=> from to pclbl _ Hpc E.
+      have Hut : is_trusted to = false.
+      { have Hu : is_untrusted to.
+        { rewrite /is_untrusted; apply: (flows_from_untr pclbl _ _ Hpc); rewrite -E /= //. }
+        rewrite /is_trusted Hu //. }
+      rewrite /clean_assign_stp_store /get_assign_dest /= update_storeview_nochange //.
+    - (* declassify_safe *) move=> from to pclbl _ Hpc E.
+      have Hut : is_trusted to = false.
+      { have Hu : is_untrusted to.
+        { rewrite /is_untrusted; apply: (flows_from_untr pclbl _ _ Hpc); rewrite -E /= //. }
+        rewrite /is_trusted Hu //. }
+      rewrite /clean_assign_stp_store /get_assign_dest /= update_storeview_nochange //.
   Qed.
 
   Lemma ni_tr_cmd_cnt:

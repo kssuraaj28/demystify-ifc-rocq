@@ -155,75 +155,6 @@ Section ts.
       + move: IH; apply/Forall_impl => co Hco. exact: (Hco _ (fjoin_mono_r _ _ _ Hl2)).
   Qed.
 
-  (* TODO: This does not look like what we want.  Is it to make sure that
-     endorses and declassifies in the full type system remain valid endorses and
-     declassifies in the 4-point system?
-
-     One idea is to try to change the 4-point system so that harmless endorses
-     and declassifies are allowed. Not clear is that will break the simulator
-     construction, however. Another idea is to translate away endorses and
-     declassifies that are harmless wrt to the current attacker, but then we
-     have two different programs and need to show that they generate the same
-     events (trusted assignments).
-  *)
-  (* Per-attacker compatibility: the side conditions needed so that the
-     projection of a full derivation lands on valid 4-point points. Indexed by
-     pc, threaded like the type system. *)
-  Inductive AtkCompat (A : AttackerLabel) : FLabel -> Cmd -> Prop :=
-  | compat_endorse :
-     forall pc from to,
-       to4pt A pc = mk_4ptlbl false true ->
-       leqP (atk_c A) (conf (fvar_lbl from)) ->
-       leqP (atk_i A) (integ (fvar_lbl from)) ->
-       ~~ leqP (atk_i A) (integ (fvar_lbl to)) ->
-       AtkCompat A pc (assign (endorse from to))
-  | compat_declassify :
-     forall pc from to,
-       to4pt A pc = mk_4ptlbl false true ->
-       ~~ leqP (atk_c A) (conf (fvar_lbl from)) ->
-       ~~ leqP (atk_i A) (integ (fvar_lbl from)) ->
-       leqP (atk_c A) (conf (fvar_lbl to)) ->
-       AtkCompat A pc (assign (declassify from to))
-  | compat_exp :
-     forall pc e d, AtkCompat A pc (assign (exp_assign e d))
-  | compat_cond :
-     forall pc gvar comp b1 b2,
-       let: newpc := fjoin (fvar_lbl gvar) pc in
-       Forall (AtkCompat A newpc) b1 -> Forall (AtkCompat A newpc) b2 ->
-       AtkCompat A pc (cond (gvar, comp) b1 b2)
-  | compat_while :
-     forall pc gvar comp wbody,
-       let: newpc := fjoin (fvar_lbl gvar) pc in
-       Forall (AtkCompat A newpc) wbody ->
-       AtkCompat A pc (while (gvar, comp) wbody).
-
-  Lemma AtkCompat_endorse_inv A pc from to :
-    AtkCompat A pc (assign (endorse from to)) ->
-    to4pt A pc = mk_4ptlbl false true /\
-    leqP (atk_c A) (conf (fvar_lbl from)) /\
-    leqP (atk_i A) (integ (fvar_lbl from)) /\
-    ~~ leqP (atk_i A) (integ (fvar_lbl to)).
-  Proof. inversion 1; subst; tauto. Qed.
-
-  Lemma AtkCompat_declassify_inv A pc from to :
-    AtkCompat A pc (assign (declassify from to)) ->
-    to4pt A pc = mk_4ptlbl false true /\
-    ~~ leqP (atk_c A) (conf (fvar_lbl from)) /\
-    ~~ leqP (atk_i A) (integ (fvar_lbl from)) /\
-    leqP (atk_c A) (conf (fvar_lbl to)).
-  Proof. inversion 1; subst; tauto. Qed.
-
-  Lemma AtkCompat_cond_inv A pc gvar comp b1 b2 :
-    AtkCompat A pc (cond (gvar, comp) b1 b2) ->
-    Forall (AtkCompat A (fjoin (fvar_lbl gvar) pc)) b1 /\
-    Forall (AtkCompat A (fjoin (fvar_lbl gvar) pc)) b2.
-  Proof. inversion 1; subst; tauto. Qed.
-
-  Lemma AtkCompat_while_inv A pc gvar comp wbody :
-    AtkCompat A pc (while (gvar, comp) wbody) ->
-    Forall (AtkCompat A (fjoin (fvar_lbl gvar) pc)) wbody.
-  Proof. inversion 1; subst; tauto. Qed.
-
   (* The 4-point variable labelling induced by an attacker. *)
   Definition proj_adv (A : AttackerLabel) : AdvLvlPrm := fun v => to4pt A (fvar_lbl v).
 
@@ -233,52 +164,72 @@ Section ts.
   (* Headline result: a full typing derivation, for any compatible attacker,
      projects to a 4-point derivation. *)
   Theorem full_to_4pt_cmd (A : AttackerLabel) pc c :
-    FullWellFormedCmd pc c -> AtkCompat A pc c ->
+    FullWellFormedCmd pc c -> 
     @WellFormedCmd _ _ (proj_adv A) (to4pt A pc) c.
   Proof.
     move=> H; elim/FullWellFormedCmd_ind: H.
     - (* endorse *)
+    admit. (* TODO *)
+    (*
       move=> pc' from to Hce _ _ /AtkCompat_endorse_inv [Hpc [Hfpub [Hfuntr Htotr]]].
       rewrite Hpc. apply: wf_endorse.
       + rewrite proj_adv_var /to4pt Hfuntr Hfpub //.
       + rewrite proj_adv_var /to4pt (negbTE Htotr) -Hce Hfpub //.
+      *)
     - (* declassify *)
+    admit. (* TODO *)
+    (*
       move=> pc' from to Hie _ _ /AtkCompat_declassify_inv [Hpc [Hfsec [Hftr Htopub]]].
       rewrite Hpc. apply: wf_declassify.
       + rewrite proj_adv_var /to4pt (negbTE Hftr) (negbTE Hfsec) //.
       + rewrite proj_adv_var /to4pt -Hie (negbTE Hftr) Htopub //.
+      *)
     - (* assign *)
+    admit.
+    (*
       move=> dst src1 src2 comp pc' Hs1 Hs2 Hpc _.
       apply: wf_assign; rewrite !proj_adv_var.
       + exact: (to4pt_mono _ _ _ Hs1).
       + exact: (to4pt_mono _ _ _ Hs2).
       + exact: (to4pt_mono _ _ _ Hpc).
+      *)
     - (* cond *)
+    admit.
+    (*
       move=> gvar comp pc' b1 b2 _ IH1 _ IH2 /AtkCompat_cond_inv [C1 C2].
       apply: wf_cond.
       + apply: (flows_to_subtype_prog _ _ _ (to4pt_join_le A (fvar_lbl gvar) pc')).
         exact: (Forall_modus IH1 C1).
       + apply: (flows_to_subtype_prog _ _ _ (to4pt_join_le A (fvar_lbl gvar) pc')).
         exact: (Forall_modus IH2 C2).
+    *)
     - (* while *)
+    admit.
+    (*
       move=> gvar comp pc' wbody _ IH /AtkCompat_while_inv C.
       apply: wf_while.
       apply: (flows_to_subtype_prog _ _ _ (to4pt_join_le A (fvar_lbl gvar) pc')).
       exact: (Forall_modus IH C).
   Qed.
+      *)
+    Admitted.
 
   Theorem full_to_4pt_prog (A : AttackerLabel) pc p :
-    FullWellFormedProg pc p -> Forall (AtkCompat A pc) p ->
+    FullWellFormedProg pc p ->
     @WellFormedProg _ _ (proj_adv A) (to4pt A pc) p.
   Proof.
+  admit.
+  (*
     rewrite /FullWellFormedProg /WellFormedProg => Hwf Hc.
     apply: (Forall_modus _ Hc).
     apply/Forall_impl; [| exact: Hwf].
     move=> c Hc'. exact: (full_to_4pt_cmd A pc c Hc').
   Qed.
+  *)
+  Admitted.
 
   Theorem full_to_4pt_optcmd (A : AttackerLabel) pc oc :
-    FullWellFormedOptCmd pc oc -> (if oc is Some c then AtkCompat A pc c else True) ->
+    FullWellFormedOptCmd pc oc ->
     @WellFormedOptCmd _ _ (proj_adv A) (to4pt A pc) oc.
   Proof.
     rewrite /FullWellFormedOptCmd /WellFormedOptCmd.

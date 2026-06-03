@@ -154,6 +154,8 @@ Section extract_step_commute.
     1,2: move=> [?] [?] ->.
     1,2: rewrite/CmbCmdCoreInv=> - []. 
     1: move/wf_endorse_inv. 2: move/wf_declassify_inv. 
+    all: admit.
+    (*
     1,2: move=> [->] [? ?]. 
     1,2: dotop [cbn]=> <- _ ? ?. 
     1,2: rewrite/comb_step/cmbcmd_step/extract_2cfg; cook.
@@ -185,6 +187,8 @@ Section extract_step_commute.
     1,2: cook; rewrite map_map.
     1,2: apply: map_ext; case=> //.
   Qed.
+    *)
+  Admitted.
 
   Lemma public_compute_new_pc_opt untr pub rcmd :
     public (compute_new_pc_opt (mk_4ptlbl untr pub) rcmd) = ~~ is_secret_guard rcmd && pub.

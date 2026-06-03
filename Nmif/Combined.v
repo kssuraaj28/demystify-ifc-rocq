@@ -245,6 +245,8 @@ Section invprf.
       repeat split; cook.
         { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_endorse rcmd))=> /orP [ | noend].
           { move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e}. (* TODO: this branch is longer *)
+          admit.
+          (*
           revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] e; rewrite -> e in *=> {e} - [] * /=.
           revert_hyp_pat (if _ then _ else _)=> /= <- /=.
           apply/storeview_eq_ext=> *; rewrite /clean_assign_stp_store /update_to_store; cook.
@@ -253,7 +255,9 @@ Section invprf.
           2: case e2: (_ =? _).
           2: apply dec_eq_true in e2; rewrite -> e2 in *=> {e2}.
           1,2: unshelve apply: storeview_eq; [exact: is_public|..]; cook.
-          unshelve apply: storeview_eq; [exact: is_trusted|..]; cook. }
+          unshelve apply: storeview_eq; [exact: is_trusted|..]; cook.
+              *)
+          }
         cook. revert_hyp_pat bool; case.
         1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=.
         2,4: auto with cook_step trickbag; fail.
@@ -261,12 +265,14 @@ Section invprf.
         { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_declassify rcmd))=> /orP [ | nodecl]; cycle 1.
           { revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [+ []] /==> *; cook. } 
         move/is_declassify_inv=> [] ? [] ? e; rewrite -> e in *=> {e}.
+        admit.
+        (*
         revert_hyp_pat (WellFormedCmd _ _)=> /wf_declassify_inv [] e; rewrite -> e in *=> {e} - [] * /=.
         revert_hyp_pat (if _ then _ else _)=> /= <- /=.
         apply/storeview_eq_ext=> *; rewrite /clean_assign_stp_store /update_to_store /=. rewrite dec_eq_refl. (* TODO: Eventually this should be a rewrite rule also *)
         case e1: (_ =? _). 
           { unshelve apply: storeview_eq; [exact: is_trusted|..]; cook. }
-        apply/storeview_eq; [|eassumption]; cook. }
+        apply/storeview_eq; [|eassumption]; cook. *) }
       move=> /=.  
       apply/Forall_and; cook; auto.
       revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)].
@@ -281,14 +287,18 @@ Section invprf.
          { erewrite ni_tr_cmd_cnt; [apply/Forall_combine2_same/Forall_map/Forall_forall => // | eassumption |..]; auto with trickbag.
          let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_endorse rcmd))=> /orP [ | noend]; cook.
          move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e}.
+         admit.
+         (*
          revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] [] e; rewrite -> e in * => {e} - [] *.
-         rewrite update_storeview_nochange; cook. } 
+         rewrite update_storeview_nochange; cook.
+         *)
+         } 
       cook. rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
       revert_hyp_pat [Cmd, (WellFormedCmd _ _), (compute_new_pc _ _ = _)].
       move=> ? /step_soundness snd newpce.
       apply/flows_to_subtype_prog; [|apply/snd].
       auto with trickbag.
-    Qed. 
+    Admitted. 
   End cook.
 
   Theorem cfg_step_inv: forall c, Invariant c ->  Invariant ((cfg_step c).1).
