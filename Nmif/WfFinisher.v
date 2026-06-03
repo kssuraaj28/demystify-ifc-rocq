@@ -11,9 +11,6 @@ Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
-#[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
-Ltac2 Set this_cookbook_ := create_new_cookbook.
-
 Section ni.
   Import VarValStore.Notations Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
@@ -172,6 +169,18 @@ Section ni.
     exact: wf_cmd_evnt_int_ni wf noend treq.
   Qed.
 
+  Lemma wf_cmd_st_end c l st1 st2:
+      WellFormedCmd l c ->
+      is_endorse c ->
+      ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
+      ⟨ clean_cmd_stp_store c st1 | is_public ⟩ = ⟨ clean_cmd_stp_store c st2 | is_public ⟩.
+  Proof.
+    move=> wf isend pubeq.
+    case: wf isend => //= from to e1 e2 _.
+    rewrite /clean_cmd_stp_store /get_assign_dest /get_assign_val /=.
+    apply: update_to_store_storeview_eq; [rewrite /is_public e1 // | exact: pubeq].
+  Qed.
+
   Lemma wf_cmd_evnt_end c l st1 st2:
       WellFormedCmd l c ->
       is_endorse c ->
@@ -258,6 +267,7 @@ Ltac wf_finisher_rec n :=
     first [
       wf_finisher_close |
       lazymatch goal with |- _ = _ => idtac | |- _ => fail end; 
+        (*(idtac + symmetry); (* TODO *) *)
         wf_finisher_arms; 
         wf_finisher_rec m]
   end.
@@ -265,7 +275,9 @@ Ltac wf_finisher_rec n :=
 Ltac wf_finisher :=
   harden 0 (wf_finisher_rec 5).
 
-Tactic Notation "wf_finisher_guess" "[" ssrpatternarg(p) "]" :=  let v := open_constr:(_) in  pattern_eq [p] with v; [wf_finisher |]. 
+(* TODO: Eventually, have an assert that ensures that there is a unique guess *) 
+Tactic Notation "wf_finisher_guess" "[" ssrpatternarg(p) "]" "with" uconstr(u) :=  
+  let v := open_constr:(u) in  pattern_eq [p] with v; [wf_finisher |].
 
 
 Goal 5 = 5. wf_finisher.  Abort.  (* TODO!!!  assert_fails also succeeds!!  WHAT *)
@@ -324,7 +336,7 @@ Section test.
     ⟨ s1 | is_trusted ⟩ = ⟨ s2 | is_trusted ⟩ ->
     ⟨ clean_cmd_stp_store c (pre_cmd_action adv ast s1) | is_trusted ⟩ =
     ⟨ clean_cmd_stp_store c s2 | is_trusted ⟩.
-  Proof. move=> *.  wf_finisher_guess [RHS]=> ->.  wf_finisher. Qed.
+  Proof. move=> *.  wf_finisher_guess [RHS] with _ => ->.  wf_finisher. Qed.
 
   Goal forall p p' c st1 st2,
     WellFormedCmd (mk_lbl false p) c ->
@@ -338,7 +350,7 @@ Section test.
     compute_new_pc (mk_lbl false p) c = mk_lbl false p' ->
     ⟨ s1 | is_trusted ⟩ = ⟨ s2 | is_trusted ⟩ ->
     clean_cmd_stp_cnt c (pre_cmd_action adv ast s1) = clean_cmd_stp_cnt c s2.
-  Proof. move=> *. wf_finisher_guess [RHS]=> ->. wf_finisher. Qed.
+  Proof. move=> *. wf_finisher_guess [RHS] with _=> ->. wf_finisher. Qed.
 
   Goal forall pc c s, untrusted pc -> WellFormedCmd pc c -> clean_cmd_evnt c s = None.
   Proof. move=> *. wf_finisher. Qed.
@@ -410,6 +422,6 @@ Section test.
     post_cmd_action adv ast (pre_cmd_action adv ast s1) =
     post_cmd_action adv ast (pre_cmd_action adv ast s2).
   Proof. move=> *.
-  wf_finisher_guess [post_cmd_action _ _ _]=> -> //.
+  wf_finisher_guess [post_cmd_action _ _ _] with _ => -> //.
   Qed.
 End test.

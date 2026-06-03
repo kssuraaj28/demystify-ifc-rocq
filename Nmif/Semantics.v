@@ -88,6 +88,12 @@ Section cleanstep.
 
   Fact optcmd_stp_store_simpl c s: ltac2:(cbn_eq (optcmd_stp_store (Some c) s)). Proof. done. Qed.
   Fact optcmd_stp_cnt_simpl c s: ltac2:(cbn_eq (optcmd_stp_cnt (Some c) s)). Proof. done. Qed.
+  Fact clean_cmd_stp_store_endorse from to s :
+    ltac2:(cbn_eq (clean_cmd_stp_store (assign (endorse from to)) s)).
+  Proof. done. Qed.
+  Fact clean_cmd_stp_store_declassify from to s :
+    ltac2:(cbn_eq (clean_cmd_stp_store (assign (declassify from to)) s)).
+  Proof. done. Qed.
 
   Lemma clean_cmd_stp_cnt_idem c s :
     clean_cmd_stp_cnt c (clean_cmd_stp_store c s) = clean_cmd_stp_cnt c s.
@@ -101,6 +107,8 @@ End cleanstep.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> optcmd_stp_store_simpl) "optcmd_stp_store_simpl" old.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> optcmd_stp_cnt_simpl) "optcmd_stp_cnt_simpl" old.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> optcmd_stp_cnd_idem) "optcmd_stp_cnd_idem" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> clean_cmd_stp_store_endorse) "clean_cmd_stp_store_endorse" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> clean_cmd_stp_store_declassify) "clean_cmd_stp_store_declassify" old.
 
 Section test.
   Context `{!VarPrm, !ValPrm}.
