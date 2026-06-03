@@ -47,6 +47,7 @@ Ltac wf_finisher :=
 (* Snapshot a constr: substitute resolved evars into a standalone term that
    doesn't reference the evar map. eval_cbn with empty flags walks the term
    and rebuilds it through the current evar map but performs no reduction. *)
+(* TODO: Should we  check if the final constr has evars? *)
 Ltac2 clone_constr (c : constr) : constr :=
   let no_red : Std.red_flags := {
     Std.rStrength := Std.Norm;
@@ -82,19 +83,28 @@ Section clone_constr_test.
   Qed.
 End clone_constr_test.
 
-Ltac2 wf_finisher_guess0 (p : Ltac1.t) : unit :=
+Ltac2 wf_finisher_guess0 (pat : Ltac1.t) : unit :=
+  let wf_partial_tac := ltac1:(p v |- pattern_eq [p] with v) pat in
   let acc : constr list ref := { contents := [] } in
   match Control.case (fun () =>
     let v := open_constr:(_) in
-    ltac1:(p v |- pattern_eq [p] with v) p (Ltac1.of_constr v);
+    wf_partial_tac (Ltac1.of_constr v);
     Control.focus 1 1 (fun () =>
       ltac1:(wf_finisher);
       acc.(contents) := clone_constr v :: acc.(contents);
       Control.zero (Tactic_failure None)
     )
   ) with
-  | Val _ => panic_s  "temp" "Not possible"
-  | Err _ => List.iter (fun c => Message.print (Message.concat (Message.of_string "saw v = ") (Message.of_constr c))) (acc.(contents))
+  | Val _ => panic_s "temp" "Not possible"
+  | Err _ =>
+    match acc.(contents) with
+    | [v_single] => 
+       wf_partial_tac (Ltac1.of_constr v_single); Control.focus 1 1 (fun () => ltac1:(wf_finisher)) (* This should definitely succeed. Assert ? TODO *)
+    | _ =>
+      Message.print (Message.of_string "Guess list");
+      List.iter (fun c =>  Message.print (Message.of_constr c) ) (acc.(contents));
+      panic_s "wf_finisher_guess" "ambiguous (or no) guess"
+    end
   end.
   
 
@@ -108,9 +118,13 @@ Goal 5 = 5. wf_finisher.  Abort.  (* TODO!!!  assert_fails also succeeds!!  WHAT
 
 Section test.
   Parameter P : T -> Prop.
+  (* Ambiguous: a1 gives v = t2 and a2 gives v = t3. *)
   Goal P t1.
   Proof.
-    wf_finisher_guess [t1]. Undo.
-    wf_finisher_guess [t1]. Undo.
+    Fail wf_finisher_guess [t1].
+  Abort.
+  Goal P t2.
+  Proof.
+    wf_finisher_guess [t2].
   Abort.
 End test.
