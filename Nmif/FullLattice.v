@@ -10,9 +10,6 @@ Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
-#[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
-Ltac2 Set this_cookbook_ := create_new_cookbook.
-
 #[local] Open Scope bool_scope.
 
 (* The full security lattice is the product P × P over an abstract principal
@@ -38,7 +35,9 @@ Class PrincipalLatticePrm := {
 
 (* Bridges between the 4-point primitives and boolean implication: they keep the
    projection proofs short. flows_to_int / flows_to_conf live at the top level of
-   Lattice4pt. *)
+   Lattice4pt. 
+   Should be in Lattice4pt
+   *)
 Lemma flows_to_intE u1 u2 : flows_to_int u1 u2 = (u1 ==> u2).
 Proof. case: u1; case: u2=> //. Qed.
 
@@ -60,8 +59,9 @@ Section full_lattice.
   Definition fjoin (l1 l2 : FLabel) : FLabel :=
     (meetP (conf l1) (conf l2), joinP (integ l1) (integ l2)).
 
-  (* A label is uncompromised (robust) when its writers are at least as powerful
+  (* A label is uncompromised when its writers are at least as powerful
      as its readers: integ ≤_P conf. *)
+  (* TODO: Notation for leqP. *)
   Definition uncompromised (l : FLabel) : bool := leqP (integ l) (conf l).
 
   (* Meet / join bounds, derived from the lub/glb characterisations. *)
@@ -118,11 +118,17 @@ Section full_lattice.
 
   (* Attacker: a pair of principals with a_c ≤_P a_i (confidentiality at least as
      powerful as integrity). a_c <_P a_i is the semi-honest / passive attacker. *)
+  (*TODO:
+   - Change name to AttackerLabel 
+   - the name atk_le should be different. TODO
+   - leqP should be acts for
+  *)
   Record Attacker := { atk_c : P; atk_i : P; atk_le : leqP atk_c atk_i }.
 
   (* Componentwise projection of a full label to the 4-point lattice: visible iff
      the attacker controls the confidentiality principal; corruptible iff it
      controls the integrity principal. *)
+  (* TODO: Maybe change mk_lbl to mk_4ptlbl *)
   Definition to4pt (A : Attacker) (l : FLabel) : Lattice4pt.Label :=
     mk_lbl (leqP (atk_i A) (integ l)) (leqP (atk_c A) (conf l)).
 
@@ -130,9 +136,7 @@ Section full_lattice.
     fflows_to l1 l2 -> flows_to (to4pt A l1) (to4pt A l2).
   Proof.
     rewrite /fflows_to /to4pt /flows_to /= flows_to_intE flows_to_confE=> /andP[Hc Hi].
-    apply/andP; split; apply/implyP=> H.
-    - exact: (leqP_trans _ _ _ H Hi).
-    - exact: (leqP_trans _ _ _ H Hc).
+    apply/andP; split; apply/implyP=> H; apply: leqP_trans; eauto.
   Qed.
 
   Lemma to4pt_join_le A l1 l2 :
@@ -150,6 +154,8 @@ Section full_lattice.
 End full_lattice.
 
 Module Notations.
+(* TODO: You are overloading notations here. Will this hurt? *)
+(* TODO: remove the ⊒ *)
   Notation "from ⊑ to" := (fflows_to from to) (at level 20).
   Notation "to ⊒ from" := (fflows_to from to) (at level 20, only parsing).
   Infix "⊔" := fjoin (at level 20).
@@ -161,6 +167,7 @@ End Notations.
    With a confidentiality principal more powerful than the integrity one
    (false ≤ true), this is exactly the semi-honest attacker. *)
 Section sanity.
+(* Can be made cleaner, but okay *)
   Definition bool_plat : PrincipalLatticePrm.
   Proof.
     refine {| P := bool; leqP := implb; meetP := andb; joinP := orb;
@@ -182,5 +189,3 @@ Section sanity.
   Goal @to4pt bool_plat semihonest (true, true) = mk_lbl true true.
   Proof. exact: erefl. Qed.
 End sanity.
-
-Ltac2 this_cookbook () := this_cookbook_ ().

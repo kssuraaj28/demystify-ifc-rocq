@@ -14,11 +14,10 @@ Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
-#[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
-Ltac2 Set this_cookbook_ := create_new_cookbook.
 
 (* A small modus-ponens combinator over Forall, used to push the per-element
    translation through a list. *)
+(* TODO: I think that there is a stdlib thing for this *)
 Lemma Forall_modus {X} {f g : X -> Prop} {l} :
   Forall (fun x => f x -> g x) l -> Forall f l -> Forall g l.
 Proof.
@@ -30,6 +29,7 @@ Proof.
 Qed.
 
 (* Each variable carries a full label (c, i) ∈ P × P; attacker-independent. *)
+(* TODO: This name is wrong. Should be VarFullLblPrm *)
 Class FullAdvLvlPrm `{!VarPrm, !PrincipalLatticePrm} := fvar_lbl : Vars -> FLabel.
 
 Section ts.
@@ -155,6 +155,7 @@ Section ts.
       + move: IH; apply/Forall_impl => co Hco. exact: (Hco _ (fjoin_mono_r _ _ _ Hl2)).
   Qed.
 
+(* TODO: Not used anywhere *)
   Lemma fflows_to_subtype_prog p l1 l2 :
     l2 ⊑ l1 -> FullWellFormedProg l1 p -> FullWellFormedProg l2 p.
   Proof.
@@ -162,6 +163,7 @@ Section ts.
     exact: (fflows_to_subtype_cmd _ _ Hco _ Hl2).
   Qed.
 
+  (* TODO: This does not look like what we want.   I have no idea what this means  *)
   (* Per-attacker compatibility: the side conditions needed so that the
      projection of a full derivation lands on valid 4-point points. Indexed by
      pc, threaded like the type system. *)
@@ -282,4 +284,3 @@ Section ts.
   Qed.
 End ts.
 
-Ltac2 this_cookbook () := this_cookbook_ ().
