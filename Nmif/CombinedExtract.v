@@ -312,9 +312,7 @@ Section extract_step_commute.
         { do [move=> /negbT; rewrite negb_and negbK=> /orP] in newpce.
         case: pub in rwt newpce *; move=> /= in newpce. 
         1: move=> /=; move: newpce=> [] // ->.
-        2: pattern_focus [optcmd_stp_store _ _]=> P;
-(*not commutative *) pattern_eq_2 [if _ then _ else _] [X in P X]; [admit| ]=> <-; subst P; cbv beta. 
-        (*2: admit. (*erewrite ni_sec_optcmd_st_conf_atk;[|eassumption].*)   *)
+        2: wf_finisher_guess [post_cmd_action _ _ (optcmd_stp_store _ _)] with (post_cmd_action _ _ (if _ then _ else _))=> ->. (* How does this even work? *)
         1-2: move=> /=; cook. 
         1-2: rewrite combine_extend3_splitl combine_extend2_same map_map. 
         1-2: erewrite combine_extend2_map_r; [|done]; rewrite map_map.
@@ -364,17 +362,19 @@ Section extract_step_commute.
         { erewrite filter_ext; [|case; case=> ? ? ?; rewrite /sim_active' /= Bool.orb_false_r; instantiate (1 := fun '(_,_,_) => _); reflexivity].
         do [move=> /negbT; rewrite negb_and negbK=> /orP] in newpce.
         case: pub in rwt newpce *; move=> /= in newpce. 
-        2: admit. (*erewrite ni_sec_optcmd_st_conf_atk; [| eassumption]=> /=; cook. *)
+
+        2: wf_finisher_guess [post_cmd_action _ _ (optcmd_stp_store _ _)] with (post_cmd_action _ _ (if _ then _ else _))=> -> /=; cook. (* How does this even work? *)
         1: move: newpce=> [] // ->.
         1: rewrite combine_extend2_nil_l.
         1: cook; set l1 := filter _ _; set l2 := repeat true _.
         1: suff: map (fun '(_,i,_) => i) l1 = l2; [move: l1 l2=> > <-; rewrite map_map; apply: map_ext=> - [] [] //|subst l1 l2].  
-        1(*,2*): move: (if _ then _ else _) (map Some _)=> ? ?.
-        1(*,2*): rewrite combine_extend3_swap23 combine_extend3_splitr filter_map_swap map_map.
-        1(*,2*): erewrite map_ext; [|case; case=> *; instantiate (1 := fun '(_, _,_)=> _); reflexivity ].
-        1(*,2*): erewrite filter_ext; [|case; case=> *; instantiate (1 := fun '(_, _,_)=> _); reflexivity ].
-        1(*,2*): enter (erewrite map_filter_combine_extend2_ind2;  only 2,3: (case=> *; instantiate (1:= fun _ => _); reflexivity); only 2: done).
-        1(*,2*): clear; revert_hyp_pat nat; elim=> * /=; cook. rewrite map_id //. }
+        1,2: move: (if _ then _ else _) (map Some _)=> ? ?.
+        1,2: rewrite combine_extend3_swap23 combine_extend3_splitr filter_map_swap map_map.
+        1,2: erewrite map_ext; [|case; case=> *; instantiate (1 := fun '(_, _,_)=> _); reflexivity ].
+        1,2: erewrite filter_ext; [|case; case=> *; instantiate (1 := fun '(_, _,_)=> _); reflexivity ].
+        1,2: enter (erewrite map_filter_combine_extend2_ind2;  only 2,3: (case=> *; instantiate (1:= fun _ => _); reflexivity); only 2: done).
+        1,2: clear; revert_hyp_pat nat; elim=> * /=; cook. 
+        rewrite map_id //. }
       move: newpce rwt=> /andP [] /negbTE rcmd_grd -> rwt.
       rewrite rcmd_grd. cook.
       rewrite combine_extend3_splitr. 

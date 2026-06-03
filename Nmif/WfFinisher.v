@@ -277,7 +277,7 @@ Ltac wf_finisher :=
 
 (* TODO: Eventually, have an assert that ensures that there is a unique guess *) 
 Tactic Notation "wf_finisher_guess" "[" ssrpatternarg(p) "]" "with" uconstr(u) :=  
-  let v := open_constr:(u) in  pattern_eq [p] with v; [wf_finisher |].
+  let v := open_constr:(u) in  pattern_eq [p] with v; [wf_finisher |]; unfold Datatypes.id. (* TODO: Why this? *)
 
 
 Goal 5 = 5. wf_finisher.  Abort.  (* TODO!!!  assert_fails also succeeds!!  WHAT *)
