@@ -168,6 +168,72 @@ Section test.
 End test.
 
 
+(* Snapshot a constr: substitute resolved evars into a standalone term that
+   doesn't reference the evar map. eval_cbn with empty flags walks the term
+   and rebuilds it through the current evar map but performs no reduction. *)
+(* TODO: Should we check if the final constr has evars? *)
+Ltac2 clone_constr (c : constr) : constr :=
+  let no_red : Std.red_flags := {
+    Std.rStrength := Std.Norm;
+    Std.rBeta := false; Std.rMatch := false; Std.rFix := false;
+    Std.rCofix := false; Std.rZeta := false; Std.rDelta := false;
+    Std.rConst := []
+  } in
+  Std.eval_cbn no_red c.
+
+Ltac2 Eval
+  let c := clone_constr constr:(1 + 1) in if Constr.equal c constr:(1 + 1) then () else
+  panic_s "test" "clone_constr reduced 1 + 1".
+
+Ltac2 Eval
+  let c := clone_constr constr:(1 + 1) in if Constr.equal c constr:(2) then
+  panic_s "test" "clone_constr reduced to 2" else ().
+
+Goal False.
+Proof Mode "Ltac2".
+  Ltac2 Eval let v := open_constr:(_) in
+    ltac1:(v |- unify v (5 + 5)) (Ltac1.of_constr v);
+    let c := clone_constr v in
+    if Constr.equal c constr:(5 + 5) then () else
+    panic_s "test" "clone_constr did not substitute evar".
+Abort.
+
+Section test.
+  (* Custom exception carrying a constr; lets us inspect the constr inside the
+     exn payload after the catch, with no message-rendering in between. *)
+  #[local] Ltac2 Type exn ::= [WipExn (constr)].
+
+  Goal False.
+  Proof Mode "Ltac2".
+    (* No-copy: throw the raw evar reference. *)
+    Ltac2 Eval
+      let v := open_constr:(_) in
+      match Control.case (fun () =>
+        ltac1:(v |- unify v (5 + 5)) (Ltac1.of_constr v);
+        Control.zero (WipExn v)
+      ) with
+      | Val _ => ()
+      | Err (WipExn c) =>
+        Message.print (Message.concat (Message.of_string "no_copy: ") (Message.of_constr c))
+      | Err _ => ()
+      end.
+
+    (* Copy: clone before throwing. *)
+    Ltac2 Eval
+      let v := open_constr:(_) in
+      match Control.case (fun () =>
+        ltac1:(v |- unify v (5 + 5)) (Ltac1.of_constr v);
+        Control.zero (WipExn (clone_constr v))
+      ) with
+      | Val _ => ()
+      | Err (WipExn c) =>
+        Message.print (Message.concat (Message.of_string "copy: ") (Message.of_constr c))
+      | Err _ => ()
+      end.
+  Abort.
+End test.
+
+
 (* The harden tactic *)
 
 #[local] Ltac2 Type exn ::= 
@@ -504,7 +570,6 @@ Module Cook.
   Ltac2 Notation "cook" cb(tactic(0)) := cook0 (cb ()).
 
 End Cook.
-
 Section usage.
   Import Cook.
   Ltac2 mutable db := create_new_cookbook.

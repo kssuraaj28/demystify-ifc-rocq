@@ -281,9 +281,35 @@ Ltac wf_finisher_rec n :=
 Ltac wf_finisher :=
   harden 0 (wf_finisher_rec 5).
 
-(* TODO: Eventually, have an assert that ensures that there is a unique guess *) 
-Tactic Notation "wf_finisher_guess" "[" ssrpatternarg(p) "]" "with" uconstr(u) :=  
-  let v := open_constr:(u) in  pattern_eq [p] with v; [wf_finisher |]; unfold Datatypes.id. (* TODO: Why this? *)
+Ltac2 wf_finisher_guess_aux (pat : Ltac1.t) (u : preterm) : unit :=
+  let wf_partial_tac := ltac1:(p v |- pattern_eq [p] with v) pat in
+  let v := Constr.Pretype.pretype Constr.Pretype.Flags.open_constr_flags_with_tc Constr.Pretype.expected_without_type_constraint u in
+  let acc : constr list ref := { contents := [] } in
+  match Control.case (fun () =>
+    wf_partial_tac (Ltac1.of_constr v);
+    Control.focus 1 1 (fun () =>
+      ltac1:(wf_finisher);
+      acc.(contents) := clone_constr v :: acc.(contents);
+      Control.zero (Tactic_failure None))
+  ) with
+  | Val _ => panic_s "wf_finisher_guess" "unreachable: probe loop must Control.zero"
+  | Err _ =>
+    let dedup := List.fold_right (fun c acc =>
+      if List.exist (Constr.equal c) acc then acc else c :: acc) (acc.(contents)) [] in
+    match dedup with
+    | [v_single] =>
+       wf_partial_tac (Ltac1.of_constr v_single); Control.focus 1 1 (fun () => ltac1:(wf_finisher)) (* This should definitely succeed. Assert ? TODO *)
+    | _ =>
+      Message.print (Message.of_string "Guess list");
+      List.iter (fun c => Message.print (Message.of_constr c)) dedup;
+      panic_s "wf_finisher_guess" "ambiguous (or no) guess"
+    end
+  end.
+
+Tactic Notation "wf_finisher_guess" "[" ssrpatternarg(p) "]" "with" uconstr(u) :=
+  let f := ltac2:(p u |- wf_finisher_guess_aux p (Option.get (Ltac1.to_preterm u))) in
+  f p u.
+
 
 
 Goal 5 = 5. wf_finisher.  Abort.  (* TODO!!!  assert_fails also succeeds!!  WHAT *)
@@ -342,7 +368,14 @@ Section test.
     ⟨ s1 | is_trusted ⟩ = ⟨ s2 | is_trusted ⟩ ->
     ⟨ clean_cmd_stp_store c (pre_cmd_action adv ast s1) | is_trusted ⟩ =
     ⟨ clean_cmd_stp_store c s2 | is_trusted ⟩.
-  Proof. move=> *.  wf_finisher_guess [RHS] with _ => ->.  wf_finisher. Qed.
+  Proof. 
+    move=> *.
+    unshelve (wf_finisher_guess [RHS] with ⟨ clean_cmd_stp_store _ _ | _ ⟩ => ->). 
+    wf_finisher.
+    Restart.
+    move=> ????? st *.
+    wf_finisher_guess [LHS] with ⟨ clean_cmd_stp_store _ st | _ ⟩ => ->. 
+    wf_finisher. Qed.
 
   Goal forall p p' c st1 st2,
     WellFormedCmd (mk_lbl false p) c ->
