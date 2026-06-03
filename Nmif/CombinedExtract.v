@@ -312,12 +312,14 @@ Section extract_step_commute.
         { do [move=> /negbT; rewrite negb_and negbK=> /orP] in newpce.
         case: pub in rwt newpce *; move=> /= in newpce. 
         1: move=> /=; move: newpce=> [] // ->.
-        2: admit. (*erewrite ni_sec_optcmd_st_conf_atk;[|eassumption].*) 
-        1(*-2*): move=> /=; cook. 
-        1(*-2*): rewrite combine_extend3_splitl combine_extend2_same map_map. 
-        1(*-2*): erewrite combine_extend2_map_r; [|done]; rewrite map_map.
-        1(*-2*): erewrite map_ext; [|case=> ?; instantiate (1 := (fun '(_,_) => _)); reflexivity].
-        1(*-2*): apply: map_ext; case=> *; rewrite/sim_active'; cook. }
+        2: pattern_focus [optcmd_stp_store _ _]=> P;
+(*not commutative *) pattern_eq_2 [if _ then _ else _] [X in P X]; [admit| ]=> <-; subst P; cbv beta. 
+        (*2: admit. (*erewrite ni_sec_optcmd_st_conf_atk;[|eassumption].*)   *)
+        1-2: move=> /=; cook. 
+        1-2: rewrite combine_extend3_splitl combine_extend2_same map_map. 
+        1-2: erewrite combine_extend2_map_r; [|done]; rewrite map_map.
+        1-2: erewrite map_ext; [|case=> ?; instantiate (1 := (fun '(_,_) => _)); reflexivity].
+        1-2: apply: map_ext; case=> *; rewrite/sim_active'; cook. }
       move: newpce rwt=> /andP [] /negbTE rcmd_grd -> rwt.
       rewrite /= rcmd_grd /=. cook.
       rewrite combine_extend3_splitr. 
@@ -346,9 +348,8 @@ Section extract_step_commute.
         rewrite combine_extend3_nil1 combine_extend2_nil_r !map_map filter_map_swap. cook.
         unshelve erewrite filter_ext; [exact xpred0|apply filter_false|]. cook. }
       rewrite/sim_step /=; cnstrct_eq_gl; cook.
-        { case: pub rwt => rwt /=; cook. (* TODO: This should be automated *)
-           { admit. (*erewrite ni_optcmd_st_conf_atk; [reflexivity|..]; eauto. *) }
-        admit.
+        { case: pub rwt => rwt /=; cook; congr (_.1.1); [wf_finisher|].
+        admit. 
         (*erewrite ni_sec_optcmd_st_conf_atk; [|eassumption]. erewrite noninterfering_post_pre; [reflexivity|]. 
         congruence. *) }
       rewrite/zip/cmd_map_sim filter_map_swap map_map. symmetry.
