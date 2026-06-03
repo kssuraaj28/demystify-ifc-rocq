@@ -170,16 +170,21 @@ End test.
 
 (* Snapshot a constr: substitute resolved evars into a standalone term that
    doesn't reference the evar map. eval_cbn with empty flags walks the term
-   and rebuilds it through the current evar map but performs no reduction. *)
-(* TODO: Should we check if the final constr has evars? *)
+   and rebuilds it through the current evar map but performs no reduction.
+   Panics if the result still has evars — that means an evar wasn't resolved
+   and the snapshot would be tied to the (rollback-able) evar map. *)
 Ltac2 clone_constr (c : constr) : constr :=
+  if Constr.has_evar c then panic_m "clone_constr" (fprintf "input has evars: %t" c) else
   let no_red : Std.red_flags := {
     Std.rStrength := Std.Norm;
     Std.rBeta := false; Std.rMatch := false; Std.rFix := false;
     Std.rCofix := false; Std.rZeta := false; Std.rDelta := false;
     Std.rConst := []
   } in
-  Std.eval_cbn no_red c.
+  let r := Std.eval_cbn no_red c in
+  if Constr.has_evar r then panic_m "clone_constr" (fprintf "result has evars: %t !!!" r)
+  else r.
+
 
 Ltac2 Eval
   let c := clone_constr constr:(1 + 1) in if Constr.equal c constr:(1 + 1) then () else
@@ -205,30 +210,32 @@ Section test.
 
   Goal False.
   Proof Mode "Ltac2".
-    (* No-copy: throw the raw evar reference. *)
+    (* No-copy: throw the raw evar reference. After rollback the evar is
+       unresolved, so the constr in the exn must NOT equal (5 + 5). *)
     Ltac2 Eval
       let v := open_constr:(_) in
       match Control.case (fun () =>
         ltac1:(v |- unify v (5 + 5)) (Ltac1.of_constr v);
         Control.zero (WipExn v)
       ) with
-      | Val _ => ()
       | Err (WipExn c) =>
-        Message.print (Message.concat (Message.of_string "no_copy: ") (Message.of_constr c))
-      | Err _ => ()
+        if Constr.equal c constr:(5 + 5) then
+          panic_m "test" (fprintf "no_copy: expected unresolved evar, got %t" c)
+        else ()
+      | _ => panic_s "test" "wrong path"
       end.
 
-    (* Copy: clone before throwing. *)
+    (* Copy: clone before throwing. After rollback the snapshot survives. *)
     Ltac2 Eval
       let v := open_constr:(_) in
       match Control.case (fun () =>
         ltac1:(v |- unify v (5 + 5)) (Ltac1.of_constr v);
         Control.zero (WipExn (clone_constr v))
       ) with
-      | Val _ => ()
       | Err (WipExn c) =>
-        Message.print (Message.concat (Message.of_string "copy: ") (Message.of_constr c))
-      | Err _ => ()
+        if Constr.equal c constr:(5 + 5) then ()
+        else panic_m "test" (fprintf "copy: expected (5 + 5), got %t" c)
+      | _ => panic_s "test" "wrong path"
       end.
   Abort.
 End test.

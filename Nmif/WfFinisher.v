@@ -283,9 +283,9 @@ Ltac wf_finisher :=
 
 Ltac2 wf_finisher_guess_aux (pat : Ltac1.t) (u : preterm) : unit :=
   let wf_partial_tac := ltac1:(p v |- pattern_eq [p] with v) pat in
-  let v := Constr.Pretype.pretype Constr.Pretype.Flags.open_constr_flags_with_tc Constr.Pretype.expected_without_type_constraint u in
   let acc : constr list ref := { contents := [] } in
   match Control.case (fun () =>
+    let v := Constr.Pretype.pretype Constr.Pretype.Flags.open_constr_flags_with_tc Constr.Pretype.expected_without_type_constraint u in
     wf_partial_tac (Ltac1.of_constr v);
     Control.focus 1 1 (fun () =>
       ltac1:(wf_finisher);
