@@ -307,41 +307,50 @@ Ltac2 rec wf_finisher_rec (n : int) : unit :=
       Control.enter (fun () => wf_finisher_rec (Int.sub n 1)))).
       
 
-Ltac wf_finisher := ltac2:(wf_finisher_rec 5).
+Ltac2 wf_finisher () := wf_finisher_rec 5.
+Ltac wf_finisher := ltac2:(wf_finisher ()).
 
+(* TODO: This Ltac1.t is weird. Maybe later *)
 Ltac2 wf_finisher_guess_aux (pat : Ltac1.t) (u : preterm) : unit :=
   let wf_partial_tac := ltac1:(p v |- pattern_eq [p] with v) pat in
   let acc : constr list ref := { contents := [] } in
-  let fail_runner () :=
+
+  let run_probe (k : constr -> unit) : unit :=
     let v := Constr.Pretype.pretype Constr.Pretype.Flags.open_constr_flags_with_tc Constr.Pretype.expected_without_type_constraint u in
     wf_partial_tac (Ltac1.of_constr v);
     wf_dbg 2 (fprintf "wf_finisher_guess: pattern_eq ok, %i goals" (Control.numgoals ()));
     Control.focus 1 1 (fun () =>
-      ltac1:(wf_finisher);
-      let v' := clone_constr v in
-      wf_dbg 1 (fprintf "wf_finisher_guess: candidate v = %t" v');
-      acc.(contents) := v' :: acc.(contents);
-      Control.zero (Tactic_failure None)) in 
+      wf_finisher ();
+      k v) in
+
+  let fail_runner () := run_probe (fun v =>
+    let v' := clone_constr v in
+    wf_dbg 1 (fprintf "wf_finisher_guess: candidate v = %t" v');
+    acc.(contents) := v' :: acc.(contents);
+    Control.zero (Tactic_failure None)) in
+
+  (* We re-guess because of weird universe quality bug *)
+  let final_runner v_init_guess :=
+    wf_dbg 1 (fprintf "wf_finisher_guess: replay with v = %t" v_init_guess);
+    run_probe (fun v_final =>
+      if Constr.equal v_init_guess v_final then () else (* Does not compare universe quality or whatnot *)
+      panic_s "wf_finisher_guess" "probe candidate diverges on replay") in
 
   wf_dbg 1 (fprintf "wf_finisher_guess: probe begin");
   match Control.case (fail_runner) with
   | Val _ => panic_s "wf_finisher_guess" "unreachable: probe loop must Control.zero"
   | Err e =>
+    wf_dbg 1 (fprintf "wf_finisher_guess: probe end");
     wf_dbg 2 (fprintf "wf_finisher_guess: probe loop exit: %a" (fun () e' => Message.of_exn e') e);
     let dedup := List.fold_right (fun c acc =>
       if List.exist (Constr.equal c) acc then acc else c :: acc) (acc.(contents)) [] in
     wf_dbg 1 (fprintf "wf_finisher_guess: %i unique candidate(s)" (List.length dedup));
     match dedup with
-    | [v_single] =>
-       wf_dbg 1 (fprintf "wf_finisher_guess: replay with v = %t" v_single);
-       wf_partial_tac (Ltac1.of_constr v_single);
-       wf_dbg 2 (fprintf "wf_finisher_guess: replay pattern_eq ok, %i goals" (Control.numgoals ()));
-       Control.focus 1 1 (fun () =>
-         wf_dbg 2 (fprintf "wf_finisher_guess: replay goal = %t" (Control.goal ()));
-         match Control.case (fun () =>ltac1:(wf_finisher)) with 
-           Err _ => panic_s "wf_finisher" "Guessed but cannot finish" | _ => ()
-         end;
-         wf_dbg 1 (fprintf "wf_finisher_guess: replay wf_finisher closed goal 1"))
+    | [v_single] => 
+      match Control.case (fun () => final_runner v_single) with
+      | Err _ => panic_s "wf_finisher_guess" "Final call should not fail"
+      | _ => ()
+      end
     | _ =>
       Message.print (Message.of_string "Guess list");
       List.iter (fun c => Message.print (Message.of_constr c)) dedup;
@@ -352,8 +361,6 @@ Ltac2 wf_finisher_guess_aux (pat : Ltac1.t) (u : preterm) : unit :=
 Tactic Notation "wf_finisher_guess" "[" ssrpatternarg(p) "]" "with" uconstr(u) :=
   let f := ltac2:(p u |- wf_finisher_guess_aux p (Option.get (Ltac1.to_preterm u))) in
   f p u.
-
-
 
 Goal 5 = 5. wf_finisher.  Abort.  (* TODO!!!  assert_fails also succeeds!!  WHAT *)
 
