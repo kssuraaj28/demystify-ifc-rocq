@@ -3,7 +3,6 @@ Import List ListNotations ssreflect ssrfun ssrbool.
 
 From Ltac2 Require Import Ltac2.
 
-
 Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem Combined Simulator.
 Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem Tacs.Cook.
 
@@ -13,13 +12,12 @@ Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 (* TODO: Order seems to matter. Syntax before fails *)
 
+Import Combined.
 #[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
 Ltac2 Set this_cookbook_ := create_new_cookbook.
 
 Section sim_active.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
-  Import Combined.
-
   Definition sim_active' (rcmd: option Cmd) (ratk: bool) (is_pubpc: bool) : bool :=
     ratk || (is_pubpc && if rcmd is None then false else true).
 
@@ -172,8 +170,7 @@ Section extract_step_commute.
        safe downgrades are handled by extract_step_commute_core via the dispatch
        in extract_step_commute. *)
     1,2: move=> [Hcanon | [Hft Hpcto]].
-    4: { by move: unsafe; rewrite /= Hft. }
-    2: { by move: unsafe; rewrite /= Hft. }
+    2,4: by move: unsafe; rewrite /= Hft.
     1,2: move: Hcanon=> [->] [? ?].
     1,2: dotop [cbn]=> <- _ ? ?.
     1,2: rewrite/comb_step/cmbcmd_step/corrupt_ideal/read_sim/extract_2cfg; cook.
@@ -523,9 +520,5 @@ Section extract_step_commute.
       * move=> id ss; exact: (corrupt_ideal_noend _ id ss (negbTE noend)).
       * move=> ss id; exact: (read_sim_nodecl _ ss id (negbTE nodecl)).
   Qed.
-  Print Assumptions extract_step_commute.
 
 End extract_step_commute.
-
-
-
