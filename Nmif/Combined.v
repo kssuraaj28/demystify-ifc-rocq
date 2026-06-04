@@ -223,7 +223,6 @@ Section invprf.
     (* TODO: Set Ltac Profiling *)
 
     Ltac cook := ltac2:(cook curr_cookbook).
-    Require Import TODO. (* TODO: This should be automated. But how to automate? *)
 
     Lemma cmbcmd_step_inv:
       forall c st,
@@ -248,16 +247,16 @@ Section invprf.
         apply: step_soundness_pubuntr=> //. } 
       rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>].
       repeat split; cook.
-        { move x: (extract_controlled_endorse _)=> x'; move: x' x. case=> [[>]/extr_endorse_is |/extr_endorse_no noend]. (* TODO move to case? *)
-          { move/is_controlled_endorse_inv=> [?] [?] [e]; rewrite -> e in *=> {e} - _. 
+        { move x: (extract_controlled_endorse _)=> x'; move: x' x. 
+        case=> [[>]/extr_endorse_eq [] + [] |/extr_endorse_no noend]. (* TODO move to case? *)
+          { move=>e; rewrite -> e in *=> {e} *.
           revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] e; rewrite -> e in *=> {e} - [] *.
-          revert_hyp_pat (if _ then _ else _)=>  <-.
-          admit. }
-          (*
+          revert_hyp_pat (if _ then _ else _)=>  <-. cook.
+          Require Import TODO. (* TODO: This should be automated. But how to automate? *)
           apply: wf_endorse_st_int; cook.
             { symmetry. apply: endorse_pre_read_eq; cook. wf_finisher. }
           apply: update_untr_keep_view; cook. 
-          wf_finisher_guess [RHS] with _=> ->. wf_finisher. } *)
+          wf_finisher_guess [RHS] with _=> ->. wf_finisher. } 
 
         revert_hyp_pat bool; case.
         1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=.
@@ -269,20 +268,19 @@ Section invprf.
         1-4: wf_finisher_guess [LHS] with ⟨clean_cmd_stp_store _ (ideal_store _) | is_trusted ⟩=> ->.
         1-4: enter (idtac;wf_finisher). }
 
-        { move x: (extract_controlled_declassify _)=> x'; move: x' x. case=> [[>]/extr_decl_is |/extr_decl_no nodecl]; cycle 1.
+        { move x: (extract_controlled_declassify _)=> x'; move: x' x. case=> [[>]/extr_decl_eq [] + []|/extr_decl_no nodecl]; cycle 1.
           { revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [+ []] /==> *.
           2: wf_finisher_guess [LHS] with ⟨if _ then _ else _ |is_public⟩=> ->. 
           1,2: case: (X in if X then _ else _); enter (idtac; wf_finisher). }
-        move/is_controlled_declassify_inv=> [?] [?] [] e; rewrite -> e in * => {e} _. (* Extra hyp *)
+        move=> e; rewrite -> e in *=> {e} _ _.
         revert_hyp_pat (WellFormedCmd _ _)=> /wf_declassify_inv [] e; rewrite -> e in *=> {e} - [] * /=.
         revert_hyp_pat (if _ then _ else _)=> /= <- /=.
-        admit. }
-        (*
+        (* TODO: Need automation here *)
         apply/storeview_eq_ext=> *; rewrite /clean_assign_stp_store /update_to_store /=. rewrite dec_eq_refl. (* TODO: Eventually this should be a rewrite rule also *)
         case e1: (_ =? _). 
           { unshelve apply: storeview_eq; [exact: is_trusted|..]; cook.
-          let v := open_constr:(_) in pattern_eq [LHS] with v; [wf_finisher|move=> ->]. cook. }
-        apply/storeview_eq; [|eassumption]; cook. wf_finisher. } *)
+          wf_finisher_guess [LHS] with _=> -> //. }
+        apply/storeview_eq; [|eassumption]; cook. wf_finisher. }
       move=> /=.  
       apply/Forall_and; cook; auto.
       revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)].
@@ -294,18 +292,10 @@ Section invprf.
          apply/flows_to_subtype_prog;[|apply/snd]; auto. }
       move=> /= ? <- /=.
       move ?: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. 
-        { move x: (extract_controlled_endorse _)=> x'; move: x' x. case=> [[>]/extr_endorse_is |/extr_endorse_no noend]; cycle 1.
+        { move x: (extract_controlled_endorse _)=> x'; move: x' x. case=> [[>]/extr_endorse_eq [] + [] |/extr_endorse_no noend]; cycle 1.
            { pattern_eq_2  [clean_cmd_stp_cnt _ _] [clean_cmd_stp_cnt _ _]; [|move=>->; cook; apply Forall_forall=> //].
            wf_finisher_guess [RHS] with (clean_cmd_stp_cnt _ (real_store _))=> ->. cook. wf_finisher. }
-
-        move/is_controlled_endorse_inv=> [?] [?]. => [] ? [] ? e; rewrite -> e in *=> {e} //. } *)
-        cook.
-        1: admit. admit. }
-
-(*
-           { pattern_eq_2  [clean_cmd_stp_cnt _ _] [clean_cmd_stp_cnt _ _]; [|move=>->; cook; apply Forall_forall=> //].
-           wf_finisher_guess [RHS] with (clean_cmd_stp_cnt _ (real_store _))=> ->. cook. wf_finisher. }
-         move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e} //. } *)
+        move=> e;rewrite -> e in *=> {e}; done. }
       cook. rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
       revert_hyp_pat [Cmd, (WellFormedCmd _ _), (compute_new_pc _ _ = _)].
       move=> ? /step_soundness snd newpce.

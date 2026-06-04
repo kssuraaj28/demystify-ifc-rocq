@@ -83,21 +83,23 @@ Section preds.
     do !esplit.
   Qed.
 
-  Lemma extr_endorse_is c v :
-    extract_controlled_endorse c = Some v -> is_controlled_endorse c.
-  Proof. rewrite /is_controlled_endorse => -> //. Qed.
-
   Lemma extr_endorse_no c :
     extract_controlled_endorse c = None -> ~~ is_controlled_endorse c.
   Proof. rewrite /is_controlled_endorse => -> //. Qed.
 
-  Lemma extr_decl_is c v :
-    extract_controlled_declassify c = Some v -> is_controlled_declassify c.
-  Proof. rewrite /is_controlled_declassify => -> //. Qed.
-
   Lemma extr_decl_no c :
     extract_controlled_declassify c = None -> ~~ is_controlled_declassify c.
   Proof. rewrite /is_controlled_declassify => -> //. Qed.
+
+  Lemma extr_endorse_eq c from to :
+    extract_controlled_endorse c = Some (from, to) ->
+    c = assign (endorse from to) /\ var_lbl from = pulbl /\ var_lbl to = ptlbl.
+  Proof. Admitted.
+
+  Lemma extr_decl_eq c from to :
+    extract_controlled_declassify c = Some (from, to) ->
+    c = assign (declassify from to) /\ var_lbl from = stlbl /\ var_lbl to = ptlbl.
+  Proof. Admitted.
 End preds.
 
 Section sa.
