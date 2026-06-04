@@ -22,11 +22,12 @@ Parameter test : forall {T}, T.
     (a : Cmd) (real_atk_bit : bool)
     (rs ss : Store) (ast : AtkStates)
     (eqp : ⟨ rs | is_public ⟩ = ⟨ ss | is_public ⟩)
-    (wfa : WellFormedCmd {| untrusted := false; public := false |} a) :
+    (wfa : WellFormedCmd {| untrusted := false; public := false |} a) 
+    :
     P ⟨ clean_cmd_stp_store a (if real_atk_bit  then pre_cmd_action adv ast rs  else rs) | is_public ⟩.
   Proof.
     move=> *.
-    wf_finisher_guess [ ⟨_|_⟩] with ⟨if _ then _ else _ |is_public⟩.
+    wf_finisher_guess [ ⟨_|_⟩] with ⟨ match _ with _ => _ end |is_public⟩.
     exact test.
   Qed.
 
