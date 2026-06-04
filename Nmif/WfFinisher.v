@@ -1,7 +1,7 @@
 From Stdlib Require List ssreflect ssrfun ssrbool.
 Import List ListNotations ssreflect ssrfun ssrbool.
 
-From Ltac2 Require Import Ltac2.
+From Ltac2 Require Import Ltac2 Printf.
 
 Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem.
 Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem Tacs.Cook.
@@ -235,6 +235,11 @@ Section ni.
 
 End ni.
 
+Ltac2 mutable wf_finisher_debug : int := 0.
+(* Print [msg] when wf_finisher_debug is at least [lvl]. *)
+Ltac2 wf_dbg (lvl : int) (msg : message) : unit :=
+  if Int.ge wf_finisher_debug lvl then Message.print msg else ().
+
 (* TODO: Eventually, we should have a pattern that let's us not have these versions for optional cmd and so on *)
 Ltac wf_finisher_arms :=
     (apply: wf_cmd_st_conf_ni
@@ -284,27 +289,34 @@ Ltac wf_finisher :=
 Ltac2 wf_finisher_guess_aux (pat : Ltac1.t) (u : preterm) : unit :=
   let wf_partial_tac := ltac1:(p v |- pattern_eq [p] with v) pat in
   let acc : constr list ref := { contents := [] } in
+  wf_dbg 1 (fprintf "wf_finisher_guess: probe begin");
   match Control.case (fun () =>
     let v := Constr.Pretype.pretype Constr.Pretype.Flags.open_constr_flags_with_tc Constr.Pretype.expected_without_type_constraint u in
+    wf_dbg 2 (fprintf "wf_finisher_guess: pretyped v = %t" v);
     wf_partial_tac (Ltac1.of_constr v);
+    wf_dbg 2 (fprintf "wf_finisher_guess: pattern_eq ok, %i goals" (Control.numgoals ()));
     Control.focus 1 1 (fun () =>
       ltac1:(wf_finisher);
-      acc.(contents) := clone_constr v :: acc.(contents);
+      let v' := clone_constr v in
+      wf_dbg 1 (fprintf "wf_finisher_guess: candidate v = %t" v');
+      acc.(contents) := v' :: acc.(contents);
       Control.zero (Tactic_failure None))
   ) with
-  | Val _ => panic_s "wf_finisher_guess" "unreachable: probe loop must Control.zero"
-  | Err _ =>
+  | Err e =>
+    wf_dbg 2 (fprintf "wf_finisher_guess: probe loop exit: %a" (fun () e' => Message.of_exn e') e);
     let dedup := List.fold_right (fun c acc =>
       if List.exist (Constr.equal c) acc then acc else c :: acc) (acc.(contents)) [] in
+    wf_dbg 1 (fprintf "wf_finisher_guess: %i unique candidate(s)" (List.length dedup));
     match dedup with
     | [v_single] =>
-       wf_partial_tac (Ltac1.of_constr v_single); 
+       wf_partial_tac (Ltac1.of_constr v_single);
        Control.focus 1 1 (fun () => ltac1:(wf_finisher))
     | _ =>
       Message.print (Message.of_string "Guess list");
       List.iter (fun c => Message.print (Message.of_constr c)) dedup;
       panic_s "wf_finisher_guess" "ambiguous (or no) guess"
     end
+  | _ => panic_s "wf_finisher_guess" "unreachable: probe loop must Control.zero"
   end.
 
 Tactic Notation "wf_finisher_guess" "[" ssrpatternarg(p) "]" "with" uconstr(u) :=
