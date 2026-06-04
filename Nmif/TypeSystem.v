@@ -455,6 +455,12 @@ Section ni.
       rewrite /clean_assign_stp_store /get_assign_dest /= update_storeview_nochange //.
   Qed.
 
+  (* Option-command version of ni_untr_cmd_st_int. *)
+  Lemma ni_untr_optcmd_st_int p oc st :
+    WellFormedOptCmd (mk_4ptlbl true p) oc ->
+    ⟨ optcmd_stp_store oc st | is_trusted ⟩ = ⟨ st | is_trusted ⟩.
+  Proof. case: oc => [c|] H //=. exact: (ni_untr_cmd_st_int p c st H). Qed.
+
   Lemma ni_tr_cmd_cnt:
     forall p c st1 st2,
       let: lbl := mk_4ptlbl false p in

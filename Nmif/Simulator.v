@@ -56,7 +56,7 @@ Section sim_constr.
     let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in
     let: sim_st := optcmd_stp_store ocmd sim_st in 
     let: sim_st := if ocmd isn't Some (assign (declassify from to)) then sim_st else
-                   if (is_public to) is false then sim_st else
+                   if (is_secret from && is_public to) is false then sim_st else
                    update_to_store sim_st to (ideal_st to) in (* Controlled ideal read *)
 
     let: post_atk := post_cmd_action atk ast sim_st in
@@ -119,7 +119,8 @@ Import VarValStore.Notations.
     rewrite/sim_post /Noninterference.Noninterfering=> from to ? ? i1 i2 *.
     pattern_eq_2 [sim_step _ _ _ _ _] [sim_step _ _ _ _ _]=> [| ->] //.
     rewrite/sim_step.
-    case e: is_public=> //=.
+    case e: (is_secret from && is_public to)=> //=.
+    move: e => /andP[_ e].
     suff: (i1 to = i2 to)=> [-> //|].
     eauto using storeview_eq.
   Qed.

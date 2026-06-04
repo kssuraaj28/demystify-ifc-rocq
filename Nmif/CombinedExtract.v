@@ -153,17 +153,26 @@ Section extract_step_commute.
     2: move: downgrade=> /is_declassify_inv_opt.
     1,2: move=> [?] [?] ->.
     1,2: rewrite/CmbCmdCoreInv=> - []. 
-    1: move/wf_endorse_inv. 2: move/wf_declassify_inv. 
-    all: admit.
-    (*
-    1,2: move=> [->] [? ?]. 
-    1,2: dotop [cbn]=> <- _ ? ?. 
+    1: move/wf_endorse_inv. 2: move/wf_declassify_inv.
+    (* The canonical disjunct (real PU→PT / ST→PT) is the original proof.  The
+       safe disjunct (harmless downgrade) is still open: with the tightened
+       combined-step guards a safe downgrade performs no controlled
+       corruption/read, so it should commute exactly like an ordinary
+       assignment — but this requires Simulator.sim_step's declassify read guard
+       to be tightened from `is_public to` to `is_secret from && is_public to`
+       to match cmbcmd_step (otherwise a safe declassify to a public target
+       reads on the simulator side but not the combined side). *)
+    1,2: move=> [Hcanon | ]; [| admit].
+    1,2: move: Hcanon.
+    1,2: move=> [->] [? ?].
+    1,2: dotop [cbn]=> <- _ ? ?.
     1,2: rewrite/comb_step/cmbcmd_step/extract_2cfg; cook.
     1,2: pattern_eq [sim_active  _] with true=>[| ->]; [simpl; cook|].
-    1,2: rewrite/step/acmd_step /=. 
+    1,2: rewrite/step/acmd_step /=.
     1,2: assert_fails (pattern_focus [construct_simulator _]). (* Checkpoint. TODO: Think about checkpoint practices *)
     1,2: rewrite/clean_assign_stp_store/get_assign_val/get_assign_dest.
     1: pattern_eq [is_untrusted _] with true=>[| ->]; cook.
+    2: pattern_eq [is_secret _] with true=>[| ->]; cook.
     1,2: pattern_eq [is_public _] with true=>[| ->]; cook.
     1,2: pattern_eq_2 [post_cmd_action _ _ (update_to_store _ _ _)] [post_cmd_action _ _ (update_to_store _ _ _)]=> [|<-]; swap 2 3.
         { apply/post_cmd_wf/update_to_store_storeview_eq; cook. }
@@ -182,12 +191,10 @@ Section extract_step_commute.
     1,2: subst lhs; rewrite !map_map /cmd_map_sim.
     1,2: rewrite/sim_active /= /sim_active'; cook.
     1,2: enter (cnstrct_eq_gl; cook; clear; [apply: map_ext=> ?; cook|]).
-    1,2: rewrite filter_map_swap. 
+    1,2: rewrite filter_map_swap.
     1,2: erewrite filter_ext; [|move=> *; rewrite /= Bool.orb_false_r; reflexivity].
     1,2: cook; rewrite map_map.
     1,2: apply: map_ext; case=> //.
-  Qed.
-    *)
   Admitted.
 
   Lemma public_compute_new_pc_opt untr pub rcmd :
@@ -394,3 +401,4 @@ Section extract_step_commute.
   Print Assumptions extract_step_commute.
 
 End extract_step_commute.
+

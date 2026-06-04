@@ -101,11 +101,13 @@ Parameter TODO: Store.
       let: (ideal_cnt, ideal_st) :=  (optcmd_stp_cnt ideal_cmd ideal_st, optcmd_stp_store ideal_cmd ideal_st) in
 
 
-      (* Controlled ideal read: only a *real* declassify (a public target — the
-         ST→PT) reads from the ideal store; a harmless declassify leaves sim
-         alone, matching sim_step. *)
+      (* Controlled ideal read: only a *real* declassify (a secret source made
+         public — the ST→PT) reads from the ideal store; a harmless declassify
+         (public source) leaves sim alone. The `is_secret from` guard is what
+         makes the read sound: a real declassify has a trusted source, so its
+         ideal value matches across the trusted views. *)
       let: sim_st := if real_cmd isn't Some (assign (declassify from to)) then sim_st else
-                     if (is_public to) is false then sim_st else
+                     if (is_secret from && is_public to) is false then sim_st else
                        update_to_store sim_st to (ideal_st to) in (* Controlled ideal read *)
     
     
@@ -273,11 +275,22 @@ Section invprf.
           have Htf : is_trusted to = false; [rewrite /is_trusted Htou // |].
           rewrite /clean_cmd_stp_store /clean_assign_stp_store /get_assign_dest /get_assign_val /=.
           rewrite update_storeview_nochange //.
-          cook. }
-          (* trusted pc: ideal_cmd = endorse from to; both sides copy to := · from *)
-          move=> Hic; rewrite -Hic /=.
+          (* ideal_cmd preserves the trusted view (PU-well-typed), and the ideal
+             corruption only touches an untrusted `from`, so both are invisible. *)
+          rewrite (ni_untr_optcmd_st_int _ _ _ Hic).
+          case Hg: (is_public from && is_untrusted from);
+            [ move: Hg => /andP[_ Hu]; have Htf2 : is_trusted from = false;
+                [ rewrite /is_trusted Hu // | rewrite update_storeview_nochange //; cook ]
+            | cook ]. }
+          (* trusted pc: ideal_cmd = endorse from to; both sides copy to := · from,
+             so the proof reduces to the same trusted-view argument. *)
+          move=> Hic; rewrite -Hic.
+          rewrite /clean_cmd_stp_store /clean_assign_stp_store /get_assign_dest /get_assign_val /=.
           apply: update_from_storeview_eq; [exact: (fun H => flows_to_tr _ _ H Hft) |].
-          cook.
+          case Hg: (is_public from && is_untrusted from);
+            [ move: Hg => /andP[_ Hu]; have Htf2 : is_trusted from = false;
+                [ rewrite /is_trusted Hu // | rewrite update_storeview_nochange //; cook ]
+            | cook ].
           }
         cook. revert_hyp_pat bool; case.
         1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=.
@@ -288,7 +301,7 @@ Section invprf.
         move/is_declassify_inv=> [from [to e]]; rewrite -> e in *=> {e}.
         revert_hyp_pat (WellFormedCmd _ _)=> /wf_declassify_inv [Hcanon | Hsafe].
         { move: Hcanon=> [Hpc [Hfrom Hto]]; rewrite -> Hpc in *=> {Hpc}.
-        have Hg : is_public to; [rewrite /is_public Hto // |].
+        have Hg : is_secret from && is_public to; [rewrite /is_secret /is_public Hfrom Hto // |].
         rewrite Hg.
         revert_hyp_pat (if _ then _ else _)=> /= <- /=.
         apply/storeview_eq_ext=> *; rewrite /clean_assign_stp_store /update_to_store /=. rewrite dec_eq_refl. (* TODO: Eventually this should be a rewrite rule also *)
@@ -296,12 +309,23 @@ Section invprf.
           { unshelve apply: storeview_eq; [exact: is_trusted|..]; cook. }
         apply/storeview_eq; [|eassumption]; cook. }
         move: Hsafe=> [Hft Hpcto].
-        (* Safe declassify (Hft : var_lbl from ⊑ var_lbl to, Hpcto : pc ⊑ var_lbl to):
-           dual of safe endorse, on the public view. The guarded ideal read only
-           fires when `to` is public; `clean (declassify from to) = update to (· from)`
-           preserves the public view because `from ⊑ to` (flows_to_pub), exactly
-           like an ordinary assignment. Use update_from_storeview_eq with is_public. *)
-        admit. (* safe declassify: see comment *) }
+        (* Safe declassify: from ⊑ to, so a public target has a public source,
+           hence the (secret-source-guarded) ideal read never fires. The copy
+           to := · from then preserves the public view like an ordinary
+           assignment. *)
+        have Hrd : is_secret from && is_public to = false.
+        { case Ht: (is_public to); [| rewrite andbF //].
+          rewrite andbT /is_secret /is_public (flows_to_pub _ _ Ht Hft) //. }
+        rewrite Hrd /=.
+        rewrite /clean_cmd_stp_store /clean_assign_stp_store /get_assign_dest /get_assign_val /=.
+        set pcl := (X in if public X then _ else _).
+        case Hpcp: (public pcl).
+        - apply: update_from_storeview_eq; [exact: (fun H => flows_to_pub _ _ H Hft) |].
+          cook.
+        - have Hts : is_public to = false.
+          { rewrite /is_public; apply/negbTE; apply: (flows_from_sec pcl _ _ Hpcto).
+            rewrite /secret Hpcp //. }
+          rewrite update_storeview_nochange //. cook. }
       move=> /=.  
       apply/Forall_and; cook; auto.
       revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)].
@@ -332,7 +356,7 @@ Section invprf.
       move=> ? /step_soundness snd newpce.
       apply/flows_to_subtype_prog; [|apply/snd].
       auto with trickbag.
-    Admitted. 
+    Qed.
   End cook.
 
   Theorem cfg_step_inv: forall c, Invariant c ->  Invariant ((cfg_step c).1).
