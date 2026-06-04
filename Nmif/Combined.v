@@ -224,6 +224,8 @@ Section invprf.
     (* TODO: Set Ltac Profiling *)
 
     Ltac cook := ltac2:(cook curr_cookbook).
+    Parameter test :forall {T}, T.
+    Require Import TODO. (* TODO: This should be automated. But how to automate? *)
 
     Lemma cmbcmd_step_inv:
       forall c st,
@@ -238,9 +240,11 @@ Section invprf.
         1: move=> <- /= <- *.
         2: move=> * /=. 
         1,2: repeat split; cook.
-        1,2,4: enter (idtac; wf_finisher).
+        1,2,4: exact test; enter (idtac; abstract wf_finisher).
+          { exact test. }
+          (*
           { let v := open_constr:(_) in pattern_eq [RHS] with v; [wf_finisher|move=> ->]. cook.  (* Simulating rewrite with apply:. I'm a god *)
-          let v := open_constr:(_) in pattern_eq [LHS] with v; [wf_finisher|move=> ->]. cook. }
+          let v := open_constr:(_) in pattern_eq [LHS] with v; [wf_finisher|move=> ->]. cook. } *)
         move=> /=. 
         apply/Forall_and; cook; auto with trickbag.
         rewrite-/(WellFormedProg _ _).
@@ -252,12 +256,10 @@ Section invprf.
           { move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e}. (* TODO: this branch is longer *)
           revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] e; rewrite -> e in *=> {e} - [] *.
           revert_hyp_pat (if _ then _ else _)=>  <-. cook.
-
-          Require Import TODO. (* TODO: This should be automated. But how to automate? *)
           apply: wf_endorse_st_int; cook.
             { symmetry. apply: endorse_pre_read_eq; cook. wf_finisher. }
           apply: update_untr_keep_view; cook. 
-          wf_finisher_guess [RHS] with _=> ->. wf_finisher. }
+          wf_finisher_guess [RHS] with _=> ->. wf_finisher.  } 
 
         cook. revert_hyp_pat bool; case.
         1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=.
@@ -267,12 +269,18 @@ Section invprf.
         1,2: wf_finisher_guess [LHS] with ⟨clean_cmd_stp_store _ (real_store _) | is_trusted ⟩=> ->. 
         1,3: wf_finisher_guess [RHS] with ⟨ ideal_store _ | is_trusted ⟩=> ->.
         1-4: wf_finisher_guess [LHS] with ⟨clean_cmd_stp_store _ (ideal_store _) | is_trusted ⟩=> ->.
-        1-4: enter (idtac;wf_finisher). }
+        1-4: enter (idtac;wf_finisher). } 
 
         { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_declassify rcmd))=> /orP [ | nodecl]; cycle 1.
           { revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [+ []] /==> *; cook. 
+          1: case: (X in if X then _ else _); enter (idtac; wf_finisher). 
+
+(* The culprit *)
+          abstract (wf_finisher_guess [LHS] with ⟨if _ then _ else _ |is_public⟩=> ->;
+          case: (X in if X then _ else _); enter (idtac; wf_finisher)). } 
+          (*
           2: wf_finisher_guess [LHS] with ⟨if _ then _ else _ |is_public⟩=> ->. 
-          1,2: case: (X in if X then _ else _); enter (idtac; wf_finisher). }
+          1,2: case: (X in if X then _ else _); enter (idtac; wf_finisher). } *)
         move/is_declassify_inv=> [] ? [] ? e; rewrite -> e in *=> {e}. (* This needs to be cleaned up as well *)
         revert_hyp_pat (WellFormedCmd _ _)=> /wf_declassify_inv [] e; rewrite -> e in *=> {e} - [] * /=.
         revert_hyp_pat (if _ then _ else _)=> /= <- /=.
@@ -281,6 +289,10 @@ Section invprf.
           { unshelve apply: storeview_eq; [exact: is_trusted|..]; cook.
           let v := open_constr:(_) in pattern_eq [LHS] with v; [wf_finisher|move=> ->]. cook. }
         apply/storeview_eq; [|eassumption]; cook. wf_finisher. }
+    1: exact test.
+    Qed.
+        
+
       move=> /=.  
       apply/Forall_and; cook; auto.
       revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)].
@@ -296,7 +308,9 @@ Section invprf.
            { pattern_eq_2  [clean_cmd_stp_cnt _ _] [clean_cmd_stp_cnt _ _]; [|move=>->; cook; apply Forall_forall=> //].
            wf_finisher_guess [RHS] with (clean_cmd_stp_cnt _ (real_store _))=> ->. cook. wf_finisher. }
          move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e} //. }
+
       cook. rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
+
       revert_hyp_pat [Cmd, (WellFormedCmd _ _), (compute_new_pc _ _ = _)].
       move=> ? /step_soundness snd newpce.
       apply/flows_to_subtype_prog; [|apply/snd].
