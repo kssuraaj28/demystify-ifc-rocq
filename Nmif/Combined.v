@@ -68,6 +68,48 @@ Section cmb_step.
     Definition Cfg := (CmbState * list CmbCmd)%type.
   End comb_state.
 
+  (* Controlled ideal corruption (see cmbcmd_step). Only a downgrade that
+     actually crosses the attacker — `from ⋢ to` — corrupts the ideal store. *)
+  Definition corrupt_ideal (real_cmd: option Cmd) (ideal_st sim_st: Store) : Store :=
+    if real_cmd isn't Some (assign (endorse from to)) then ideal_st else
+    if (is_public from && is_untrusted from && ~~ flows_to (var_lbl from) (var_lbl to)) is false then ideal_st else
+      update_to_store ideal_st from (sim_st from).
+
+  (* Controlled ideal read (see cmbcmd_step). Only a real declassify
+     (secret source made public, ST→PT) reads from the ideal store. *)
+  Definition read_sim (real_cmd: option Cmd) (sim_st ideal_st: Store) : Store :=
+    if real_cmd isn't Some (assign (declassify from to)) then sim_st else
+    if (is_secret from && is_public to) is false then sim_st else
+      update_to_store sim_st to (ideal_st to).
+
+  (* A command that is not an endorse never corrupts the ideal store. *)
+  Lemma corrupt_ideal_noend rcmd ist sst :
+    oapp is_endorse false rcmd = false -> corrupt_ideal rcmd ist sst = ist.
+  Proof. rewrite /corrupt_ideal; case: rcmd => [c|]//=; case: c => //; case=> //. Qed.
+
+  (* A safe endorse (from ⊑ to) respects NI, so it does not corrupt either. *)
+  Lemma corrupt_ideal_safe_endorse from to ist sst :
+    flows_to (var_lbl from) (var_lbl to) ->
+    corrupt_ideal (Some (assign (endorse from to))) ist sst = ist.
+  Proof. move=> Hft; rewrite /corrupt_ideal Hft andbF //. Qed.
+
+  (* A command that is not a declassify never reads the ideal store. *)
+  Lemma read_sim_nodecl rcmd sst ist :
+    oapp is_declassify false rcmd = false -> read_sim rcmd sst ist = sst.
+  Proof. rewrite /read_sim; case: rcmd => [c|]//=; case: c => //; case=> //. Qed.
+
+  (* A safe declassify (from ⊑ to) has a public target only if its source is
+     public, so the secret-source-guarded read never fires. *)
+  Lemma read_sim_safe_declassify from to sst ist :
+    flows_to (var_lbl from) (var_lbl to) ->
+    read_sim (Some (assign (declassify from to))) sst ist = sst.
+  Proof.
+    move=> Hft; rewrite /read_sim.
+    have -> : is_secret from && is_public to = false; [| done].
+    case Ht: (is_public to); [| rewrite andbF //].
+    rewrite andbT /is_secret /is_public (flows_to_pub _ _ Ht Hft) //.
+  Qed.
+
 
 
 Parameter TODO: Store.
@@ -92,26 +134,13 @@ Parameter TODO: Store.
       let: sim_st := if (public pc_lbl) is false then sim_st else optcmd_stp_store real_cmd sim_st  in
 
 
-      (* Controlled ideal corruption.  Only a downgrade that actually crosses the
-         attacker — one whose source does NOT flow to its target (`from ⋢ to`,
-         the canonical PU→PT endorse) — corrupts the ideal store.  A *safe*
-         endorse (`from ⊑ to`) respects noninterference, so it behaves exactly
-         like an ordinary assignment and leaves the ideal store alone.  This
-         matches sim_pre, which uses the same NI-violation guard. *)
-      let: ideal_st :=  if real_cmd isn't  Some (assign (endorse from to)) then ideal_st else
-                        if (is_public from && is_untrusted from && ~~ flows_to (var_lbl from) (var_lbl to)) is false then ideal_st else
-                          update_to_store ideal_st from (sim_st from) in (* get the value of from from sim_st, then update to ideal_st *)
+      (* Controlled ideal corruption (see corrupt_ideal). *)
+      let: ideal_st := corrupt_ideal real_cmd ideal_st sim_st in
       let: (ideal_cnt, ideal_st) :=  (optcmd_stp_cnt ideal_cmd ideal_st, optcmd_stp_store ideal_cmd ideal_st) in
 
 
-      (* Controlled ideal read: only a *real* declassify (a secret source made
-         public — the ST→PT) reads from the ideal store; a harmless declassify
-         (public source) leaves sim alone. The `is_secret from` guard is what
-         makes the read sound: a real declassify has a trusted source, so its
-         ideal value matches across the trusted views. *)
-      let: sim_st := if real_cmd isn't Some (assign (declassify from to)) then sim_st else
-                     if (is_secret from && is_public to) is false then sim_st else
-                       update_to_store sim_st to (ideal_st to) in (* Controlled ideal read *)
+      (* Controlled ideal read (see read_sim). *)
+      let: sim_st := read_sim real_cmd sim_st ideal_st in
     
     
       let: atk_pst := (post_cmd_action atk_st real_st) in (* Not having this was quite painful. TODO *)
@@ -254,7 +283,7 @@ Section invprf.
         rewrite-/(WellFormedProg _ _).
         revert_hyp_pat [(option Cmd), (_ ⊢ _)]; case=> /==> [|* //] >.
         apply: step_soundness_pubuntr=> //. } 
-      rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>].
+      rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/corrupt_ideal/read_sim/StateInv=> ? ? [>].
       repeat split; cook.
         { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_endorse rcmd))=> /orP [ | noend].
           { move/is_endorse_inv=> [from [to e]]; rewrite -> e in *=> {e}. (* TODO: this branch is longer *)

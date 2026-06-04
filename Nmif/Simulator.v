@@ -1,8 +1,8 @@
 From Stdlib Require List ssreflect ssrfun ssrbool. 
 Import List ListNotations ssreflect ssrfun ssrbool.
 
-Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics.
-Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics Tacs.Cook.
+Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics Combined.
+Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics Combined Tacs.Cook.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
@@ -55,9 +55,7 @@ Section sim_constr.
 
     let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in
     let: sim_st := optcmd_stp_store ocmd sim_st in 
-    let: sim_st := if ocmd isn't Some (assign (declassify from to)) then sim_st else
-                   if (is_secret from && is_public to) is false then sim_st else
-                   update_to_store sim_st to (ideal_st to) in (* Controlled ideal read *)
+    let: sim_st := read_sim ocmd sim_st ideal_st in (* Controlled ideal read; see Combined.read_sim *)
 
     let: post_atk := post_cmd_action atk ast sim_st in
     let: ast := if isatk is true then post_atk.1.1 else ast in
@@ -119,7 +117,7 @@ Import VarValStore.Notations.
     case=> ? ?; case=> // - [] [] // [] // [] //.  
     rewrite/sim_post /Noninterference.Noninterfering=> from to ? ? i1 i2 *.
     pattern_eq_2 [sim_step _ _ _ _ _] [sim_step _ _ _ _ _]=> [| ->] //.
-    rewrite/sim_step.
+    rewrite/sim_step/read_sim.
     case e: (is_secret from && is_public to)=> //=.
     move: e => /andP[_ e].
     suff: (i1 to = i2 to)=> [-> //|].
