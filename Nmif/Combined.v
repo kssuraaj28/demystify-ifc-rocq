@@ -294,7 +294,12 @@ Section invprf.
          apply/flows_to_subtype_prog;[|apply/snd]; auto. }
       move=> /= ? <- /=.
       move ?: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. 
-        { move x: (extract_controlled_endorse _)=> x'; move: x' x. case=> [[>]/extr_endorse_is |/extr_endorse_no noend]. (* TODO move to case? *)
+        { move x: (extract_controlled_endorse _)=> x'; move: x' x. case=> [[>]/extr_endorse_is |/extr_endorse_no noend]; cycle 1.
+           { pattern_eq_2  [clean_cmd_stp_cnt _ _] [clean_cmd_stp_cnt _ _]; [|move=>->; cook; apply Forall_forall=> //].
+           wf_finisher_guess [RHS] with (clean_cmd_stp_cnt _ (real_store _))=> ->. cook. wf_finisher. }
+
+        move/is_controlled_endorse_inv=> [?] [?]. => [] ? [] ? e; rewrite -> e in *=> {e} //. } *)
+        cook.
         1: admit. admit. }
 
 (*
