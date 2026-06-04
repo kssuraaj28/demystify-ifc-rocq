@@ -238,7 +238,7 @@ Section invprf.
         1: move=> <- /= <- *.
         2: move=> * /=. 
         1,2: repeat split; cook.
-        1,2,4: enter wf_finisher.
+        1,2,4: enter (idtac; wf_finisher).
           { let v := open_constr:(_) in pattern_eq [RHS] with v; [wf_finisher|move=> ->]. cook.  (* Simulating rewrite with apply:. I'm a god *)
           let v := open_constr:(_) in pattern_eq [LHS] with v; [wf_finisher|move=> ->]. cook. }
         move=> /=. 
@@ -257,25 +257,22 @@ Section invprf.
           apply: wf_endorse_st_int; cook.
             { symmetry. apply: endorse_pre_read_eq; cook. wf_finisher. }
           apply: update_untr_keep_view; cook. 
-          wf_finisher_guess [LHS] with ⟨ real_store _ | _ ⟩=> ->. wf_finisher. } (* TODO: Why does RHS not work? *)
+          wf_finisher_guess [RHS] with _=> ->. wf_finisher. }
 
         cook. revert_hyp_pat bool; case.
         1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=.
-        2,4: move=> ? <- /=; wf_finisher_guess [RHS] with ⟨clean_cmd_stp_store _ _ | is_trusted ⟩=> ->; wf_finisher.
-        1-2: revert_hyp_pat (option _); case=> /= *. 
-        1: wf_finisher_guess [LHS] with ⟨clean_cmd_stp_store _ (real_store _) | is_trusted ⟩=> ->.
-        1: wf_finisher_guess [LHS] with ⟨clean_cmd_stp_store _ (ideal_store _) | is_trusted ⟩=> ->.
-        1: wf_finisher.
-        1-4: wf_finisher_guess [LHS] with ⟨clean_cmd_stp_store _ (real_store _) | is_trusted ⟩=> ->.
-        1-2: wf_finisher_guess [LHS] with ⟨clean_cmd_stp_store _ (ideal_store _) | is_trusted ⟩=> ->.
-        1,3: wf_finisher_guess [RHS] with ⟨ideal_store _ | is_trusted ⟩=> ->. 
-        (* TODO: Maybe I can use big brain backtracking?  do ! wf_finisher_guess [LHS]; do! wf_finisher [RHS]; wf_finisher.*)
-        1-4: wf_finisher. }
+        2,4: enter (move=> ? <- /=; wf_finisher_guess [RHS] with ⟨clean_cmd_stp_store _ _ | is_trusted ⟩=> ->; wf_finisher).
+        1,2: revert_hyp_pat (option _); case=> /= *. 
+        (* When I have time, I'd like to automate this *)
+        1,2: wf_finisher_guess [LHS] with ⟨clean_cmd_stp_store _ (real_store _) | is_trusted ⟩=> ->. 
+        1,3: wf_finisher_guess [RHS] with ⟨ ideal_store _ | is_trusted ⟩=> ->.
+        1-4: wf_finisher_guess [LHS] with ⟨clean_cmd_stp_store _ (ideal_store _) | is_trusted ⟩=> ->.
+        1-4: enter (idtac;wf_finisher). }
 
         { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_declassify rcmd))=> /orP [ | nodecl]; cycle 1.
           { revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [+ []] /==> *; cook. 
           2: wf_finisher_guess [LHS] with ⟨if _ then _ else _ |is_public⟩=> ->. 
-          1,2: case: (X in if X then _ else _); wf_finisher. }
+          1,2: case: (X in if X then _ else _); enter (idtac; wf_finisher). }
         move/is_declassify_inv=> [] ? [] ? e; rewrite -> e in *=> {e}. (* This needs to be cleaned up as well *)
         revert_hyp_pat (WellFormedCmd _ _)=> /wf_declassify_inv [] e; rewrite -> e in *=> {e} - [] * /=.
         revert_hyp_pat (if _ then _ else _)=> /= <- /=.
