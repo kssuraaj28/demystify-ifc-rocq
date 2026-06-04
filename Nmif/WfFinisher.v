@@ -241,51 +241,73 @@ Ltac2 wf_dbg (lvl : int) (msg : message) : unit :=
   if Int.ge wf_finisher_debug lvl then Message.print msg else ().
 
 (* TODO: Eventually, we should have a pattern that let's us not have these versions for optional cmd and so on *)
-Ltac wf_finisher_arms :=
-    (apply: wf_cmd_st_conf_ni
-   + apply: wf_optcmd_st_conf_ni
-   + apply: wf_sec_cmd_st_conf_ni
-   + apply: wf_sec_optcmd_st_conf_ni
-   + apply: wf_cmd_st_int_ni
-   + apply: wf_untr_cmd_st_int_ni
-   + apply: wf_untr_optcmd_st_int_ni
-   + apply: wf_tr_cmd_cnt_ni
-   + apply: wf_untr_cmd_evnt_ni
-   + apply: wf_untr_optcmd_evnt_ni
-   + apply: wf_cmd_evnt_int_ni
-   + apply: wf_optcmd_evnt_int_ni
-   + apply: wf_cmd_evnt_end
-   + apply: wf_optcmd_evnt_end
-   + apply: wf_cmd_evnt_decl
-   + apply: wf_optcmd_evnt_decl
-   + apply: pre_cmd_wf_int
-   + apply: pre_cmd_wf_conf
-   + apply: post_cmd_wf).
+Ltac2 wf_finisher_arms () : unit :=
+  goal_assertion 1 "wf_finisher_rec";
+  let lemmas : Std.reference list := [
+    reference:(wf_cmd_st_conf_ni); (* References are parse time! *)
+    reference:(wf_optcmd_st_conf_ni);
+    reference:(wf_sec_cmd_st_conf_ni);
+    reference:(wf_sec_optcmd_st_conf_ni);
+    reference:(wf_cmd_st_int_ni);
+    reference:(wf_untr_cmd_st_int_ni);
+    reference:(wf_untr_optcmd_st_int_ni);
+    reference:(wf_tr_cmd_cnt_ni);
+    reference:(wf_untr_cmd_evnt_ni);
+    reference:(wf_untr_optcmd_evnt_ni);
+    reference:(wf_cmd_evnt_int_ni);
+    reference:(wf_optcmd_evnt_int_ni);
+    reference:(wf_cmd_evnt_end);
+    reference:(wf_optcmd_evnt_end);
+    reference:(wf_cmd_evnt_decl);
+    reference:(wf_optcmd_evnt_decl);
+    reference:(pre_cmd_wf_int);
+    reference:(pre_cmd_wf_conf);
+    reference:(post_cmd_wf)
+  ] in
+  let apply_lemma (c : constr) : unit := ltac1:(c |- apply: c) (Ltac1.of_constr c) in
+  let rec or_all l :=
+    match l with
+    | [] => softfail_s "wf_finisher_arms" "no lemma applies"
+    | r :: rest =>
+      Control.plus 
+      (fun _ =>
+        let c := Env.instantiate r in
+        wf_dbg 3 (fprintf "wf_finisher_arms: trying %t" c);
+        apply_lemma c) 
+      (fun _ => 
+        or_all rest)
+    end in
+  or_all lemmas.
 
-Ltac wf_finisher_close := 
-  lazymatch goal with
-  |- ?G => 
-    first [
-      tryif has_evar G then  fail else reflexivity | 
-      eassumption |
-      symmetry; eassumption]
-  end; enter (throw). (* Should never come here. TODO: Message *)
+Ltac2 wf_finisher_close () : unit :=
+  goal_assertion 1 "wf_finisher_rec";
+  first [
+    wf_dbg 3 (fprintf "close: reflexivity branch");
+    if Constr.has_evar (Control.goal ()) then Control.zero (Tactic_failure None) else reflexivity |
+    wf_dbg 3 (fprintf "close: eassumption branch"); eassumption |
+    wf_dbg 3 (fprintf "close: symmetry; eassumption branch"); symmetry; eassumption];
+  goal_assertion 0 "wf_finisher_rec". (* TODO: There's this whole assert_goals_hard thing or whatever. Maybe I just need this *)
 
 (* TODO: We don't need n I think *)
-Ltac wf_finisher_rec n :=
-  lazymatch n with
-  | 0 => throw (* We really don't want to recurse so much*)
-  | S ?m =>
-    first [
-      wf_finisher_close |
-      lazymatch goal with |- _ = _ => idtac | |- _ => fail end; 
-        (idtac + symmetry);
-        wf_finisher_arms; 
-        wf_finisher_rec m]
-  end.
+Ltac2 rec wf_finisher_rec (n : int) : unit :=
+  harden 0 (
+  goal_assertion 1 "wf_finisher_rec";
+  if Int.equal n 0 then panic_s "wf_finisher_rec" "out of fuel" else
+  Control.plus
+    (fun () => wf_finisher_close ())
+    (fun _ =>
+      lazy_match! goal with
+      | [ |- _ = _ ] => ()
+      | [ |- _ ] => softfail_s "wf_finisher_rec" "goal is not an equation" (* TODO: Why softfail? *)
+      end;
+      Control.plus 
+         (fun _  => wf_dbg 3 (fprintf "nosym branch"))
+         (fun _ => wf_dbg 3 (fprintf "sym branch"); symmetry);
+      wf_finisher_arms (); 
+      Control.enter (fun () => wf_finisher_rec (Int.sub n 1)))).
+      
 
-Ltac wf_finisher :=
-  harden 0 (wf_finisher_rec 5).
+Ltac wf_finisher := ltac2:(wf_finisher_rec 5).
 
 Ltac2 wf_finisher_guess_aux (pat : Ltac1.t) (u : preterm) : unit :=
   let wf_partial_tac := ltac1:(p v |- pattern_eq [p] with v) pat in
