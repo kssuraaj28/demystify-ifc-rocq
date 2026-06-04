@@ -535,9 +535,9 @@ Module Cook.
 
 
   Ltac2 mutable cook_debug : int := 0.
-  (* Print [msg ()] when cook_debug is at least [lvl]. *)
-  #[local] Ltac2 cook_dbg (lvl : int) (msg : unit -> unit) : unit :=
-    if Int.ge cook_debug lvl then msg () else ().
+  (* Print [msg] when cook_debug is at least [lvl]. *)
+  #[local] Ltac2 cook_dbg (lvl : int) (msg : message) : unit :=
+    if Int.ge cook_debug lvl then Message.print msg else ().
 
   Ltac2 cook_step0 (cb : cookbook) : unit :=
     goal_assertion 1 "cook_step";
@@ -545,11 +545,11 @@ Module Cook.
       match l with
       | [] => softfail_s "cook_step" "all tactics failed"
       | (t, desc) :: rest =>
-        cook_dbg 2 (fun () => printf "Trying: cook_step[%i]: %s" i desc);
+        cook_dbg 2 (fprintf "Trying: cook_step[%i]: %s" i desc);
         match Control.case t with
-        | Val ((),_) => cook_dbg 1 (fun () => printf "cook_step[%i]: %s success" i desc)
+        | Val ((),_) => cook_dbg 1 (fprintf "cook_step[%i]: %s success" i desc)
         | Err e =>
-            cook_dbg 3 (fun () => printf "cook_step[%i]: %s failed: %a" i desc (fun () e' => Message.of_exn e') e);
+            cook_dbg 3 (fprintf "cook_step[%i]: %s failed: %a" i desc (fun () e' => Message.of_exn e') e);
             go (Int.add i 1) rest
         end
       end in
@@ -560,14 +560,14 @@ Module Cook.
   Ltac2 cook0 (cb : cookbook) : unit :=
     let rec go (acc : bool) : bool :=
       let gls := Control.numgoals () in
-      cook_dbg 1 (fun () => printf "cook: numgoals = %i" gls);
+      cook_dbg 1 (fprintf "cook: numgoals = %i" gls);
       if Int.equal gls 0 then acc else
 
       let this := Control.focus 1 1 (fun () =>
         match Control.case (fun () => cook_step0 cb) with
         | Val ((), _) => true
         | Err _ =>
-              cook_dbg 2 (fun () => printf "cook: cook_step failed, shelving goal");
+              cook_dbg 2 (fprintf "cook: cook_step failed, shelving goal");
               Control.shelve (); false
         end) in
       go (Bool.or acc this) in
