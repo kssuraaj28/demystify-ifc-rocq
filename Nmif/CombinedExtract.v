@@ -162,7 +162,13 @@ Section extract_step_commute.
        to be tightened from `is_public to` to `is_secret from && is_public to`
        to match cmbcmd_step (otherwise a safe declassify to a public target
        reads on the simulator side but not the combined side). *)
-    1,2: move=> [Hcanon | ]; [| admit].
+    (* The safe disjunct (harmless downgrade) is still open.  Unlike the
+       canonical case it can occur under an untrusted pc, so `ideal_cmd` need
+       not be the downgrade itself — the extraction manipulation below assumes
+       `ideal_cmd = endorse/declassify` (via `dotop [cbn]=> <-`).  Closing it
+       needs the general-pc / general-ideal_cmd treatment (case on `untrusted
+       pc`), mirroring the safe cases of cmbcmd_step_inv. *)
+    1,2: move=> [Hcanon | _]; [| admit].
     1,2: move: Hcanon.
     1,2: move=> [->] [? ?].
     1,2: dotop [cbn]=> <- _ ? ?.
@@ -401,4 +407,6 @@ Section extract_step_commute.
   Print Assumptions extract_step_commute.
 
 End extract_step_commute.
+
+
 
