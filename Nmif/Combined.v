@@ -92,13 +92,21 @@ Parameter TODO: Store.
       let: sim_st := if (public pc_lbl) is false then sim_st else optcmd_stp_store real_cmd sim_st  in
 
 
-      (* Controlled ideal corruption *)
+      (* Controlled ideal corruption. Only a *real* endorse (a public, untrusted
+         source — the attacker's PU→PT) corrupts the ideal store; a harmless
+         endorse leaves it alone, matching sim_pre. *)
       let: ideal_st :=  if real_cmd isn't  Some (assign (endorse from to)) then ideal_st else
+                        if (is_public from && is_untrusted from) is false then ideal_st else
                           update_to_store ideal_st from (sim_st from) in (* get the value of from from sim_st, then update to ideal_st *)
       let: (ideal_cnt, ideal_st) :=  (optcmd_stp_cnt ideal_cmd ideal_st, optcmd_stp_store ideal_cmd ideal_st) in
 
 
-      let: sim_st := if real_cmd isn't Some (assign (declassify from to)) then sim_st else update_to_store sim_st to (ideal_st to) in (* Controlled ideal read *)
+      (* Controlled ideal read: only a *real* declassify (a public target — the
+         ST→PT) reads from the ideal store; a harmless declassify leaves sim
+         alone, matching sim_step. *)
+      let: sim_st := if real_cmd isn't Some (assign (declassify from to)) then sim_st else
+                     if (is_public to) is false then sim_st else
+                       update_to_store sim_st to (ideal_st to) in (* Controlled ideal read *)
     
     
       let: atk_pst := (post_cmd_action atk_st real_st) in (* Not having this was quite painful. TODO *)
@@ -244,19 +252,32 @@ Section invprf.
       rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>].
       repeat split; cook.
         { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_endorse rcmd))=> /orP [ | noend].
-          { move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e}. (* TODO: this branch is longer *)
-          admit. (* TODO *)
-          (*
-          revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] e; rewrite -> e in *=> {e} - [] * /=.
+          { move/is_endorse_inv=> [from [to e]]; rewrite -> e in *=> {e}. (* TODO: this branch is longer *)
+          revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [Hcanon | Hsafe].
+          { move: Hcanon=> [Hpc [Hfrom Hto]]; rewrite -> Hpc in *=> {Hpc}.
+          have Hg : is_public from && is_untrusted from; [rewrite /is_public /is_untrusted Hfrom // |].
+          rewrite Hg.
           revert_hyp_pat (if _ then _ else _)=> /= <- /=.
           apply/storeview_eq_ext=> *; rewrite /clean_assign_stp_store /update_to_store; cook.
           rewrite/get_assign_val/get_assign_dest dec_eq_refl. (* TODO: Eventually this should be a rewrite rule also *)
-          case e1: (_ =? _). 
+          case e1: (_ =? _).
           2: case e2: (_ =? _).
           2: apply dec_eq_true in e2; rewrite -> e2 in *=> {e2}.
           1,2: unshelve apply: storeview_eq; [exact: is_public|..]; cook.
-          unshelve apply: storeview_eq; [exact: is_trusted|..]; cook.
-              *)
+          unshelve apply: storeview_eq; [exact: is_trusted|..]; cook. }
+          move: Hsafe=> [Hft Hpcto].
+          revert_hyp_pat (if untrusted _ then _ else _); case: ifP => Hpcu.
+          { (* untrusted pc: ideal_cmd is PU-well-typed; pc ⊑ to ⟹ to untrusted *)
+          move=> Hic.
+          have Htou : is_untrusted to := flows_from_untr _ _ Hpcu Hpcto.
+          have Htf : is_trusted to = false; [rewrite /is_trusted Htou // |].
+          rewrite /clean_cmd_stp_store /clean_assign_stp_store /get_assign_dest /get_assign_val /=.
+          rewrite update_storeview_nochange //.
+          cook. }
+          (* trusted pc: ideal_cmd = endorse from to; both sides copy to := · from *)
+          move=> Hic; rewrite -Hic /=.
+          apply: update_from_storeview_eq; [exact: (fun H => flows_to_tr _ _ H Hft) |].
+          cook.
           }
         cook. revert_hyp_pat bool; case.
         1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=.
@@ -264,15 +285,23 @@ Section invprf.
         1-2: revert_hyp_pat (option _); case=> /= *; cook. } 
         { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_declassify rcmd))=> /orP [ | nodecl]; cycle 1.
           { revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [+ []] /==> *; cook. } 
-        move/is_declassify_inv=> [] ? [] ? e; rewrite -> e in *=> {e}.
-        admit. (* TODO *)
-        (*
-        revert_hyp_pat (WellFormedCmd _ _)=> /wf_declassify_inv [] e; rewrite -> e in *=> {e} - [] * /=.
+        move/is_declassify_inv=> [from [to e]]; rewrite -> e in *=> {e}.
+        revert_hyp_pat (WellFormedCmd _ _)=> /wf_declassify_inv [Hcanon | Hsafe].
+        { move: Hcanon=> [Hpc [Hfrom Hto]]; rewrite -> Hpc in *=> {Hpc}.
+        have Hg : is_public to; [rewrite /is_public Hto // |].
+        rewrite Hg.
         revert_hyp_pat (if _ then _ else _)=> /= <- /=.
         apply/storeview_eq_ext=> *; rewrite /clean_assign_stp_store /update_to_store /=. rewrite dec_eq_refl. (* TODO: Eventually this should be a rewrite rule also *)
-        case e1: (_ =? _). 
+        case e1: (_ =? _).
           { unshelve apply: storeview_eq; [exact: is_trusted|..]; cook. }
-        apply/storeview_eq; [|eassumption]; cook. *) }
+        apply/storeview_eq; [|eassumption]; cook. }
+        move: Hsafe=> [Hft Hpcto].
+        (* Safe declassify (Hft : var_lbl from ⊑ var_lbl to, Hpcto : pc ⊑ var_lbl to):
+           dual of safe endorse, on the public view. The guarded ideal read only
+           fires when `to` is public; `clean (declassify from to) = update to (· from)`
+           preserves the public view because `from ⊑ to` (flows_to_pub), exactly
+           like an ordinary assignment. Use update_from_storeview_eq with is_public. *)
+        admit. (* safe declassify: see comment *) }
       move=> /=.  
       apply/Forall_and; cook; auto.
       revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)].
@@ -286,13 +315,18 @@ Section invprf.
       move ?: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. 
          { erewrite ni_tr_cmd_cnt; [apply/Forall_combine2_same/Forall_map/Forall_forall => // | eassumption |..]; auto with trickbag.
          let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_endorse rcmd))=> /orP [ | noend]; cook.
-         move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e}.
-         admit. (* TODO *)
-         (*
-         revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] [] e; rewrite -> e in * => {e} - [] *.
-         rewrite update_storeview_nochange; cook.
-         *)
-         } 
+         move/is_endorse_inv=> [from [to e]]; rewrite -> e in *=> {e}.
+         revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [Hcanon | Hsafe].
+         { move: Hcanon=> [Hpc [Hfrom Hto]]; rewrite -> Hpc in * => {Hpc}.
+         have Hg : is_public from && is_untrusted from; [rewrite /is_public /is_untrusted Hfrom // |].
+         rewrite Hg /= update_storeview_nochange; cook. }
+         move: Hsafe=> [Hft Hpcto].
+         case Hg: (is_public from && is_untrusted from).
+         { move: Hg => /andP[_ Hu].
+           have Htf : is_trusted from = false; [rewrite /is_trusted Hu // |].
+           rewrite update_storeview_nochange //. cook. }
+         cook.
+         }
       cook. rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
       revert_hyp_pat [Cmd, (WellFormedCmd _ _), (compute_new_pc _ _ = _)].
       move=> ? /step_soundness snd newpce.
@@ -314,3 +348,6 @@ Section invprf.
 
   Print Assumptions cfg_step_inv.
 End invprf.
+
+
+
