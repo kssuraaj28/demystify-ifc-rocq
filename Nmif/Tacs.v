@@ -243,7 +243,7 @@ End test.
 
 (* The harden tactic *)
 
-#[local] Ltac2 Type exn ::= 
+#[local] Ltac2 Type exn ::=
   [ProgressWrap (exn)].
 
 #[local] Ltac2 once_hard_progress (t: unit -> unit) : unit :=
