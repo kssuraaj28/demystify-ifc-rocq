@@ -265,9 +265,10 @@ Ltac wf_finisher_arms :=
 Ltac wf_finisher_close := 
   lazymatch goal with
   |- ?G => 
-    tryif has_evar G then 
-      first [eassumption | symmetry; eassumption] else
-      first [assumption | reflexivity]
+    first [
+      tryif has_evar G then  fail else reflexivity | 
+      eassumption |
+      symmetry; eassumption]
   end; enter (throw). (* Should never come here. TODO: Message *)
 
 (* TODO: We don't need n I think *)
@@ -289,10 +290,8 @@ Ltac wf_finisher :=
 Ltac2 wf_finisher_guess_aux (pat : Ltac1.t) (u : preterm) : unit :=
   let wf_partial_tac := ltac1:(p v |- pattern_eq [p] with v) pat in
   let acc : constr list ref := { contents := [] } in
-  wf_dbg 1 (fprintf "wf_finisher_guess: probe begin");
-  match Control.case (fun () =>
+  let fail_runner () :=
     let v := Constr.Pretype.pretype Constr.Pretype.Flags.open_constr_flags_with_tc Constr.Pretype.expected_without_type_constraint u in
-    wf_dbg 2 (fprintf "wf_finisher_guess: pretyped v = %t" v);
     wf_partial_tac (Ltac1.of_constr v);
     wf_dbg 2 (fprintf "wf_finisher_guess: pattern_eq ok, %i goals" (Control.numgoals ()));
     Control.focus 1 1 (fun () =>
@@ -300,8 +299,11 @@ Ltac2 wf_finisher_guess_aux (pat : Ltac1.t) (u : preterm) : unit :=
       let v' := clone_constr v in
       wf_dbg 1 (fprintf "wf_finisher_guess: candidate v = %t" v');
       acc.(contents) := v' :: acc.(contents);
-      Control.zero (Tactic_failure None))
-  ) with
+      Control.zero (Tactic_failure None)) in 
+
+  wf_dbg 1 (fprintf "wf_finisher_guess: probe begin");
+  match Control.case (fail_runner) with
+  | Val _ => panic_s "wf_finisher_guess" "unreachable: probe loop must Control.zero"
   | Err e =>
     wf_dbg 2 (fprintf "wf_finisher_guess: probe loop exit: %a" (fun () e' => Message.of_exn e') e);
     let dedup := List.fold_right (fun c acc =>
@@ -309,14 +311,20 @@ Ltac2 wf_finisher_guess_aux (pat : Ltac1.t) (u : preterm) : unit :=
     wf_dbg 1 (fprintf "wf_finisher_guess: %i unique candidate(s)" (List.length dedup));
     match dedup with
     | [v_single] =>
+       wf_dbg 1 (fprintf "wf_finisher_guess: replay with v = %t" v_single);
        wf_partial_tac (Ltac1.of_constr v_single);
-       Control.focus 1 1 (fun () => ltac1:(wf_finisher))
+       wf_dbg 2 (fprintf "wf_finisher_guess: replay pattern_eq ok, %i goals" (Control.numgoals ()));
+       Control.focus 1 1 (fun () =>
+         wf_dbg 2 (fprintf "wf_finisher_guess: replay goal = %t" (Control.goal ()));
+         match Control.case (fun () =>ltac1:(wf_finisher)) with 
+           Err _ => panic_s "wf_finisher" "Guessed but cannot finish" | _ => ()
+         end;
+         wf_dbg 1 (fprintf "wf_finisher_guess: replay wf_finisher closed goal 1"))
     | _ =>
       Message.print (Message.of_string "Guess list");
       List.iter (fun c => Message.print (Message.of_constr c)) dedup;
       panic_s "wf_finisher_guess" "ambiguous (or no) guess"
     end
-  | _ => panic_s "wf_finisher_guess" "unreachable: probe loop must Control.zero"
   end.
 
 Tactic Notation "wf_finisher_guess" "[" ssrpatternarg(p) "]" "with" uconstr(u) :=
@@ -476,4 +484,23 @@ Section test.
   Proof. move=> *.
   wf_finisher_guess [post_cmd_action _ _ _] with _ => -> //.
   Qed.
+
+  Goal forall (P : StoreView -> Prop) s s',
+    ⟨ s | is_trusted ⟩ = ⟨ s' | is_trusted ⟩ ->
+    P (⟨ s' | is_trusted ⟩) ->
+    P (⟨ s | is_trusted ⟩).
+  Proof. move=> *. wf_finisher_guess [⟨ _ | is_trusted ⟩] with _ => ->. auto. Qed.
+
+  Ltac2 Set wf_finisher_debug := 3.
+
+  Goal forall (P : StoreView -> Prop) s s',
+    ⟨ s | is_trusted ⟩ = ⟨ s' | is_trusted ⟩ ->
+    P (⟨ s | is_trusted ⟩) ->
+    P (⟨ s' | is_trusted ⟩).
+  Proof. move=> *. wf_finisher_guess [⟨ _ | is_trusted ⟩] with _ => ->. auto. Qed.
+
+  Goal forall s s',
+    ⟨ s | is_trusted ⟩ = ⟨ s' | is_trusted ⟩ ->
+    ⟨ s' | is_trusted ⟩ = ⟨ s | is_trusted ⟩.
+  Proof. move=> *. wf_finisher. Qed.
 End test.
