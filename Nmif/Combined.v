@@ -92,11 +92,14 @@ Parameter TODO: Store.
       let: sim_st := if (public pc_lbl) is false then sim_st else optcmd_stp_store real_cmd sim_st  in
 
 
-      (* Controlled ideal corruption. Only a *real* endorse (a public, untrusted
-         source — the attacker's PU→PT) corrupts the ideal store; a harmless
-         endorse leaves it alone, matching sim_pre. *)
+      (* Controlled ideal corruption.  Only a downgrade that actually crosses the
+         attacker — one whose source does NOT flow to its target (`from ⋢ to`,
+         the canonical PU→PT endorse) — corrupts the ideal store.  A *safe*
+         endorse (`from ⊑ to`) respects noninterference, so it behaves exactly
+         like an ordinary assignment and leaves the ideal store alone.  This
+         matches sim_pre, which uses the same NI-violation guard. *)
       let: ideal_st :=  if real_cmd isn't  Some (assign (endorse from to)) then ideal_st else
-                        if (is_public from && is_untrusted from) is false then ideal_st else
+                        if (is_public from && is_untrusted from && ~~ flows_to (var_lbl from) (var_lbl to)) is false then ideal_st else
                           update_to_store ideal_st from (sim_st from) in (* get the value of from from sim_st, then update to ideal_st *)
       let: (ideal_cnt, ideal_st) :=  (optcmd_stp_cnt ideal_cmd ideal_st, optcmd_stp_store ideal_cmd ideal_st) in
 
@@ -257,7 +260,8 @@ Section invprf.
           { move/is_endorse_inv=> [from [to e]]; rewrite -> e in *=> {e}. (* TODO: this branch is longer *)
           revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [Hcanon | Hsafe].
           { move: Hcanon=> [Hpc [Hfrom Hto]]; rewrite -> Hpc in *=> {Hpc}.
-          have Hg : is_public from && is_untrusted from; [rewrite /is_public /is_untrusted Hfrom // |].
+          have Hg : is_public from && is_untrusted from && ~~ flows_to (var_lbl from) (var_lbl to);
+            [rewrite /is_public /is_untrusted Hfrom Hto // |].
           rewrite Hg.
           revert_hyp_pat (if _ then _ else _)=> /= <- /=.
           apply/storeview_eq_ext=> *; rewrite /clean_assign_stp_store /update_to_store; cook.
@@ -268,6 +272,11 @@ Section invprf.
           1,2: unshelve apply: storeview_eq; [exact: is_public|..]; cook.
           unshelve apply: storeview_eq; [exact: is_trusted|..]; cook. }
           move: Hsafe=> [Hft Hpcto].
+          (* Safe endorse (from ⊑ to): NI-respecting, so the corruption guard
+             `~~ flows_to from to` is false and no corruption happens — it behaves
+             exactly like an ordinary assignment. *)
+          have Hg : ~~ flows_to (var_lbl from) (var_lbl to) = false; [rewrite Hft // |].
+          rewrite Hg !Bool.andb_false_r.
           revert_hyp_pat (if untrusted _ then _ else _); case: ifP => Hpcu.
           { (* untrusted pc: ideal_cmd is PU-well-typed; pc ⊑ to ⟹ to untrusted *)
           move=> Hic.
@@ -275,22 +284,11 @@ Section invprf.
           have Htf : is_trusted to = false; [rewrite /is_trusted Htou // |].
           rewrite /clean_cmd_stp_store /clean_assign_stp_store /get_assign_dest /get_assign_val /=.
           rewrite update_storeview_nochange //.
-          (* ideal_cmd preserves the trusted view (PU-well-typed), and the ideal
-             corruption only touches an untrusted `from`, so both are invisible. *)
-          rewrite (ni_untr_optcmd_st_int _ _ _ Hic).
-          case Hg: (is_public from && is_untrusted from);
-            [ move: Hg => /andP[_ Hu]; have Htf2 : is_trusted from = false;
-                [ rewrite /is_trusted Hu // | rewrite update_storeview_nochange //; cook ]
-            | cook ]. }
-          (* trusted pc: ideal_cmd = endorse from to; both sides copy to := · from,
-             so the proof reduces to the same trusted-view argument. *)
+          rewrite (ni_untr_optcmd_st_int _ _ _ Hic). cook. }
+          (* trusted pc: ideal_cmd = endorse from to; both sides copy to := · from. *)
           move=> Hic; rewrite -Hic.
           rewrite /clean_cmd_stp_store /clean_assign_stp_store /get_assign_dest /get_assign_val /=.
-          apply: update_from_storeview_eq; [exact: (fun H => flows_to_tr _ _ H Hft) |].
-          case Hg: (is_public from && is_untrusted from);
-            [ move: Hg => /andP[_ Hu]; have Htf2 : is_trusted from = false;
-                [ rewrite /is_trusted Hu // | rewrite update_storeview_nochange //; cook ]
-            | cook ].
+          apply: update_from_storeview_eq; [exact: (fun H => flows_to_tr _ _ H Hft) | cook].
           }
         cook. revert_hyp_pat bool; case.
         1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=.
@@ -342,14 +340,13 @@ Section invprf.
          move/is_endorse_inv=> [from [to e]]; rewrite -> e in *=> {e}.
          revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [Hcanon | Hsafe].
          { move: Hcanon=> [Hpc [Hfrom Hto]]; rewrite -> Hpc in * => {Hpc}.
-         have Hg : is_public from && is_untrusted from; [rewrite /is_public /is_untrusted Hfrom // |].
+         have Hg : is_public from && is_untrusted from && ~~ flows_to (var_lbl from) (var_lbl to);
+           [rewrite /is_public /is_untrusted Hfrom Hto // |].
          rewrite Hg /= update_storeview_nochange; cook. }
          move: Hsafe=> [Hft Hpcto].
-         case Hg: (is_public from && is_untrusted from).
-         { move: Hg => /andP[_ Hu].
-           have Htf : is_trusted from = false; [rewrite /is_trusted Hu // |].
-           rewrite update_storeview_nochange //. cook. }
-         cook.
+         (* safe endorse: no corruption (flows_to from to) *)
+         have Hg : ~~ flows_to (var_lbl from) (var_lbl to) = false; [rewrite Hft // |].
+         rewrite Hg !Bool.andb_false_r. cook.
          }
       cook. rewrite-/(WellFormedProg _ _). (* TODO: lift that weakening thing to wf prog also*)
       revert_hyp_pat [Cmd, (WellFormedCmd _ _), (compute_new_pc _ _ = _)].

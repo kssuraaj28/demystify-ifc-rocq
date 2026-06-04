@@ -154,23 +154,24 @@ Section extract_step_commute.
     1,2: move=> [?] [?] ->.
     1,2: rewrite/CmbCmdCoreInv=> - []. 
     1: move/wf_endorse_inv. 2: move/wf_declassify_inv.
-    (* The canonical disjunct (real PU→PT / ST→PT) is the original proof.  The
-       safe disjunct (harmless downgrade) is still open: with the tightened
-       combined-step guards a safe downgrade performs no controlled
-       corruption/read, so it should commute exactly like an ordinary
-       assignment — but this requires Simulator.sim_step's declassify read guard
-       to be tightened from `is_public to` to `is_secret from && is_public to`
-       to match cmbcmd_step (otherwise a safe declassify to a public target
-       reads on the simulator side but not the combined side). *)
-    (* The safe disjunct (harmless downgrade) is still open.  Unlike the
-       canonical case it can occur under an untrusted pc, so `ideal_cmd` need
-       not be the downgrade itself — the extraction manipulation below assumes
-       `ideal_cmd = endorse/declassify` (via `dotop [cbn]=> <-`).  Closing it
-       needs the general-pc / general-ideal_cmd treatment (case on `untrusted
-       pc`), mirroring the safe cases of cmbcmd_step_inv. *)
-    1,2: move=> [Hcanon | _]; [| admit].
-    1,2: move: Hcanon.
-    1,2: move=> [->] [? ?].
+    (* Split the wf_*_inv disjunction.  After this the four goals are, in order:
+       endorse-canonical, endorse-safe, declassify-canonical, declassify-safe.
+       We close the two safe goals (4 then 2 so the indices below stay put),
+       leaving the two canonical goals as 1,2 for the original script. *)
+    1,2: move=> [Hcanon | [Hft Hpcto]].
+    (* The two safe (harmless-downgrade) goals.  With the NI-violation corruption
+       guard a safe downgrade (from ⊑ to) performs NO ideal corruption and NO
+       ideal read — its `cmbcmd_step`/simulator behaviour is *literally* that of an
+       ordinary assignment (after rewriting the corruption/read guards away with
+       `Hft`, the goal is exactly the commute proved by `extract_step_commute`
+       below for general `noend nodecl` commands; unlike the canonical script it
+       must handle `sim_active = false`, so it is the general reshaping, not the
+       sim_active-forcing canonical one).  The clean way to discharge them is to
+       factor that reshaping (lines 276–398) into a lemma parameterized by the
+       ideal-command noninterference fact and reuse it here; left admitted. *)
+    4: { admit. (* safe declassify: read guard false (Hft); ordinary commute *) }
+    2: { admit. (* safe endorse: corruption guard false (Hft); ordinary commute *) }
+    1,2: move: Hcanon=> [->] [? ?].
     1,2: dotop [cbn]=> <- _ ? ?.
     1,2: rewrite/comb_step/cmbcmd_step/extract_2cfg; cook.
     1,2: pattern_eq [sim_active  _] with true=>[| ->]; [simpl; cook|].
