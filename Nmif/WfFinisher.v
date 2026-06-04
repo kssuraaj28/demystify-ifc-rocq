@@ -264,17 +264,17 @@ Ltac2 wf_finisher_arms () : unit :=
     reference:(pre_cmd_wf_conf);
     reference:(post_cmd_wf)
   ] in
-  let apply_lemma (c : constr) : unit := ltac1:(c |- apply: c) (Ltac1.of_constr c) in
+  let apply_lemma (c : constr) : unit := ltac1:(c |- eapply c) (Ltac1.of_constr c) in (* ssr apply: fails in some other file. TODO: Debug *)
   let rec or_all l :=
     match l with
     | [] => softfail_s "wf_finisher_arms" "no lemma applies"
     | r :: rest =>
-      Control.plus 
+      Control.plus
       (fun _ =>
         let c := Env.instantiate r in
         wf_dbg 3 (fprintf "wf_finisher_arms: trying %t" c);
-        apply_lemma c) 
-      (fun _ => 
+        apply_lemma c)
+      (fun _ =>
         or_all rest)
     end in
   or_all lemmas.
