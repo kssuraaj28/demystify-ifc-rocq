@@ -20,24 +20,42 @@ Definition PcLbl := Lattice4pt.Label.
 
 Section sa.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
-  Import Lattice4pt.Notations.
+  Import Lattice4pt.Notations Util.DecEq.Notations.
 
-  Notation WellFormedProg' WellFormedCmd pclbl prog :=
-    (Forall (WellFormedCmd pclbl) prog) (only parsing).
+  Notation ptlbl := (mk_lbl false true).
+  Notation stlbl := (mk_lbl false false).
+  Notation pulbl := (mk_lbl true true).
+
+  Definition is_controlled_endorse (a : Assignment) :=
+    match a with
+    | endorse from to => (var_lbl from =? pulbl) && (var_lbl to =? ptlbl)
+    | _ => false
+    end.
+
+  Definition is_controlled_declassify (a : Assignment) :=
+    match a with
+    | declassify from to => (var_lbl from =? stlbl) && (var_lbl to =? ptlbl)
+    | _ => false
+    end.
+
+
+  (* TODO: 
+  is_ni_assign
+  *)
 
   (* TODO: How would a parameterized thing look like, as opposed to indexed? *)
   (* WellTyped? *)
+  Notation WellFormedProg' WellFormedCmd pclbl prog :=
+    (Forall (WellFormedCmd pclbl) prog) (only parsing).
   Unset Elimination Schemes.
   Inductive WellFormedCmd : PcLbl -> Cmd -> Prop := 
   | wf_endorse: 
      forall from to,
-       let: ptlbl := mk_lbl false true in let: pulbl := mk_lbl true true in
        var_lbl from = pulbl -> var_lbl to = ptlbl ->
        _ ptlbl (assign (endorse from to))
 
   | wf_declassify: 
      forall from to,
-       let: ptlbl := mk_lbl false true in let: stlbl := mk_lbl false false in
        var_lbl from = stlbl -> var_lbl to = ptlbl ->
        _ ptlbl (assign (declassify from to))
 
@@ -77,13 +95,11 @@ Section sa.
     *)
     Hypothesis hyp_endorse : 
         forall from to,
-          let: ptlbl := mk_lbl false true in let: pulbl := mk_lbl true true in
           var_lbl from = pulbl -> var_lbl to = ptlbl ->
           P ptlbl (assign (endorse from to)).
 
     Hypothesis hyp_declassify : 
         forall from to,
-          let: ptlbl := mk_lbl false true in let: stlbl := mk_lbl false false in
           var_lbl from = stlbl -> var_lbl to = ptlbl ->
           P ptlbl (assign (declassify from to)).
 

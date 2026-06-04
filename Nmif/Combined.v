@@ -70,8 +70,6 @@ Section cmb_step.
 
 
 
-Parameter TODO: Store.
-
   Section step.
     Variable (adv: AdvNextStep AtkStates). 
     Notation AcmdEvent := (Semantics.Event).
