@@ -65,6 +65,7 @@ Section syntax.
     Qed.
   End cmd_ind.
 
+(*
 (* TODO: Should go elsewhere *)
   Definition is_endorse (c : Cmd) : bool :=
     match c with assign (endorse _ _) => true | _ => false end.
@@ -94,8 +95,10 @@ Section syntax.
     oapp is_endorse false oc \/ oapp is_declassify false oc
     \/ (~~ oapp is_endorse false oc /\ ~~ oapp is_declassify false oc).
   Proof. case: oc=> [c | ] /=; [exact: is_endorse_declassify | intuition]. Qed.
+*)
 End syntax.
 
+(*
 Ltac2 Set this_cookbook_ as old :=
   add_cookstep
     ltac1:(match goal with
@@ -135,9 +138,11 @@ Ltac2 Set this_cookbook_ as old :=
            set b := (X in match _ with assign (declassify _ _) => _ | _ => X end);
            suff: P b; [move: P b nodecl; clear; case: c=> [[]| |] //= |subst P b; cbv beta]
          end) "no_declassify" old.
+*)
 
 Ltac2 this_cookbook () := this_cookbook_ ().
 
+(*
 Section test.
   Context `{!VarPrm, !ValPrm}.
   Ltac cook := ltac2:(cook this_cookbook).
@@ -165,4 +170,4 @@ Section test.
     ~~ is_declassify c ->
     match c with assign (declassify _ _) => X | _ => Y end = Y.
   Proof. move=> c X Y nodecl. cook. Abort.
-End test.
+End test. *)

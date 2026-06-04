@@ -49,6 +49,12 @@ Section preds.
   Definition is_controlled_declassify (c : Cmd) :=
     if extract_controlled_declassify c is Some _ then true else false.
 
+  (* 
+    Use oapp for optional
+    oapp extract_controlled_endorse None oc.
+    oapp extract_controlled_declassify None oc.
+  *)
+
   Import Util.DecEq.
 
   Lemma is_controlled_endorse_inv c :

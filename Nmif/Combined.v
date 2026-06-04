@@ -91,12 +91,13 @@ Section cmb_step.
 
 
       (* Controlled ideal corruption *)
-      let: ideal_st :=  if real_cmd isn't  Some (assign (endorse from to)) then ideal_st else
+      let: ideal_st :=  if oapp extract_controlled_endorse None real_cmd isn't Some (from, to) then ideal_st else 
                           update_to_store ideal_st from (sim_st from) in (* get the value of from from sim_st, then update to ideal_st *)
       let: (ideal_cnt, ideal_st) :=  (optcmd_stp_cnt ideal_cmd ideal_st, optcmd_stp_store ideal_cmd ideal_st) in
 
 
-      let: sim_st := if real_cmd isn't Some (assign (declassify from to)) then sim_st else update_to_store sim_st to (ideal_st to) in (* Controlled ideal read *)
+      let: sim_st := if oapp extract_controlled_declassify None real_cmd isn't Some (from, to) then sim_st else 
+                      update_to_store sim_st to (ideal_st to) in (* Controlled ideal read *)
     
     
       let: atk_pst := (post_cmd_action atk_st real_st) in (* Not having this was quite painful. TODO *)
