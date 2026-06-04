@@ -17,47 +17,88 @@ Ltac2 Set this_cookbook_ := create_new_cookbook.
 
 (* TODO: Maybe elsewere *)
 Definition PcLbl := Lattice4pt.Label.
+#[local]  Notation ptlbl := (mk_lbl false true).
+#[local]  Notation stlbl := (mk_lbl false false).
+#[local]  Notation pulbl := (mk_lbl true true).
+
+Section preds. 
+  Import Util.DecEq.Notations.
+
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
+
+  Definition extract_controlled_endorse (c: Cmd) : option (Vars * Vars) :=
+    match c with
+    | assign (endorse from to) => 
+      if (var_lbl from =? pulbl) && (var_lbl to =? ptlbl) is false then None else
+      Some (from, to)
+    | _ => None
+    end.
+
+  (* The things with ~~ is_endorse should become something else *)
+  Definition is_controlled_endorse (c : Cmd) :=
+    if extract_controlled_endorse c is Some _ then true else false.
+
+  Definition extract_controlled_declassify (c: Cmd) : option (Vars * Vars) :=
+    match c with
+    | assign (declassify from to) => 
+      if (var_lbl from =? stlbl) && (var_lbl to =? ptlbl) is false then None else
+      Some (from, to)
+    | _ => None
+    end.
+
+  Definition is_controlled_declassify (c : Cmd) :=
+    if extract_controlled_declassify c is Some _ then true else false.
+
+  Import Util.DecEq.
+
+  Lemma is_controlled_endorse_inv c :
+    is_controlled_endorse c ->
+    exists from to, c = assign (endorse from to)
+                 /\ var_lbl from = pulbl /\ var_lbl to = ptlbl.
+  Proof. 
+    case: c=> //= - [] //= >.
+    rewrite/is_controlled_endorse/extract_controlled_endorse.
+    case e: (_ && _)=> //. move/andP:e=> [] e1 e2.
+    specialize (dec_eq_true _ _ e1). specialize (dec_eq_true _ _ e2).
+    move=> {e1 e2} <- <- _.
+    do !econstructor.
+  Qed.
+
+  Lemma is_controlled_declassify_inv c :
+    is_controlled_declassify c ->
+    exists from to, c = assign (declassify from to)
+                 /\ var_lbl from = stlbl /\ var_lbl to = ptlbl.
+  Proof. 
+    case: c=> //= - [] //= >.
+    rewrite/is_controlled_declassify/extract_controlled_declassify.
+    case e: (_ && _)=> //. move/andP:e=> [] e1 e2.
+    specialize (dec_eq_true _ _ e1). specialize (dec_eq_true _ _ e2).
+    move=> {e1 e2} <- <- _.
+    do !esplit.
+  Qed.
+End preds.
 
 Section sa.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
-  Import Lattice4pt.Notations Util.DecEq.Notations.
-
-  Notation ptlbl := (mk_lbl false true).
-  Notation stlbl := (mk_lbl false false).
-  Notation pulbl := (mk_lbl true true).
-
-  Definition is_controlled_endorse (a : Assignment) :=
-    match a with
-    | endorse from to => (var_lbl from =? pulbl) && (var_lbl to =? ptlbl)
-    | _ => false
-    end.
-
-  Definition is_controlled_declassify (a : Assignment) :=
-    match a with
-    | declassify from to => (var_lbl from =? stlbl) && (var_lbl to =? ptlbl)
-    | _ => false
-    end.
-
-
+  Import Lattice4pt.Notations. 
   (* TODO: 
   is_ni_assign
   *)
 
   (* TODO: How would a parameterized thing look like, as opposed to indexed? *)
   (* WellTyped? *)
-  Notation WellFormedProg' WellFormedCmd pclbl prog :=
-    (Forall (WellFormedCmd pclbl) prog) (only parsing).
+  Notation WellFormedProg' WellFormedCmd pclbl prog :=  (Forall (WellFormedCmd pclbl) prog) (only parsing).
   Unset Elimination Schemes.
   Inductive WellFormedCmd : PcLbl -> Cmd -> Prop := 
   | wf_endorse: 
-     forall from to,
-       var_lbl from = pulbl -> var_lbl to = ptlbl ->
-       _ ptlbl (assign (endorse from to))
+     forall c,
+       is_controlled_endorse c ->
+       _ ptlbl c
 
   | wf_declassify: 
-     forall from to,
-       var_lbl from = stlbl -> var_lbl to = ptlbl ->
-       _ ptlbl (assign (declassify from to))
+     forall c,
+       is_controlled_declassify c ->
+       _ ptlbl c
 
   | wf_assign: 
      forall dst src1 src2 comp pclbl, 
@@ -93,15 +134,11 @@ Section sa.
        However, do we even need induction? Maybe we don't need it at all.. 
        So, can we do something weaker than inductively defining this then?
     *)
-    Hypothesis hyp_endorse : 
-        forall from to,
-          var_lbl from = pulbl -> var_lbl to = ptlbl ->
-          P ptlbl (assign (endorse from to)).
+    Hypothesis hyp_endorse :
+        forall c, is_controlled_endorse c -> P ptlbl c.
 
-    Hypothesis hyp_declassify : 
-        forall from to,
-          var_lbl from = stlbl -> var_lbl to = ptlbl ->
-          P ptlbl (assign (declassify from to)).
+    Hypothesis hyp_declassify :
+        forall c, is_controlled_declassify c -> P ptlbl c.
 
     Hypothesis hyp_assign : 
         forall dst src1 src2  comp pclbl,
@@ -221,7 +258,7 @@ Section flow_to_subtype.
   Proof. 
     (* TODO: What does elim do? Is it just apply? *)  
     move: l2=> ++ h. elim: h=> *; [ | | constructor=> //; eauto using flows_to_trans|..].
-    1-2: revert_hyp_pat  (is_true (_ ⊑ _))=> /flows_to_pt ->; constructor=> //. 
+    1-2: revert_hyp_pat  (is_true (_ ⊑ _))=> /flows_to_pt ->; constructor; assumption.
     1-2: constructor; (apply/Forall_impl;[ |eassumption])=> /= >; auto using join_mono_r.
   Qed.
 
@@ -246,14 +283,20 @@ Section downgrading.
     pc = mk_lbl false true /\
     var_lbl from = mk_lbl true true /\
     var_lbl to = mk_lbl false true.
-  Proof. inversion 1; subst; tauto. Qed.
+  Proof. 
+    inversion 1; subst; revert_hyp_pat (is_true _); clear=> //.
+    move=> /is_controlled_endorse_inv [?] [?] [] [-> ->] [-> ->] //.
+  Qed.
 
   Lemma wf_declassify_inv pc from to:
     WellFormedCmd pc (assign (declassify from to)) ->
     pc = mk_lbl false true /\
     var_lbl from = mk_lbl false false /\
     var_lbl to = mk_lbl false true.
-  Proof. inversion 1; subst; tauto. Qed.
+  Proof.
+    inversion 1; subst; revert_hyp_pat (is_true _); clear=> //.
+    move=> /is_controlled_declassify_inv [?] [?] [] [-> ->] [-> ->] //.
+  Qed.
 End downgrading.
 
 Section step_soundness.
@@ -278,9 +321,12 @@ Section step_soundness.
       WellFormedCmd pc c ->
       forall st,
         WellFormedProg (compute_new_pc pc c) (clean_cmd_stp_cnt c st).
-  Proof.
-    move=> + > => - []=> * //=.
-    1-2: move: (X in if X then _ else _)=> ?; if_easy_goals.
+  Proof. 
+    move=> + > => - []=> > //= * //. 
+    1-2: revert_hyp_pat (is_true _).
+    1: move/is_controlled_endorse_inv.    2: move/is_controlled_declassify_inv. 
+    1-2: move=> [?] [?] [->] [] *; done.
+    1-2: move=> * //=; move: (X in if X then _ else _)=> ?; if_easy_goals.
     apply/Forall_app. split=> //.
     constructor 2=> //.
     apply/wf_while /Forall_impl; [| eassumption]; clear=> *.

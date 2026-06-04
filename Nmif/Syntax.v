@@ -65,6 +65,7 @@ Section syntax.
     Qed.
   End cmd_ind.
 
+(* TODO: Should go elsewhere *)
   Definition is_endorse (c : Cmd) : bool :=
     match c with assign (endorse _ _) => true | _ => false end.
 
@@ -93,7 +94,6 @@ Section syntax.
     oapp is_endorse false oc \/ oapp is_declassify false oc
     \/ (~~ oapp is_endorse false oc /\ ~~ oapp is_declassify false oc).
   Proof. case: oc=> [c | ] /=; [exact: is_endorse_declassify | intuition]. Qed.
-
 End syntax.
 
 Ltac2 Set this_cookbook_ as old :=
