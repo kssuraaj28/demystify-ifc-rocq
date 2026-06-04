@@ -245,7 +245,7 @@ Section invprf.
       repeat split; cook.
         { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_endorse rcmd))=> /orP [ | noend].
           { move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e}. (* TODO: this branch is longer *)
-          admit.
+          admit. (* TODO *)
           (*
           revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] e; rewrite -> e in *=> {e} - [] * /=.
           revert_hyp_pat (if _ then _ else _)=> /= <- /=.
@@ -265,7 +265,7 @@ Section invprf.
         { let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_declassify rcmd))=> /orP [ | nodecl]; cycle 1.
           { revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [+ []] /==> *; cook. } 
         move/is_declassify_inv=> [] ? [] ? e; rewrite -> e in *=> {e}.
-        admit.
+        admit. (* TODO *)
         (*
         revert_hyp_pat (WellFormedCmd _ _)=> /wf_declassify_inv [] e; rewrite -> e in *=> {e} - [] * /=.
         revert_hyp_pat (if _ then _ else _)=> /= <- /=.
@@ -287,7 +287,7 @@ Section invprf.
          { erewrite ni_tr_cmd_cnt; [apply/Forall_combine2_same/Forall_map/Forall_forall => // | eassumption |..]; auto with trickbag.
          let rcmd := pick_hyp_pat uconstr:(Cmd) in  move: (orbN (is_endorse rcmd))=> /orP [ | noend]; cook.
          move/is_endorse_inv=> [] ? [] ? e; rewrite -> e in *=> {e}.
-         admit.
+         admit. (* TODO *)
          (*
          revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] [] e; rewrite -> e in * => {e} - [] *.
          rewrite update_storeview_nochange; cook.

@@ -141,6 +141,59 @@ Section full_lattice.
       + exact: (leqP_trans _ _ _ H (meet_le_l _ _)).
       + exact: (leqP_trans _ _ _ H (meet_le_r _ _)).
   Qed.
+
+  (* A label flows to its join, so the join being uncompromised forces each
+     component to be. *)
+  Lemma fle_join_l l1 l2 : fflows_to l1 (fjoin l1 l2).
+  Proof.
+    rewrite /fflows_to /fjoin /conf /integ /=; apply/andP; split.
+    - exact: meet_le_l.
+    - exact: join_ge_l.
+  Qed.
+
+  Lemma uncompromised_join_l l1 l2 : uncompromised (fjoin l1 l2) -> uncompromised l1.
+  Proof. exact: (uncompromised_mono _ _ (fle_join_l l1 l2)). Qed.
+
+  (* When an endorse's source does NOT flow to its target in the 4-point
+     projection (from ⋢ to), the source/target must be exactly the canonical
+     public-untrusted / public-trusted points. The other "from ⋢ to" candidate
+     (secret-untrusted source) is excluded because an uncompromised source is
+     never secret-untrusted for a reasonable attacker (a_c ≤ a_i). *)
+  Lemma to4pt_endorse_canonical (A : AttackerLabel) from to :
+    conf from = conf to -> uncompromised from ->
+    ~~ flows_to (to4pt A from) (to4pt A to) ->
+    to4pt A from = mk_4ptlbl true true /\ to4pt A to = mk_4ptlbl false true.
+  Proof.
+    move=> Hc Hunc Hnf.
+    rewrite /to4pt /flows_to /= flows_to_intE flows_to_confE Hc implybb andbT negb_imply in Hnf.
+    move: Hnf => /andP[Huf Hut].
+    have Hcf := Hunc; rewrite /uncompromised Hc in Hcf.
+    have Hpub : leqP (atk_c A) (conf to) :=
+      leqP_trans _ _ _ (reasonable_atk A) (leqP_trans _ _ _ Huf Hcf).
+    split.
+    - rewrite /to4pt Hc Huf Hpub //.
+    - rewrite /to4pt (negbTE Hut) Hpub //.
+  Qed.
+
+  (* Dual for declassify: from ⋢ to forces secret-trusted source / public-trusted
+     target (an uncompromised source is never untrusted-and-secret). *)
+  Lemma to4pt_declassify_canonical (A : AttackerLabel) from to :
+    integ from = integ to -> uncompromised from ->
+    ~~ flows_to (to4pt A from) (to4pt A to) ->
+    to4pt A from = mk_4ptlbl false false /\ to4pt A to = mk_4ptlbl false true.
+  Proof.
+    move=> Hi Hunc Hnf.
+    rewrite /to4pt /flows_to /= flows_to_intE flows_to_confE Hi implybb andTb negb_imply in Hnf.
+    move: Hnf => /andP[Hpt Hsf].
+    have Hcf := Hunc; rewrite /uncompromised in Hcf.
+    have Himp : leqP (atk_i A) (integ from) -> leqP (atk_c A) (conf from) :=
+      fun Huf => leqP_trans _ _ _ (reasonable_atk A) (leqP_trans _ _ _ Huf Hcf).
+    have Htf : ~~ leqP (atk_i A) (integ from).
+    { apply/negP => Huf. apply: (negP Hsf). exact: Himp Huf. }
+    split; rewrite /to4pt.
+    - rewrite (negbTE Htf) (negbTE Hsf) //.
+    - rewrite -Hi (negbTE Htf) Hpt //.
+  Qed.
 End full_lattice.
 
 (* ⊑ / ⊔ deliberately reuse the 4-point glyphs but live in a separate Notations

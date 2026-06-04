@@ -49,6 +49,7 @@ Section ts.
      forall pc from to,
        conf (fvar_lbl from) = conf (fvar_lbl to) ->
        integ (fvar_lbl to) ≽ integ (fvar_lbl from) ->
+       pc ⊑ fvar_lbl to ->
        uncompromised (fjoin (fvar_lbl from) pc) ->
        FullWellFormedCmd pc (assign (endorse from to))
 
@@ -56,6 +57,7 @@ Section ts.
      forall pc from to,
        integ (fvar_lbl from) = integ (fvar_lbl to) ->
        conf (fvar_lbl from) ≽ conf (fvar_lbl to) ->
+       pc ⊑ fvar_lbl to ->
        uncompromised (fjoin (fvar_lbl from) pc) ->
        FullWellFormedCmd pc (assign (declassify from to))
 
@@ -87,6 +89,7 @@ Section ts.
       forall pc from to,
         conf (fvar_lbl from) = conf (fvar_lbl to) ->
         integ (fvar_lbl to) ≽ integ (fvar_lbl from) ->
+        pc ⊑ fvar_lbl to ->
         uncompromised (fjoin (fvar_lbl from) pc) ->
         Pr pc (assign (endorse from to)).
 
@@ -94,6 +97,7 @@ Section ts.
       forall pc from to,
         integ (fvar_lbl from) = integ (fvar_lbl to) ->
         conf (fvar_lbl from) ≽ conf (fvar_lbl to) ->
+        pc ⊑ fvar_lbl to ->
         uncompromised (fjoin (fvar_lbl from) pc) ->
         Pr pc (assign (declassify from to)).
 
@@ -142,10 +146,14 @@ Section ts.
     FullWellFormedCmd l1 c -> forall l2, l2 ⊑ l1 -> FullWellFormedCmd l2 c.
   Proof.
     move=> H; elim/FullWellFormedCmd_ind: H.
-    - move=> pc from to Hce Hi Hu l2 Hl2.
-      apply: wff_endorse; [exact: Hce | exact: Hi | exact: (uncompromised_anti _ _ _ Hl2 Hu)].
-    - move=> pc from to Hie Hcl Hu l2 Hl2.
-      apply: wff_declassify; [exact: Hie | exact: Hcl | exact: (uncompromised_anti _ _ _ Hl2 Hu)].
+    - move=> pc from to Hce Hi Hpcto Hu l2 Hl2.
+      apply: wff_endorse;
+        [exact: Hce | exact: Hi | exact: (fflows_to_trans _ _ _ Hl2 Hpcto)
+        | exact: (uncompromised_anti _ _ _ Hl2 Hu)].
+    - move=> pc from to Hie Hcl Hpcto Hu l2 Hl2.
+      apply: wff_declassify;
+        [exact: Hie | exact: Hcl | exact: (fflows_to_trans _ _ _ Hl2 Hpcto)
+        | exact: (uncompromised_anti _ _ _ Hl2 Hu)].
     - move=> dst src1 src2 comp pc Hs1 Hs2 Hpc l2 Hl2.
       apply: wff_assign; [exact: Hs1 | exact: Hs2 | exact: (fflows_to_trans _ _ _ Hl2 Hpc)].
     - move=> gvar comp pc b1 b2 _ IH1 _ IH2 l2 Hl2. apply: wff_cond.
@@ -161,72 +169,63 @@ Section ts.
   Lemma proj_adv_var (A : AttackerLabel) v : @var_lbl _ (proj_adv A) v = to4pt A (fvar_lbl v).
   Proof. exact: erefl. Qed.
 
-  (* Headline result: a full typing derivation, for any compatible attacker,
-     projects to a 4-point derivation. *)
+  (* Headline result: a full typing derivation projects to a 4-point derivation
+     for any attacker, unconditionally. A downgrade whose 4-point projection is
+     the ordinary assignment flow (from ⊑ to) becomes a harmless wf_*_safe; one
+     where from ⋢ to is the canonical real downgrade (PU→PT / ST→PT, pc=PT). *)
   Theorem full_to_4pt_cmd (A : AttackerLabel) pc c :
-    FullWellFormedCmd pc c -> 
+    FullWellFormedCmd pc c ->
     @WellFormedCmd _ _ (proj_adv A) (to4pt A pc) c.
   Proof.
     move=> H; elim/FullWellFormedCmd_ind: H.
     - (* endorse *)
-    admit. (* TODO *)
-    (*
-      move=> pc' from to Hce _ _ /AtkCompat_endorse_inv [Hpc [Hfpub [Hfuntr Htotr]]].
-      rewrite Hpc. apply: wf_endorse.
-      + rewrite proj_adv_var /to4pt Hfuntr Hfpub //.
-      + rewrite proj_adv_var /to4pt (negbTE Htotr) -Hce Hfpub //.
-      *)
+      move=> pc' from to Hce _ Hpcto Hunc.
+      case Hfl: ([elaborate flows_to (to4pt A (fvar_lbl from)) (to4pt A (fvar_lbl to))]).
+      + (* harmless: from ⊑ to in the projection *)
+        apply: wf_endorse_safe; rewrite !proj_adv_var;
+          [exact: Hfl | exact: (to4pt_mono _ _ _ Hpcto)].
+      + (* canonical PU→PT, pc forced to PT *)
+        move: (to4pt_endorse_canonical A (fvar_lbl from) (fvar_lbl to) Hce
+                 (uncompromised_join_l _ _ Hunc) (negbT Hfl)) => [Hfrom4 Hto4].
+        have Hpc4 : to4pt A pc' = mk_4ptlbl false true.
+        { apply: flows_to_pt. rewrite -Hto4. exact: (to4pt_mono _ _ _ Hpcto). }
+        rewrite Hpc4. apply: wf_endorse; rewrite proj_adv_var; [exact: Hfrom4 | exact: Hto4].
     - (* declassify *)
-    admit. (* TODO *)
-    (*
-      move=> pc' from to Hie _ _ /AtkCompat_declassify_inv [Hpc [Hfsec [Hftr Htopub]]].
-      rewrite Hpc. apply: wf_declassify.
-      + rewrite proj_adv_var /to4pt (negbTE Hftr) (negbTE Hfsec) //.
-      + rewrite proj_adv_var /to4pt -Hie (negbTE Hftr) Htopub //.
-      *)
+      move=> pc' from to Hie _ Hpcto Hunc.
+      case Hfl: ([elaborate flows_to (to4pt A (fvar_lbl from)) (to4pt A (fvar_lbl to))]).
+      + (* harmless *)
+        apply: wf_declassify_safe; rewrite !proj_adv_var;
+          [exact: Hfl | exact: (to4pt_mono _ _ _ Hpcto)].
+      + (* canonical ST→PT, pc forced to PT *)
+        move: (to4pt_declassify_canonical A (fvar_lbl from) (fvar_lbl to) Hie
+                 (uncompromised_join_l _ _ Hunc) (negbT Hfl)) => [Hfrom4 Hto4].
+        have Hpc4 : to4pt A pc' = mk_4ptlbl false true.
+        { apply: flows_to_pt. rewrite -Hto4. exact: (to4pt_mono _ _ _ Hpcto). }
+        rewrite Hpc4. apply: wf_declassify; rewrite proj_adv_var; [exact: Hfrom4 | exact: Hto4].
     - (* assign *)
-    admit. (* TODO *)
-    (*
-      move=> dst src1 src2 comp pc' Hs1 Hs2 Hpc _.
+      move=> dst src1 src2 comp pc' Hs1 Hs2 Hpc.
       apply: wf_assign; rewrite !proj_adv_var.
       + exact: (to4pt_mono _ _ _ Hs1).
       + exact: (to4pt_mono _ _ _ Hs2).
       + exact: (to4pt_mono _ _ _ Hpc).
-      *)
     - (* cond *)
-    admit. (* TODO *)
-    (*
-      move=> gvar comp pc' b1 b2 _ IH1 _ IH2 /AtkCompat_cond_inv [C1 C2].
+      move=> gvar comp pc' b1 b2 _ IH1 _ IH2.
       apply: wf_cond.
-      + apply: (flows_to_subtype_prog _ _ _ (to4pt_join_le A (fvar_lbl gvar) pc')).
-        exact: (Forall_modus IH1 C1).
-      + apply: (flows_to_subtype_prog _ _ _ (to4pt_join_le A (fvar_lbl gvar) pc')).
-        exact: (Forall_modus IH2 C2).
-    *)
+      + apply: (flows_to_subtype_prog _ _ _ (to4pt_join_le A (fvar_lbl gvar) pc')); exact: IH1.
+      + apply: (flows_to_subtype_prog _ _ _ (to4pt_join_le A (fvar_lbl gvar) pc')); exact: IH2.
     - (* while *)
-    admit. (* TODO *)
-    (*
-      move=> gvar comp pc' wbody _ IH /AtkCompat_while_inv C.
+      move=> gvar comp pc' wbody _ IH.
       apply: wf_while.
-      apply: (flows_to_subtype_prog _ _ _ (to4pt_join_le A (fvar_lbl gvar) pc')).
-      exact: (Forall_modus IH C).
+      apply: (flows_to_subtype_prog _ _ _ (to4pt_join_le A (fvar_lbl gvar) pc')); exact: IH.
   Qed.
-      *)
-    Admitted.
 
   Theorem full_to_4pt_prog (A : AttackerLabel) pc p :
     FullWellFormedProg pc p ->
     @WellFormedProg _ _ (proj_adv A) (to4pt A pc) p.
   Proof.
-  admit. (* TODO *)
-  (*
-    rewrite /FullWellFormedProg /WellFormedProg => Hwf Hc.
-    apply: (Forall_modus _ Hc).
-    apply/Forall_impl; [| exact: Hwf].
-    move=> c Hc'. exact: (full_to_4pt_cmd A pc c Hc').
+    rewrite /FullWellFormedProg /WellFormedProg.
+    apply/Forall_impl => c. exact: (full_to_4pt_cmd A pc c).
   Qed.
-  *)
-  Admitted.
 
   Theorem full_to_4pt_optcmd (A : AttackerLabel) pc oc :
     FullWellFormedOptCmd pc oc ->
