@@ -74,7 +74,7 @@ Section preds.
     is_controlled_declassify c ->
     exists from to, c = assign (declassify from to)
                  /\ var_lbl from = stlbl /\ var_lbl to = ptlbl.
-  Proof. 
+  Proof.
     case: c=> //= - [] //= >.
     rewrite/is_controlled_declassify/extract_controlled_declassify.
     case e: (_ && _)=> //. move/andP:e=> [] e1 e2.
@@ -82,6 +82,22 @@ Section preds.
     move=> {e1 e2} <- <- _.
     do !esplit.
   Qed.
+
+  Lemma extr_endorse_is c v :
+    extract_controlled_endorse c = Some v -> is_controlled_endorse c.
+  Proof. rewrite /is_controlled_endorse => -> //. Qed.
+
+  Lemma extr_endorse_no c :
+    extract_controlled_endorse c = None -> ~~ is_controlled_endorse c.
+  Proof. rewrite /is_controlled_endorse => -> //. Qed.
+
+  Lemma extr_decl_is c v :
+    extract_controlled_declassify c = Some v -> is_controlled_declassify c.
+  Proof. rewrite /is_controlled_declassify => -> //. Qed.
+
+  Lemma extr_decl_no c :
+    extract_controlled_declassify c = None -> ~~ is_controlled_declassify c.
+  Proof. rewrite /is_controlled_declassify => -> //. Qed.
 End preds.
 
 Section sa.

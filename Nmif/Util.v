@@ -623,6 +623,10 @@ Section test.
   Abort.
 End test.
 
+Fact oapp_some {A B} (f: A -> B) d a: ltac2:(cbn_eq (oapp f d (Some a))). Proof. done. Qed.
+Fact oapp_none {A B} (f: A -> B) d: ltac2:(cbn_eq (oapp f d None)). Proof. done. Qed.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite ->  oapp_some) "oapp_some" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite ->  oapp_none) "oapp_none" old.
 
 (* TODO: maybe better to have  
 Example map_nil_simpl {A B} (f: A -> B) := (erefl : ltac2:(cbn_eq (map f []))). 
