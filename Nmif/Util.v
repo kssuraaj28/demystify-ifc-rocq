@@ -700,6 +700,7 @@ Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> orbT) "orbT" o
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(done) "done" old.
 
 Ltac2 this_cookbook () := this_cookbook_ ().
+Ltac local_cook := ltac2:(cook this_cookbook).
 
 (* TODO: multimatch vs lazymatch in trickbag *)
 Hint Extern 10 => multimatch goal with H : _ = _ |- _ => rewrite H end : trickbag. (* TODO: This should go somewhere good *)

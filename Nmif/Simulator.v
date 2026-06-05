@@ -92,22 +92,18 @@ Section sim_constr.
       post_cmd_action := sim_post;
     |}. (* TODO: Why 11 obligations. *)
   Next Obligation. 
-    case=> ? ?; case=> [] //= [] [] // [] //.
-
-(*
-    =.[] // ? ? *.
-    case e1: is_untrusted=> //;[|rewrite Bool.andb_false_r]=> //.
-    rewrite Bool.andb_true_r.
-    case: is_public=> //.
-    apply: update_storeview_nochange. rewrite /is_trusted e1 //.
-    *)
-  Admitted.
+    case=> ? ? [] //= - [] [] // [] // [] // *. Util.local_cook. 
+    move t: (extract_controlled_endorse _)=> t'; move: t' t; case=> // - [] >. (* this move + equation happens a lot*)
+    move/extr_endorse_eq=> [] [-> ->] [] /= *. 
+    apply: update_storeview_nochange. rewrite /is_trusted /is_untrusted.
+    auto with trickbag. (* TODO: cook? *)
+  Qed.
 
 Import VarValStore.Notations.
   Next Obligation. 
     case=> ? ?; case=> // - []. 
     rewrite/sim_pre /Noninterference.Noninterfering; case; try easy.
-    case; try easy. case=> // *.
+    case; try easy. case=> // *. 
     (*
     case e1: is_untrusted=> //; [|rewrite Bool.andb_false_r]=> //.
     rewrite Bool.andb_true_r.
