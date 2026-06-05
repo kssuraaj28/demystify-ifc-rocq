@@ -24,7 +24,7 @@ Section cmb_cmd.
     real_cmd : option Cmd ;
     real_atk_bit : bool ;
     ideal_cmd : option Cmd ;
-    pc_lbl : PcLbl ;
+    pc_lbl : Label ;
   }.
 
   Fact real_cmd_mk rcmd ratk icmd pclbl :
@@ -47,7 +47,7 @@ End cmb_cmd.
 Section cmb_step.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
 
-  Definition zip (real_cont: list Cmd) (ideal_cont: list Cmd) (atk_steps: nat) (pc_lbl: PcLbl): list CmbCmd :=
+  Definition zip (real_cont: list Cmd) (ideal_cont: list Cmd) (atk_steps: nat) (pc_lbl: Label): list CmbCmd :=
     let: real_cont := map Some real_cont in
     let: ideal_cont := map Some ideal_cont in
     let: atk_steps := repeat true atk_steps in
@@ -259,7 +259,7 @@ Section invprf.
           wf_finisher_guess [RHS] with _=> ->. wf_finisher. } 
 
         revert_hyp_pat bool; case.
-        1-2: revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=.
+        1-2: revert_hyp_pat [Label, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [[] ?] /=.
         2,4: enter (move=> ? <- /=; wf_finisher_guess [RHS] with ⟨clean_cmd_stp_store _ _ | is_trusted ⟩=> ->; wf_finisher).
         1,2: revert_hyp_pat (option _); case=> /= *. 
         (* When I have time, I'd like to automate this *)
@@ -269,7 +269,7 @@ Section invprf.
         1-4: enter (idtac;wf_finisher). }
 
         { move x: (extract_controlled_declassify _)=> x'; move: x' x. case=> [[>]/extr_decl_eq [] + []|nodecl]; cycle 1.
-          { revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [+ []] /==> *.
+          { revert_hyp_pat [Label, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [+ []] /==> *.
           2: wf_finisher_guess [LHS] with ⟨if _ then _ else _ |is_public⟩=> ->. 
           1,2: case: (X in if X then _ else _); enter (idtac; wf_finisher). }
         move=> e; rewrite -> e in *=> {e} _ _.
@@ -283,7 +283,7 @@ Section invprf.
         apply/storeview_eq; [|eassumption]; cook. wf_finisher. }
       move=> /=.  
       apply/Forall_and; cook; auto.
-      revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)].
+      revert_hyp_pat [Label, (WellFormedCmd _ _), (if _ then _ else _)].
       case=> [[] ?] /= >.
          { move=> *; cook.
          revert_hyp_pat [(option _), (_ ⊢ _)]; case=> //= >.

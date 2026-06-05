@@ -15,8 +15,6 @@ Set Mangle Names. Set Mangle Names Light.
 #[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
 Ltac2 Set this_cookbook_ := create_new_cookbook.
 
-(* TODO: Maybe elsewere *)
-Definition PcLbl := Lattice4pt.Label.
 
 Section asgn_lbls.
   Import Lattice4pt.Notations.
@@ -37,6 +35,7 @@ Section asgn_lbls.
     end.
 End asgn_lbls.
 
+#[local] Notation PcLbl := Lattice4pt.Label.
 Section sa.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
   Import Lattice4pt.Notations.
