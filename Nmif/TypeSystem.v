@@ -90,9 +90,28 @@ Ltac2 Set this_cookbook_ as old :=
 Ltac2 Set this_cookbook_ as old :=
   add_cookstep ltac1:(rewrite -> extract_decl_endorse) "extract_decl_endorse" old.
 
+Section asgn_lbls.
+  Import Lattice4pt.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
+
+  Definition asgn_dst_lbl (a : Assignment) : Label :=
+    var_lbl (match a with
+             | endorse _ dst => dst
+             | declassify _ dst => dst
+             | exp_assign _ dst => dst
+             end).
+
+  Definition asgn_src_lbl (a : Assignment) : Label :=
+    match a with
+    | endorse src _ => var_lbl src
+    | declassify src _ => var_lbl src
+    | exp_assign (s1, s2, _) _ => var_lbl s1 ⊔ var_lbl s2
+    end.
+End asgn_lbls.
+
 Section sa.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
-  Import Lattice4pt.Notations. 
+  Import Lattice4pt.Notations.
   (* TODO: 
   is_ni_assign
   *)
@@ -103,7 +122,7 @@ Section sa.
   Unset Elimination Schemes.
   Inductive WellFormedCmd : PcLbl -> Cmd -> Prop := 
   | wf_endorse: 
-     forall c,
+     forall c, (* TODO: Maybe  don't define it in terms of this. Actually that is preferrable *)
        extract_controlled_endorse c <> None ->
        _ ptlbl c
 
@@ -112,13 +131,11 @@ Section sa.
        extract_controlled_declassify c <> None ->
        _ ptlbl c
 
-  | wf_assign: 
-     forall dst src1 src2 comp pclbl, 
-       let: dstlbl := var_lbl dst in
-       let: s1lbl := var_lbl src1 in
-       let: s2lbl := var_lbl src2 in
-       s1lbl ⊑ dstlbl -> s2lbl ⊑ dstlbl -> pclbl ⊑ dstlbl -> (* Using ssrbool coercion *)
-       _ pclbl (assign (exp_assign (src1, src2, comp) dst))
+  | wf_assign:
+     forall a pclbl,
+       asgn_src_lbl a ⊑ asgn_dst_lbl a ->
+       pclbl ⊑ asgn_dst_lbl a ->
+       _ pclbl (assign a)
 
   | wf_cond: 
      forall gvar comp pclbl b1 b2, 
@@ -152,13 +169,11 @@ Section sa.
     Hypothesis hyp_declassify :
         forall c, extract_controlled_declassify c <> None -> P ptlbl c.
 
-    Hypothesis hyp_assign : 
-        forall dst src1 src2  comp pclbl,
-          let: dstlbl := var_lbl dst in
-          let: s1lbl := var_lbl src1 in
-          let: s2lbl := var_lbl src2 in
-          s1lbl ⊑ dstlbl -> s2lbl ⊑ dstlbl -> pclbl ⊑ dstlbl ->
-          P pclbl (assign (exp_assign (src1, src2, comp) dst)).
+    Hypothesis hyp_assign :
+        forall a pclbl,
+          asgn_src_lbl a ⊑ asgn_dst_lbl a ->
+          pclbl ⊑ asgn_dst_lbl a ->
+          P pclbl (assign a).
 
     (* I have no idea whether this is the right thing *)
     Hypothesis hyp_cond : 
