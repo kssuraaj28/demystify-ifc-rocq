@@ -97,6 +97,7 @@ Ltac2 Set this_cookbook_ as old :=
     end) "label_unfold" old.
 
 Ltac2 this_cookbook () := this_cookbook_ ().
+Ltac local_cook := ltac2:(cook this_cookbook).
 Ltac2 Eval print_cookbook this_cookbook.
 
 Section test.

@@ -95,8 +95,8 @@ Section sim_constr.
     case=> ? ? [] //= - [] [] // [] // [] // *. Util.local_cook. 
     move t: (extract_controlled_endorse _)=> t'; move: t' t; case=> // - [] >. (* this move + equation happens a lot*)
     move/extr_endorse_eq=> [] [-> ->] [] /= *. 
-    apply: update_storeview_nochange. rewrite /is_trusted /is_untrusted.
-    auto with trickbag. (* TODO: cook? *)
+    apply: update_storeview_nochange. 
+    Util.local_cook. Attacker.local_cook.
   Qed.
 
 Import VarValStore.Notations.
@@ -104,29 +104,22 @@ Import VarValStore.Notations.
     case=> ? ?; case=> // - []. 
     rewrite/sim_pre /Noninterference.Noninterfering; case; try easy.
     case; try easy. case=> // *. 
-    (*
-    case e1: is_untrusted=> //; [|rewrite Bool.andb_false_r]=> //.
-    rewrite Bool.andb_true_r.
-    case e2: is_public=> //=.
-    rewrite/clean_assign_stp_store.
-    move: (update_to_store (if _ then _ else _) _ _ _)=> ?.
+    Semantics.local_cook. Util.local_cook.
+    move t: (extract_controlled_endorse _)=> t'; move: t' t; case=> // - [] >. (* this move + equation happens a lot*)
+    move/extr_endorse_eq=> [] [-> ->] [] /= *. 
     auto using update_same_varval.
   Qed.
-    *)
-  Admitted.
 
   Next Obligation. 
     case=> ? ?; case=> // - [] [] // [] // [] //.  
     rewrite/sim_post /Noninterference.Noninterfering=> from to ? ? i1 i2 *.
     pattern_eq_2 [sim_step _ _ _ _ _] [sim_step _ _ _ _ _]=> [| ->] //.
-    rewrite/sim_step.
-    case e: is_public=> //=.
-    (*
-    suff: (i1 to = i2 to)=> [-> //|].
-    eauto using storeview_eq.
+    rewrite/sim_step. Semantics.local_cook. Util.local_cook.
+    move t: (extract_controlled_declassify _)=> t'; move: t' t; case=> // - [] vfr vto. (* This move + equn *)
+    move/extr_decl_eq=> [] [-> ->] [] /= *.
+    suff: (i1 vto = i2 vto)=> [-> //|].
+    apply: storeview_eq; eauto. Attacker.local_cook. 
   Qed.
-  *)
-  Admitted.
 
   Lemma clean_cmd_stp_store_secret_guard c s :
     is_secret_guard (Some c) = true ->
@@ -148,3 +141,4 @@ End sim_constr.
 
 
 Ltac2 this_cookbook () := this_cookbook_ ().
+Ltac local_cook := ltac2:(cook this_cookbook).

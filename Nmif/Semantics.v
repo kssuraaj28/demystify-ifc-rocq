@@ -347,3 +347,4 @@ End Notations.
 *)
 
 Ltac2 this_cookbook () := this_cookbook_ ().
+Ltac local_cook := ltac2:(cook this_cookbook).
