@@ -188,6 +188,7 @@ Section extract_step_commute.
     1,2: apply: map_ext; case=> //.
   Qed.
 
+(* TODO: All these need to go to TODO.v *)
   Lemma public_compute_new_pc_opt untr pub rcmd :
     public (compute_new_pc_opt (mk_lbl untr pub) rcmd) = ~~ is_secret_guard rcmd && pub.
   Proof.
@@ -263,7 +264,7 @@ Section extract_step_commute.
       (oapp extract_controlled_endorse None rcmd = None /\ oapp extract_controlled_declassify None rcmd = None)
       \/ (exists x, oapp extract_controlled_endorse None rcmd = Some x \/
                     oapp extract_controlled_declassify None rcmd = Some x);[.. |case; case; eauto using extract_step_commute_downgrade ].
-      { admit. }
+      { clear; case: rcmd=> //=; auto. case=> [ | /=|/= ]; auto. case=> *; cook; auto; case: (_ (assign _))=> *; constructor; eauto; fail. }
     case=> noend nodecl.
     rewrite /= in inv. move: inv=> []. (Forall_inv_toph)=> i1 restinv i3.
     rewrite /CmbCmdInv/CmbCmdCoreInv in i1. case: i1=> rwt _.
@@ -275,8 +276,8 @@ Section extract_step_commute.
     rewrite/sim_active. cook.
     rewrite/step /acmd_step.  
     pattern_eq [if _ then pre_cmd_action (construct_simulator _) _ _ else ist] with ist; [| move=> ->]. (* Ninja repair *)
-      { case: sim_active'; destruct pub; destruct rcmd as [c| ]=> //.
-      destruct c as [a | | ]=> //; destruct a=> //. admit. }
+      { case: sim_active'=> //; move: noend; clear. case: pub=> //.
+      rewrite/pre_cmd_action/construct_simulator/sim_pre. move=> -> //. }   (* TODO: This needs to be cook!! Why does the noend rewrite not fire.. *)
     congr (_,_,_); cook.
     - set l1 := (X in map _ X = _). set l2 := (X in _ = map _ X).
       suff: l1 = map (fun c => (real_cmd c, real_atk_bit c,  ideal_cmd c, sim_active c)) l2;
