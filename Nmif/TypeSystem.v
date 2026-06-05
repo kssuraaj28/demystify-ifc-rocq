@@ -18,75 +18,6 @@ Ltac2 Set this_cookbook_ := create_new_cookbook.
 (* TODO: Maybe elsewere *)
 Definition PcLbl := Lattice4pt.Label.
 
-Section preds. 
-  Import Util.DecEq.Notations.
-
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
-
-  Definition extract_controlled_endorse (c: Cmd) : option (Vars * Vars) :=
-    match c with
-    | assign (endorse from to) => 
-      if (var_lbl from =? pulbl) && (var_lbl to =? ptlbl) is false then None else
-      Some (from, to)
-    | _ => None
-    end.
-
-  Definition extract_controlled_declassify (c: Cmd) : option (Vars * Vars) :=
-    match c with
-    | assign (declassify from to) => 
-      if (var_lbl from =? stlbl) && (var_lbl to =? ptlbl) is false then None else
-      Some (from, to)
-    | _ => None
-    end.
-
-  (* 
-    Use oapp for optional
-    oapp extract_controlled_endorse None oc.
-    oapp extract_controlled_declassify None oc.
-  *)
-
-  Import Util.DecEq.
-
-  Lemma extr_endorse_eq c from to :
-    extract_controlled_endorse c = Some (from, to) ->
-    c = assign (endorse from to) /\ var_lbl from = pulbl /\ var_lbl to = ptlbl.
-  Proof. Admitted.
-
-  Lemma extr_decl_eq c from to :
-    extract_controlled_declassify c = Some (from, to) ->
-    c = assign (declassify from to) /\ var_lbl from = stlbl /\ var_lbl to = ptlbl.
-  Proof. Admitted.
-
-  Lemma extr_endorse_opt oc from to:
-    oapp extract_controlled_endorse None oc = Some (from, to) ->
-    oc = Some (assign (endorse from to))
-      /\ var_lbl from = pulbl /\ var_lbl to = ptlbl.
-  Proof.
-    case: oc=> //= c /extr_endorse_eq [-> ?]; by [].
-  Qed.
-
-  Lemma extr_decl_opt oc from to:
-    oapp extract_controlled_declassify None oc = Some (from, to) ->
-    oc = Some (assign (declassify from to))
-      /\ var_lbl from = stlbl /\ var_lbl to = ptlbl.
-  Proof.
-    case: oc=> //= c /extr_decl_eq [-> ?]; by [].
-  Qed.
-
-  Fact extract_endorse_decl from to :
-    extract_controlled_endorse (assign (declassify from to)) = None.
-  Proof. done. Qed.
-
-  Fact extract_decl_endorse from to :
-    extract_controlled_declassify (assign (endorse from to)) = None.
-  Proof. done. Qed.
-End preds.
-
-Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(rewrite -> extract_endorse_decl) "extract_endorse_decl" old.
-Ltac2 Set this_cookbook_ as old :=
-  add_cookstep ltac1:(rewrite -> extract_decl_endorse) "extract_decl_endorse" old.
-
 Section asgn_lbls.
   Import Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
@@ -118,15 +49,15 @@ Section sa.
   Notation WellFormedProg' WellFormedCmd pclbl prog :=  (Forall (WellFormedCmd pclbl) prog) (only parsing).
   Unset Elimination Schemes.
   Inductive WellFormedCmd : PcLbl -> Cmd -> Prop := 
-  | wf_endorse: 
-     forall c, (* TODO: Maybe  don't define it in terms of this. Actually that is preferrable *)
-       extract_controlled_endorse c <> None ->
-       _ ptlbl c
+  | wf_endorse:
+     forall from to,
+       var_lbl from = pulbl -> var_lbl to = ptlbl ->
+       _ ptlbl (assign (endorse from to))
 
-  | wf_declassify: 
-     forall c,
-       extract_controlled_declassify c <> None ->
-       _ ptlbl c
+  | wf_declassify:
+     forall from to,
+       var_lbl from = stlbl -> var_lbl to = ptlbl ->
+       _ ptlbl (assign (declassify from to))
 
   | wf_assign:
      forall a pclbl,
@@ -161,10 +92,14 @@ Section sa.
        So, can we do something weaker than inductively defining this then?
     *)
     Hypothesis hyp_endorse :
-        forall c, extract_controlled_endorse c <> None -> P ptlbl c.
+        forall from to,
+          var_lbl from = pulbl -> var_lbl to = ptlbl ->
+          P ptlbl (assign (endorse from to)).
 
     Hypothesis hyp_declassify :
-        forall c, extract_controlled_declassify c <> None -> P ptlbl c.
+        forall from to,
+          var_lbl from = stlbl -> var_lbl to = ptlbl ->
+          P ptlbl (assign (declassify from to)).
 
     Hypothesis hyp_assign :
         forall a pclbl,

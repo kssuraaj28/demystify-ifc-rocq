@@ -3,8 +3,8 @@ Import List ListNotations ssreflect ssrfun ssrbool.
 
 From Ltac2 Require Import Ltac2 Printf.
 
-Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem.
-Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem Tacs.Cook.
+Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade.
+Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade Tacs.Cook.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".

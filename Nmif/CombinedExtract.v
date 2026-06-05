@@ -4,8 +4,8 @@ Import List ListNotations ssreflect ssrfun ssrbool.
 From Ltac2 Require Import Ltac2.
 
 
-Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem Combined Simulator WfFinisher.
-Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem WfFinisher Tacs.Cook.
+Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade Combined Simulator WfFinisher.
+Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade WfFinisher Tacs.Cook.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!". 
@@ -134,6 +134,7 @@ Section extract_step_commute.
   Ltac2 Set curr_cookbook as old := join_cookbooks Lattice4pt.this_cookbook old.
   Ltac2 Set curr_cookbook as old := join_cookbooks VarValStore.this_cookbook old.
   Ltac2 Set curr_cookbook as old := join_cookbooks Syntax.this_cookbook old.
+  Ltac2 Set curr_cookbook as old := join_cookbooks ControlledDowngrade.this_cookbook old.
 
 
   Ltac2 Set cook_debug := 0.

@@ -3,8 +3,8 @@ Import List ListNotations ssreflect ssrfun ssrbool FunctionalExtensionality.
 
 From Ltac2 Require Import Ltac2.
 
-Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem WfFinisher.
-Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem WfFinisher Tacs.Cook.
+Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade WfFinisher.
+Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade WfFinisher Tacs.Cook.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
