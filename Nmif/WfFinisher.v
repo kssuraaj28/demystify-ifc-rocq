@@ -21,6 +21,10 @@ Section ni.
       ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
       ⟨ clean_cmd_stp_store c st1 | is_public ⟩ = ⟨ clean_cmd_stp_store c st2 | is_public ⟩.
   Proof. 
+    case=> //.
+    - move=> > ? ? _ ?. admit. 
+    - admit.
+    - admit.
   Admitted.
   (* TODO repair (constructors changed shape):
     move=> [] // d s1 s2 ? ?.

@@ -15,7 +15,7 @@ Set Mangle Names. Set Mangle Names Light.
 Ltac2 Set this_cookbook_ := create_new_cookbook.
 
 Section preds.
-  Import Util.DecEq.Notations.
+  Import Util.DecEq Util.DecEq.Notations.
 
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
 
@@ -35,17 +35,25 @@ Section preds.
     | _ => None
     end.
 
-  Import Util.DecEq.
-
   Lemma extr_endorse_eq c from to :
     extract_controlled_endorse c = Some (from, to) ->
     c = assign (endorse from to) /\ var_lbl from = pulbl /\ var_lbl to = ptlbl.
-  Proof. Admitted.
+  Proof. 
+    case: c=> // - [] // >.
+    rewrite/extract_controlled_endorse.
+    case e1: (_ =? _); [apply dec_eq_true in e1| apply dec_eq_false in e1]=> //.
+    case e2: (_ =? _); [apply dec_eq_true in e2| apply dec_eq_false in e2]=> //= - [<- <-] //.
+  Qed.
 
   Lemma extr_decl_eq c from to :
     extract_controlled_declassify c = Some (from, to) ->
     c = assign (declassify from to) /\ var_lbl from = stlbl /\ var_lbl to = ptlbl.
-  Proof. Admitted.
+  Proof. 
+    case: c=> // - [] // >.
+    rewrite/extract_controlled_declassify.
+    case e1: (_ =? _); [apply dec_eq_true in e1| apply dec_eq_false in e1]=> //.
+    case e2: (_ =? _); [apply dec_eq_true in e2| apply dec_eq_false in e2]=> //= - [<- <-] //.
+  Qed.
 
   Lemma extr_endorse_opt oc from to:
     oapp extract_controlled_endorse None oc = Some (from, to) ->
