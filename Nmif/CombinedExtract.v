@@ -211,7 +211,7 @@ Section extract_step_commute.
 
   Fact post_optcmd_acmd_pubeq atkst isatk l oc s1 s2 :
     l ⊢ oc ->
-    ~~ oapp is_declassify false oc ->
+    oapp extract_controlled_declassify None oc = None ->
     ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
     post_cmd_action adv atkst
       (optcmd_stp_store oc (if isatk then pre_cmd_action adv atkst s1 else s1)) =
@@ -259,7 +259,11 @@ Section extract_step_commute.
   Proof.
     case: c. case=> rst ist simst atkst.
     case=> //. case=> rcmd isatk icmd pclbl restcmd inv.
-    case: (is_endorse_declassify_opt rcmd)=> [ | - []]; auto using extract_step_commute_downgrade.
+    have [] :
+      (oapp extract_controlled_endorse None rcmd = None /\ oapp extract_controlled_declassify None rcmd = None)
+      \/ (exists x, oapp extract_controlled_endorse None rcmd = Some x \/
+                    oapp extract_controlled_declassify None rcmd = Some x);[.. |case; case; eauto using extract_step_commute_downgrade ].
+      { admit. }
     case=> noend nodecl.
     rewrite /= in inv. move: inv=> []. (Forall_inv_toph)=> i1 restinv i3.
     rewrite /CmbCmdInv/CmbCmdCoreInv in i1. case: i1=> rwt _.
@@ -272,7 +276,7 @@ Section extract_step_commute.
     rewrite/step /acmd_step.  
     pattern_eq [if _ then pre_cmd_action (construct_simulator _) _ _ else ist] with ist; [| move=> ->]. (* Ninja repair *)
       { case: sim_active'; destruct pub; destruct rcmd as [c| ]=> //.
-      destruct c as [a | | ]=> //; destruct a=> //. }
+      destruct c as [a | | ]=> //; destruct a=> //. admit. }
     congr (_,_,_); cook.
     - set l1 := (X in map _ X = _). set l2 := (X in _ = map _ X).
       suff: l1 = map (fun c => (real_cmd c, real_atk_bit c,  ideal_cmd c, sim_active c)) l2;
