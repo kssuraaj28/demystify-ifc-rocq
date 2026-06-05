@@ -138,36 +138,40 @@ Section extract_step_commute.
 
   Ltac2 Set cook_debug := 0.
 
-  Lemma extract_step_commute_downgrade (st: CmbState) (c: CmbCmd) (restcmd: list CmbCmd):
-    oapp is_endorse false (real_cmd c) \/ oapp is_declassify false (real_cmd c) ->
+  Lemma extract_step_commute_downgrade (st: CmbState) (c: CmbCmd) (restcmd: list CmbCmd)
+    (from to : Vars):
+    oapp extract_controlled_endorse None (real_cmd c) = Some (from, to) \/
+    oapp extract_controlled_declassify None (real_cmd c) = Some (from, to) ->
     Invariant (st, c :: restcmd) ->
-    (step (extract_2cfg (st, c :: restcmd))).1 = extract_2cfg ((comb_step (st, c :: restcmd)).1). 
+    (step (extract_2cfg (st, c :: restcmd))).1 = extract_2cfg ((comb_step (st, c :: restcmd)).1).
   Proof.
     case: c=> >.  case: st=> >.
     cook. rewrite/Invariant=> downgrade. case. cook.
     rewrite/CmbCmdInv/StateInv=> + + [].
-    case: downgrade=> downgrade.
-    1: move: downgrade=> /is_endorse_inv_opt.
-    2: move: downgrade=> /is_declassify_inv_opt.
-    1,2: move=> [?] [?] ->.
+    case: downgrade=> /[dup] downgrade.
+    1,2: move=> /[swap] + /[swap] + /[swap] + /[swap].
+    1: move: downgrade=> /extr_endorse_opt.
+    2: move: downgrade=> /extr_decl_opt.
+    1,2: move=> [->] [_ _].
     1,2: rewrite/CmbCmdCoreInv=> - []. 
     1: move/wf_endorse_inv. 2: move/wf_declassify_inv. 
     1,2: move=> [->] [? ?]. 
     1,2: dotop [cbn]=> <- _ ? ?. 
     1,2: rewrite/comb_step/cmbcmd_step/extract_2cfg; cook.
     1,2: pattern_eq [sim_active  _] with true=>[| ->]; [simpl; cook|].
-    1,2: rewrite/step/acmd_step /=. 
+    1,2: rewrite/step/acmd_step.
+    1,2: move=> dgeqn.
+    1,2: pattern_focus[pre_cmd_action (construct_simulator _) _ _ ]=> P. 
+    1,2: rewrite/pre_cmd_action/construct_simulator/sim_pre; cook. 
+    1,2: subst P; cbn beta.
+    1,2: pattern_focus[post_cmd_action (construct_simulator _) _ _ ]=> P. 
+    1,2: rewrite/pre_cmd_action/construct_simulator; cbn [post_cmd_action sim_post sim_step]; cook; subst P; cbn beta.
     1,2: assert_fails (pattern_focus [construct_simulator _]). (* Checkpoint. TODO: Think about checkpoint practices *)
-    1,2: rewrite/clean_assign_stp_store/get_assign_val/get_assign_dest.
-    1: pattern_eq [is_untrusted _] with true=>[| ->]; cook.
-    1,2: pattern_eq [is_public _] with true=>[| ->]; cook.
+    1,2: rewrite/clean_assign_stp_store/get_assign_val/get_assign_dest; cook.
     1,2: pattern_eq_2 [post_cmd_action _ _ (update_to_store _ _ _)] [post_cmd_action _ _ (update_to_store _ _ _)]=> [|<-]; swap 2 3.
-        { apply/post_cmd_wf/update_to_store_storeview_eq; cook. wf_finisher. }
-        { apply/post_cmd_wf.  set a := (pre_cmd_action _ _ _). set b := (pre_cmd_action _ _ _).
-        have ?: ⟨ b | is_public ⟩ = ⟨ a | is_public ⟩; subst a b; [wf_finisher|].
-        erewrite <- update_same_varval;[| eassumption]. repeat f_equal.
-        erewrite storeview_eq; [ |apply: pre_cmd_wf_int| ]; cook.
-        apply:storeview_eq; eauto. cook. }
+        { apply/post_cmd_wf/update_to_store_storeview_eq; cook. wf_finisher. } (* TODO : wf_finisher this *)
+        { apply/post_cmd_wf. Require Import TODO. exact:declassify_pubeq. }
+    1,2: rewrite/clean_assign_stp_store/get_assign_val/get_assign_dest; cook.
     1,2: move: (post_cmd_action _ _ (update_to_store _ _ _));case=> >; cook.
     1,2: rewrite/zip.
     1,2: set rhs := RHS.

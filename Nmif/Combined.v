@@ -248,7 +248,7 @@ Section invprf.
       rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>].
       repeat split; cook.
         { move x: (extract_controlled_endorse _)=> x'; move: x' x. 
-        case=> [[>]/extr_endorse_eq [] + [] |/extr_endorse_no noend]. (* TODO move to case? *)
+        case=> [[>]/extr_endorse_eq [] + [] |noend]. (* TODO move to case? *)
           { move=>e; rewrite -> e in *=> {e} *.
           revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] e; rewrite -> e in *=> {e} - [] *.
           revert_hyp_pat (if _ then _ else _)=>  <-. cook.
@@ -268,7 +268,7 @@ Section invprf.
         1-4: wf_finisher_guess [LHS] with ⟨clean_cmd_stp_store _ (ideal_store _) | is_trusted ⟩=> ->.
         1-4: enter (idtac;wf_finisher). }
 
-        { move x: (extract_controlled_declassify _)=> x'; move: x' x. case=> [[>]/extr_decl_eq [] + []|/extr_decl_no nodecl]; cycle 1.
+        { move x: (extract_controlled_declassify _)=> x'; move: x' x. case=> [[>]/extr_decl_eq [] + []|nodecl]; cycle 1.
           { revert_hyp_pat [PcLbl, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [+ []] /==> *.
           2: wf_finisher_guess [LHS] with ⟨if _ then _ else _ |is_public⟩=> ->. 
           1,2: case: (X in if X then _ else _); enter (idtac; wf_finisher). }
@@ -292,7 +292,7 @@ Section invprf.
          apply/flows_to_subtype_prog;[|apply/snd]; auto. }
       move=> /= ? <- /=.
       move ?: (compute_new_pc _ _)=> [[] ?] /=; cycle 1. 
-        { move x: (extract_controlled_endorse _)=> x'; move: x' x. case=> [[>]/extr_endorse_eq [] + [] |/extr_endorse_no noend]; cycle 1.
+        { move x: (extract_controlled_endorse _)=> x'; move: x' x. case=> [[>]/extr_endorse_eq [] + [] |noend]; cycle 1.
            { pattern_eq_2  [clean_cmd_stp_cnt _ _] [clean_cmd_stp_cnt _ _]; [|move=>->; cook; apply Forall_forall=> //].
            wf_finisher_guess [RHS] with (clean_cmd_stp_cnt _ (real_store _))=> ->. cook. wf_finisher. }
         move=> e;rewrite -> e in *=> {e}; done. }

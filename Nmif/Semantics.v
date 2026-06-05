@@ -102,6 +102,9 @@ Section cleanstep.
   Fact optcmd_stp_cnd_idem c s : (* TODO: This should be rewrite step *)
     optcmd_stp_cnt c (optcmd_stp_store c s) = optcmd_stp_cnt c s.
   Proof. case: c=> //= *. exact: clean_cmd_stp_cnt_idem. Qed.
+
+  Fact clean_cmd_stp_cnt_assign a s : clean_cmd_stp_cnt (assign a) s = [].
+  Proof. done. Qed.
 End cleanstep.
 
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> optcmd_stp_store_simpl) "optcmd_stp_store_simpl" old.
@@ -109,6 +112,7 @@ Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> optcmd_stp_cnt
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> optcmd_stp_cnd_idem) "optcmd_stp_cnd_idem" old.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> clean_cmd_stp_store_endorse) "clean_cmd_stp_store_endorse" old.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> clean_cmd_stp_store_declassify) "clean_cmd_stp_store_declassify" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> clean_cmd_stp_cnt_assign) "clean_cmd_stp_cnt_assign" old.
 
 Section test.
   Context `{!VarPrm, !ValPrm}.

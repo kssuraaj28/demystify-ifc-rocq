@@ -605,22 +605,57 @@ End test.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(if_easy_goals) "if_easy_goals" old.
 
   
-Ltac2 Set this_cookbook_ as old := 
-  add_cookstep  
-    ltac1:(match goal with  
-           | H: ?x = ?b |- context [if ?x then _ else _] => is_constructor b; pattern x; rewrite H
-           | H: ?b = ?x |- context [if ?x then _ else _] => is_constructor b; pattern x; rewrite -H
-           end)
-    "if_w_hyp_eq" old.
+Ltac2 match_w_hyp_eq () : unit :=
+  let is_head_ctor (c : constr) : bool :=
+    match Constr.Unsafe.kind (head c) with
+    | Constr.Unsafe.Constructor _ _ => true
+    | _ => false
+    end in
+  match! goal with
+  | [ h : ?x = ?b |- context [match ?x with _ => _ end] ] =>
+    if is_head_ctor b
+    then let eq := Control.hyp h in pattern $x; rewrite -> $eq
+    else softfail_s "match_w_hyp_eq" "head not constructor"
+  | [ h : ?b = ?x |- context [match ?x with _ => _ end] ] =>
+    if is_head_ctor b
+    then let eq := Control.hyp h in pattern $x; rewrite <- $eq
+    else softfail_s "match_w_hyp_eq" "head not constructor"
+  end.
+
+Ltac match_w_hyp_eq := ltac2:(match_w_hyp_eq ()).
+
+Ltac2 Set this_cookbook_ as old :=
+  add_cookstep ltac1:(match_w_hyp_eq) "match_w_hyp_eq" old.
 
 Section test.
-  Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["if_w_hyp_eq"])).
+  Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["match_w_hyp_eq"])).
+
   Goal forall b, b = true -> if b then True else False.
-  Proof. 
-    move=> *.
-    cook. Undo.
-    Succeed now cook. 
-  Abort.
+  Proof. move=> b ?. cook. Undo. Succeed now cook. Abort.
+
+  Goal forall b, true = b -> if b then True else False.
+  Proof. move=> b ?. cook. Abort.
+
+  Goal forall b, b = false -> if b then False else True.
+  Proof. move=> b ?. cook. Abort.
+
+  Goal forall (o : option nat), o = Some 0 -> match o with Some _ => True | None => False end.
+  Proof. move=> o ?. cook. Abort.
+
+  Goal forall (o : option nat), Some 0 = o -> match o with Some _ => True | None => False end.
+  Proof. move=> o ?. cook. Abort.
+
+  Goal forall (o : option nat), o = None -> match o with Some _ => False | None => True end.
+  Proof. move=> o ?. cook. Abort.
+
+  Goal forall (n : nat), n = S 3 -> match n with S _ => True | O => False end.
+  Proof. move=> n ?. cook. Abort.
+
+  Goal forall (b1 b2 : bool), b1 = b2 -> if b1 then b2 = true else b2 = false.
+  Proof. move=> b1 b2 ?. Fail cook. Abort.
+
+  Goal forall (f : bool -> bool) (b : bool), b = f true -> if b then True else False.
+  Proof. move=> f b ?. Fail cook. Abort.
 End test.
 
 Fact oapp_some {A B} (f: A -> B) d a: ltac2:(cbn_eq (oapp f d (Some a))). Proof. done. Qed.

@@ -17,7 +17,7 @@ Section ni.
 
   Lemma wf_cmd_st_conf_ni c l st1 st2:
       WellFormedCmd l c ->
-      ~~ is_controlled_declassify c ->
+      extract_controlled_declassify c = None ->
       ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
       ⟨ clean_cmd_stp_store c st1 | is_public ⟩ = ⟨ clean_cmd_stp_store c st2 | is_public ⟩.
   Proof. Admitted.
@@ -51,7 +51,7 @@ Section ni.
 
   Lemma wf_cmd_st_int_ni c l st1 st2:
       WellFormedCmd l c ->
-      ~~ is_controlled_endorse c ->
+      extract_controlled_endorse c = None ->
       ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
       ⟨ clean_cmd_stp_store c st1 | is_trusted ⟩ = ⟨ clean_cmd_stp_store c st2 | is_trusted ⟩.
   Proof. Admitted.
@@ -74,7 +74,7 @@ Section ni.
 
   Fact wf_optcmd_st_conf_ni l oc st1 st2:
       l ⊢ oc ->
-      ~~ oapp is_controlled_declassify false oc ->
+      oapp extract_controlled_declassify None oc = None ->
       ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
       ⟨ optcmd_stp_store oc st1 | is_public ⟩ = ⟨ optcmd_stp_store oc st2 | is_public ⟩.
   Proof.
@@ -139,7 +139,7 @@ Section ni.
 
   Lemma wf_cmd_evnt_int_ni c l st1 st2:
       WellFormedCmd l c ->
-      ~~ is_controlled_endorse c ->
+      extract_controlled_endorse c = None ->
       ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
       clean_cmd_evnt c st1 = clean_cmd_evnt c st2.
   Proof. Admitted.
@@ -165,7 +165,7 @@ Section ni.
 
   Fact wf_optcmd_evnt_int_ni l oc st1 st2:
       l ⊢ oc ->
-      ~~ oapp is_controlled_endorse false oc ->
+      oapp extract_controlled_endorse None oc = None ->
       ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
       optcmd_evnt oc st1 = optcmd_evnt oc st2.
   Proof.
@@ -173,9 +173,9 @@ Section ni.
     exact: wf_cmd_evnt_int_ni wf noend treq.
   Qed.
 
-  Lemma wf_cmd_st_end c l st1 st2:
+  Lemma wf_cmd_st_end c l cc st1 st2:
       WellFormedCmd l c ->
-      is_controlled_endorse c ->
+      extract_controlled_endorse c = Some cc ->
       ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
       ⟨ clean_cmd_stp_store c st1 | is_public ⟩ = ⟨ clean_cmd_stp_store c st2 | is_public ⟩.
   Proof. Admitted.
@@ -186,9 +186,9 @@ Section ni.
     apply: update_to_store_storeview_eq; [rewrite /is_public e1 // | exact: pubeq].
   *)
 
-  Lemma wf_cmd_evnt_end c l st1 st2:
+  Lemma wf_cmd_evnt_end c l cc st1 st2:
       WellFormedCmd l c ->
-      is_controlled_endorse c ->
+      extract_controlled_endorse c = Some cc ->
       ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
       clean_cmd_evnt c st1 = clean_cmd_evnt c st2.
   Proof. Admitted.
@@ -203,9 +203,9 @@ Section ni.
     done.
   *)
 
-  Fact wf_optcmd_evnt_end l oc st1 st2:
+  Fact wf_optcmd_evnt_end l oc cc st1 st2:
       l ⊢ oc ->
-      oapp is_controlled_endorse false oc ->
+      oapp extract_controlled_endorse None oc = Some cc ->
       ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
       optcmd_evnt oc st1 = optcmd_evnt oc st2.
   Proof.
@@ -213,9 +213,9 @@ Section ni.
     exact: wf_cmd_evnt_end wf isend pubeq.
   Qed.
 
-  Lemma wf_cmd_evnt_decl c l st1 st2:
+  Lemma wf_cmd_evnt_decl c l cc st1 st2:
       WellFormedCmd l c ->
-      is_controlled_declassify c ->
+      extract_controlled_declassify c = Some cc ->
       ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
       clean_cmd_evnt c st1 = clean_cmd_evnt c st2.
   Proof. Admitted.
@@ -230,9 +230,9 @@ Section ni.
     done.
   *)
 
-  Fact wf_optcmd_evnt_decl l oc st1 st2:
+  Fact wf_optcmd_evnt_decl l oc cc st1 st2:
       l ⊢ oc ->
-      oapp is_controlled_declassify false oc ->
+      oapp extract_controlled_declassify None oc = Some cc ->
       ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
       optcmd_evnt oc st1 = optcmd_evnt oc st2.
   Proof.
@@ -324,17 +324,17 @@ Section test.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
   Goal forall l c st1 st2, WellFormedCmd l c ->
-    ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->    ~~ is_controlled_declassify c ->
+    ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->    extract_controlled_declassify c = None ->
     ⟨ clean_cmd_stp_store c st1 | is_public ⟩ = ⟨ clean_cmd_stp_store c st2 | is_public ⟩.
   Proof. move=> *. wf_finisher. Qed.
 
   Goal forall l c st1 st2, WellFormedCmd l c ->
-    ⟨ st2 | is_public ⟩ = ⟨ st1 | is_public ⟩ ->    ~~ is_controlled_declassify c ->
+    ⟨ st2 | is_public ⟩ = ⟨ st1 | is_public ⟩ ->    extract_controlled_declassify c = None ->
     ⟨ clean_cmd_stp_store c st1 | is_public ⟩ = ⟨ clean_cmd_stp_store c st2 | is_public ⟩.
   Proof. move=> *. wf_finisher. Qed.
 
   Goal forall l c st1 st2, WellFormedCmd l c ->
-    ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->    ~~ is_controlled_endorse c ->
+    ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->    extract_controlled_endorse c = None ->
     ⟨ clean_cmd_stp_store c st1 | is_trusted ⟩ = ⟨ clean_cmd_stp_store c st2 | is_trusted ⟩.
   Proof. move=> *. wf_finisher. Qed.
 
@@ -348,7 +348,7 @@ Section test.
 
   Goal forall {AtkStates} (adv : AdvNextStep AtkStates) ast l c s1 s2,
     WellFormedCmd l c ->
-    ~~ is_controlled_declassify c ->
+    extract_controlled_declassify c = None ->
     ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
     post_cmd_action adv ast (clean_cmd_stp_store c (pre_cmd_action adv ast s1)) =
     post_cmd_action adv ast (clean_cmd_stp_store c (pre_cmd_action adv ast s2)).
@@ -356,7 +356,7 @@ Section test.
 
   Goal forall {AtkStates} (adv : AdvNextStep AtkStates) ast l oc s1 s2,
     l ⊢ oc ->
-    ~~ oapp is_controlled_declassify false oc ->
+    oapp extract_controlled_declassify None oc = None ->
     ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
     post_cmd_action adv ast (optcmd_stp_store oc (pre_cmd_action adv ast s1)) =
     post_cmd_action adv ast (optcmd_stp_store oc (pre_cmd_action adv ast s2)).
@@ -381,37 +381,37 @@ Section test.
   Proof. move=> *. wf_finisher. Qed.
 
   Goal forall l c st1 st2, WellFormedCmd l c ->
-    ~~ is_controlled_endorse c ->
+    extract_controlled_endorse c = None ->
     ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
     clean_cmd_evnt c st1 = clean_cmd_evnt c st2.
   Proof. move=> *. wf_finisher. Qed.
 
   Goal forall l oc st1 st2, l ⊢ oc ->
-    ~~ oapp is_controlled_endorse false oc ->
+    oapp extract_controlled_endorse None oc = None ->
     ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
     optcmd_evnt oc st1 = optcmd_evnt oc st2.
   Proof. move=> *. wf_finisher. Qed.
 
-  Goal forall l c st1 st2, WellFormedCmd l c ->
-    is_controlled_endorse c ->
+  Goal forall l c cc st1 st2, WellFormedCmd l c ->
+    extract_controlled_endorse c = Some cc ->
     ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
     clean_cmd_evnt c st1 = clean_cmd_evnt c st2.
   Proof. move=> *. wf_finisher. Qed.
 
-  Goal forall l oc st1 st2, l ⊢ oc ->
-    oapp is_controlled_endorse false oc ->
+  Goal forall l oc cc st1 st2, l ⊢ oc ->
+    oapp extract_controlled_endorse None oc = Some cc ->
     ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
     optcmd_evnt oc st1 = optcmd_evnt oc st2.
   Proof. move=> *. wf_finisher. Qed.
 
-  Goal forall l c st1 st2, WellFormedCmd l c ->
-    is_controlled_declassify c ->
+  Goal forall l c cc st1 st2, WellFormedCmd l c ->
+    extract_controlled_declassify c = Some cc ->
     ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
     clean_cmd_evnt c st1 = clean_cmd_evnt c st2.
   Proof. move=> *. wf_finisher. Qed.
 
-  Goal forall l oc st1 st2, l ⊢ oc ->
-    oapp is_controlled_declassify false oc ->
+  Goal forall l oc cc st1 st2, l ⊢ oc ->
+    oapp extract_controlled_declassify None oc = Some cc ->
     ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
     optcmd_evnt oc st1 = optcmd_evnt oc st2.
   Proof. move=> *. wf_finisher. Qed.
@@ -432,8 +432,8 @@ Section test.
   Proof. move=> *. wf_finisher. Qed.
 
 (* A funny test *)
-  Goal forall l oc st1 st2, l ⊢ oc ->
-    oapp is_controlled_declassify false oc ->
+  Goal forall l oc cc st1 st2, l ⊢ oc ->
+    oapp extract_controlled_declassify None oc = Some cc ->
     ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
     exists something, optcmd_evnt oc st1 = something.
   Proof. move=> *. eexists. wf_finisher. Qed.
@@ -502,7 +502,7 @@ Section test.
 
   Goal forall {AtkStates} (adv : AdvNextStep AtkStates) ast l c s1 s2,
     WellFormedCmd l c ->
-    ~~ is_controlled_endorse c ->
+    extract_controlled_endorse c = None ->
     ⟨ s1 | is_trusted ⟩ = ⟨ s2 | is_trusted ⟩ ->
     ⟨ clean_cmd_stp_store c (pre_cmd_action adv ast s1) | is_trusted ⟩ =
     ⟨ clean_cmd_stp_store c s2 | is_trusted ⟩.
