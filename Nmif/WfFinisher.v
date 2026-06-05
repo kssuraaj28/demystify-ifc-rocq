@@ -20,7 +20,8 @@ Section ni.
       extract_controlled_declassify c = None ->
       ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
       ⟨ clean_cmd_stp_store c st1 | is_public ⟩ = ⟨ clean_cmd_stp_store c st2 | is_public ⟩.
-  Proof. Admitted.
+  Proof. 
+  Admitted.
   (* TODO repair (constructors changed shape):
     move=> [] // d s1 s2 ? ?.
       { apply: update_to_store_storeview_eq. rewrite /is_public s2 //. }
@@ -41,14 +42,13 @@ Section ni.
       WellFormedCmd (mk_lbl i false) c ->
       ⟨ clean_cmd_stp_store c st | is_public ⟩ =
       ⟨ st | is_public ⟩.
-  Proof. Admitted.
-  (* TODO repair (wf_assign binders changed shape):
+  Proof. 
     move=> >; move e: (mk_lbl _ _)=> ?; move:e=> /[swap].
-    case=> //= > +++e; rewrite -{}e=> _ _ flw.
+    case=> //= > ++e; rewrite -{}e => *.
     rewrite update_storeview_nochange=> //.
     rewrite/is_public.
     apply/negbTE/flows_from_sec; rewrite/secret; eauto; done.
-  *)
+  Qed.
 
   Lemma wf_cmd_st_int_ni c l st1 st2:
       WellFormedCmd l c ->
@@ -92,49 +92,41 @@ Section ni.
     forall p c st,
     WellFormedCmd (mk_lbl true p) c ->
     ⟨ clean_cmd_stp_store c st | is_trusted ⟩ = ⟨ st | is_trusted ⟩.
-  Proof. Admitted.
-  (* TODO repair (wf_assign binders changed shape):
+  Proof.
     move=> >; move e: (mk_lbl _ _)=> ?; move:e=> /[swap].
-    case=> //= > +++e; rewrite -{}e=> _ _ flw.
-    rewrite update_storeview_nochange=> //.
-    rewrite/is_trusted/is_untrusted negbF //.
-    apply/flows_from_untr; eauto; done.
-  *)
+    case=> //= > ++ /ltac:(dotop [idtac])=> <- /[swap].
+    move/flows_from_untr=> /=. evar_spec_toph=> // + _.
+    rewrite/asgn_dst_lbl-/(get_assign_dest _).
+    move=> + /ltac:(apply: update_storeview_nochange=> //).
+    move: (get_assign_dest _)=> ?.
+    rewrite/is_trusted/is_untrusted=> -> //.
+  Qed.
 
   Fact wf_untr_optcmd_st_int_ni p oc s:
     mk_lbl true p ⊢ oc ->
     ⟨ optcmd_stp_store oc s | is_trusted ⟩ = ⟨ s | is_trusted ⟩.
   Proof. case: oc => //= c wf. exact: wf_untr_cmd_st_int_ni wf. Qed.
 
-  Lemma wf_tr_cmd_cnt_ni:
-    forall p p' c st1 st2,
+  Lemma wf_tr_cmd_cnt_ni p p' c st1 st2:
       WellFormedCmd (mk_lbl false p) c ->
       compute_new_pc (mk_lbl false p) c = mk_lbl false p' ->
       ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
       clean_cmd_stp_cnt c st1 = clean_cmd_stp_cnt c st2.
-  Proof. Admitted.
-  (* TODO repair (constructors changed shape):
-    move=> p p' c st1 st2 wf hyp treq.
-    have untrg: untrusted (compute_new_pc (mk_lbl false p) c) = false by rewrite hyp.
-    move: wf untrg treq.
-    move e: (mk_lbl _ _)=> l; move: e=> /[swap].
-    case=> //= > => [_ _| _] <- untrg *.
-    1-2: set gr := (X in _ = (if X then _ else _)); set gl := (X in (if X then _ else _) = _).
-    1-2: suff: gl = gr; [move=> -> //|subst gl gr]; congr (_ _).
-    1-2: apply/storeview_eq; [eassumption|].
-    1-2: move: untrg; rewrite Bool.orb_false_r /is_trusted/is_untrusted=> -> //.
-  *)
+  Proof. 
+    move=> >; move e: (mk_lbl _ _)=> ?; move:e=> /[swap].
+    case=> // > => [++ <- | + <- ]=> * /=.
+    1,2: pattern_eq_2 [X in _ = (if (_ X) then _ else _)] [X in (if (_ X) then _ else _) = _]=> [|->] //.
+    1,2: apply:storeview_eq; [symmetry;eassumption | ].
+    1,2: revert_hyp_pat (compute_new_pc _ _ = _)=> /=; rewrite/is_trusted/is_untrusted; case: var_lbl=> - [] [] //. (* TODO: Should be in Lattice4pt *)
+  Qed.
 
   Lemma wf_untr_cmd_evnt_ni pc c s:
     untrusted pc -> WellFormedCmd pc c -> clean_cmd_evnt c s = None.
-  Proof. Admitted.
-  (* TODO repair (wf_assign binders changed shape):
-    move=> /[swap]. case=> // > _ _ /[swap].
-    rewrite/clean_cmd_evnt/clean_assign_evnt/get_assign_dest=> *.
-    pattern_eq [is_trusted _] with false=> [|-> //].
-    rewrite/is_trusted/is_untrusted.
-    erewrite flows_from_untr; eauto.
-  *)
+  Proof.
+    move=> /[swap]; case=> //=.
+    move=> a ? _ /flows_from_untr H /H {H} /=.
+    rewrite /clean_assign_evnt /is_trusted /is_untrusted /= => -> //.
+  Qed.
 
   Fact wf_untr_optcmd_evnt_ni pc oc s:
     untrusted pc -> pc ⊢ oc -> optcmd_evnt oc s = None.
@@ -181,30 +173,25 @@ Section ni.
       extract_controlled_endorse c = Some cc ->
       ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
       ⟨ clean_cmd_stp_store c st1 | is_public ⟩ = ⟨ clean_cmd_stp_store c st2 | is_public ⟩.
-  Proof. Admitted.
-  (* TODO repair (constructors changed shape):
-    move=> wf isend pubeq.
-    case: wf isend => //= from to e1 e2 _.
-    rewrite /clean_cmd_stp_store /get_assign_dest /get_assign_val /=.
-    apply: update_to_store_storeview_eq; [rewrite /is_public e1 // | exact: pubeq].
-  *)
+  Proof.
+    move=> _; case: cc=> [from to] /extr_endorse_eq [-> [efrom eto]] pubeq /=.
+    apply: update_to_store_storeview_eq; [rewrite /is_public efrom // | exact: pubeq].
+  Qed.
 
   Lemma wf_cmd_evnt_end c l cc st1 st2:
       WellFormedCmd l c ->
       extract_controlled_endorse c = Some cc ->
       ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
       clean_cmd_evnt c st1 = clean_cmd_evnt c st2.
-  Proof. Admitted.
-  (* TODO repair (constructors changed shape):
-    move=> wf isend pubeq.
-    case: wf isend => //= from to e1 e2 _.
+  Proof.
+    move=> _; case: cc=> [from to] /extr_endorse_eq [-> [efrom eto]] pubeq.
     rewrite /clean_cmd_evnt /clean_assign_evnt /get_assign_dest /get_assign_val /=.
     have ->: is_trusted to.
-    { rewrite /is_trusted /is_untrusted e2 //. }
+    { rewrite /is_trusted /is_untrusted eto //. }
     have ->: st1 from = st2 from.
-    { apply: storeview_eq; [exact: pubeq | rewrite /is_public e1 // ]. }
+    { apply: storeview_eq; [exact: pubeq | rewrite /is_public efrom //]. }
     done.
-  *)
+  Qed.
 
   Fact wf_optcmd_evnt_end l oc cc st1 st2:
       l ⊢ oc ->
@@ -221,17 +208,15 @@ Section ni.
       extract_controlled_declassify c = Some cc ->
       ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
       clean_cmd_evnt c st1 = clean_cmd_evnt c st2.
-  Proof. Admitted.
-  (* TODO repair (constructors changed shape):
-    move=> wf isdecl treq.
-    case: wf isdecl => //= from to e1 e2 _.
+  Proof.
+    move=> _; case: cc=> [from to] /extr_decl_eq [-> [efrom eto]] treq.
     rewrite /clean_cmd_evnt /clean_assign_evnt /get_assign_dest /get_assign_val /=.
     have ->: is_trusted to.
-    { rewrite /is_trusted /is_untrusted e2 //. }
+    { rewrite /is_trusted /is_untrusted eto //. }
     have ->: st1 from = st2 from.
-    { apply: storeview_eq; [exact: treq | rewrite /is_trusted /is_untrusted e1 // ]. }
+    { apply: storeview_eq; [exact: treq | rewrite /is_trusted /is_untrusted efrom //]. }
     done.
-  *)
+  Qed.
 
   Fact wf_optcmd_evnt_decl l oc cc st1 st2:
       l ⊢ oc ->
