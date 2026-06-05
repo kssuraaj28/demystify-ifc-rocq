@@ -245,14 +245,24 @@ Section downgrading.
     var_lbl to = ptlbl ->
     WellFormedCmd pc (assign (endorse from to)) ->
     pc = ptlbl.
-  Proof. Admitted.
+  Proof.
+    move=> efrom eto.
+    move t1: (assign (_))=> ? t2; move: t2 t1=> [] // > + + /ltac:(dotop [idtac]).
+    case=> <- /=. rewrite/asgn_dst_lbl {}efrom {}eto=> _.
+    exact: flows_to_pt.
+  Qed.
 
   Lemma wf_declassify_pc pc from to:
     var_lbl from = stlbl ->
     var_lbl to = ptlbl ->
     WellFormedCmd pc (assign (declassify from to)) ->
     pc = ptlbl.
-  Proof. Admitted.
+  Proof.
+    move=> efrom eto.
+    move t1: (assign (_))=> ? t2; move: t2 t1=> [] // > + + /ltac:(dotop [idtac]).
+    case=> <- /=. rewrite/asgn_dst_lbl {}efrom {}eto=> _.
+    exact: flows_to_pt.
+  Qed.
 End downgrading.
 
 Section step_soundness.
@@ -277,18 +287,14 @@ Section step_soundness.
       WellFormedCmd pc c ->
       forall st,
         WellFormedProg (compute_new_pc pc c) (clean_cmd_stp_cnt c st).
-  Proof. Admitted.
-  (* TODO repair (constructors changed to <> None):
-    move=> + > => - []=> > //= * //.
-    1-2: revert_hyp_pat (is_true _).
-    1: move/is_controlled_endorse_inv.    2: move/is_controlled_declassify_inv.
-    1-2: move=> [?] [?] [->] [] *; done.
+  Proof. 
+    case=> //= * //.
     1-2: move=> * //=; move: (X in if X then _ else _)=> ?; if_easy_goals.
     apply/Forall_app. split=> //.
     constructor 2=> //.
     apply/wf_while /Forall_impl; [| eassumption]; clear=> *.
     rewrite -join_assoc join_idem=> //.
-  *)
+  Qed.
 
   Lemma step_soundness_pubuntr:
     forall c st,
