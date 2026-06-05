@@ -249,8 +249,8 @@ Section invprf.
       repeat split; cook.
         { move x: (extract_controlled_endorse _)=> x'; move: x' x. 
         case=> [[>]/extr_endorse_eq [] + [] |noend]. (* TODO move to case? *)
-          { move=>e; rewrite -> e in *=> {e} *.
-          revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_inv [] e; rewrite -> e in *=> {e} - [] *.
+          { move=>e; rewrite -> e in *=> {e} el1 el2.
+          revert_hyp_pat (WellFormedCmd _ _)=> /(wf_endorse_pc _ _ _ el1 el2) e; rewrite -> e in *=> {e}. 
           revert_hyp_pat (if _ then _ else _)=>  <-. cook.
           Require Import TODO. (* TODO: This should be automated. But how to automate? *)
           apply: wf_endorse_st_int; cook.
@@ -272,8 +272,8 @@ Section invprf.
           { revert_hyp_pat [Label, (WellFormedCmd _ _), (if _ then _ else _)]; case=> [+ []] /==> *.
           2: wf_finisher_guess [LHS] with ⟨if _ then _ else _ |is_public⟩=> ->. 
           1,2: case: (X in if X then _ else _); enter (idtac; wf_finisher). }
-        move=> e; rewrite -> e in *=> {e} _ _.
-        revert_hyp_pat (WellFormedCmd _ _)=> /wf_declassify_inv [] e; rewrite -> e in *=> {e} - [] * /=.
+        move=> e; rewrite -> e in *=> {e} el1 el2.
+        revert_hyp_pat (WellFormedCmd _ _)=> /(wf_declassify_pc _ _ _ el1 el2) e; rewrite -> e in *=> {e} /=.
         revert_hyp_pat (if _ then _ else _)=> /= <- /=.
         (* TODO: Need automation here *)
         apply/storeview_eq_ext=> *; rewrite /clean_assign_stp_store /update_to_store /=. rewrite dec_eq_refl. (* TODO: Eventually this should be a rewrite rule also *)

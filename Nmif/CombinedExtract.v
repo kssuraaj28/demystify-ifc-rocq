@@ -153,10 +153,10 @@ Section extract_step_commute.
     1,2: move=> /[swap] + /[swap] + /[swap] + /[swap].
     1: move: downgrade=> /extr_endorse_opt.
     2: move: downgrade=> /extr_decl_opt.
-    1,2: move=> [->] [_ _].
-    1,2: rewrite/CmbCmdCoreInv=> - []. 
-    1: move/wf_endorse_inv. 2: move/wf_declassify_inv. 
-    1,2: move=> [->] [? ?]. 
+    1,2: move=> [->] [el1 el2].
+    1,2: rewrite/CmbCmdCoreInv=> - [].
+    1: move/(wf_endorse_pc _ _ _ el1 el2). 2: move/(wf_declassify_pc _ _ _ el1 el2).
+    1,2: move=> ->.
     1,2: dotop [cbn]=> <- _ ? ?. 
     1,2: rewrite/comb_step/cmbcmd_step/extract_2cfg; cook.
     1,2: pattern_eq [sim_active  _] with true=>[| ->]; [simpl; cook|].

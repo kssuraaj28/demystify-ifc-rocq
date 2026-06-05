@@ -240,27 +240,19 @@ Section downgrading.
   Import Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
 
-  Lemma wf_endorse_inv pc from to:
+  Lemma wf_endorse_pc pc from to:
+    var_lbl from = pulbl ->
+    var_lbl to = ptlbl ->
     WellFormedCmd pc (assign (endorse from to)) ->
-    pc = mk_lbl false true /\
-    var_lbl from = mk_lbl true true /\
-    var_lbl to = mk_lbl false true.
+    pc = ptlbl.
   Proof. Admitted.
-  (* TODO repair (constructors changed to <> None):
-    inversion 1; subst; revert_hyp_pat (is_true _); clear=> //.
-    move=> /is_controlled_endorse_inv [?] [?] [] [-> ->] [-> ->] //.
-  *)
 
-  Lemma wf_declassify_inv pc from to:
+  Lemma wf_declassify_pc pc from to:
+    var_lbl from = stlbl ->
+    var_lbl to = ptlbl ->
     WellFormedCmd pc (assign (declassify from to)) ->
-    pc = mk_lbl false true /\
-    var_lbl from = mk_lbl false false /\
-    var_lbl to = mk_lbl false true.
+    pc = ptlbl.
   Proof. Admitted.
-  (* TODO repair (constructors changed to <> None):
-    inversion 1; subst; revert_hyp_pat (is_true _); clear=> //.
-    move=> /is_controlled_declassify_inv [?] [?] [] [-> ->] [-> ->] //.
-  *)
 End downgrading.
 
 Section step_soundness.
