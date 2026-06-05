@@ -154,7 +154,7 @@ Section extract_step_commute.
     1: move: downgrade=> /extr_endorse_opt.
     2: move: downgrade=> /extr_decl_opt.
     1,2: move=> [->]; case=> /[dup] ? /[swap] /[dup] ? /[swap].
-    1,2: rewrite/CmbCmdCoreInv=> - [] + + [] /ltac:(dotop [cbn]).
+    1,2: rewrite/CmbCmdCoreInv=> + + [] /ltac:(dotop [cbn]).
     1: move=> /wf_endorse_pc. 2: move/wf_declassify_pc.
     1,2: move=> /[apply] /[apply] ->.
     1,2: dotop [cbn]=> <- _ ? ?. 
