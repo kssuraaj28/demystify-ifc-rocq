@@ -17,9 +17,6 @@ Ltac2 Set this_cookbook_ := create_new_cookbook.
 
 (* TODO: Maybe elsewere *)
 Definition PcLbl := Lattice4pt.Label.
-#[local]  Notation ptlbl := (mk_lbl false true).
-#[local]  Notation stlbl := (mk_lbl false false).
-#[local]  Notation pulbl := (mk_lbl true true).
 
 Section preds. 
   Import Util.DecEq.Notations.

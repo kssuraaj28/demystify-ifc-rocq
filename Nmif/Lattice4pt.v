@@ -32,6 +32,11 @@ Section var_lbl.
   Proof. done. Qed.
 End var_lbl.
 
+Notation ptlbl := (mk_lbl false true) (only parsing).   (* trusted, public *)
+Notation stlbl := (mk_lbl false false) (only parsing).  (* trusted, secret *)
+Notation pulbl := (mk_lbl true true) (only parsing).    (* untrusted, public *)
+Notation sulbl := (mk_lbl true false) (only parsing).   (* untrusted, secret *)
+
 #[export] Instance Label_DecEq : DecEq Label.
 Proof.
   constructor=> [[u1 p1] [u2 p2]].
