@@ -124,6 +124,8 @@ Section ni.
     1,2: revert_hyp_pat (compute_new_pc _ _ = _)=> /=; rewrite/is_trusted/is_untrusted; case: var_lbl=> - [] [] //. (* TODO: Should be in Lattice4pt *)
   Qed.
 
+  Fail Check "delete_this".
+  (*
   Lemma wf_untr_cmd_evnt_ni pc c s:
     untrusted pc -> WellFormedCmd pc c -> clean_cmd_evnt c s = None.
   Proof.
@@ -142,25 +144,6 @@ Section ni.
       ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
       clean_cmd_evnt c st1 = clean_cmd_evnt c st2.
   Proof. Admitted.
-  (* TODO repair (constructors changed shape):
-    move=> wf noend treq.
-    case: wf noend => //=.
-    - move=> from to e1 e2 _.
-      rewrite /clean_cmd_evnt /clean_assign_evnt /get_assign_dest /get_assign_val /=.
-      have ->: is_trusted to.
-      { rewrite /is_trusted /is_untrusted e2 //. }
-      have ->: st1 from = st2 from.
-      { apply: storeview_eq; [exact: treq | rewrite /is_trusted /is_untrusted e1 // ]. }
-      done.
-    - move=> dst src1 src2 comp pclbl fs1 fs2 _ _.
-      rewrite /clean_cmd_evnt /clean_assign_evnt /get_assign_dest /get_assign_val /eval_val_exp /=.
-      case te: (is_trusted dst)=> //.
-      have ->: st1 src1 = st2 src1.
-      { apply: storeview_eq; [exact: treq | exact: flows_to_tr te fs1 ]. }
-      have ->: st1 src2 = st2 src2.
-      { apply: storeview_eq; [exact: treq | exact: flows_to_tr te fs2 ]. }
-      done.
-  *)
 
   Fact wf_optcmd_evnt_int_ni l oc st1 st2:
       l ⊢ oc ->
@@ -171,6 +154,7 @@ Section ni.
     case: oc => //= c wf noend treq.
     exact: wf_cmd_evnt_int_ni wf noend treq.
   Qed.
+  *)
 
   Lemma wf_cmd_st_end c l cc st1 st2:
       WellFormedCmd l c ->
@@ -182,6 +166,8 @@ Section ni.
     apply: update_to_store_storeview_eq; [rewrite /is_public efrom // | exact: pubeq].
   Qed.
 
+  Fail Check "delete_this".
+  (*
   Lemma wf_cmd_evnt_end c l cc st1 st2:
       WellFormedCmd l c ->
       extract_controlled_endorse c = Some cc ->
@@ -231,6 +217,7 @@ Section ni.
     case: oc => //= c wf isdecl treq.
     exact: wf_cmd_evnt_decl wf isdecl treq.
   Qed.
+  *)
 
 End ni.
 
@@ -251,6 +238,7 @@ Ltac2 wf_finisher_arms () : unit :=
     reference:(wf_untr_cmd_st_int_ni);
     reference:(wf_untr_optcmd_st_int_ni);
     reference:(wf_tr_cmd_cnt_ni);
+    (*
     reference:(wf_untr_cmd_evnt_ni);
     reference:(wf_untr_optcmd_evnt_ni);
     reference:(wf_cmd_evnt_int_ni);
@@ -259,6 +247,7 @@ Ltac2 wf_finisher_arms () : unit :=
     reference:(wf_optcmd_evnt_end);
     reference:(wf_cmd_evnt_decl);
     reference:(wf_optcmd_evnt_decl);
+    *)
     reference:(pre_cmd_wf_int);
     reference:(pre_cmd_wf_conf);
     reference:(post_cmd_wf)
@@ -366,6 +355,8 @@ Section test.
     clean_cmd_stp_cnt c st1 = clean_cmd_stp_cnt c st2.
   Proof. move=> *. wf_finisher. Qed.
 
+  Fail Check "delete_this".
+  (*
   Goal forall pc c s, untrusted pc -> WellFormedCmd pc c -> clean_cmd_evnt c s = None.
   Proof. move=> *. wf_finisher. Qed.
 
@@ -407,6 +398,7 @@ Section test.
     ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
     optcmd_evnt oc st1 = optcmd_evnt oc st2.
   Proof. move=> *. wf_finisher. Qed.
+  *)
 
   Goal forall {AtkStates} (adv : AdvNextStep AtkStates) ast s,
     ⟨ pre_cmd_action adv ast s | is_trusted ⟩ = ⟨ s | is_trusted ⟩.
@@ -424,11 +416,14 @@ Section test.
   Proof. move=> *. wf_finisher. Qed.
 
 (* A funny test *)
+  Fail Check "delete_this".
+  (*
   Goal forall l oc cc st1 st2, l ⊢ oc ->
     oapp extract_controlled_declassify None oc = Some cc ->
     ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
     exists something, optcmd_evnt oc st1 = something.
   Proof. move=> *. eexists. wf_finisher. Qed.
+  *)
 
   Goal forall s s',
     ⟨ s | is_trusted ⟩ = ⟨ s' | is_trusted ⟩ ->

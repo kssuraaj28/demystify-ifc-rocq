@@ -53,8 +53,9 @@ Record AdvNextStep `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
     {AtkStates : Type} := {
     (* Corruption *)
     pre_cmd_action: AtkStates -> Store -> Store;
-    post_cmd_action: AtkStates -> Store -> (AtkStates * AdvEvent * nat); (* New state, event, and substeps *)
- 
+    post_cmd_action: AtkStates -> Store -> (AtkStates * nat); (* New state and substeps *)
+    post_cmd_event: AtkStates -> AdvEvent;
+
     pre_cmd_wf_int: 
       forall ast, 
         let: ast_corr := pre_cmd_action ast in

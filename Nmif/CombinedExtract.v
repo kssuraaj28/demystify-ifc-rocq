@@ -144,7 +144,7 @@ Section extract_step_commute.
     oapp extract_controlled_endorse None (real_cmd c) = Some (from, to) \/
     oapp extract_controlled_declassify None (real_cmd c) = Some (from, to) ->
     Invariant (st, c :: restcmd) ->
-    (step (extract_2cfg (st, c :: restcmd))).1 = extract_2cfg ((comb_step (st, c :: restcmd)).1).
+    step (extract_2cfg (st, c :: restcmd)) = extract_2cfg (comb_step (st, c :: restcmd)).
   Proof.
     case: c=> >.  case: st=> >.
     cook. rewrite/Invariant=> downgrade. case. cook.
@@ -257,7 +257,7 @@ Section extract_step_commute.
 
   Theorem extract_step_commute c:
     Invariant c ->
-    (step (extract_2cfg c)).1 = extract_2cfg ((comb_step c).1).
+    step (extract_2cfg c) = extract_2cfg (comb_step c).
   Proof.
     case: c. case=> rst ist simst atkst.
     case=> //. case=> rcmd isatk icmd pclbl restcmd inv.
@@ -354,7 +354,7 @@ Section extract_step_commute.
         rewrite combine_extend3_nil1 combine_extend2_nil_r !map_map filter_map_swap. cook.
         unshelve erewrite filter_ext; [exact xpred0|apply filter_false|]. cook. }
       rewrite/sim_step /=; cnstrct_eq_gl; cook.
-        { case: pub rwt => rwt /=; cook; congr (_.1.1); [wf_finisher|].
+        { case: pub rwt => rwt /=; cook; congr (_.1); [wf_finisher|].
         wf_finisher_guess [LHS] with (post_cmd_action _ _ (_ _ _ rst))=> ->. wf_finisher. } (* Classic transitivity *)
       rewrite/zip/cmd_map_sim filter_map_swap map_map. symmetry.
       erewrite map_ext; [|case; case=> * /=; instantiate (1:= fun '(_,_,_) => _); reflexivity].

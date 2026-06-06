@@ -50,9 +50,12 @@ Section assignstep.
   Definition clean_assign_stp_store (a: Assignment) (s: Store) : Store :=
     update_to_store s (get_assign_dest a) (get_assign_val s a).
 
+  Fail Check "delete_this".
+  (*
   Definition clean_assign_evnt (a: Assignment) (s: Store) : option (Vars * Vals) :=
     let: dst := get_assign_dest a in
     if (is_trusted dst) is false then None else Some (dst, get_assign_val s a).
+  *)
 End assignstep.
 
 Section cleanstep.
@@ -81,10 +84,13 @@ Section cleanstep.
   (* The option is epsilon  *)
   Definition CmdEvent := option (Vars * Vals).
 
+  Fail Check "delete_this".
+  (*
   Definition clean_cmd_evnt (c: Cmd) (s: Store) : CmdEvent :=
     if c isn't assign a then None else clean_assign_evnt a s.
 
   Definition optcmd_evnt := oapp clean_cmd_evnt (fun _ => None).
+  *)
 
   Fact optcmd_stp_store_simpl c s: ltac2:(cbn_eq (optcmd_stp_store (Some c) s)). Proof. done. Qed.
   Fact optcmd_stp_cnt_simpl c s: ltac2:(cbn_eq (optcmd_stp_cnt (Some c) s)). Proof. done. Qed.
@@ -127,21 +133,25 @@ Section acmd.
   Variable (adv: AdvNextStep AtkStates).
   Record AtkCmd := mk_atkcmd {is_attacked: bool; ocmd : option Cmd}.
   Definition State := (Store * AtkStates)%type.
+
+  Fail Check "delete_this".
+  (*
   Record Event := mk_acmd_evnt { cevnt : CmdEvent ; aevnt : AdvEvent }.
   Definition blank_event := mk_acmd_evnt None None.
+  *)
 
-  Definition acmd_step (ac: AtkCmd) (s: State): Prog * State * Event * nat :=
+  Definition acmd_step (ac: AtkCmd) (s: State): Prog * State (* * Event *) * nat :=
     let: mk_atkcmd isatk cmd := ac in
     let: (store, atk_st) := s in
     let: st := if isatk is true then pre_cmd_action adv atk_st store else store in
-    let: (prog, st, cevnt) := (optcmd_stp_cnt cmd st,  optcmd_stp_store cmd st, optcmd_evnt cmd st) in
+    let: (prog, st (*, cevnt *)) := (optcmd_stp_cnt cmd st,  optcmd_stp_store cmd st (*, optcmd_evnt cmd st *)) in
 
     let: atk_pst := (post_cmd_action adv atk_st st) in
     let: atk_st := if isatk is true then atk_pst.1.1 else atk_st in
-    let: aevnt := if isatk is true then atk_pst.1.2 else None in
+    (* let: aevnt := if isatk is true then atk_pst.1.2 else None in *)
     let: steps := if isatk is true then atk_pst.2 else 0 in
 
-    (prog, (st, atk_st), mk_acmd_evnt cevnt aevnt ,steps).
+    (prog, (st, atk_st) (*, mk_acmd_evnt cevnt aevnt *), steps).
   
 
   Fact acmd_step_atk cmd store atk_st :
@@ -166,18 +176,18 @@ Section twocfg.
 
   Definition TwoCfg := (list (AtkCmd * AtkCmd) * State1 * State2)%type.
 
-  Definition step (c: TwoCfg): TwoCfg * (Event * Event) :=
+  Definition step (c: TwoCfg): TwoCfg (* * (Event * Event) *) :=
     let: (c2lst, s1, s2) := c in
-    if c2lst isn't (ac1, ac2) :: rest then (c, (blank_event, blank_event)) else
-    let: (p1, st1, ev1, steps1) := (acmd_step adv1 ac1 s1) in
-    let: (p2, st2, ev2, steps2) := (acmd_step adv2 ac2 s2) in
+    if c2lst isn't (ac1, ac2) :: rest then c (*, (blank_event, blank_event) *) else
+    let: (p1, st1 (*, ev1 *), steps1) := (acmd_step adv1 ac1 s1) in
+    let: (p2, st2 (*, ev2 *), steps2) := (acmd_step adv2 ac2 s2) in
 
     let: cont := combine_extend4
                    (map Some p1) (repeat true steps1)
                    (map Some p2) (repeat true steps2)
                    None false None false in
     let: cont := map (fun '(oc1, a1, oc2, a2) => (mk_atkcmd a1 oc1, mk_atkcmd a2 oc2)) cont in
-    ((cont ++ rest, st1, st2), (ev1, ev2)).
+    (cont ++ rest, st1, st2) (*, (ev1, ev2) *).
 End twocfg.
 
 

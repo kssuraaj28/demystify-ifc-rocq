@@ -49,9 +49,10 @@ Section sim_constr.
          mk_simstate (init_state atk init_sv) store (map (fun c => (Some c, true)) prog).
      Dropped along with the init_state field of AdvNextStep. *)
 
-  Definition sim_step 
+  Fail Check "delete_this".
+  Definition sim_step
     (ideal_st : Store) (ocmd: option Cmd) (isatk: bool) (sim_st : Store) (ast: AtkStates):
-    (Store (* sim_st *) * AtkStates * AdvEvent * list ((option Cmd) * bool)) :=
+    (Store (* sim_st *) * AtkStates (* * AdvEvent *) * list ((option Cmd) * bool)) :=
 
     let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in
     let: sim_st := optcmd_stp_store ocmd sim_st in 
@@ -59,37 +60,45 @@ Section sim_constr.
                    update_to_store sim_st to (ideal_st to) in (* Controlled ideal read *)
 
     let: post_atk := post_cmd_action atk ast sim_st in
-    let: ast := if isatk is true then post_atk.1.1 else ast in
-    let: event := if isatk is true then post_atk.1.2 else None in
+    let: ast := if isatk is true then post_atk.1 else ast in
+    (* let: event := if isatk is true then post_atk.1.2 else None in *)
     let: steps := if isatk is true then post_atk.2 else 0 in
 
 
-    let: cont_prog := if is_secret_guard ocmd is true then [] else map Some (optcmd_stp_cnt ocmd sim_st) in 
+    let: cont_prog := if is_secret_guard ocmd is true then [] else map Some (optcmd_stp_cnt ocmd sim_st) in
     let: cont_atk := repeat true steps in
     let: cont_full := combine_extend2 cont_prog cont_atk None false in
 
-    (sim_st, ast, event, cont_full).
+    (sim_st, ast (*, event *), cont_full).
 
   
+  Fail Check "delete_this".
   Definition sim_post st ideal_st :=
-    let: (mk_simstate ast sim_st prg) :=  st in 
-    if prg isn't (ocmd, isatk) :: rest then (st, None, 0) else
-    let: (sim_st, new_ast, evnt, cont) := sim_step ideal_st ocmd isatk sim_st ast in
-    (mk_simstate new_ast sim_st (cont ++ rest), evnt, length cont).
+    let: (mk_simstate ast sim_st prg) :=  st in
+    if prg isn't (ocmd, isatk) :: rest then (st (*, None *), 0) else
+    let: (sim_st, new_ast (*, evnt *), cont) := sim_step ideal_st ocmd isatk sim_st ast in
+    (mk_simstate new_ast sim_st (cont ++ rest) (*, evnt *), length cont).
 
   Definition sim_pre st ideal_st :=
-    let: (mk_simstate ast sim_st prg) :=  st in 
-    if prg isn't (ocmd, isatk) :: rest then ideal_st else 
+    let: (mk_simstate ast sim_st prg) :=  st in
+    if prg isn't (ocmd, isatk) :: rest then ideal_st else
     let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in (* There is repetition here *)
-    let: sim_st := optcmd_stp_store ocmd sim_st in 
+    let: sim_st := optcmd_stp_store ocmd sim_st in
     if oapp extract_controlled_endorse None ocmd isn't Some (from, to) then ideal_st else
     update_to_store ideal_st from (sim_st from).
 
+  Definition sim_evnt st :=
+    let: (mk_simstate ast _ prg) := st in
+    if prg isn't (_, isatk) :: rest then None else
+    if isatk is false then None else
+    post_cmd_event atk ast.
+
   Obligation Tactic := idtac. (* Program cases *)
-  Program Definition construct_simulator : SimStateMachine := 
+  Program Definition construct_simulator : SimStateMachine :=
     {|
       pre_cmd_action := sim_pre;
       post_cmd_action := sim_post;
+      post_cmd_event := sim_evnt;
     |}. (* TODO: Why 11 obligations. *)
   Next Obligation. 
     case=> ? ? [] //= - [] [] // [] // [] // *. Util.local_cook. 
