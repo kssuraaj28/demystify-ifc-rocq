@@ -180,6 +180,14 @@ Section cfg.
     let: cont := combine_extend2 (map Some p) (repeat true steps) None false in
     let: cont := map (fun '(oc, a) => mk_atkcmd a oc) cont in
     (cont ++ rest, s').
+
+  Definition event (c : Cfg) : Event :=
+    let: (aclst, s) := c in
+    if aclst isn't ac :: rest then blank_event else
+    let: (_, old_ast) := s in
+    let: (_, s') := step c in
+    let: (new_store, _) := s' in
+    event_helper adv ac new_store old_ast.
 End cfg.
 
 
@@ -211,7 +219,7 @@ Section twocfg.
 
   Import VarValStore.Notations.
 
-  Definition event (c: TwoCfg): Event * Event :=
+  Definition twoevent (c: TwoCfg): Event * Event :=
     let: (c2lst, s1, s2) := c in
     if c2lst isn't (ac1, ac2) :: rest then (blank_event, blank_event) else
     let: (_, old_ast1) := s1 in

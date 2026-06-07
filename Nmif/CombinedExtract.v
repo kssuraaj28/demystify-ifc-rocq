@@ -114,7 +114,7 @@ Section extract_step_commute.
   Notation comb_event := (Combined.cmb_event adv).
   Notation extract_2cfg := (extract_2cfg (AtkStates := AtkStates)).
   Notation step := (twostep adv (construct_simulator adv)).
-  Notation two_event := (Semantics.event adv (construct_simulator adv)).
+  Notation two_event := (Semantics.twoevent adv (construct_simulator adv)).
 
   Import Util.List Combined VarValStore.Notations.
 
