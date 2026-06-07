@@ -22,13 +22,11 @@ Section ni.
       ⟨ clean_cmd_stp_store c st1 | is_public ⟩ = ⟨ clean_cmd_stp_store c st2 | is_public ⟩.
   Proof. 
     case=> //.
-    - move=> > ? ? _ ?. admit. 
-    - admit.
-    - admit.
+      { move=> *;apply: update_to_store_storeview_eq; Attacker.local_cook; done. }
+      { move=> > + + + /ltac:(exfalso)=> /= -> -> //. }
+
   Admitted.
-  (* TODO repair (constructors changed shape):
-    move=> [] // d s1 s2 ? ?.
-      { apply: update_to_store_storeview_eq. rewrite /is_public s2 //. }
+(*
     case de: ([elaborate is_public d])=> fs1d fs2d _ _ pubeq /=; [| rewrite !update_storeview_nochange //].
     move: (flows_to_pub _ _ de fs1d)=> {fs1d} ps1.
     move: (flows_to_pub _ _ de fs2d)=> {fs2d} ps2.
@@ -260,51 +258,6 @@ Section test.
     clean_cmd_stp_cnt c st1 = clean_cmd_stp_cnt c st2.
   Proof. move=> *. wf_finisher. Qed.
 
-  Fail Check "delete_this".
-  (*
-  Goal forall pc c s, untrusted pc -> WellFormedCmd pc c -> clean_cmd_evnt c s = None.
-  Proof. move=> *. wf_finisher. Qed.
-
-  Goal forall pc oc s, untrusted pc -> pc ⊢ oc -> optcmd_evnt oc s = None.
-  Proof. move=> *. wf_finisher. Qed.
-
-  Goal forall l c st1 st2, WellFormedCmd l c ->
-    extract_controlled_endorse c = None ->
-    ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
-    clean_cmd_evnt c st1 = clean_cmd_evnt c st2.
-  Proof. move=> *. wf_finisher. Qed.
-
-  Goal forall l oc st1 st2, l ⊢ oc ->
-    oapp extract_controlled_endorse None oc = None ->
-    ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
-    optcmd_evnt oc st1 = optcmd_evnt oc st2.
-  Proof. move=> *. wf_finisher. Qed.
-
-  Goal forall l c cc st1 st2, WellFormedCmd l c ->
-    extract_controlled_endorse c = Some cc ->
-    ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
-    clean_cmd_evnt c st1 = clean_cmd_evnt c st2.
-  Proof. move=> *. wf_finisher. Qed.
-
-  Goal forall l oc cc st1 st2, l ⊢ oc ->
-    oapp extract_controlled_endorse None oc = Some cc ->
-    ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
-    optcmd_evnt oc st1 = optcmd_evnt oc st2.
-  Proof. move=> *. wf_finisher. Qed.
-
-  Goal forall l c cc st1 st2, WellFormedCmd l c ->
-    extract_controlled_declassify c = Some cc ->
-    ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
-    clean_cmd_evnt c st1 = clean_cmd_evnt c st2.
-  Proof. move=> *. wf_finisher. Qed.
-
-  Goal forall l oc cc st1 st2, l ⊢ oc ->
-    oapp extract_controlled_declassify None oc = Some cc ->
-    ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
-    optcmd_evnt oc st1 = optcmd_evnt oc st2.
-  Proof. move=> *. wf_finisher. Qed.
-  *)
-
   Goal forall {AtkStates} (adv : AdvNextStep AtkStates) ast s,
     ⟨ pre_cmd_action adv ast s | is_trusted ⟩ = ⟨ s | is_trusted ⟩.
   Proof. move=> *. wf_finisher. Qed.
@@ -319,16 +272,6 @@ Section test.
     post_cmd_action adv ast (pre_cmd_action adv ast s1) =
     post_cmd_action adv ast (pre_cmd_action adv ast s2).
   Proof. move=> *. wf_finisher. Qed.
-
-(* A funny test *)
-  Fail Check "delete_this".
-  (*
-  Goal forall l oc cc st1 st2, l ⊢ oc ->
-    oapp extract_controlled_declassify None oc = Some cc ->
-    ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
-    exists something, optcmd_evnt oc st1 = something.
-  Proof. move=> *. eexists. wf_finisher. Qed.
-  *)
 
   Goal forall s s',
     ⟨ s | is_trusted ⟩ = ⟨ s' | is_trusted ⟩ ->
