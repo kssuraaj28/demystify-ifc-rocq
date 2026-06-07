@@ -157,11 +157,11 @@ Section event_helper.
   (* Can be split into a CmdEvent helper and an AdvEvent helper later. *)
   Definition event_helper (past_acmd : AtkCmd) (new_store : Store) (old_ast : AtkStates) : Event :=
     let: mk_atkcmd isatk ocmd := past_acmd in
+    let: atk_event := if isatk is false then None else pre_cmd_event adv old_ast in
     let: cmd_event := if ocmd isn't Some (assign a) then None else
                       let: adst := get_assign_dest a in
                       let: oval := ⟨ new_store | is_trusted ⟩ adst in
                       omap (pair adst) oval in
-    let: atk_event := if isatk is false then None else post_cmd_event adv old_ast in
     mk_acmd_evnt cmd_event atk_event.
 End event_helper.
 

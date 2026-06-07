@@ -91,14 +91,14 @@ Section sim_constr.
     let: (mk_simstate ast _ prg) := st in
     if prg isn't (_, isatk) :: rest then None else
     if isatk is false then None else
-    post_cmd_event atk ast.
+    pre_cmd_event atk ast.
 
   Obligation Tactic := idtac. (* Program cases *)
   Program Definition construct_simulator : SimStateMachine :=
     {|
       pre_cmd_action := sim_pre;
+      pre_cmd_event := sim_evnt;
       post_cmd_action := sim_post;
-      post_cmd_event := sim_evnt;
     |}. (* TODO: Why 11 obligations. *)
   Next Obligation. 
     case=> ? ? [] //= - [] [] // [] // [] // *. Util.local_cook. 

@@ -413,7 +413,7 @@ Section extract_step_commute.
     congr (_,_).
     rewrite/event_helper.
     cnstrct_eq_gl; cycle 1.
-      { rewrite/post_cmd_event/construct_simulator/sim_evnt cmd_map_sim_cons -/(post_cmd_event _)/sim_active.
+      { rewrite/pre_cmd_event/construct_simulator/sim_evnt cmd_map_sim_cons -/(pre_cmd_event _)/sim_active.
       case e: sim_active'=> //.
       move: e=> /sim_active'_false [] -> //. }
     pattern_eq_2 [⟨_|_⟩] [⟨_|_⟩]; [move: cs2i=> [] //|].
