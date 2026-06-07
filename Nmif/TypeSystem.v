@@ -265,6 +265,16 @@ Section downgrading.
   Qed.
 End downgrading.
 
+Section untrusted_dst.
+  Import Lattice4pt.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
+
+  Lemma wf_untr_cmd_dst_untr p c a:
+    WellFormedCmd (mk_lbl true p) c -> c = assign a ->
+    untrusted (var_lbl (get_assign_dest a)).
+  Proof. Admitted.
+End untrusted_dst.
+
 Section step_soundness.
   Import VarValStore.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.

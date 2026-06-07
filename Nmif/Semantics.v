@@ -144,6 +144,27 @@ End acmd.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> acmd_step_atk ) "acmd_step_atk" old.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> acmd_step_noatk ) "acmd_step_noatk" old.
 
+Section event_helper.
+  Import VarValStore.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
+  Variable (adv : AdvNextStep AtkStates).
+
+  Definition CmdEvent := option (Vars * Vals).
+
+  Record Event := mk_acmd_evnt { cevnt : CmdEvent ; aevnt : AdvEvent }.
+  Definition blank_event := mk_acmd_evnt None None.
+
+  (* Can be split into a CmdEvent helper and an AdvEvent helper later. *)
+  Definition event_helper (past_acmd : AtkCmd) (new_store : Store) (old_ast : AtkStates) : Event :=
+    let: mk_atkcmd isatk ocmd := past_acmd in
+    let: cmd_event := if ocmd isn't Some (assign a) then None else
+                      let: adst := get_assign_dest a in
+                      let: oval := ⟨ new_store | is_trusted ⟩ adst in
+                      omap (pair adst) oval in
+    let: atk_event := if isatk is false then None else post_cmd_event adv old_ast in
+    mk_acmd_evnt cmd_event atk_event.
+End event_helper.
+
 
 Section twocfg.
   Import Util.List.
@@ -171,47 +192,18 @@ Section twocfg.
 
 
 
-  Fail Check "delete_this".
-  (*
-  Definition clean_assign_evnt (a: Assignment) (s: Store) : option (Vars * Vals) :=
-    let: dst := get_assign_dest a in
-    if (is_trusted dst) is false then None else Some (dst, get_assign_val s a).
-  *)
-  Definition CmdEvent := option (Vars * Vals).
-
-(*
-  Fail Check "delete_this".
-  Definition clean_cmd_evnt (c: Cmd) (s: Store) : CmdEvent :=
-    if c isn't assign a then None else 
-    ⟨  ⟩
-    clean_assign_evnt a s.
-
-  Definition optcmd_evnt := oapp clean_cmd_evnt (fun _ => None).
-  *)
-
-  Record Event := mk_acmd_evnt { cevnt : CmdEvent ; aevnt : AdvEvent }.
-  Definition blank_event := mk_acmd_evnt None None.
-
   Import VarValStore.Notations.
 
-(* TODO: This should be cleaned up *)
-  Definition event_aux {AtkStates} adv (past_acmd : AtkCmd) (new_state: State (AtkStates:=AtkStates)) : Event :=
-    let: (new_store, new_ast) := new_state in
-    let: mk_atkcmd isatk ocmd := past_acmd in
-    let: cmd_event := if ocmd isn't Some (assign a) then None else
-                      let: adst := get_assign_dest a in
-                      let: oval := ⟨ new_store | is_trusted ⟩ adst in
-                      omap  (pair adst) oval in
-    let: atk_event := if isatk is false then None else
-                      post_cmd_event adv new_ast in
-    mk_acmd_evnt cmd_event atk_event.
-
-  Definition event (c: TwoCfg): Event * Event := 
-    let: (c2lst, _, _) := c in
+  Definition event (c: TwoCfg): Event * Event :=
+    let: (c2lst, s1, s2) := c in
     if c2lst isn't (ac1, ac2) :: rest then (blank_event, blank_event) else
+    let: (_, old_ast1) := s1 in
+    let: (_, old_ast2) := s2 in
     let: (_, s1', s2') := step c in (* Here, I've defined this in terms of step. *)
-    let: e1 := event_aux adv1 ac1 s1' in 
-    let: e2 := event_aux adv2 ac2 s2' in 
+    let: (new_store1, _) := s1' in
+    let: (new_store2, _) := s2' in
+    let: e1 := event_helper adv1 ac1 new_store1 old_ast1 in
+    let: e2 := event_helper adv2 ac2 new_store2 old_ast2 in
     (e1, e2).
 End twocfg.
 

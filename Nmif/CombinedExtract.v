@@ -59,9 +59,7 @@ Section cmd_map.
     map mapfn (filter sim_active lst).
 
   Fact cmd_map_cons a l :
-    cmd_map (a :: l) =
-      (mk_atkcmd (real_atk_bit a) (real_cmd a),
-       mk_atkcmd (sim_active a) (ideal_cmd a)) :: cmd_map l.
+    ltac2:(cbn_eq (cmd_map (a :: l))). 
   Proof. done. Qed.
 
   Fact cmd_map_sim_cons a l :
@@ -113,8 +111,10 @@ Section extract_step_commute.
 
   Notation CombCfg := Combined.Cfg.
   Notation comb_step := (Combined.cfg_step adv).
+  Notation comb_event := (Combined.cmb_event adv).
   Notation extract_2cfg := (extract_2cfg (AtkStates := AtkStates)).
   Notation step := (step adv (construct_simulator adv)).
+  Notation two_event := (Semantics.event adv (construct_simulator adv)).
 
   Import Util.List Combined VarValStore.Notations.
 
@@ -396,53 +396,39 @@ Section extract_step_commute.
       cnstrct_eq_gl. rewrite filter_true //.
   Qed.
   Print Assumptions extract_step_commute.
-(*
+
   Theorem extract_step_commute_event c:
     Invariant c ->
-    let: comb_evnt := (comb_step c).2 in
-    let: two_evnt := (step (extract_2cfg c)).2 in
-    two_evnt = (comb_evnt, comb_evnt).
-  Proof.
-    case: c. case. rewrite/Invariant=> ? ? ? ?.
-    case=> // - [] rcmd ratk icmd pclbl ? []. Forall_inv_toph. rewrite/CmbCmdInv/CmbCmdCoreInv. 
-    case=> rwt iwt _. rewrite/StateInv. case=> treq pubeq.
-    pattern_focus [LHS]=> P.
-    rewrite /extract_2cfg cmd_map_cons. cook.
-    rewrite/step/acmd_step. cook.
-    subst P. cbn beta.
-    pattern_focus [RHS]=> P.
-    rewrite/comb_step/cmbcmd_step. cook.
-    subst P. cbn beta.
-    cnstrct_eq_gl. cnstrct_eq_gl.
-    + case pcuntr: (untrusted _) iwt rwt; [| move=> <-]=> *.
-        { do 2 (erewrite ni_untr_optcmd_evnt; [| | eassumption]=> //). }
-      rewrite/pre_cmd_action/construct_simulator/sim_pre/sim_active. cook.
-      move: (orbN (oapp is_endorse false rcmd))=> /orP [isend | noend]. 
-      case e: (sim_active' _ _ _); cycle 1; [| clear e].
-        {
-        { apply: ni_optcmd_evnt_endorse; eauto.
-            admit. }
-      cook.
-        { move: (sim_active'_false _ _ _ e)=> [] -> [] _;
-        eauto using ni_optcmd_evnt_int. } (* I don't like this *)
-      apply: ni_optcmd_evnt_int; eauto.
-      case pcpub: public; cycle 1.
-        { admit. }
-      cook.
-      destruct rcmd=> //=.
-      rewrite/optcmd_evnt/oapp/clean.
-      admit.
-      idtac. }
-        { 
-          rewrite/pre_cmd_action/construct_simulator/sim_pre/sim_active/sim_active'. 
-      admi
-      rewrite/optcmd_evnt/clean_cmd_evnt/oapp. cook.
-
-        admit. }
-    { admit. }
-
-    
-  Admitted.
-  *)
-
+    two_event (extract_2cfg c) = (comb_event c, comb_event c).
+  Proof. 
+    move=> cinv.
+    rewrite/two_event extract_step_commute // /comb_event.
+    set cstp := comb_step c.
+    have csinv: Invariant cstp; [exact: cfg_step_inv|].
+    case: c cinv cstp csinv. (* TODO: we lose info*)
+    rewrite/Invariant/extract_2cfg.
+    move=> ? [] // ? ? []. Forall_inv_toph.
+    rewrite cmd_map_cons=> cc1i _ cs1i []. 
+    move=> ? ? [] _ cs2i.
+    congr (_,_).
+    rewrite/event_helper.
+    cnstrct_eq_gl; cycle 1.
+      { rewrite/post_cmd_event/construct_simulator/sim_evnt cmd_map_sim_cons -/(post_cmd_event _)/sim_active.
+      case e: sim_active'=> //.
+      move: e=> /sim_active'_false [] -> //. }
+    pattern_eq_2 [⟨_|_⟩] [⟨_|_⟩]; [move: cs2i=> [] //|].
+    move: (X in ⟨X|_⟩)=> ? <- {cs2i}.
+    move: cc1i cs1i. rewrite/CmbCmdInv/CmbCmdCoreInv/StateInv. 
+    case. case: (pc_lbl _)=> - [] ? /= rwt=> [ |<- //].
+    move=> iwt [] *.
+    pattern_eq [LHS] with None=> [|->] ;[|pattern_eq [RHS] with None=> [|->]]=>//.
+    1: case: (ideal_cmd _) iwt => // c //= wt.
+    2: case: (real_cmd _) rwt => // c //= wt.
+    1,2: case e: c=> //. 
+    1,2: move: (wf_untr_cmd_dst_untr _ _ _ wt e).
+    1,2: rewrite -/(is_untrusted _).
+    1,2: move: (get_assign_dest _)=> > untr.
+    1,2: pattern_eq [ ⟨ _ | _ ⟩ _] with None=> [|->] //. (* TODO: Could be elsewhere *)
+    1,2: rewrite/⟨_|_⟩ /is_trusted untr //.
+  Qed.
 End extract_step_commute.
