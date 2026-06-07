@@ -50,12 +50,12 @@ Section sa.
   Inductive WellFormedCmd : PcLbl -> Cmd -> Prop := 
   | wf_endorse:
      forall from to,
-       var_lbl from = pulbl -> var_lbl to = ptlbl ->
+       var_lbl from = pulbl -> var_lbl to = ptlbl -> (* Maybe just trusted *)
        _ ptlbl (assign (endorse from to))
 
   | wf_declassify:
      forall from to,
-       var_lbl from = stlbl -> var_lbl to = ptlbl ->
+       var_lbl from = stlbl -> var_lbl to = ptlbl -> (* Maybe just public *)
        _ ptlbl (assign (declassify from to))
 
   | wf_assign:
@@ -272,7 +272,9 @@ Section untrusted_dst.
   Lemma wf_untr_cmd_dst_untr p c a:
     WellFormedCmd (mk_lbl true p) c -> c = assign a ->
     untrusted (var_lbl (get_assign_dest a)).
-  Proof. Admitted.
+  Proof. 
+    move=> >; move e: (mk_lbl _ _)=> ?; move:e=> /[swap].
+  Admitted.
 End untrusted_dst.
 
 Section step_soundness.

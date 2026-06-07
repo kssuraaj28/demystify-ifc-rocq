@@ -166,6 +166,23 @@ Section event_helper.
 End event_helper.
 
 
+Section cfg.
+  Import Util.List.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
+  Variable (adv : AdvNextStep AtkStates).
+
+  Definition Cfg := (list AtkCmd * State (AtkStates:=AtkStates))%type.
+
+  Definition step (c : Cfg) : Cfg :=
+    let: (aclst, s) := c in
+    if aclst isn't ac :: rest then c else
+    let: (p, s', steps) := acmd_step adv ac s in
+    let: cont := combine_extend2 (map Some p) (repeat true steps) None false in
+    let: cont := map (fun '(oc, a) => mk_atkcmd a oc) cont in
+    (cont ++ rest, s').
+End cfg.
+
+
 Section twocfg.
   Import Util.List.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates1 AtkStates2 : Type}.
@@ -176,7 +193,7 @@ Section twocfg.
 
   Definition TwoCfg := (list (AtkCmd * AtkCmd) * State1 * State2)%type.
 
-  Definition step (c: TwoCfg): TwoCfg (* * (Event * Event) *) :=
+  Definition twostep (c: TwoCfg): TwoCfg (* * (Event * Event) *) :=
     let: (c2lst, s1, s2) := c in
     if c2lst isn't (ac1, ac2) :: rest then c (*, (blank_event, blank_event) *) else
     let: (p1, st1 (*, ev1 *), steps1) := (acmd_step adv1 ac1 s1) in
@@ -199,7 +216,7 @@ Section twocfg.
     if c2lst isn't (ac1, ac2) :: rest then (blank_event, blank_event) else
     let: (_, old_ast1) := s1 in
     let: (_, old_ast2) := s2 in
-    let: (_, s1', s2') := step c in (* Here, I've defined this in terms of step. *)
+    let: (_, s1', s2') := twostep c in (* Here, I've defined this in terms of twostep. *)
     let: (new_store1, _) := s1' in
     let: (new_store2, _) := s2' in
     let: e1 := event_helper adv1 ac1 new_store1 old_ast1 in
