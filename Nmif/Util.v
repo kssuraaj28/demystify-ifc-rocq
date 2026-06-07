@@ -416,6 +416,19 @@ Module List.
     apply: map_ext. case=> [[a b] [d c]] //.
   Qed.
 
+  Lemma combine_extend4_split22 {A B C D}
+    (la : list A) (lb : list B) (lc : list C) (ld : list D) da db dc dd :
+    combine_extend4 la lb lc ld da db dc dd =
+    map (fun '((a, b), (c, d)) => (a, b, c, d))
+      (combine_extend2 (combine_extend2 la lb da db)
+                       (combine_extend2 lc ld dc dd)
+                       (da, db) (dc, dd)).
+  Proof.
+    rewrite /combine_extend4 /combine_extend3.
+    rewrite combine_extend2_assoc.
+    apply: map_ext. case=> [[? ?] [? ?]] //.
+  Qed.
+
 
   Lemma Forall_combine2_ind1 :
      forall {A B} P l1 l2 (d1:A) (d2:B) Q,
@@ -585,6 +598,7 @@ Module List.
   End test.
 
   Ltac2 this_cookbook () := this_cookbook_ ().
+  Ltac local_cook := ltac2:(cook this_cookbook).
   Hint Extern 10 => lazymatch goal with _ =>  apply/Forall_forall end : trickbag.
 End List.
 

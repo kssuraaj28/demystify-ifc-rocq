@@ -232,6 +232,87 @@ Section twocfg.
     (e1, e2).
 End twocfg.
 
+Section twooneextract.
+  Import Util.List.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates1 AtkStates2 : Type}.
+  Variable (adv1: AdvNextStep AtkStates1) (adv2: AdvNextStep AtkStates2).
+
+  Notation State1 := (State (AtkStates:=AtkStates1)).
+  Notation State2 := (State (AtkStates:=AtkStates2)).
+
+  Definition extract_one_cfg (is_left : bool)
+    (c : TwoCfg (AtkStates1:=AtkStates1) (AtkStates2:=AtkStates2)) :=
+    let: (aclst, s1, s2) := c in
+    let: aclst :=
+      filter (fun ac => is_attacked ac || isSome (ocmd ac))
+        (map (if is_left then fst else snd) aclst) in
+    if is_left as b return Cfg (AtkStates := if b then AtkStates1 else AtkStates2)
+    then (aclst, s1) else (aclst, s2).
+
+  Definition extract_one_event (is_left : bool)
+    (c : TwoCfg (AtkStates1:=AtkStates1) (AtkStates2:=AtkStates2)) : Event :=
+    let: (e1, e2) := twoevent adv1 adv2 c in
+    if is_left then e1 else e2.
+
+
+  Lemma extract_two_one_correct b c: 
+    let: step_extract := extract_one_cfg b (twostep adv1 adv2 c) in
+    let: adv := if b as b' return (AdvNextStep (if b' then AtkStates1 else AtkStates2)) then adv1 else adv2 in
+      (step_extract = (extract_one_cfg b c) /\ extract_one_event b c = blank_event) (* Stutter *)
+    \/ 
+      (step_extract = step adv (extract_one_cfg b c) /\
+      extract_one_event b  c = event adv (extract_one_cfg b c)).
+  Proof.
+    case: b. 
+    1: case: c; case; case; [repeat constructor; fail| ]; case. 
+    1: move=> + ?.
+    1: move=> ac ? st ?.
+    1: case: st; case: ac=> isatk ocmd *. 
+    1: enter (idtac; case stutter: (isatk || isSome (ocmd)); cycle 1).
+      1: left. 
+      1: move: stutter=> /Bool.orb_false_elim [].
+      1: move=> ->; case: ocmd=> // _.
+      1: split.
+        1: rewrite/extract_one_cfg map_cons [filter _ _]/=. 
+        1: pattern_focus [LHS] => P.
+        1: rewrite/twostep /= ; case: (acmd_step _ _ _)=>- [] *.
+        1: rewrite map_app combine_extend4_split22 /= !map_map.
+        1: erewrite map_ext; [|case=> * /=; instantiate (1 := fun _ => _); reflexivity].
+        1: rewrite filter_app;  subst P; cbn beta; Util.local_cook; Util.List.local_cook.
+        1: rewrite filter_map_swap. 
+        1: rewrite filter_false //.
+      1: rewrite/extract_one_event/twoevent/=; case: (acmd_step _ _ _)=> - [] _ [] ? _ _.
+      1: clear; revert_hyp_pat State2; case; done.
+
+
+    1: right; split.
+      1: rewrite/extract_one_cfg map_cons [filter _ _] /= stutter.
+      1: pattern_focus [LHS] => P.
+      1: rewrite/twostep; case: (acmd_step adv2 _ _)=>- [] *.
+      1: move step: (acmd_step adv1 _ _)=> [[? ?] ?].
+      1: rewrite combine_extend4_split22  !map_app filter_app !map_map.
+      1: erewrite map_ext; [| case=> - [] ? ? [] > /=; instantiate (1 := fun '(_,_,(_, _)) => _); reflexivity].
+      1: subst P; cbn beta. 
+      1: rewrite/Semantics.step step; Util.local_cook; Util.List.local_cook.
+      1: rewrite filter_map_swap.
+      1: erewrite filter_ext; [|case=> - [? ?]  [? ?] /=; instantiate (1 := fun '(_,_,_) => _); reflexivity ].
+      1: erewrite map_filter_combine_extend2_ind1; [ | case=> ? ? _; instantiate (1 := fun '(_,_)=> _); reflexivity | case=> ? ? [] _ _; instantiate (1 := fun '(_,_) => _); reflexivity | done].
+      1: congr map; clear.
+      1: revert_hyp_pat [Prog, nat].
+      1: elim; [ elim=> // >  /= -> // |].
+      1: move=> > ih  [] /= *; Util.local_cook. 
+      1: clear; rewrite map_map filter_map_swap filter_true //.
+
+    1: rewrite/extract_one_event /extract_one_cfg map_cons [filter _ _]/= stutter.
+    1: rewrite/event/step; move e: (acmd_step _ _ _)=> [[? [? ?]] ?].
+    1: rewrite/twoevent/twostep e; case: (acmd_step _ _ _)=> - [] _ [] ? _ _.
+    1: clear; revert_hyp_pat State2; case; done.
+
+
+  Admitted.
+
+End twooneextract.
+
 
 (*
 Section cont.
