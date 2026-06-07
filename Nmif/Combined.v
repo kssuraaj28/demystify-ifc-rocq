@@ -139,6 +139,8 @@ Section inv.
   Notation cfg_step := (cfg_step adv).
   Notation cmbcmd_step := (cmbcmd_step adv).
 
+  Definition ActiveInv '(rcmd, icmd, isatk) : Prop :=
+    isatk || isSome (rcmd : option Cmd) || isSome (icmd : option Cmd). 
 
   Definition TypeInv '(rcmd, icmd,pclbl) : Prop :=
     pclbl ⊢ rcmd /\ 
@@ -177,13 +179,6 @@ Section thm.
    Qed.
 
 End thm.
-
-Ltac2 Set this_cookbook_ as old :=
-  add_cookstep
-    ltac1:(lazymatch goal with
-           | |- Forall _ (zip _ _ _ _) => apply/Forall_CmbCmd_zip
-           end)
-    "Forall_CmbCmd_zip" old.
 
 Ltac2 Set this_cookbook_ as old :=
   add_cookstep ltac1:(rewrite -> real_cmd_mk ) "real_cmd_mk" old.
@@ -249,9 +244,11 @@ Section invprf.
         1: move=> <- /= <- *.
         2: move=> * /=. 
         1,2: repeat split; cook.
-        1,2,4: enter (idtac; wf_finisher).
+        1,2,5: enter (idtac; wf_finisher).
+          {apply: Forall_CmbCmd_zip; cook. } 
           { let v := open_constr:(_) in pattern_eq [RHS] with v; [wf_finisher|move=> ->]. cook.  (* Simulating rewrite with apply:. I'm a god *)
           let v := open_constr:(_) in pattern_eq [LHS] with v; [wf_finisher|move=> ->]. cook. }
+        apply: Forall_CmbCmd_zip; cook.
         move=> /=. 
         apply/Forall_and; cook; auto with trickbag.
         rewrite-/(WellFormedProg _ _).
@@ -294,7 +291,7 @@ Section invprf.
           wf_finisher_guess [LHS] with _=> -> //. }
         apply/storeview_eq; [|eassumption]; cook. wf_finisher. }
       move=> /=.  
-      apply/Forall_and; cook; auto.
+      apply/Forall_CmbCmd_zip/Forall_and; cook; auto.
       revert_hyp_pat [Label, (WellFormedCmd _ _), (if _ then _ else _)].
       case=> [[] ?] /= >.
          { move=> *; cook.
