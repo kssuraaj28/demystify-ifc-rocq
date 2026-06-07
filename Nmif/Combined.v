@@ -140,7 +140,7 @@ Section inv.
   Notation cmbcmd_step := (cmbcmd_step adv).
 
 
-  Definition CmbCmdCoreInv '(rcmd,icmd,pclbl) : Prop :=
+  Definition TypeInv '(rcmd, icmd,pclbl) : Prop :=
     pclbl ⊢ rcmd /\ 
     (if (untrusted pclbl) is true 
       then (mk_lbl true true) ⊢ icmd  (* icmd is still a good public untrusted *)
@@ -148,7 +148,7 @@ Section inv.
 
   Definition CmbCmdInv (cmb_cmd: CmbCmd) : Prop :=
     let: mk_cmbcmd rcmd _ icmd pclbl := cmb_cmd in (* TODO: is_atk does not make an appearance... *)
-    CmbCmdCoreInv (rcmd, icmd, pclbl).
+    TypeInv (rcmd, icmd, pclbl).
 
   Definition StateInv (s: CmbState): Prop :=
     let: mk_cmbstate real_st ideal_st sim_st _ := s in
@@ -168,7 +168,7 @@ Section thm.
    Lemma Forall_CmbCmd_zip:
      forall l1 l2 substeps pc_lbl,
        (* TODO: I didn't have fst and snd before, and that wait painful. How to solve? *)
-       Forall (fun p => CmbCmdCoreInv (p.1, p.2, pc_lbl))  (combine_extend2 (map Some l1) (map Some l2) None None) ->
+       Forall (fun p => TypeInv (p.1, p.2, pc_lbl))  (combine_extend2 (map Some l1) (map Some l2) None None) ->
        Forall CmbCmdInv (zip l1 l2 substeps pc_lbl).
    Proof.
      move=> *; rewrite /zip.
@@ -257,7 +257,7 @@ Section invprf.
         rewrite-/(WellFormedProg _ _).
         revert_hyp_pat [(option Cmd), (_ ⊢ _)]; case=> /==> [|* //] >.
         apply: step_soundness_pubuntr=> //. } 
-      rewrite /CmbCmdCoreInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>].
+      rewrite /TypeInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>].
       repeat split; cook.
         { move x: (extract_controlled_endorse _)=> x'; move: x' x. 
         case=> [[>]/extr_endorse_eq [] + [] |noend]. (* TODO move to case? *)

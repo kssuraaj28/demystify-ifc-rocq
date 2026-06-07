@@ -154,7 +154,7 @@ Section extract_step_commute.
     1: move: downgrade=> /extr_endorse_opt.
     2: move: downgrade=> /extr_decl_opt.
     1,2: move=> [->]; case=> /[dup] ? /[swap] /[dup] ? /[swap].
-    1,2: rewrite/CmbCmdCoreInv=> + + [] /ltac:(dotop [cbn]).
+    1,2: rewrite/TypeInv=> + + [] /ltac:(dotop [cbn]).
     1: move=> /wf_endorse_pc. 2: move/wf_declassify_pc.
     1,2: move=> /[apply] /[apply] ->.
     1,2: dotop [cbn]=> <- _ ? ?. 
@@ -268,7 +268,7 @@ Section extract_step_commute.
       { clear; case: rcmd=> //=; auto. case=> [ | /=|/= ]; auto. case=> *; cook; auto; case: (_ (assign _))=> *; constructor; eauto; fail. }
     case=> noend nodecl.
     rewrite /= in inv. move: inv=> []. (Forall_inv_toph)=> i1 restinv i3.
-    rewrite /CmbCmdInv/CmbCmdCoreInv in i1. case: i1=> rwt _.
+    rewrite /CmbCmdInv/TypeInv in i1. case: i1=> rwt _.
     rewrite /StateInv in i3. case: i3=> _ pubeq.
     move: pclbl rwt.
     case=> untr pub => rwt.
@@ -418,7 +418,7 @@ Section extract_step_commute.
       move: e=> /sim_active'_false [] -> //. }
     pattern_eq_2 [⟨_|_⟩] [⟨_|_⟩]; [move: cs2i=> [] //|].
     move: (X in ⟨X|_⟩)=> ? <- {cs2i}.
-    move: cc1i cs1i. rewrite/CmbCmdInv/CmbCmdCoreInv/StateInv. 
+    move: cc1i cs1i. rewrite/CmbCmdInv/TypeInv/StateInv. 
     case. case: (pc_lbl _)=> - [] ? /= rwt=> [ |<- //].
     move=> iwt [] *.
     pattern_eq [LHS] with None=> [|->] ;[|pattern_eq [RHS] with None=> [|->]]=>//.
