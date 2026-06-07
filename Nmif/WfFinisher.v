@@ -124,38 +124,6 @@ Section ni.
     1,2: revert_hyp_pat (compute_new_pc _ _ = _)=> /=; rewrite/is_trusted/is_untrusted; case: var_lbl=> - [] [] //. (* TODO: Should be in Lattice4pt *)
   Qed.
 
-  Fail Check "delete_this".
-  (*
-  Lemma wf_untr_cmd_evnt_ni pc c s:
-    untrusted pc -> WellFormedCmd pc c -> clean_cmd_evnt c s = None.
-  Proof.
-    move=> /[swap]; case=> //=.
-    move=> a ? _ /flows_from_untr H /H {H} /=.
-    rewrite /clean_assign_evnt /is_trusted /is_untrusted /= => -> //.
-  Qed.
-
-  Fact wf_untr_optcmd_evnt_ni pc oc s:
-    untrusted pc -> pc ⊢ oc -> optcmd_evnt oc s = None.
-  Proof. case: oc=> //= c untr wf.   eauto using wf_untr_cmd_evnt_ni. Qed.
-
-  Lemma wf_cmd_evnt_int_ni c l st1 st2:
-      WellFormedCmd l c ->
-      extract_controlled_endorse c = None ->
-      ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
-      clean_cmd_evnt c st1 = clean_cmd_evnt c st2.
-  Proof. Admitted.
-
-  Fact wf_optcmd_evnt_int_ni l oc st1 st2:
-      l ⊢ oc ->
-      oapp extract_controlled_endorse None oc = None ->
-      ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
-      optcmd_evnt oc st1 = optcmd_evnt oc st2.
-  Proof.
-    case: oc => //= c wf noend treq.
-    exact: wf_cmd_evnt_int_ni wf noend treq.
-  Qed.
-  *)
-
   Lemma wf_cmd_st_end c l cc st1 st2:
       WellFormedCmd l c ->
       extract_controlled_endorse c = Some cc ->
@@ -165,59 +133,6 @@ Section ni.
     move=> _; case: cc=> [from to] /extr_endorse_eq [-> [efrom eto]] pubeq /=.
     apply: update_to_store_storeview_eq; [rewrite /is_public efrom // | exact: pubeq].
   Qed.
-
-  Fail Check "delete_this".
-  (*
-  Lemma wf_cmd_evnt_end c l cc st1 st2:
-      WellFormedCmd l c ->
-      extract_controlled_endorse c = Some cc ->
-      ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
-      clean_cmd_evnt c st1 = clean_cmd_evnt c st2.
-  Proof.
-    move=> _; case: cc=> [from to] /extr_endorse_eq [-> [efrom eto]] pubeq.
-    rewrite /clean_cmd_evnt /clean_assign_evnt /get_assign_dest /get_assign_val /=.
-    have ->: is_trusted to.
-    { rewrite /is_trusted /is_untrusted eto //. }
-    have ->: st1 from = st2 from.
-    { apply: storeview_eq; [exact: pubeq | rewrite /is_public efrom //]. }
-    done.
-  Qed.
-
-  Fact wf_optcmd_evnt_end l oc cc st1 st2:
-      l ⊢ oc ->
-      oapp extract_controlled_endorse None oc = Some cc ->
-      ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
-      optcmd_evnt oc st1 = optcmd_evnt oc st2.
-  Proof.
-    case: oc => //= c wf isend pubeq.
-    exact: wf_cmd_evnt_end wf isend pubeq.
-  Qed.
-
-  Lemma wf_cmd_evnt_decl c l cc st1 st2:
-      WellFormedCmd l c ->
-      extract_controlled_declassify c = Some cc ->
-      ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
-      clean_cmd_evnt c st1 = clean_cmd_evnt c st2.
-  Proof.
-    move=> _; case: cc=> [from to] /extr_decl_eq [-> [efrom eto]] treq.
-    rewrite /clean_cmd_evnt /clean_assign_evnt /get_assign_dest /get_assign_val /=.
-    have ->: is_trusted to.
-    { rewrite /is_trusted /is_untrusted eto //. }
-    have ->: st1 from = st2 from.
-    { apply: storeview_eq; [exact: treq | rewrite /is_trusted /is_untrusted efrom //]. }
-    done.
-  Qed.
-
-  Fact wf_optcmd_evnt_decl l oc cc st1 st2:
-      l ⊢ oc ->
-      oapp extract_controlled_declassify None oc = Some cc ->
-      ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
-      optcmd_evnt oc st1 = optcmd_evnt oc st2.
-  Proof.
-    case: oc => //= c wf isdecl treq.
-    exact: wf_cmd_evnt_decl wf isdecl treq.
-  Qed.
-  *)
 
 End ni.
 
@@ -238,16 +153,6 @@ Ltac2 wf_finisher_arms () : unit :=
     reference:(wf_untr_cmd_st_int_ni);
     reference:(wf_untr_optcmd_st_int_ni);
     reference:(wf_tr_cmd_cnt_ni);
-    (*
-    reference:(wf_untr_cmd_evnt_ni);
-    reference:(wf_untr_optcmd_evnt_ni);
-    reference:(wf_cmd_evnt_int_ni);
-    reference:(wf_optcmd_evnt_int_ni);
-    reference:(wf_cmd_evnt_end);
-    reference:(wf_optcmd_evnt_end);
-    reference:(wf_cmd_evnt_decl);
-    reference:(wf_optcmd_evnt_decl);
-    *)
     reference:(pre_cmd_wf_int);
     reference:(pre_cmd_wf_conf);
     reference:(post_cmd_wf)
