@@ -264,53 +264,63 @@ Section twooneextract.
       extract_one_event b  c = event adv (extract_one_cfg b c)).
   Proof.
     case: b. 
-    1: case: c; case; case; [repeat constructor; fail| ]; case. 
-    1: move=> + ?.
-    1: move=> ac ? st ?.
-    1: case: st; case: ac=> isatk ocmd *. 
-    1: enter (idtac; case stutter: (isatk || isSome (ocmd)); cycle 1).
-      1: left. 
-      1: move: stutter=> /Bool.orb_false_elim [].
-      1: move=> ->; case: ocmd=> // _.
-      1: split.
-        1: rewrite/extract_one_cfg map_cons [filter _ _]/=. 
-        1: pattern_focus [LHS] => P.
-        1: rewrite/twostep /= ; case: (acmd_step _ _ _)=>- [] *.
-        1: rewrite map_app combine_extend4_split22 /= !map_map.
-        1: erewrite map_ext; [|case=> * /=; instantiate (1 := fun _ => _); reflexivity].
-        1: rewrite filter_app;  subst P; cbn beta; Util.local_cook; Util.List.local_cook.
-        1: rewrite filter_map_swap. 
-        1: rewrite filter_false //.
-      1: rewrite/extract_one_event/twoevent/=; case: (acmd_step _ _ _)=> - [] _ [] ? _ _.
-      1: clear; revert_hyp_pat State2; case; done.
+    1,2: case: c; case; case; [repeat constructor; fail| ]; case. 
+    1: move=> + ? ? + ?. 2: move=> ? + ? ?.
+    1,2: move=> ac st.
+    1,2: case: st; case: ac=> isatk ocmd *. 
+    1,2: enter (idtac; case stutter: (isatk || isSome (ocmd)); cycle 1).  2,4: shelve.
+      1,2: left.  (* This switches goals for some reason. stupid *)
+      1,2: move: stutter=> /Bool.orb_false_elim [].
+      1,2: move=> ->; case: ocmd=> // _.
+      1,2: split. 2,4: shelve.
+        1,2: rewrite/extract_one_cfg map_cons [filter _ _]/=. 
+        1,2: pattern_focus [LHS] => P.
+        1,2: rewrite/twostep /= . 
+        1: case: (acmd_step adv2 _ _)=>- [] *.  2: case: (acmd_step adv1 _ _)=>- [] *. 
+        1,2: rewrite map_app combine_extend4_split22 /= !map_map.
+        1: enter (idtac; erewrite map_ext; [|case=> * /=; instantiate (1 := fun _ => _); reflexivity]).
+        2: enter (idtac; erewrite map_ext; [|case=> - [? ?] [? ?] /=; instantiate (1 := fun '(_, _, (_,_)) => _); reflexivity]).
+        1,2: rewrite filter_app;  subst P; cbn beta; Util.local_cook; Util.List.local_cook.
+        2: rewrite map_map.
+        1,2: rewrite filter_map_swap; Util.List.local_cook.
+        2:  erewrite filter_ext; [| case=> > /=; instantiate (1 := fun _ => _); reflexivity] .
+        1,2: rewrite filter_false //.
+      Unshelve. 1,2: shelve.
+      1,2: rewrite/extract_one_event/twoevent/=; case: (acmd_step _ _ _)=> - [] _ [] ? _ _.
+      1,2: clear.
+      1: revert_hyp_pat State2. 2: revert_hyp_pat State1.
+      1,2: case; done.
 
-
-    1: right; split.
-      1: rewrite/extract_one_cfg map_cons [filter _ _] /= stutter.
-      1: pattern_focus [LHS] => P.
-      1: rewrite/twostep; case: (acmd_step adv2 _ _)=>- [] *.
-      1: move step: (acmd_step adv1 _ _)=> [[? ?] ?].
-      1: rewrite combine_extend4_split22  !map_app filter_app !map_map.
-      1: erewrite map_ext; [| case=> - [] ? ? [] > /=; instantiate (1 := fun '(_,_,(_, _)) => _); reflexivity].
-      1: subst P; cbn beta. 
-      1: rewrite/Semantics.step step; Util.local_cook; Util.List.local_cook.
-      1: rewrite filter_map_swap.
+   Unshelve.
+    1,2: right; split. 2,4: shelve.
+      1,2: rewrite/extract_one_cfg map_cons [filter _ _] /= stutter.
+      1,2: pattern_focus [LHS] => P.
+      1,2: rewrite/twostep. 
+      1: case: (acmd_step adv2 _ _)=>- [] *. 2: case: (acmd_step adv1 _ _)=>- [] *.
+      1: move step: (acmd_step adv1 _ _)=> [[? ?] ?]. 2: move step: (acmd_step adv2 _ _)=> [[? ?] ?].
+      1,2: rewrite combine_extend4_split22  !map_app filter_app !map_map.
+      1,2: erewrite map_ext; [| case=> - [] ? ? [] > /=; instantiate (1 := fun '(_,_,(_, _)) => _); reflexivity].
+      1,2: subst P; cbn beta. 
+      1,2: rewrite/Semantics.step step; Util.local_cook; Util.List.local_cook.
+      1,2: rewrite filter_map_swap.
       1: erewrite filter_ext; [|case=> - [? ?]  [? ?] /=; instantiate (1 := fun '(_,_,_) => _); reflexivity ].
+      2: erewrite filter_ext; [|case=> - [? ?]  [? ?] /=; instantiate (1 := fun '(_,_,(_,_)) => _); reflexivity ].
       1: erewrite map_filter_combine_extend2_ind1; [ | case=> ? ? _; instantiate (1 := fun '(_,_)=> _); reflexivity | case=> ? ? [] _ _; instantiate (1 := fun '(_,_) => _); reflexivity | done].
-      1: congr map; clear.
-      1: revert_hyp_pat [Prog, nat].
-      1: elim; [ elim=> // >  /= -> // |].
-      1: move=> > ih  [] /= *; Util.local_cook. 
-      1: clear; rewrite map_map filter_map_swap filter_true //.
+      2: erewrite map_filter_combine_extend2_ind2; [| case=> _ _ [] >; instantiate (1 := fun '(_,_) => _); reflexivity| case=> _ _ [] >; instantiate (1 := fun '(_,_) => _); reflexivity | done].
+      1,2: congr map; clear.
+      1,2: revert_hyp_pat [Prog, nat].
+      1,2: elim; [ elim=> // >  /= -> // |].
+      1,2: move=> > ih  [] /= *; Util.local_cook. 
+      1,2: clear; rewrite map_map filter_map_swap filter_true //.
 
-    1: rewrite/extract_one_event /extract_one_cfg map_cons [filter _ _]/= stutter.
-    1: rewrite/event/step; move e: (acmd_step _ _ _)=> [[? [? ?]] ?].
-    1: rewrite/twoevent/twostep e; case: (acmd_step _ _ _)=> - [] _ [] ? _ _.
-    1: clear; revert_hyp_pat State2; case; done.
-
-
-  Admitted.
-
+    Unshelve.
+    1,2: rewrite/extract_one_event /extract_one_cfg map_cons [filter _ _]/= stutter.
+    1,2: rewrite/event/step; move e: (acmd_step _ _ _)=> [[? [? ?]] ?].
+    1,2: rewrite/twoevent/twostep e; case: (acmd_step _ _ _)=> - [] _ [] ? _ _.
+    1,2: clear. 
+    1: revert_hyp_pat State2.  2: revert_hyp_pat State1.
+    1,2: case; done.
+  Qed.
 End twooneextract.
 
 
