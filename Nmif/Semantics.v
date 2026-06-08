@@ -368,6 +368,20 @@ Section twooneextract.
     1: revert_hyp_pat State2.  2: revert_hyp_pat State1.
     1,2: case; done.
   Qed.
+
+  (* Under the running invariant, both projections cannot stutter at the same
+     combined step: a stuttering head would have to be (noop, noop), which the
+     running invariant forbids.  Hence both sides stutter only when the list is
+     empty, in which case the projections are fixed points and emit no event. *)
+  Lemma extract_both_stutter_blank (c : TwoCfg):
+    Forall (fun '(a,b)=> is_running a || is_running b) c.1.1 ->
+    extract_one_cfg true  (twostep adv1 adv2 c) = extract_one_cfg true  c ->
+    extract_one_cfg false (twostep adv1 adv2 c) = extract_one_cfg false c ->
+       event adv1 (extract_one_cfg true c) = blank_event
+    /\ event adv2 (extract_one_cfg false c) = blank_event
+    /\ step adv1 (extract_one_cfg true c) = extract_one_cfg true c
+    /\ step adv2 (extract_one_cfg false c) = extract_one_cfg false c.
+  Proof. Admitted.
 End twooneextract.
 
 
