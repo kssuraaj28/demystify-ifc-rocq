@@ -242,11 +242,11 @@ Section twooneextract.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates1 AtkStates2 : Type}.
   Variable (adv1: AdvNextStep AtkStates1) (adv2: AdvNextStep AtkStates2).
 
+  Notation TwoCfg := (TwoCfg (AtkStates1:=AtkStates1) (AtkStates2:=AtkStates2)).
   Notation State1 := (State (AtkStates:=AtkStates1)).
   Notation State2 := (State (AtkStates:=AtkStates2)).
 
-  Definition extract_one_cfg (is_left : bool)
-    (c : TwoCfg (AtkStates1:=AtkStates1) (AtkStates2:=AtkStates2)) :=
+  Definition extract_one_cfg (is_left : bool) (c : TwoCfg ) :=
     let: (aclst, s1, s2) := c in
     let: aclst :=
       filter is_running
@@ -254,19 +254,48 @@ Section twooneextract.
     if is_left as b return Cfg (AtkStates := if b then AtkStates1 else AtkStates2)
     then (aclst, s1) else (aclst, s2).
 
-  Definition extract_one_event (is_left : bool)
-    (c : TwoCfg (AtkStates1:=AtkStates1) (AtkStates2:=AtkStates2)) : Event :=
+  Definition extract_one_event (is_left : bool) (c: TwoCfg) : Event :=
     let: (e1, e2) := twoevent adv1 adv2 c in
     if is_left then e1 else e2.
 
+  Notation adv b := (if b as b' return (_ (if b' then _ else _)) then adv1 else adv2).
+
+  Lemma extract_left_or_right (c: TwoCfg):
+    let:  (lst, _, _) := c in
+    Forall (fun '(a,b)=> is_running a || is_running b) lst ->
+    exists b, 
+    extract_one_cfg b (twostep adv1 adv2 c) =  step (adv b) (extract_one_cfg b c).
+  Proof.
+    case: c=>-  [] [].
+      {move=> * /=; exists true=> //. }
+    move=> [c1 c2] > . Forall_inv_toph=> + ?=> /orP.
+    case=> runningass;  [exists true | exists false].
+    1,2: rewrite/extract_one_cfg map_cons [filter _ _]/= runningass.
+    1,2: rewrite/step /twostep.
+    1,2: move: (acmd_step adv1 _ _)=> [[] ]; move: (acmd_step adv2 _ _)=> [[] ]=> *.
+    1,2: rewrite map_app filter_app map_map; Util.local_cook; Util.List.local_cook.
+    1,2: clear; rewrite combine_extend4_split22 map_map filter_map_swap.
+    1: erewrite map_ext; [|case=> - [? ?] [? ?] /=; instantiate (1 := fun '(_,_,_) => _); reflexivity].
+    2: erewrite map_ext; [|case=> - [? ?] [? ?] /=; instantiate (1 := fun '(_,_,(_, _)) => _); reflexivity].
+    1: erewrite filter_ext; [|case=> - [? ?] [? ?] /=; instantiate (1 := fun '(_,_,_) => _); reflexivity].
+    2: erewrite filter_ext; [|case=> - [? ?] [? ?] /=; instantiate (1 := fun '(_,_,(_, _)) => _); reflexivity].
+    1: erewrite map_filter_combine_extend2_ind1; 
+         [| case=> ? ? _; instantiate (1 := fun '(_,_) => _); reflexivity| case=> ? ? _; instantiate (1 := fun '(_,_) => _); reflexivity | done].
+    2: erewrite map_filter_combine_extend2_ind2; 
+         [| case=> _ _ [] *; instantiate (1 := fun '(_,_) => _); reflexivity| case=> _ _ [] *; instantiate (1 := fun '(_,_) => _); reflexivity | done].
+    1,2: congr map; clear.
+    1,2: revert_hyp_pat [Prog, nat].
+    1,2: elim; [elim=> //= > -> //|]. (* TODO: Maybe lemma this. This is pretty annoying *)
+    1,2: move=> ? ? ? []=> //= *; Util.local_cook.
+    1,2: clear; revert_hyp_pat Prog;    elim=> //= > -> //.
+  Qed.
 
   Lemma extract_two_one_correct b c: 
     let: step_extract := extract_one_cfg b (twostep adv1 adv2 c) in
-    let: adv := if b as b' return (_ (if b' then _ else _)) then adv1 else adv2 in
       (step_extract = (extract_one_cfg b c) /\ extract_one_event b c = blank_event) (* Stutter *)
     \/ 
-      (step_extract = step adv (extract_one_cfg b c) /\
-      extract_one_event b  c = event adv (extract_one_cfg b c)).
+      (step_extract = step (adv b) (extract_one_cfg b c) /\
+      extract_one_event b  c = event (adv b) (extract_one_cfg b c)).
   Proof.
     case: b. 
     1,2: case: c; case; case; [repeat constructor; fail| ]; case. 
