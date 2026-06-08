@@ -431,4 +431,19 @@ Section extract_step_commute.
     1,2: pattern_eq [ ⟨ _ | _ ⟩ _] with None=> [|->] //. (* TODO: Could be elsewhere *)
     1,2: rewrite/⟨_|_⟩ /is_trusted untr //.
   Qed.
+
+  
+  Theorem extract_step_running c:
+    Invariant c ->
+    let: twocfg := extract_2cfg c  in
+    let: (lst ,_, _) := twocfg in
+    Forall (fun '(a,b)=> is_running a || is_running b) lst.
+  Proof.
+    case: c=> >. rewrite/Invariant. case=> + _.
+    rewrite/CmbCmdInv/extract_2cfg/cmd_map Forall_map.
+    apply: Forall_impl=> > [] _.
+    rewrite/ActiveInv/sim_active/sim_active'. clear.
+    case: (real_atk_bit _); case: (real_cmd _); case: (ideal_cmd _)=> * //.
+    cook.
+  Qed.
 End extract_step_commute.
