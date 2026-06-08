@@ -274,7 +274,10 @@ Section untrusted_dst.
     untrusted (var_lbl (get_assign_dest a)).
   Proof. 
     move=> >; move e: (mk_lbl _ _)=> ?; move:e=> /[swap].
-  Admitted.
+    case=> // > + + e1 e2. rewrite -{}e1. case: e2=> -> ?.
+    move:(flows_from_untr)=> /[apply] /=.
+    evar_spec_toph=> //.
+  Qed.
 End untrusted_dst.
 
 Section step_soundness.

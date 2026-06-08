@@ -64,4 +64,5 @@ Section bisim.
           split; [rewrite -Hcom SSc // | rewrite -Sc Hcom //].
         * rewrite -Se Hef -Het SSe //.
   Qed.
+  Print Assumptions simulator_bisim.
 End bisim.

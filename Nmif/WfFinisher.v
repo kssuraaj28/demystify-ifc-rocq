@@ -64,7 +64,29 @@ Section ni.
       extract_controlled_endorse c = None ->
       ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
       ⟨ clean_cmd_stp_store c st1 | is_trusted ⟩ = ⟨ clean_cmd_stp_store c st2 | is_trusted ⟩.
-  Proof. Admitted.
+  Proof.
+    case=> //.
+      { move=> > + + + /ltac:(exfalso)=> /= -> -> //. }
+      { move=> *;apply: update_to_store_storeview_eq; Attacker.local_cook; done. }
+    { (* wf_assign *)
+      move=> a pclbl Hsrc _ _ treq /=.
+      case dtr: [elaborate (is_trusted (get_assign_dest a))]; cycle 1.
+        { rewrite !update_storeview_nochange //. }
+      have tsrc : trusted (asgn_src_lbl a); [exact: (flows_to_tr _ _ dtr Hsrc)|].
+      have Hval : get_assign_val st1 a = get_assign_val st2 a.
+      { move: tsrc; case: a {Hsrc dtr} => /=.
+        - move=> src d tsrc /=; rewrite (storeview_eq _ _ _ src treq) //.
+        - move=> src d tsrc /=; rewrite (storeview_eq _ _ _ src treq) //.
+        - move=> [[v1 v2] comp] d Hp.
+          have pv1 : is_trusted v1.
+          { move: Hp; rewrite /asgn_src_lbl /is_trusted /is_untrusted /trusted.
+            case: (var_lbl v1) => u1 p1; case: (var_lbl v2) => u2 p2 /=; rewrite negb_or => /andP[h _]; exact: h. }
+          have pv2 : is_trusted v2.
+          { move: Hp; rewrite /asgn_src_lbl /is_trusted /is_untrusted /trusted.
+            case: (var_lbl v1) => u1 p1; case: (var_lbl v2) => u2 p2 /=; rewrite negb_or => /andP[_ h]; exact: h. }
+          rewrite /eval_val_exp /= (storeview_eq _ _ _ v1 treq pv1) (storeview_eq _ _ _ v2 treq pv2) //. }
+      rewrite /clean_assign_stp_store Hval. apply: update_same_varval; exact: treq. }
+  Qed.
   (* TODO repair (constructors changed shape):
     move=> [] // d s1 s2 ? ?.
       { apply: update_to_store_storeview_eq. rewrite /is_trusted /is_untrusted s2 //. }
