@@ -190,6 +190,11 @@ Section cfg.
     event_helper adv ac new_store old_ast.
 End cfg.
 
+Section running.
+  Context `{!VarPrm, !ValPrm}.
+  Definition is_running (ac : AtkCmd) : bool :=
+      is_attacked ac || isSome (ocmd ac).
+End running.
 
 Section twocfg.
   Import Util.List.
@@ -244,7 +249,7 @@ Section twooneextract.
     (c : TwoCfg (AtkStates1:=AtkStates1) (AtkStates2:=AtkStates2)) :=
     let: (aclst, s1, s2) := c in
     let: aclst :=
-      filter (fun ac => is_attacked ac || isSome (ocmd ac))
+      filter is_running
         (map (if is_left then fst else snd) aclst) in
     if is_left as b return Cfg (AtkStates := if b then AtkStates1 else AtkStates2)
     then (aclst, s1) else (aclst, s2).
@@ -293,7 +298,7 @@ Section twooneextract.
 
    Unshelve.
     1,2: right; split. 2,4: shelve.
-      1,2: rewrite/extract_one_cfg map_cons [filter _ _] /= stutter.
+      1,2: rewrite/extract_one_cfg/is_running map_cons [filter _ _] /= stutter.
       1,2: pattern_focus [LHS] => P.
       1,2: rewrite/twostep. 
       1: case: (acmd_step adv2 _ _)=>- [] *. 2: case: (acmd_step adv1 _ _)=>- [] *.
@@ -314,7 +319,7 @@ Section twooneextract.
       1,2: clear; rewrite map_map filter_map_swap filter_true //.
 
     Unshelve.
-    1,2: rewrite/extract_one_event /extract_one_cfg map_cons [filter _ _]/= stutter.
+    1,2: rewrite/extract_one_event /extract_one_cfg/is_running map_cons [filter _ _]/= stutter.
     1,2: rewrite/event/step; move e: (acmd_step _ _ _)=> [[? [? ?]] ?].
     1,2: rewrite/twoevent/twostep e; case: (acmd_step _ _ _)=> - [] _ [] ? _ _.
     1,2: clear. 
