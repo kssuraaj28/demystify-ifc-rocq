@@ -22,7 +22,6 @@ Section trace_weq.
 
   CoInductive Trace_weq : Trace -> Trace -> Prop :=
     | weq_match : forall e t1 t2,
-        e <> stutter ->
         Trace_weq t1 t2 ->
         Trace_weq (tcons e t1) (tcons e t2)
     | weq_skip_l : forall t1 t2,
@@ -35,16 +34,16 @@ Section trace_weq.
   Lemma Trace_weq_coind (R : Trace -> Trace -> Prop) :
     (forall t1 t2, R t1 t2 ->
          (exists e t1' t2',
-            e <> stutter /\ t1 = tcons e t1' /\ t2 = tcons e t2' /\ R t1' t2')
+            t1 = tcons e t1' /\ t2 = tcons e t2' /\ R t1' t2')
       \/ (exists t1', t1 = tcons stutter t1' /\ R t1' t2)
       \/ (exists t2', t2 = tcons stutter t2' /\ R t1 t2')) ->
     forall t1 t2, R t1 t2 -> Trace_weq t1 t2.
   Proof.
     move=> Hstep. cofix self=> t1 t2 /Hstep.
-    case=> [[e [t1' [t2' [Hne [-> [-> HR]]]]]]
+    case=> [[e [t1' [t2' [-> [-> HR]]]]]
            |[[t1' [-> HR]]
             |[t2' [-> HR]]]].
-    - apply: weq_match. + exact: Hne. + exact: self _ _ HR.
+    - apply: weq_match. exact: self _ _ HR.
     - apply: weq_skip_l. exact: self _ _ HR.
     - apply: weq_skip_r. exact: self _ _ HR.
   Qed.
@@ -71,7 +70,7 @@ Section bisim.
 
   Lemma trace_bisim (R : S1 -> S2 -> Prop) :
     (forall s1 s2, R s1 s2 ->
-         (exists e, e <> stutter /\ event1 s1 = e /\ event2 s2 = e /\ R (step1 s1) (step2 s2))
+         (exists e, event1 s1 = e /\ event2 s2 = e /\ R (step1 s1) (step2 s2))
       \/ (event1 s1 = stutter /\ R (step1 s1) s2)
       \/ (event2 s2 = stutter /\ R s1 (step2 s2))) ->
     forall s1 s2, R s1 s2 -> Trace_weq (build step1 event1 s1) (build step2 event2 s2).
@@ -81,12 +80,11 @@ Section bisim.
       exists s1' s2', R s1' s2' /\ t1 = build step1 event1 s1' /\ t2 = build step2 event2 s2'.
     apply: (Trace_weq_coind R').
     - move=> t1 t2 [s1' [s2' [HRss [-> ->]]]].
-      case: (Hstep s1' s2' HRss)=> [[e [Hne [He1 [He2 HR']]]]
+      case: (Hstep s1' s2' HRss)=> [[e [He1 [He2 HR']]]
                                    |[[Hstut HR']
                                     |[Hstut HR']]].
       + left. exists e,
           (build step1 event1 (step1 s1')), (build step2 event2 (step2 s2')).
-        split; [exact: Hne|].
         split; [rewrite build_unfold He1 //|].
         split; [rewrite build_unfold He2 //|].
         exists (step1 s1'), (step2 s2'). split=> //.
