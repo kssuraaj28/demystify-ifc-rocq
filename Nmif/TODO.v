@@ -59,5 +59,14 @@ Section ni.
     ⟨ real_store | is_public ⟩ = ⟨ sim_store | is_public ⟩ ->
     ⟨ update_to_store (pre_cmd_action adv ast sim_store) to (ideal_store from) | is_public ⟩ =
     ⟨ update_to_store (pre_cmd_action adv ast real_store) to (pre_cmd_action adv ast real_store from) | is_public ⟩.
-  Proof. Admitted.
+  Proof.
+    move=> Hfrom Hto treq pubeq.
+    have tfrom : is_trusted from; [rewrite /is_trusted /is_untrusted Hfrom //|].
+    have valeq : pre_cmd_action adv ast real_store from = ideal_store from.
+    { rewrite (storeview_eq _ _ _ from (pre_cmd_wf_int adv ast real_store) tfrom).
+      exact: (storeview_eq _ _ _ from treq tfrom). }
+    rewrite valeq.
+    apply: update_same_varval.
+    exact: (pre_cmd_wf_conf adv ast _ _ (esym pubeq)).
+  Qed.
 End ni.

@@ -374,7 +374,6 @@ Section twooneextract.
       1,2: clear; revert_hyp_pat Prog; elim=> //= > -> //.
   Qed.
     
-
 End twooneextract.
 
 
