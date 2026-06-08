@@ -3,8 +3,8 @@ Import List ListNotations ssreflect ssrfun ssrbool FunctionalExtensionality.
 
 From Ltac2 Require Import Ltac2.
 
-Require Tacs Util VarValStore Attacker Syntax Lattice4pt.
-Import Tacs Util VarValStore Attacker Syntax Lattice4pt Tacs.Cook.
+Require Tacs Util VarValStore Attacker Syntax Lattice4pt CoTrace.
+Import Tacs Util VarValStore Attacker Syntax Lattice4pt CoTrace Tacs.Cook.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
@@ -189,6 +189,19 @@ Section cfg.
     let: (new_store, _) := s' in
     event_helper adv ac new_store old_ast.
 End cfg.
+
+Section trace.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
+  Variable (adv : AdvNextStep AtkStates).
+
+  Instance event_prm : EventPrm := {
+    Events := Event;
+    stutter := blank_event;
+  }.
+
+  Definition trace (c : Cfg (AtkStates := AtkStates)) : Trace :=
+    build (step adv) (event adv) c.
+End trace.
 
 Section running.
   Context `{!VarPrm, !ValPrm}.
