@@ -492,9 +492,48 @@ Module List.
       by apply: Forall_cons; [|apply: IH].
   Qed.
 
-  Ltac2 Set this_cookbook_ as old := add_cookstep 
-    ltac1:(lazymatch goal with |- Forall _ (combine_extend2 _ _ _ _) => apply:Forall_combine2_same end) 
+  Ltac2 Set this_cookbook_ as old := add_cookstep
+    ltac1:(lazymatch goal with |- Forall _ (combine_extend2 _ _ _ _) => apply:Forall_combine2_same end)
     "Forall_combine2_same" old.
+
+  Lemma Forall_combine2_disj {A B}
+    (Pa : A -> Prop) (Pb : B -> Prop)
+    (la : list A) (lb : list B) (da : A) (db : B) :
+    Forall Pa la -> Forall Pb lb ->
+    Forall (fun '(a, b) => Pa a \/ Pb b) (combine_extend2 la lb da db).
+  Proof.
+    elim: la lb => [|h1 t1 IH] [|h2 t2] HPa HPb /=.
+    - apply: Forall_nil.
+    - apply: Forall_cons; [right; exact: Forall_inv HPb|].
+      move: (Forall_inv_tail HPb)=> {}HPb.
+      elim: t2 HPb => [|h t IHt] HPb /=.
+      + apply: Forall_nil.
+      + apply: Forall_cons; [right; exact: Forall_inv HPb|].
+        apply: IHt; exact: Forall_inv_tail HPb.
+    - apply: Forall_cons; [left; exact: Forall_inv HPa|].
+      move: (Forall_inv_tail HPa)=> {}HPa. clear IH.
+      elim: t1 HPa => [|h t IHt] HPa /=.
+      + apply: Forall_nil.
+      + apply: Forall_cons; [left; exact: Forall_inv HPa|].
+        apply: IHt; exact: Forall_inv_tail HPa.
+    - apply: Forall_cons; [left; exact: Forall_inv HPa|].
+      apply: IH; [exact: Forall_inv_tail HPa | exact: Forall_inv_tail HPb].
+  Qed.
+
+  Lemma Forall_combine3_disj {A B C}
+    (Pa : A -> Prop) (Pb : B -> Prop) (Pc : C -> Prop)
+    (la : list A) (lb : list B) (lc : list C) (da : A) (db : B) (dc : C) :
+    Forall Pa la -> Forall Pb lb -> Forall Pc lc ->
+    Forall (fun '(a, b, c) => Pa a \/ Pb b \/ Pc c)
+      (combine_extend3 la lb lc da db dc).
+  Proof.
+    rewrite /combine_extend3 => HPa HPb HPc.
+    apply: Forall_impl;
+      last apply: (Forall_combine2_disj (fun '(a, b) => Pa a \/ Pb b) Pc _ lc (da, db) dc).
+    - case=> [[? ?] ?] /= [|]; tauto.
+    - exact: Forall_combine2_disj.
+    - exact: HPc.
+  Qed.
 
   Ltac Forall_inv_toph :=  (move=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _)).
   Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(Forall_inv_toph) "Forall_inv" old.

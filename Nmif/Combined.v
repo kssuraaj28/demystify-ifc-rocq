@@ -167,17 +167,33 @@ Section thm.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
 
   Import VarValStore.Notations Util.List.
-   Lemma Forall_CmbCmd_zip:
-     forall l1 l2 substeps pc_lbl,
+
+  Lemma ActiveInv_combine_extend3 l1 l2 n: 
+    Forall ActiveInv  (combine_extend3 (map Some l1) (map Some l2) (repeat true n) None
+     None false).
+  Proof.
+    rewrite/ActiveInv.
+    apply: Forall_impl.
+      { case. case=> >. instantiate (1 := fun '(a,b,c) => is_true a \/ is_true b \/ is_true c)=> /= h.
+      apply/ orP. case: h=> [| []] *; constructor; try apply/orP; try constructor; done. }
+    apply/Forall_combine3_disj; clear. 
+    1: move: l1. 2: move: l2. 3: move: n.
+    1,2,3:elim=> //= *; constructor; done.
+  Qed.
+
+   Lemma Forall_CmbCmd_zip l1 l2 substeps pc_lbl:
        (* TODO: I didn't have fst and snd before, and that wait painful. How to solve? *)
        Forall (fun p => TypeInv (p.1, p.2, pc_lbl))  (combine_extend2 (map Some l1) (map Some l2) None None) ->
        Forall CmbCmdInv (zip l1 l2 substeps pc_lbl).
    Proof.
-     move=> *; rewrite /zip.
-     apply/Forall_map/Forall_combine2_ind1;[|eassumption|]=> //= => [[] [] > //|].
-     all: admit;
-     move: (X in if X then _ else _)=> ?; if_easy_goals. (* TODO: Maybe  *)
-   Admitted.
+     move=> *. rewrite /zip.
+     rewrite/CmbCmdInv. apply: Forall_and.
+       { apply/Forall_map/Forall_combine2_ind1;[|eassumption|]=> //= => [[] [] > //|].
+       move: (X in if X then _ else _)=> ?; if_easy_goals. } 
+     rewrite Forall_map.
+     apply: Forall_impl; [case; case=> > h; exact h|].
+     exact: ActiveInv_combine_extend3.
+   Qed.
 
 End thm.
 
