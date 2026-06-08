@@ -70,9 +70,9 @@ Section bisim.
 
   Lemma trace_bisim (R : S1 -> S2 -> Prop) :
     (forall s1 s2, R s1 s2 ->
-         (exists e, event1 s1 = e /\ event2 s2 = e /\ R (step1 s1) (step2 s2))
-      \/ (event1 s1 = stutter /\ R (step1 s1) s2)
-      \/ (event2 s2 = stutter /\ R s1 (step2 s2))) ->
+         (R (step1 s1) (step2 s2) /\ event1 s1 = event2 s2)
+      \/ (R (step1 s1) s2 /\ event1 s1 = stutter)
+      \/ (R s1 (step2 s2) /\ event2 s2 = stutter)) ->
     forall s1 s2, R s1 s2 -> Trace_weq (build step1 event1 s1) (build step2 event2 s2).
   Proof.
     move=> Hstep s1 s2 HR.
@@ -80,13 +80,13 @@ Section bisim.
       exists s1' s2', R s1' s2' /\ t1 = build step1 event1 s1' /\ t2 = build step2 event2 s2'.
     apply: (Trace_weq_coind R').
     - move=> t1 t2 [s1' [s2' [HRss [-> ->]]]].
-      case: (Hstep s1' s2' HRss)=> [[e [He1 [He2 HR']]]
-                                   |[[Hstut HR']
-                                    |[Hstut HR']]].
-      + left. exists e,
+      case: (Hstep s1' s2' HRss)=> [[HR' Heq]
+                                   |[[HR' Hstut]
+                                    |[HR' Hstut]]].
+      + left. exists (event1 s1'),
           (build step1 event1 (step1 s1')), (build step2 event2 (step2 s2')).
-        split; [rewrite build_unfold He1 //|].
-        split; [rewrite build_unfold He2 //|].
+        split; [rewrite build_unfold //|].
+        split; [rewrite build_unfold -Heq //|].
         exists (step1 s1'), (step2 s2'). split=> //.
       + right; left. exists (build step1 event1 (step1 s1')).
         split; [rewrite build_unfold Hstut //|].

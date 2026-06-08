@@ -20,22 +20,29 @@ Section ni.
       extract_controlled_declassify c = None ->
       ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
       ⟨ clean_cmd_stp_store c st1 | is_public ⟩ = ⟨ clean_cmd_stp_store c st2 | is_public ⟩.
-  Proof. 
+  Proof.
     case=> //.
       { move=> *;apply: update_to_store_storeview_eq; Attacker.local_cook; done. }
       { move=> > + + + /ltac:(exfalso)=> /= -> -> //. }
-
-  Admitted.
-(*
-    case de: ([elaborate is_public d])=> fs1d fs2d _ _ pubeq /=; [| rewrite !update_storeview_nochange //].
-    move: (flows_to_pub _ _ de fs1d)=> {fs1d} ps1.
-    move: (flows_to_pub _ _ de fs2d)=> {fs2d} ps2.
-    set v1 := (X in ⟨update_to_store _ _ X | _ ⟩ = _ ).
-    set v2 := (X in _ = ⟨update_to_store _ _ X | _ ⟩).
-    suff: v1 = v2; [move=> ->; apply/update_same_varval=> //|subst v1 v2].
-    rewrite /get_assign_val /eval_val_exp /=.
-    f_equal; eauto using storeview_eq.
-  *)
+    { (* wf_assign *)
+      move=> a pclbl Hsrc _ _ pubeq /=.
+      case dpub: [elaborate (is_public (get_assign_dest a))]; cycle 1.
+        { rewrite !update_storeview_nochange //. }
+      have psrc : public (asgn_src_lbl a); [exact: (flows_to_pub _ _ dpub Hsrc)|].
+      have Hval : get_assign_val st1 a = get_assign_val st2 a.
+      { move: psrc; case: a {Hsrc dpub} => /=.
+        - move=> src d psrc /=; rewrite (storeview_eq _ _ _ src pubeq) //.
+        - move=> src d psrc /=; rewrite (storeview_eq _ _ _ src pubeq) //.
+        - move=> [[v1 v2] comp] d Hp.
+          have pv1 : is_public v1.
+          { move: Hp; rewrite /asgn_src_lbl /is_public.
+            case: (var_lbl v1) => u1 p1; case: (var_lbl v2) => u2 p2 /= /andP[h _]; exact: h. }
+          have pv2 : is_public v2.
+          { move: Hp; rewrite /asgn_src_lbl /is_public.
+            case: (var_lbl v1) => u1 p1; case: (var_lbl v2) => u2 p2 /= /andP[_ h]; exact: h. }
+          rewrite /eval_val_exp /= (storeview_eq _ _ _ v1 pubeq pv1) (storeview_eq _ _ _ v2 pubeq pv2) //. }
+      rewrite /clean_assign_stp_store Hval. apply: update_same_varval; exact: pubeq. }
+  Qed.
 
   
   (* In a secret context, the public view is constant *)
