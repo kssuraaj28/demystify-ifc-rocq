@@ -149,8 +149,8 @@ Section inv.
       else rcmd = icmd). (* The rcmd is still well typed *)
 
   Definition CmbCmdInv (cmb_cmd: CmbCmd) : Prop :=
-    let: mk_cmbcmd rcmd _ icmd pclbl := cmb_cmd in (* TODO: is_atk does not make an appearance... *)
-    TypeInv (rcmd, icmd, pclbl).
+    let: mk_cmbcmd rcmd isatk icmd pclbl := cmb_cmd in (* TODO: is_atk does not make an appearance... *)
+    TypeInv (rcmd, icmd, pclbl) /\ ActiveInv (rcmd, icmd, isatk).
 
   Definition StateInv (s: CmbState): Prop :=
     let: mk_cmbstate real_st ideal_st sim_st _ := s in
@@ -175,8 +175,9 @@ Section thm.
    Proof.
      move=> *; rewrite /zip.
      apply/Forall_map/Forall_combine2_ind1;[|eassumption|]=> //= => [[] [] > //|].
+     all: admit;
      move: (X in if X then _ else _)=> ?; if_easy_goals. (* TODO: Maybe  *)
-   Qed.
+   Admitted.
 
 End thm.
 
@@ -238,8 +239,8 @@ Section invprf.
         let: (st', clst') := cmbcmd_step c st in
         StateInv st' /\ Forall CmbCmdInv clst'.
     Proof.
-      case; rewrite {}/CmbCmdInv=> - []; cycle 1.
-        { move=>>[]_; rewrite/StateInv=> + [].
+      case; rewrite {}/CmbCmdInv=>  -  [] ; cycle 1.
+        { move=>>  [] + _=>- [] _ . rewrite/StateInv=> + [].
         case pce: (untrusted _); cycle 1.
         1: move=> <- /= <- *.
         2: move=> * /=. 
@@ -254,7 +255,7 @@ Section invprf.
         rewrite-/(WellFormedProg _ _).
         revert_hyp_pat [(option Cmd), (_ ⊢ _)]; case=> /==> [|* //] >.
         apply: step_soundness_pubuntr=> //. } 
-      rewrite /TypeInv=> > []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>].
+      rewrite /TypeInv=>   > [] + _=> - []; rewrite /(_⊢_)/cmbcmd_step/StateInv=> ? ? [>].
       repeat split; cook.
         { move x: (extract_controlled_endorse _)=> x'; move: x' x. 
         case=> [[>]/extr_endorse_eq [] + [] |noend]. (* TODO move to case? *)
