@@ -3,8 +3,9 @@ Import List ListNotations ssreflect ssrfun ssrbool.
 
 From Ltac2 Require Import Ltac2.
 
-Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem Combined Simulator.
-Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem Tacs.Cook.
+
+Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade Combined Simulator WfFinisher.
+Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade WfFinisher Tacs.Cook.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!". 
@@ -12,12 +13,13 @@ Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 (* TODO: Order seems to matter. Syntax before fails *)
 
-Import Combined.
 #[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
 Ltac2 Set this_cookbook_ := create_new_cookbook.
 
 Section sim_active.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Import Combined.
+
   Definition sim_active' (rcmd: option Cmd) (ratk: bool) (is_pubpc: bool) : bool :=
     ratk || (is_pubpc && if rcmd is None then false else true).
 
@@ -57,9 +59,7 @@ Section cmd_map.
     map mapfn (filter sim_active lst).
 
   Fact cmd_map_cons a l :
-    cmd_map (a :: l) =
-      (mk_atkcmd (real_atk_bit a) (real_cmd a),
-       mk_atkcmd (sim_active a) (ideal_cmd a)) :: cmd_map l.
+    ltac2:(cbn_eq (cmd_map (a :: l))). 
   Proof. done. Qed.
 
   Fact cmd_map_sim_cons a l :
@@ -111,8 +111,10 @@ Section extract_step_commute.
 
   Notation CombCfg := Combined.Cfg.
   Notation comb_step := (Combined.cfg_step adv).
+  Notation comb_event := (Combined.cmb_event adv).
   Notation extract_2cfg := (extract_2cfg (AtkStates := AtkStates)).
-  Notation step := (step adv (construct_simulator adv)).
+  Notation step := (twostep adv (construct_simulator adv)).
+  Notation two_event := (Semantics.twoevent adv (construct_simulator adv)).
 
   Import Util.List Combined VarValStore.Notations.
 
@@ -122,7 +124,7 @@ Section extract_step_commute.
        cookbook is not enough — the importing file must also `Import` the
        module so the bare name resolves at fire time, otherwise the rewrite
        errors and `cook` silently drops the step. Figure out a cleaner fix. *)
-  Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()).
+  Ltac2 mutable curr_cookbook () := this_cookbook_ (). Ltac cook := ltac2:(cook curr_cookbook).
   Ltac2 Set curr_cookbook as old := join_cookbooks Combined.this_cookbook old.
   Ltac2 Set curr_cookbook as old := join_cookbooks Semantics.this_cookbook old.
   Ltac2 Set curr_cookbook as old := join_cookbooks TypeSystem.this_cookbook old.
@@ -132,62 +134,45 @@ Section extract_step_commute.
   Ltac2 Set curr_cookbook as old := join_cookbooks Lattice4pt.this_cookbook old.
   Ltac2 Set curr_cookbook as old := join_cookbooks VarValStore.this_cookbook old.
   Ltac2 Set curr_cookbook as old := join_cookbooks Syntax.this_cookbook old.
-
-
+  Ltac2 Set curr_cookbook as old := join_cookbooks ControlledDowngrade.this_cookbook old.
 
 
   Ltac2 Set cook_debug := 0.
 
-  (* A downgrade that actually crosses the attacker — `from ⋢ to`.  A *safe*
-     downgrade (`from ⊑ to`) is routed to extract_step_commute_core instead;
-     this predicate lets extract_step_commute_downgrade assume the canonical
-     (NI-violating) shape, so its two safe disjuncts close by contradiction. *)
-  Definition downgrade_unsafe (oc : option Cmd) : bool :=
-    match oc with
-    | Some (assign (endorse from to)) => ~~ flows_to (var_lbl from) (var_lbl to)
-    | Some (assign (declassify from to)) => ~~ flows_to (var_lbl from) (var_lbl to)
-    | _ => true
-    end.
-
-  Lemma extract_step_commute_downgrade (st: CmbState) (c: CmbCmd) (restcmd: list CmbCmd):
-    oapp is_endorse false (real_cmd c) \/ oapp is_declassify false (real_cmd c) ->
-    downgrade_unsafe (real_cmd c) ->
+  Lemma extract_step_commute_downgrade (st: CmbState) (c: CmbCmd) (restcmd: list CmbCmd)
+    (from to : Vars):
+    oapp extract_controlled_endorse None (real_cmd c) = Some (from, to) \/
+    oapp extract_controlled_declassify None (real_cmd c) = Some (from, to) ->
     Invariant (st, c :: restcmd) ->
-    (step (extract_2cfg (st, c :: restcmd))).1.1 = extract_2cfg ((comb_step (st, c :: restcmd)).1).
+    step (extract_2cfg (st, c :: restcmd)) = extract_2cfg (comb_step (st, c :: restcmd)).
   Proof.
-    case: c=> rcmd ratk icmd pclbl.  case: st=> rst ist simst atkst.
-    cook. rewrite/Invariant=> downgrade unsafe. case. cook.
+    case: c=> >.  case: st=> >.
+    cook. rewrite/Invariant=> downgrade. case. cook.
     rewrite/CmbCmdInv/StateInv=> + + [].
-    case: downgrade=> downgrade.
-    1: move: downgrade=> /is_endorse_inv_opt.
-    2: move: downgrade=> /is_declassify_inv_opt.
-    1,2: move=> [from] [to] Hrc; rewrite Hrc in unsafe; move: Hrc=> ->.
-    1,2: rewrite/CmbCmdCoreInv=> - [].
-    1: move/wf_endorse_inv. 2: move/wf_declassify_inv.
-    (* Split the wf_*_inv disjunction.  After this the four goals are, in order:
-       endorse-canonical, endorse-safe, declassify-canonical, declassify-safe.
-       The two safe goals (from ⊑ to) contradict `unsafe` (from ⋢ to); the real
-       safe downgrades are handled by extract_step_commute_core via the dispatch
-       in extract_step_commute. *)
-    1,2: move=> [Hcanon | [Hft Hpcto]].
-    2,4: by move: unsafe; rewrite /= Hft.
-    1,2: move: Hcanon=> [->] [? ?].
-    1,2: dotop [cbn]=> <- _ ? ?.
-    1,2: rewrite/comb_step/cmbcmd_step/corrupt_ideal/read_sim/extract_2cfg; cook.
+    case: downgrade=> /[dup] downgrade=> + [] + _.
+    1,2: move=> /[swap] + /[swap] + /[swap] + /[swap].
+    1: move: downgrade=> /extr_endorse_opt.
+    2: move: downgrade=> /extr_decl_opt.
+    1,2: move=> [->]; case=> /[dup] ? /[swap] /[dup] ? /[swap].
+    1,2: rewrite/TypeInv=> + + [] /ltac:(dotop [cbn]).
+    1: move=> /wf_endorse_pc. 2: move/wf_declassify_pc.
+    1,2: move=> /[apply] /[apply] ->.
+    1,2: dotop [cbn]=> <- _ ? ?. 
+    1,2: rewrite/comb_step/cmbcmd_step/extract_2cfg; cook.
     1,2: pattern_eq [sim_active  _] with true=>[| ->]; [simpl; cook|].
-    1,2: rewrite/step/acmd_step /=.
+    1,2: rewrite/step/acmd_step.
+    1,2: move=> dgeqn.
+    1,2: pattern_focus[pre_cmd_action (construct_simulator _) _ _ ]=> P. 
+    1,2: rewrite/pre_cmd_action/construct_simulator/sim_pre; cook. 
+    1,2: subst P; cbn beta.
+    1,2: pattern_focus[post_cmd_action (construct_simulator _) _ _ ]=> P. 
+    1,2: rewrite/pre_cmd_action/construct_simulator; cbn [post_cmd_action sim_post sim_step]; cook; subst P; cbn beta.
     1,2: assert_fails (pattern_focus [construct_simulator _]). (* Checkpoint. TODO: Think about checkpoint practices *)
-    1,2: rewrite/clean_assign_stp_store/get_assign_val/get_assign_dest.
-    1: pattern_eq [is_untrusted _] with true=>[| ->]; cook.
-    2: pattern_eq [is_secret _] with true=>[| ->]; cook.
-    1,2: pattern_eq [is_public _] with true=>[| ->]; cook.
+    1,2: rewrite/clean_assign_stp_store/get_assign_val/get_assign_dest; cook.
     1,2: pattern_eq_2 [post_cmd_action _ _ (update_to_store _ _ _)] [post_cmd_action _ _ (update_to_store _ _ _)]=> [|<-]; swap 2 3.
-        { apply/post_cmd_wf/update_to_store_storeview_eq; cook. }
-        { apply/post_cmd_wf.  set a := (pre_cmd_action _ _ _). set b := (pre_cmd_action _ _ _).
-        have ?: ⟨ b | is_public ⟩ = ⟨ a | is_public ⟩; subst a b; cook. (* I don't like this *)
-        erewrite <- update_same_varval;[| eassumption]. repeat f_equal.
-        erewrite storeview_eq; [ |apply: pre_cmd_wf_int| ]; cook.
-        apply:storeview_eq; eauto. cook. }
+        { apply/post_cmd_wf/update_to_store_storeview_eq; cook. wf_finisher. } (* TODO : wf_finisher this *)
+        { apply/post_cmd_wf. Require Import TODO. exact:declassify_pubeq. }
+    1,2: rewrite/clean_assign_stp_store/get_assign_val/get_assign_dest; cook.
     1,2: move: (post_cmd_action _ _ (update_to_store _ _ _));case=> >; cook.
     1,2: rewrite/zip.
     1,2: set rhs := RHS.
@@ -198,59 +183,13 @@ Section extract_step_commute.
     1,2: subst lhs; rewrite !map_map /cmd_map_sim.
     1,2: rewrite/sim_active /= /sim_active'; cook.
     1,2: enter (cnstrct_eq_gl; cook; clear; [apply: map_ext=> ?; cook|]).
-    1,2: rewrite filter_map_swap.
+    1,2: rewrite filter_map_swap. 
     1,2: erewrite filter_ext; [|move=> *; rewrite /= Bool.orb_false_r; reflexivity].
     1,2: cook; rewrite map_map.
     1,2: apply: map_ext; case=> //.
   Qed.
 
-  (* A command preserves confidentiality unless it is an NI-violating declassify.
-     Non-declassify commands and *safe* declassifies (from ⊑ to) all qualify; the
-     canonical ST→PT declassify (from ⋢ to) does not.  This is what the reshaping
-     in extract_step_commute_core needs for the public-view (simulator) side, and
-     it covers the safe-declassify case that `~~ is_declassify` would exclude. *)
-  Definition conf_safe_cmd (c : Cmd) : bool :=
-    if c is assign (declassify from to) then flows_to (var_lbl from) (var_lbl to) else true.
-  Definition conf_safe_oc (oc : option Cmd) : bool := oapp conf_safe_cmd true oc.
-
-  (* Confidentiality noninterference, generalised from `~~ is_declassify` to
-     `conf_safe_cmd` so it also holds for safe declassifies. *)
-  Lemma ni_cmd_st_conf' c l st1 st2 :
-    WellFormedCmd l c -> conf_safe_cmd c ->
-    ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->
-    ⟨ clean_cmd_stp_store c st1 | is_public ⟩ = ⟨ clean_cmd_stp_store c st2 | is_public ⟩.
-  Proof.
-    move=> wt cs peq.
-    case Hd: (is_declassify c); last first.
-    - apply: ni_cmd_st_conf; [exact: wt | rewrite Hd // | exact: peq].
-    - move: (is_declassify_inv c Hd) cs => [from [to ->]] /= cs.
-      rewrite /clean_cmd_stp_store /clean_assign_stp_store /get_assign_dest /get_assign_val /=.
-      case dp: ([elaborate is_public to]); [| rewrite !update_storeview_nochange //].
-      apply: update_to_store_storeview_eq; [exact: (flows_to_pub _ _ dp cs) | exact: peq].
-  Qed.
-
-  (* The simulator's pre (sim_pre) has the same NI-violation corruption guard as
-     corrupt_ideal, so when the command does not corrupt (the core hypothesis
-     Hcorr) the simulator leaves the protected ideal store untouched. *)
-  Lemma sim_pre_id ast sst ocmd isatk rest ist :
-    (forall id ss, corrupt_ideal ocmd id ss = id) ->
-    pre_cmd_action (construct_simulator adv) (mk_simstate ast sst ((ocmd, isatk) :: rest)) ist = ist.
-  Proof.
-    move=> H. rewrite /pre_cmd_action /construct_simulator /sim_pre.
-    exact: (H ist _).
-  Qed.
-
-  Lemma ni_optcmd_st_conf_atk' ast l oc s1 s2 :
-    l ⊢ oc -> conf_safe_oc oc -> ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
-    post_cmd_action adv ast (optcmd_stp_store oc (pre_cmd_action adv ast s1)) =
-    post_cmd_action adv ast (optcmd_stp_store oc (pre_cmd_action adv ast s2)).
-  Proof.
-    move=> wt cs peq. apply: post_cmd_wf.
-    case: oc wt cs => [c | ] wt cs /=.
-    - apply: (ni_cmd_st_conf' _ _ _ _ wt cs). apply: pre_cmd_wf_conf=> //.
-    - apply: pre_cmd_wf_conf=> //.
-  Qed.
-
+(* TODO: All these need to go to TODO.v *)
   Lemma public_compute_new_pc_opt untr pub rcmd :
     public (compute_new_pc_opt (mk_4ptlbl untr pub) rcmd) = ~~ is_secret_guard rcmd && pub.
   Proof.
@@ -274,17 +213,17 @@ Section extract_step_commute.
 
   Fact post_optcmd_acmd_pubeq atkst isatk l oc s1 s2 :
     l ⊢ oc ->
-    conf_safe_oc oc ->
+    oapp extract_controlled_declassify None oc = None ->
     ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
     post_cmd_action adv atkst
       (optcmd_stp_store oc (if isatk then pre_cmd_action adv atkst s1 else s1)) =
     post_cmd_action adv atkst
       (optcmd_stp_store oc (if isatk then pre_cmd_action adv atkst s2 else s2)).
   Proof.
-    move=> wt cs pe. apply: post_cmd_wf.
+    move=> wt nodecl pe. apply: post_cmd_wf.
     move: (acmd_prestate_pubeq atkst isatk _ _ pe) => pe'.
-    case: oc cs wt => [c | ] //= *.
-    apply: ni_cmd_st_conf'; eauto.
+    case: oc nodecl wt => [c | ] //= *.
+    wf_finisher.
   Qed.
 
   Fact cnt_acmd_pubeq atkst isatk oc s1 s2 :
@@ -316,48 +255,30 @@ Section extract_step_commute.
               [apply: cnt_acmd_pubeq; eassumption|] ]
       end) "acmd_pubeq" old.
 
-  Lemma read_sim_none a b : read_sim None a b = a.
-  Proof. by []. Qed.
-
-  (* The simulator's controlled read (sim_step / cmbcmd_step both use read_sim).
-     When a `forall ss id, read_sim rcmd ss id = ss` hypothesis is present (the
-     core's Hread), eliminate any read_sim of rcmd or None.  This replaces the
-     syntactic `no_declassify` cook step for the assignment-like core, which must
-     also cover safe declassifies (where `~~ is_declassify` does not hold). *)
-  Ltac2 Set curr_cookbook as old :=
-    add_cookstep ltac1:(match goal with
-      | Hr : forall ss id, read_sim ?c ss id = ss |- context[read_sim ?c ?a ?b] =>
-          rewrite (Hr a b)
-      | |- context[read_sim None ?a ?b] => rewrite (read_sim_none a b)
-      end) "read_sim_elim" old.
-
-  (* The "assignment-like" commute: the reshaping that proves the step/comb_step
-     square for a head command that performs NO ideal corruption (Hcorr) and NO
-     ideal read (Hread) and preserves confidentiality (conf_safe_oc).  Every
-     non-downgrade command and every *safe* downgrade satisfies these (the safe
-     downgrades supply Hcorr/Hread via flows_to from to); the dispatcher in
-     extract_step_commute routes them here, and routes the canonical
-     (NI-violating) downgrades to extract_step_commute_downgrade. *)
-  Lemma extract_step_commute_core rst ist simst atkst rcmd ratk icmd untr pub restcmd :
-    (mk_4ptlbl untr pub) ⊢ rcmd ->
-    ⟨ rst | is_public ⟩ = ⟨ simst | is_public ⟩ ->
-    conf_safe_oc rcmd ->
-    (forall id ss, corrupt_ideal rcmd id ss = id) ->
-    (forall ss id, read_sim rcmd ss id = ss) ->
-    (step (extract_2cfg (mk_cmbstate rst ist simst atkst,
-                         mk_cmbcmd rcmd ratk icmd (mk_4ptlbl untr pub) :: restcmd))).1.1 =
-    extract_2cfg ((comb_step (mk_cmbstate rst ist simst atkst,
-                         mk_cmbcmd rcmd ratk icmd (mk_4ptlbl untr pub) :: restcmd)).1).
+  Theorem extract_step_commute c:
+    Invariant c ->
+    step (extract_2cfg c) = extract_2cfg (comb_step c).
   Proof.
-    move=> rwt pubeq csafe Hcorr Hread.
-    rewrite/comb_step/cmbcmd_step. rewrite Hcorr Hread {}/extract_2cfg. cook.
+    case: c. case=> rst ist simst atkst.
+    case=> //. case=> rcmd isatk icmd pclbl restcmd inv.
+    have [] :
+      (oapp extract_controlled_endorse None rcmd = None /\ oapp extract_controlled_declassify None rcmd = None)
+      \/ (exists x, oapp extract_controlled_endorse None rcmd = Some x \/
+                    oapp extract_controlled_declassify None rcmd = Some x);[.. |case; case; eauto using extract_step_commute_downgrade ].
+      { clear; case: rcmd=> //=; auto. case=> [ | /=|/= ]; auto. case=> *; cook; auto; case: (_ (assign _))=> *; constructor; eauto; fail. }
+    case=> noend nodecl.
+    rewrite /= in inv. move: inv=> []. (Forall_inv_toph)=> i1 restinv i3.
+    rewrite /CmbCmdInv/TypeInv in i1. case: i1=> - + _=>- [] rwt _.
+    rewrite /StateInv in i3. case: i3=> _ pubeq.
+    move: pclbl rwt.
+    case=> untr pub => rwt.
+    rewrite/comb_step/cmbcmd_step {}/extract_2cfg. cook.
     rewrite /extract_2cfg.
     rewrite/sim_active. cook.
     rewrite/step /acmd_step.  
     pattern_eq [if _ then pre_cmd_action (construct_simulator _) _ _ else ist] with ist; [| move=> ->]. (* Ninja repair *)
-      { case: (sim_active' rcmd ratk pub)=> //=.
-        rewrite /pre_cmd_action /construct_simulator /sim_pre /=.
-        case E: pub=> /=; [exact: (Hcorr ist _) | by rewrite /corrupt_ideal]. }
+      { case: sim_active'=> //; move: noend; clear. case: pub=> //.
+      rewrite/pre_cmd_action/construct_simulator/sim_pre. move=> -> //. }   (* TODO: This needs to be cook!! Why does the noend rewrite not fire.. *)
     congr (_,_,_); cook.
     - set l1 := (X in map _ X = _). set l2 := (X in _ = map _ X).
       suff: l1 = map (fun c => (real_cmd c, real_atk_bit c,  ideal_cmd c, sim_active c)) l2;
@@ -399,9 +320,9 @@ Section extract_step_commute.
         { do [move=> /negbT; rewrite negb_and negbK=> /orP] in newpce.
         case: pub in rwt newpce *; move=> /= in newpce. 
         1: move=> /=; move: newpce=> [] // ->.
-        2: erewrite ni_sec_optcmd_st_conf_atk;[|eassumption]. 
-        1-2: move=> /=; cook.
-        1-2: rewrite combine_extend3_splitl combine_extend2_same map_map.
+        2: wf_finisher_guess [post_cmd_action _ _ (optcmd_stp_store _ _)] with (post_cmd_action _ _ (if _ then _ else _))=> ->. (* How does this even work? *)
+        1-2: move=> /=; cook. 
+        1-2: rewrite combine_extend3_splitl combine_extend2_same map_map. 
         1-2: erewrite combine_extend2_map_r; [|done]; rewrite map_map.
         1-2: erewrite map_ext; [|case=> ?; instantiate (1 := (fun '(_,_) => _)); reflexivity].
         1-2: apply: map_ext; case=> *; rewrite/sim_active'; cook. }
@@ -433,10 +354,8 @@ Section extract_step_commute.
         rewrite combine_extend3_nil1 combine_extend2_nil_r !map_map filter_map_swap. cook.
         unshelve erewrite filter_ext; [exact xpred0|apply filter_false|]. cook. }
       rewrite/sim_step /=; cnstrct_eq_gl; cook.
-        { case: pub rwt => rwt /=; cook. (* TODO: This should be automated *)
-           { erewrite ni_optcmd_st_conf_atk'; [reflexivity|..]; eauto. }
-        erewrite ni_sec_optcmd_st_conf_atk; [|eassumption]. erewrite noninterfering_post_pre; [reflexivity|]. 
-        congruence. }
+        { case: pub rwt => rwt /=; cook; congr (_.1); [wf_finisher|].
+        wf_finisher_guess [LHS] with (post_cmd_action _ _ (_ _ _ rst))=> ->. wf_finisher. } (* Classic transitivity *)
       rewrite/zip/cmd_map_sim filter_map_swap map_map. symmetry.
       erewrite map_ext; [|case; case=> * /=; instantiate (1:= fun '(_,_,_) => _); reflexivity].
       erewrite filter_ext; [|case; case=> *; rewrite /sim_active; cbn; instantiate (1:= fun '(_,_,_) => _); reflexivity].
@@ -449,7 +368,8 @@ Section extract_step_commute.
         { erewrite filter_ext; [|case; case=> ? ? ?; rewrite /sim_active' /= Bool.orb_false_r; instantiate (1 := fun '(_,_,_) => _); reflexivity].
         do [move=> /negbT; rewrite negb_and negbK=> /orP] in newpce.
         case: pub in rwt newpce *; move=> /= in newpce. 
-        2: erewrite ni_sec_optcmd_st_conf_atk; [| eassumption]=> /=; cook.
+
+        2: wf_finisher_guess [post_cmd_action _ _ (optcmd_stp_store _ _)] with (post_cmd_action _ _ (if _ then _ else _))=> -> /=; cook. (* How does this even work? *)
         1: move: newpce=> [] // ->.
         1: rewrite combine_extend2_nil_l.
         1: cook; set l1 := filter _ _; set l2 := repeat true _.
@@ -459,7 +379,8 @@ Section extract_step_commute.
         1,2: erewrite map_ext; [|case; case=> *; instantiate (1 := fun '(_, _,_)=> _); reflexivity ].
         1,2: erewrite filter_ext; [|case; case=> *; instantiate (1 := fun '(_, _,_)=> _); reflexivity ].
         1,2: enter (erewrite map_filter_combine_extend2_ind2;  only 2,3: (case=> *; instantiate (1:= fun _ => _); reflexivity); only 2: done).
-        1,2: clear; revert_hyp_pat nat; elim=> * /=; cook. rewrite map_id //. }
+        1,2: clear; revert_hyp_pat nat; elim=> * /=; cook. 
+        rewrite map_id //. }
       move: newpce rwt=> /andP [] /negbTE rcmd_grd -> rwt.
       rewrite rcmd_grd. cook.
       rewrite combine_extend3_splitr. 
@@ -474,51 +395,55 @@ Section extract_step_commute.
       erewrite filter_ext; [| move=> * /=; reflexivity].
       cnstrct_eq_gl. rewrite filter_true //.
   Qed.
+  Print Assumptions extract_step_commute.
 
-  Theorem extract_step_commute c:
+  Theorem extract_step_commute_event c:
     Invariant c ->
-    (step (extract_2cfg c)).1.1 = extract_2cfg ((comb_step c).1).
-  Proof.
-    case: c. case=> rst ist simst atkst.
-    case=> //. case=> rcmd isatk icmd pclbl restcmd inv.
-    (* extract the head typing (rwt) and the public-view equality (pubeq) from a
-       copy of the invariant; the original `inv` is kept for the canonical route. *)
-    move: (inv)=> [hfa hst].
-    move: (Forall_inv hfa); rewrite /CmbCmdInv /CmbCmdCoreInv => -[rwt _].
-    move: hst; rewrite /StateInv => -[_ pubeq].
-    case: (is_endorse_declassify_opt rcmd)=> [Hend | [Hdecl | [noend nodecl]]].
-    - (* endorse: canonical → downgrade lemma; safe → core *)
-      move: (Hend)=> /is_endorse_inv_opt [from][to] erc.
-      rewrite erc in rwt.
-      move: (rwt); rewrite WellFormedOptCmd_Some => /wf_endorse_inv [[Hpc [Hfrom Hto]] | [Hft Hpcto]].
-      + apply: extract_step_commute_downgrade; [left; exact: Hend | rewrite erc /= Hfrom Hto // | exact: inv].
-      + clear inv hfa. move: rwt Hpcto; rewrite erc; move: pclbl; case=> untr pub rwt Hpcto.
-        apply: extract_step_commute_core.
-        * exact: rwt.
-        * exact: pubeq.
-        * by [].
-        * move=> id ss; exact: (corrupt_ideal_safe_endorse from to id ss Hft).
-        * move=> ss id; apply: read_sim_nodecl=> //.
-    - (* declassify: canonical → downgrade lemma; safe → core *)
-      move: (Hdecl)=> /is_declassify_inv_opt [from][to] erc.
-      rewrite erc in rwt.
-      move: (rwt); rewrite WellFormedOptCmd_Some => /wf_declassify_inv [[Hpc [Hfrom Hto]] | [Hft Hpcto]].
-      + apply: extract_step_commute_downgrade; [right; exact: Hdecl | rewrite erc /= Hfrom Hto // | exact: inv].
-      + clear inv hfa. move: rwt Hpcto; rewrite erc; move: pclbl; case=> untr pub rwt Hpcto.
-        apply: extract_step_commute_core.
-        * exact: rwt.
-        * exact: pubeq.
-        * by rewrite /conf_safe_oc /conf_safe_cmd.
-        * move=> id ss; apply: corrupt_ideal_noend=> //.
-        * move=> ss id; exact: (read_sim_safe_declassify from to ss id Hft).
-    - (* non-downgrade → core *)
-      clear inv hfa. move: rwt; move: pclbl; case=> untr pub rwt.
-      apply: extract_step_commute_core.
-      * exact: rwt.
-      * exact: pubeq.
-      * move: nodecl; case: rcmd {rwt noend} => [c|]//; case: c => //; case=> //.
-      * move=> id ss; exact: (corrupt_ideal_noend _ id ss (negbTE noend)).
-      * move=> ss id; exact: (read_sim_nodecl _ ss id (negbTE nodecl)).
+    two_event (extract_2cfg c) = (comb_event c, comb_event c).
+  Proof. 
+    move=> cinv.
+    rewrite/two_event extract_step_commute // /comb_event.
+    set cstp := comb_step c.
+    have csinv: Invariant cstp; [exact: cfg_step_inv|].
+    case: c cinv cstp csinv. (* TODO: we lose info*)
+    rewrite/Invariant/extract_2cfg.
+    move=> ? [] // ? ? []. Forall_inv_toph.
+    rewrite cmd_map_cons=> cc1i _ cs1i []. 
+    move=> ? ? [] _ cs2i.
+    congr (_,_).
+    rewrite/event_helper.
+    cnstrct_eq_gl; cycle 1.
+      { rewrite/pre_cmd_event/construct_simulator/sim_evnt cmd_map_sim_cons -/(pre_cmd_event _)/sim_active.
+      case e: sim_active'=> //.
+      move: e=> /sim_active'_false [] -> //. }
+    pattern_eq_2 [⟨_|_⟩] [⟨_|_⟩]; [move: cs2i=> [] //|].
+    move: (X in ⟨X|_⟩)=> ? <- {cs2i}.
+    move: cc1i cs1i. rewrite/CmbCmdInv/TypeInv/StateInv. 
+    case=> + _. case. case: (pc_lbl _)=> - [] ? /= rwt=> [ |<- //].
+    move=> iwt [] *.
+    pattern_eq [LHS] with None=> [|->] ;[|pattern_eq [RHS] with None=> [|->]]=>//.
+    1: case: (ideal_cmd _) iwt => // c //= wt.
+    2: case: (real_cmd _) rwt => // c //= wt.
+    1,2: case e: c=> //. 
+    1,2: move: (wf_untr_cmd_dst_untr _ _ _ wt e).
+    1,2: rewrite -/(is_untrusted _).
+    1,2: move: (get_assign_dest _)=> > untr.
+    1,2: pattern_eq [ ⟨ _ | _ ⟩ _] with None=> [|->] //. (* TODO: Could be elsewhere *)
+    1,2: rewrite/⟨_|_⟩ /is_trusted untr //.
   Qed.
 
+  
+  Theorem extract_step_running c:
+    Invariant c ->
+    let: twocfg := extract_2cfg c  in
+    let: (lst ,_, _) := twocfg in
+    Forall (fun '(a,b)=> is_running a || is_running b) lst.
+  Proof.
+    case: c=> >. rewrite/Invariant. case=> + _.
+    rewrite/CmbCmdInv/extract_2cfg/cmd_map Forall_map.
+    apply: Forall_impl=> > [] _.
+    rewrite/ActiveInv/sim_active/sim_active'. clear.
+    case: (real_atk_bit _); case: (real_cmd _); case: (ideal_cmd _)=> * //.
+    cook.
+  Qed.
 End extract_step_commute.

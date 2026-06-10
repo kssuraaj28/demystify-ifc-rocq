@@ -14,21 +14,6 @@ Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
-
-(* A small modus-ponens combinator over Forall, used to push the per-element
-   translation through a list. (Stdlib has Forall_impl for weakening a single
-   predicate and Forall_and for pairing two, but no direct pointwise modus
-   ponens, so we spell it out.) *)
-Lemma Forall_modus {X} {f g : X -> Prop} {l} :
-  Forall (fun x => f x -> g x) l -> Forall f l -> Forall g l.
-Proof.
-  move=> Hfg Hf; elim: Hfg Hf => [|x xs Hxfg Hrest IH] Hf.
-  - constructor.
-  - constructor.
-    + exact: Hxfg (Forall_inv Hf).
-    + exact: IH (Forall_inv_tail Hf).
-Qed.
-
 (* Each variable carries a full label (c, i) ∈ P × P; attacker-independent. *)
 Class VarFullLblPrm `{!VarPrm, !PrincipalLatticePrm} := fvar_lbl : Vars -> FLabel.
 
@@ -169,10 +154,7 @@ Section ts.
   Lemma proj_adv_var (A : AttackerLabel) v : @var_lbl _ (proj_adv A) v = to4pt A (fvar_lbl v).
   Proof. exact: erefl. Qed.
 
-  (* Headline result: a full typing derivation projects to a 4-point derivation
-     for any attacker, unconditionally. A downgrade whose 4-point projection is
-     the ordinary assignment flow (from ⊑ to) becomes a harmless wf_*_safe; one
-     where from ⋢ to is the canonical real downgrade (PU→PT / ST→PT, pc=PT). *)
+  (* A full typing derivation projects to a 4-point derivation for any attacker. *)
   Theorem full_to_4pt_cmd (A : AttackerLabel) pc c :
     FullWellFormedCmd pc c ->
     @WellFormedCmd _ _ (proj_adv A) (to4pt A pc) c.
@@ -181,8 +163,8 @@ Section ts.
     - (* endorse *)
       move=> pc' from to Hce _ Hpcto Hunc.
       case Hfl: ([elaborate flows_to (to4pt A (fvar_lbl from)) (to4pt A (fvar_lbl to))]).
-      + (* harmless: from ⊑ to in the projection *)
-        apply: wf_endorse_safe; rewrite !proj_adv_var;
+      + (* harmless: from ⊑ to in the projection, an ordinary assignment flow *)
+        apply: wf_assign; rewrite /asgn_src_lbl /asgn_dst_lbl /=;
           [exact: Hfl | exact: (to4pt_mono _ _ _ Hpcto)].
       + (* canonical PU→PT, pc forced to PT *)
         move: (to4pt_endorse_canonical A (fvar_lbl from) (fvar_lbl to) Hce
@@ -193,8 +175,8 @@ Section ts.
     - (* declassify *)
       move=> pc' from to Hie _ Hpcto Hunc.
       case Hfl: ([elaborate flows_to (to4pt A (fvar_lbl from)) (to4pt A (fvar_lbl to))]).
-      + (* harmless *)
-        apply: wf_declassify_safe; rewrite !proj_adv_var;
+      + (* harmless: an ordinary assignment flow *)
+        apply: wf_assign; rewrite /asgn_src_lbl /asgn_dst_lbl /=;
           [exact: Hfl | exact: (to4pt_mono _ _ _ Hpcto)].
       + (* canonical ST→PT, pc forced to PT *)
         move: (to4pt_declassify_canonical A (fvar_lbl from) (fvar_lbl to) Hie
@@ -202,12 +184,12 @@ Section ts.
         have Hpc4 : to4pt A pc' = mk_4ptlbl false true.
         { apply: flows_to_pt. rewrite -Hto4. exact: (to4pt_mono _ _ _ Hpcto). }
         rewrite Hpc4. apply: wf_declassify; rewrite proj_adv_var; [exact: Hfrom4 | exact: Hto4].
-    - (* assign *)
+    - (* assign: the generalized wf_assign splits into a source-join flow and a pc flow *)
       move=> dst src1 src2 comp pc' Hs1 Hs2 Hpc.
-      apply: wf_assign; rewrite !proj_adv_var.
-      + exact: (to4pt_mono _ _ _ Hs1).
-      + exact: (to4pt_mono _ _ _ Hs2).
-      + exact: (to4pt_mono _ _ _ Hpc).
+      apply: wf_assign.
+      + rewrite /asgn_src_lbl /asgn_dst_lbl !proj_adv_var join_flow; apply/andP; split;
+          [exact: (to4pt_mono _ _ _ Hs1) | exact: (to4pt_mono _ _ _ Hs2)].
+      + rewrite /asgn_dst_lbl !proj_adv_var; exact: (to4pt_mono _ _ _ Hpc).
     - (* cond *)
       move=> gvar comp pc' b1 b2 _ IH1 _ IH2.
       apply: wf_cond.

@@ -1,8 +1,8 @@
 From Stdlib Require List ssreflect ssrfun ssrbool. 
 Import List ListNotations ssreflect ssrfun ssrbool.
 
-Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics Combined.
-Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics Combined Tacs.Cook.
+Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade.
+Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade Tacs.Cook.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
@@ -49,67 +49,73 @@ Section sim_constr.
          mk_simstate (init_state atk init_sv) store (map (fun c => (Some c, true)) prog).
      Dropped along with the init_state field of AdvNextStep. *)
 
-  Definition sim_step 
+  Fail Check "delete_this".
+  Definition sim_step
     (ideal_st : Store) (ocmd: option Cmd) (isatk: bool) (sim_st : Store) (ast: AtkStates):
-    (Store (* sim_st *) * AtkStates * AdvEvent * list ((option Cmd) * bool)) :=
+    (Store (* sim_st *) * AtkStates (* * AdvEvent *) * list ((option Cmd) * bool)) :=
 
     let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in
     let: sim_st := optcmd_stp_store ocmd sim_st in 
-    let: sim_st := read_sim ocmd sim_st ideal_st in (* Controlled ideal read; see Combined.read_sim *)
+    let: sim_st := if oapp extract_controlled_declassify None ocmd isn't Some (from, to) then sim_st else
+                   update_to_store sim_st to (ideal_st to) in (* Controlled ideal read *)
 
     let: post_atk := post_cmd_action atk ast sim_st in
-    let: ast := if isatk is true then post_atk.1.1 else ast in
-    let: event := if isatk is true then post_atk.1.2 else None in
+    let: ast := if isatk is true then post_atk.1 else ast in
+    (* let: event := if isatk is true then post_atk.1.2 else None in *)
     let: steps := if isatk is true then post_atk.2 else 0 in
 
 
-    let: cont_prog := if is_secret_guard ocmd is true then [] else map Some (optcmd_stp_cnt ocmd sim_st) in 
+    let: cont_prog := if is_secret_guard ocmd is true then [] else map Some (optcmd_stp_cnt ocmd sim_st) in
     let: cont_atk := repeat true steps in
     let: cont_full := combine_extend2 cont_prog cont_atk None false in
 
-    (sim_st, ast, event, cont_full).
+    (sim_st, ast (*, event *), cont_full).
 
   
+  Fail Check "delete_this".
   Definition sim_post st ideal_st :=
-    let: (mk_simstate ast sim_st prg) :=  st in 
-    if prg isn't (ocmd, isatk) :: rest then (st, None, 0) else
-    let: (sim_st, new_ast, evnt, cont) := sim_step ideal_st ocmd isatk sim_st ast in
-    (mk_simstate new_ast sim_st (cont ++ rest), evnt, length cont).
+    let: (mk_simstate ast sim_st prg) :=  st in
+    if prg isn't (ocmd, isatk) :: rest then (st (*, None *), 0) else
+    let: (sim_st, new_ast (*, evnt *), cont) := sim_step ideal_st ocmd isatk sim_st ast in
+    (mk_simstate new_ast sim_st (cont ++ rest) (*, evnt *), length cont).
 
   Definition sim_pre st ideal_st :=
-    let: (mk_simstate ast sim_st prg) :=  st in 
-    if prg isn't (ocmd, isatk) :: rest then ideal_st else 
+    let: (mk_simstate ast sim_st prg) :=  st in
+    if prg isn't (ocmd, isatk) :: rest then ideal_st else
     let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in (* There is repetition here *)
-    let: sim_st := optcmd_stp_store ocmd sim_st in 
-    if ocmd isn't Some (assign (endorse from to)) then ideal_st else
-    if (is_public from && is_untrusted from && ~~ flows_to (var_lbl from) (var_lbl to)) is false
-    then ideal_st
-    else update_to_store ideal_st from (sim_st from).
+    let: sim_st := optcmd_stp_store ocmd sim_st in
+    if oapp extract_controlled_endorse None ocmd isn't Some (from, to) then ideal_st else
+    update_to_store ideal_st from (sim_st from).
+
+  Definition sim_evnt st :=
+    let: (mk_simstate ast _ prg) := st in
+    if prg isn't (_, isatk) :: rest then None else
+    if isatk is false then None else
+    pre_cmd_event atk ast.
 
   Obligation Tactic := idtac. (* Program cases *)
-  Program Definition construct_simulator : SimStateMachine := 
+  Program Definition construct_simulator : SimStateMachine :=
     {|
       pre_cmd_action := sim_pre;
+      pre_cmd_event := sim_evnt;
       post_cmd_action := sim_post;
     |}. (* TODO: Why 11 obligations. *)
-  Next Obligation.
-    case=> ? ?; case=> [] //= [] [] // [] //= [] // ? ? *.
-    case ep: is_public=> //=.
-    case e1: is_untrusted=> //=.
-    case ef: (flows_to _ _)=> //=.
-    apply: update_storeview_nochange. rewrite /is_trusted e1 //.
+  Next Obligation. 
+    case=> ? ? [] //= - [] [] // [] // [] // *. Util.local_cook. 
+    move t: (extract_controlled_endorse _)=> t'; move: t' t; case=> // - [] >. (* this move + equation happens a lot*)
+    move/extr_endorse_eq=> [] [-> ->] [] /= *. 
+    apply: update_storeview_nochange. 
+    Util.local_cook. Attacker.local_cook.
   Qed.
 
 Import VarValStore.Notations.
-  Next Obligation.
-    case=> ? ?; case=> // - [].
+  Next Obligation. 
+    case=> ? ?; case=> // - []. 
     rewrite/sim_pre /Noninterference.Noninterfering; case; try easy.
-    case; try easy. case=> // *.
-    case ep: is_public=> //=.
-    case e1: is_untrusted=> //=.
-    case ef: (flows_to _ _)=> //=.
-    rewrite/clean_assign_stp_store.
-    move: (update_to_store (if _ then _ else _) _ _ _)=> ?.
+    case; try easy. case=> // *. 
+    Semantics.local_cook. Util.local_cook.
+    move t: (extract_controlled_endorse _)=> t'; move: t' t; case=> // - [] >. (* this move + equation happens a lot*)
+    move/extr_endorse_eq=> [] [-> ->] [] /= *. 
     auto using update_same_varval.
   Qed.
 
@@ -117,11 +123,11 @@ Import VarValStore.Notations.
     case=> ? ?; case=> // - [] [] // [] // [] //.  
     rewrite/sim_post /Noninterference.Noninterfering=> from to ? ? i1 i2 *.
     pattern_eq_2 [sim_step _ _ _ _ _] [sim_step _ _ _ _ _]=> [| ->] //.
-    rewrite/sim_step/read_sim.
-    case e: (is_secret from && is_public to)=> //=.
-    move: e => /andP[_ e].
-    suff: (i1 to = i2 to)=> [-> //|].
-    eauto using storeview_eq.
+    rewrite/sim_step. Semantics.local_cook. Util.local_cook.
+    move t: (extract_controlled_declassify _)=> t'; move: t' t; case=> // - [] vfr vto. (* This move + equn *)
+    move/extr_decl_eq=> [] [-> ->] [] /= *.
+    suff: (i1 vto = i2 vto)=> [-> //|].
+    apply: storeview_eq; eauto. Attacker.local_cook. 
   Qed.
 
   Lemma clean_cmd_stp_store_secret_guard c s :
@@ -144,3 +150,4 @@ End sim_constr.
 
 
 Ltac2 this_cookbook () := this_cookbook_ ().
+Ltac local_cook := ltac2:(cook this_cookbook).

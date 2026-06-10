@@ -17,9 +17,9 @@ Ltac2 softfail_s (fn_name: string) (s: string) := softfail_m fn_name (Message.of
 
 Tactic Notation "throw" := ltac2:(panic_s "throw" "thrown").
 
-Ltac2 one_goal_assertion (fn_name: string) :=
-  if (Int.equal (Control.numgoals()) 1) then () else
-  panic_s fn_name "Needs to run with one goal".
+Ltac2 goal_assertion (numgoals) (fn_name: string) :=
+  if (Int.equal (Control.numgoals()) numgoals) then () else
+  panic_s fn_name "Goal assertion failed". (* TODO: More information *)
  
 
 (* TODO: This file structure is ugly *)
@@ -109,7 +109,7 @@ End test.
 (* Run `t`. If it succeeds, then check goals. TODO: Reconsider Control.enter. Maybe better to pull that out? *)
 (* TODO: Is Ltac1.run tt the same as ltac1:(x |- x) tt ?*)
 #[local] Ltac2 goals_check (t : unit -> unit) (n: int) (is_le: bool) (is_hard: bool) : unit :=
-  one_goal_assertion "goals_check";
+  goal_assertion 1 "goals_check";
   t ();
   let m := Control.numgoals () in
   let tst := if is_le then (Int.le m n) else (Int.equal m n) in
@@ -168,13 +168,86 @@ Section test.
 End test.
 
 
+(* Snapshot a constr: substitute resolved evars into a standalone term that
+   doesn't reference the evar map. eval_cbn with empty flags walks the term
+   and rebuilds it through the current evar map but performs no reduction.
+   Panics if the result still has evars — that means an evar wasn't resolved
+   and the snapshot would be tied to the (rollback-able) evar map. *)
+Ltac2 clone_constr (c : constr) : constr :=
+  if Constr.has_evar c then panic_m "clone_constr" (fprintf "input has evars: %t" c) else
+  let no_red : Std.red_flags := {
+    Std.rStrength := Std.Norm;
+    Std.rBeta := false; Std.rMatch := false; Std.rFix := false;
+    Std.rCofix := false; Std.rZeta := false; Std.rDelta := false;
+    Std.rConst := []
+  } in
+  let r := Std.eval_cbn no_red c in
+  if Constr.has_evar r then panic_m "clone_constr" (fprintf "result has evars: %t !!!" r)
+  else r.
+
+
+Ltac2 Eval
+  let c := clone_constr constr:(1 + 1) in if Constr.equal c constr:(1 + 1) then () else
+  panic_s "test" "clone_constr reduced 1 + 1".
+
+Ltac2 Eval
+  let c := clone_constr constr:(1 + 1) in if Constr.equal c constr:(2) then
+  panic_s "test" "clone_constr reduced to 2" else ().
+
+Goal False.
+Proof Mode "Ltac2".
+  Ltac2 Eval let v := open_constr:(_) in
+    ltac1:(v |- unify v (5 + 5)) (Ltac1.of_constr v);
+    let c := clone_constr v in
+    if Constr.equal c constr:(5 + 5) then () else
+    panic_s "test" "clone_constr did not substitute evar".
+Abort.
+
+Section test.
+  (* Custom exception carrying a constr; lets us inspect the constr inside the
+     exn payload after the catch, with no message-rendering in between. *)
+  #[local] Ltac2 Type exn ::= [WipExn (constr)].
+
+  Goal False.
+  Proof Mode "Ltac2".
+    (* No-copy: throw the raw evar reference. After rollback the evar is
+       unresolved, so the constr in the exn must NOT equal (5 + 5). *)
+    Ltac2 Eval
+      let v := open_constr:(_) in
+      match Control.case (fun () =>
+        ltac1:(v |- unify v (5 + 5)) (Ltac1.of_constr v);
+        Control.zero (WipExn v)
+      ) with
+      | Err (WipExn c) =>
+        if Constr.equal c constr:(5 + 5) then
+          panic_m "test" (fprintf "no_copy: expected unresolved evar, got %t" c)
+        else ()
+      | _ => panic_s "test" "wrong path"
+      end.
+
+    (* Copy: clone before throwing. After rollback the snapshot survives. *)
+    Ltac2 Eval
+      let v := open_constr:(_) in
+      match Control.case (fun () =>
+        ltac1:(v |- unify v (5 + 5)) (Ltac1.of_constr v);
+        Control.zero (WipExn (clone_constr v))
+      ) with
+      | Err (WipExn c) =>
+        if Constr.equal c constr:(5 + 5) then ()
+        else panic_m "test" (fprintf "copy: expected (5 + 5), got %t" c)
+      | _ => panic_s "test" "wrong path"
+      end.
+  Abort.
+End test.
+
+
 (* The harden tactic *)
 
-#[local] Ltac2 Type exn ::= 
+#[local] Ltac2 Type exn ::=
   [ProgressWrap (exn)].
 
 #[local] Ltac2 once_hard_progress (t: unit -> unit) : unit :=
-  one_goal_assertion "once_hard_progress";
+  goal_assertion 1 "once_hard_progress";
   let t := fun () => match Control.case t with | Err e => Control.zero (ProgressWrap e) | _ => () end in
   let t := fun () => Control.progress t in
   match Control.case t with
@@ -192,7 +265,7 @@ Section test.
 End test.
 
 #[local] Ltac2 assert_no_hyp_change (t:unit -> unit) : unit :=
-  one_goal_assertion "assert_no_hyp_change";
+  goal_assertion 1 "assert_no_hyp_change";
   let hyp_eq (n1, b1, t1) (n2, b2, t2) :=
     Bool.and (Ident.equal n1 n2)
     (Bool.and
@@ -252,7 +325,7 @@ End test.
 *)
 (* TODO: This type could be made into a record  *)
 Ltac2 precise_harden (t: unit -> unit) (goals: (int * bool) option) (allow_hyps_change : bool): unit :=
-    one_goal_assertion "precise_harden";
+    goal_assertion 1 "precise_harden";
     let t := fun () => once_hard_progress t in  (* TODO: What is the correct order? *)
     let t := fun () => Control.unshelve t in  
     let t := match goals with | Some (n, b) (* is_le*) =>  fun () => goals_check t n b true | None => t end in
@@ -416,20 +489,24 @@ Module Cook.
   #[abstract] Ltac2 Type cook_tac := ((unit -> unit) * (string)).
   #[abstract] Ltac2 Type cookbook := cook_tac list.
 
-  Ltac2 create_new_cookbook () : cookbook := [].
-  Ltac2 mutable curr_cookbook () : cookbook := [].
+  Ltac2 create_new_cookbook () : cookbook := []. (* I don't  *)
 
-  Ltac2 mutable cook_debug : int := 0.
+  (* TODO: Maybe check that there is no name duplication in the future? Throw a warning if this is the case *)
+  #[local] Ltac2 add_cookstep0 (t: unit -> unit) (desc: string) (l : cookbook) : cookbook :=
+    let hardened := fun () => precise_harden t (Some (1, true)) false in
+    (hardened, desc) :: l.
 
-  (* Print [msg ()] when cook_debug is at least [lvl]. *)
-  #[local] Ltac2 cook_dbg (lvl : int) (msg : unit -> unit) : unit :=
-    if Int.ge cook_debug lvl then msg () else ().
+  (* TODO: This desc() is sus *)
+  Ltac2 Notation "add_cookstep" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
+    fun () => add_cookstep0 t (desc ()) (l ()).
+
+  #[local] Ltac2 join_cookbooks0 (l1: cookbook)(l2 : cookbook) : cookbook := List.append l1 l2.
+  Ltac2 Notation "join_cookbooks" l1(tactic(0)) l2(tactic(0)) := fun () => join_cookbooks0 (l1 ()) (l2 ()).
 
   #[local] Ltac2 print_cookbook0 (l : cookbook) : unit :=
     List.iteri (fun i p =>
       let (_, desc) := p in
       printf "%i: %s" i desc) (l).
-
   Ltac2 Notation "print_cookbook" l(tactic(0)) :=  print_cookbook0 (l ()).
 
   #[local] Ltac2 check_all_present (fn_name : string) (l : cookbook) (names : string list) : unit :=
@@ -456,69 +533,50 @@ Module Cook.
     fun () => delete0 (l ()) (names ()).
 
 
-  (* TODO: Maybe check that there is no name duplication in the future? Throw a warning if this is the case *)
-  #[local] Ltac2 append_tac0 (t: unit -> unit) (desc: string) (l : cookbook) : cookbook :=
-    let hardened := fun () => precise_harden t (Some (1, true)) false in
-    (hardened, desc) :: l.
 
-  (* TODO: This desc() is sus *)
-  Ltac2 Notation "add_cookstep" t(thunk(tactic(0))) desc(thunk(tactic(0))) l(tactic(0)) :=
-    fun () => append_tac0 t (desc ()) (l ()).
+  Ltac2 mutable cook_debug : int := 0.
+  (* Print [msg] when cook_debug is at least [lvl]. *)
+  #[local] Ltac2 cook_dbg (lvl : int) (msg : message) : unit :=
+    if Int.ge cook_debug lvl then Message.print msg else ().
 
-  (* TODO: PROOF_STYLE.md is going to be very different *)
-  #[local] Ltac2 join_cookbooks0 (l1: cookbook)(l2 : cookbook) : cookbook := List.append l1 l2.
-
-  Ltac2 Notation "join_cookbooks" l1(tactic(0)) l2(tactic(0)) := fun () => join_cookbooks0 (l1 ()) (l2 ()).
-
-  #[local] Ltac2 cook_step () : unit :=
-    one_goal_assertion "cook_step";
+  Ltac2 cook_step0 (cb : cookbook) : unit :=
+    goal_assertion 1 "cook_step";
     let rec go i l :=
       match l with
       | [] => softfail_s "cook_step" "all tactics failed"
       | (t, desc) :: rest =>
-        cook_dbg 2 (fun () => printf "Trying: cook_step[%i]: %s" i desc);
+        cook_dbg 2 (fprintf "Trying: cook_step[%i]: %s" i desc);
         match Control.case t with
-        | Val ((),_) => cook_dbg 1 (fun () => printf "cook_step[%i]: %s success" i desc)
+        | Val ((),_) => cook_dbg 1 (fprintf "cook_step[%i]: %s success" i desc)
         | Err e =>
-            cook_dbg 3 (fun () => printf "cook_step[%i]: %s failed: %a" i desc (fun () e' => Message.of_exn e') e);
+            cook_dbg 3 (fprintf "cook_step[%i]: %s failed: %a" i desc (fun () e' => Message.of_exn e') e);
             go (Int.add i 1) rest
         end
       end in
-    go 0 (curr_cookbook ()).
-
-  Tactic Notation "cook_step" := ltac2:(cook_step ()).
-
-  (* 
-    - Singleton hintdatabase with cook_step. 
-    Clients are not allowed to touch this database
-  *)
-  Create HintDb cook_step. (* TODO: Does #[local] help *)
-  Hint Extern 100  => cook_step: cook_step.
+    go 0 cb.
 
   (* For every focused goal, it runs cook_step one by one. (dfs strategy).
      Panics if no cook_step ever succeeded. *)
-  #[local] Ltac2 cook () : unit :=
+  Ltac2 cook0 (cb : cookbook) : unit :=
     let rec go (acc : bool) : bool :=
       let gls := Control.numgoals () in
-      cook_dbg 1 (fun () => printf "cook: numgoals = %i" gls);
+      cook_dbg 1 (fprintf "cook: numgoals = %i" gls);
       if Int.equal gls 0 then acc else
 
       let this := Control.focus 1 1 (fun () =>
-        match Control.case (fun () => cook_step ()) with
+        match Control.case (fun () => cook_step0 cb) with
         | Val ((), _) => true
         | Err _ =>
-              cook_dbg 2 (fun () => printf "cook: cook_step failed, shelving goal");
+              cook_dbg 2 (fprintf "cook: cook_step failed, shelving goal");
               Control.shelve (); false
         end) in
       go (Bool.or acc this) in
     if unshelve (go false) then () else panic_s "cook" "no progress".
 
-  Tactic Notation "cook" := ltac2:(cook ()).
-
-  (* TODO: You need to have a lot of tests here.. TODO: Maybe claude can help *)
+  Ltac2 Notation "cook_step" cb(tactic(0)) := cook_step0 (cb ()).
+  Ltac2 Notation "cook" cb(tactic(0)) := cook0 (cb ()).
 
 End Cook.
-
 Section usage.
   Import Cook.
   Ltac2 mutable db := create_new_cookbook.
@@ -532,17 +590,14 @@ Section test.
   Import Cook.
 
   Section progfail.
-    Ltac2 this_cookbook_ :=
-      add_cookstep ltac1:(idtac) "dummy" create_new_cookbook.
-    Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()). (* Maybe keep only 1 *)
-    Goal False. Proof. Fail cook.  Abort.
+    Ltac2 this_cookbook_ :=  add_cookstep ltac1:(idtac) "dummy" create_new_cookbook.
+    Goal False. Proof. Fail ltac2:(cook (this_cookbook_ )).  Abort.
   End progfail.
 
   (* clears hyp *)
   Section bad_cook.
     Ltac2 this_cookbook_ :=
       add_cookstep ltac1:(lazymatch goal with H: True |- _ => clear H end ) "dummy" create_new_cookbook.
-    Ltac2 Set curr_cookbook := (fun () => this_cookbook_ ()). (* Maybe keep only 1 *)
-    Goal True -> False. Proof. move=> *. Fail cook.  Abort.
+    Goal True -> False. Proof. move=> *. Fail ltac2:(cook this_cookbook_). Abort.
   End bad_cook.
 End test.

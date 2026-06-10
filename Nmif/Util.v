@@ -57,7 +57,7 @@ Ltac2 Set this_cookbook_ as old :=
     end) "bool_canonicalize" old.
 
 Section test.
-  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["bool_canonicalize"]) ().
+  Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["bool_canonicalize"]) ).
 
   Goal forall b, b = true -> b = true.
   Proof. move=> b H. cook. exact: H. Abort.
@@ -79,7 +79,7 @@ Section test.
 End test.
 
 Section test.
-  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["cnstr_eq_simpl"]) ().
+  Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["cnstr_eq_simpl"])).
   Goal forall n m, S n = S m.
   Proof. move=> *. cook. Abort.
   Goal forall A (x y: A) (l: list A), x :: l = y :: l.
@@ -416,6 +416,19 @@ Module List.
     apply: map_ext. case=> [[a b] [d c]] //.
   Qed.
 
+  Lemma combine_extend4_split22 {A B C D}
+    (la : list A) (lb : list B) (lc : list C) (ld : list D) da db dc dd :
+    combine_extend4 la lb lc ld da db dc dd =
+    map (fun '((a, b), (c, d)) => (a, b, c, d))
+      (combine_extend2 (combine_extend2 la lb da db)
+                       (combine_extend2 lc ld dc dd)
+                       (da, db) (dc, dd)).
+  Proof.
+    rewrite /combine_extend4 /combine_extend3.
+    rewrite combine_extend2_assoc.
+    apply: map_ext. case=> [[? ?] [? ?]] //.
+  Qed.
+
 
   Lemma Forall_combine2_ind1 :
      forall {A B} P l1 l2 (d1:A) (d2:B) Q,
@@ -479,9 +492,48 @@ Module List.
       by apply: Forall_cons; [|apply: IH].
   Qed.
 
-  Ltac2 Set this_cookbook_ as old := add_cookstep 
-    ltac1:(lazymatch goal with |- Forall _ (combine_extend2 _ _ _ _) => apply:Forall_combine2_same end) 
+  Ltac2 Set this_cookbook_ as old := add_cookstep
+    ltac1:(lazymatch goal with |- Forall _ (combine_extend2 _ _ _ _) => apply:Forall_combine2_same end)
     "Forall_combine2_same" old.
+
+  Lemma Forall_combine2_disj {A B}
+    (Pa : A -> Prop) (Pb : B -> Prop)
+    (la : list A) (lb : list B) (da : A) (db : B) :
+    Forall Pa la -> Forall Pb lb ->
+    Forall (fun '(a, b) => Pa a \/ Pb b) (combine_extend2 la lb da db).
+  Proof.
+    elim: la lb => [|h1 t1 IH] [|h2 t2] HPa HPb /=.
+    - apply: Forall_nil.
+    - apply: Forall_cons; [right; exact: Forall_inv HPb|].
+      move: (Forall_inv_tail HPb)=> {}HPb.
+      elim: t2 HPb => [|h t IHt] HPb /=.
+      + apply: Forall_nil.
+      + apply: Forall_cons; [right; exact: Forall_inv HPb|].
+        apply: IHt; exact: Forall_inv_tail HPb.
+    - apply: Forall_cons; [left; exact: Forall_inv HPa|].
+      move: (Forall_inv_tail HPa)=> {}HPa. clear IH.
+      elim: t1 HPa => [|h t IHt] HPa /=.
+      + apply: Forall_nil.
+      + apply: Forall_cons; [left; exact: Forall_inv HPa|].
+        apply: IHt; exact: Forall_inv_tail HPa.
+    - apply: Forall_cons; [left; exact: Forall_inv HPa|].
+      apply: IH; [exact: Forall_inv_tail HPa | exact: Forall_inv_tail HPb].
+  Qed.
+
+  Lemma Forall_combine3_disj {A B C}
+    (Pa : A -> Prop) (Pb : B -> Prop) (Pc : C -> Prop)
+    (la : list A) (lb : list B) (lc : list C) (da : A) (db : B) (dc : C) :
+    Forall Pa la -> Forall Pb lb -> Forall Pc lc ->
+    Forall (fun '(a, b, c) => Pa a \/ Pb b \/ Pc c)
+      (combine_extend3 la lb lc da db dc).
+  Proof.
+    rewrite /combine_extend3 => HPa HPb HPc.
+    apply: Forall_impl;
+      last apply: (Forall_combine2_disj (fun '(a, b) => Pa a \/ Pb b) Pc _ lc (da, db) dc).
+    - case=> [[? ?] ?] /= [|]; tauto.
+    - exact: Forall_combine2_disj.
+    - exact: HPc.
+  Qed.
 
   Ltac Forall_inv_toph :=  (move=>/[dup] /(@Forall_inv _ _ _) + /(@Forall_inv_tail _ _ _)).
   Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(Forall_inv_toph) "Forall_inv" old.
@@ -490,7 +542,7 @@ Module List.
     Goal forall (P: nat -> Prop) (x: nat) l, Forall P (x :: l) -> P x.
     Proof. move=> P x l. Forall_inv_toph. done. Abort.
 
-    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["Forall_inv"]) ().
+    Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["Forall_inv"])).
     Goal forall (P: nat -> Prop) (x: nat) l, Forall P (x :: l) -> P x.
     Proof. move=> P x l. cook. Abort.
   End test.
@@ -521,7 +573,7 @@ Module List.
     "eq_map_nil" old.
 
   Section test.
-    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["eq_app_nil"]) ().
+    Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["eq_app_nil"])).
     Goal forall A (y l: list A), y = l ++ y.
     Proof. move=> A y l. cook. Abort.
     Goal forall A (y l: list A), l ++ y = y.
@@ -533,7 +585,7 @@ Module List.
   End test.
 
   Section test.
-    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["eq_map_nil"]) ().
+    Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["eq_map_nil"])).
     Goal forall A B (f: A -> B) (l: list A), map f l = [].
     Proof. move=> *. cook. Abort.
     Goal forall A B (f: A -> B) (l: list A), [] = map f l.
@@ -550,7 +602,7 @@ Module List.
     "eq_app_peel" old.
 
   Section test.
-    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["eq_app_peel"]) ().
+    Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["eq_app_peel"])).
     Goal forall A (a b y: list A), a ++ y = b ++ y.
     Proof. move=> A a b y. cook. Abort.
     Goal forall A (a b y: list A), y ++ a = y ++ b.
@@ -561,13 +613,13 @@ Module List.
   Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> repeat_length) "repeat_length" old.
 
   Section test.
-    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["length_map"]) ().
+    Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["length_map"])).
     Goal forall A B (f: A -> B) (l: list A), length (map f l) = length l.
     Proof. move=> *. cook. Abort.
   End test.
 
   Section test.
-    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["repeat_length"]) ().
+    Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["repeat_length"])).
     Goal forall A (x: A) n, length (repeat x n) = n.
     Proof. move=> *. cook. Abort.
   End test.
@@ -579,12 +631,13 @@ Module List.
   Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> filter_id_repeat_true) "filter_id_repeat_true" old.
 
   Section test.
-    Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["filter_id_repeat_true"]) ().
+    Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["filter_id_repeat_true"])).
     Goal forall n, filter id (repeat true n) = repeat true n.
     Proof. move=> *. cook. Abort.
   End test.
 
   Ltac2 this_cookbook () := this_cookbook_ ().
+  Ltac local_cook := ltac2:(cook this_cookbook).
   Hint Extern 10 => lazymatch goal with _ =>  apply/Forall_forall end : trickbag.
 End List.
 
@@ -605,26 +658,63 @@ End test.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(if_easy_goals) "if_easy_goals" old.
 
   
-Ltac2 Set this_cookbook_ as old := 
-  add_cookstep  
-    ltac1:(match goal with  
-           | H: ?x = ?b |- context [if ?x then _ else _] => is_constructor b; pattern x; rewrite H
-           | H: ?b = ?x |- context [if ?x then _ else _] => is_constructor b; pattern x; rewrite -H
-           end)
-    "if_w_hyp_eq" old.
+Ltac2 match_w_hyp_eq () : unit :=
+  let is_head_ctor (c : constr) : bool :=
+    match Constr.Unsafe.kind (head c) with
+    | Constr.Unsafe.Constructor _ _ => true
+    | _ => false
+    end in
+  match! goal with
+  | [ h : ?x = ?b |- context [match ?x with _ => _ end] ] =>
+    if is_head_ctor b
+    then let eq := Control.hyp h in pattern $x; rewrite -> $eq
+    else softfail_s "match_w_hyp_eq" "head not constructor"
+  | [ h : ?b = ?x |- context [match ?x with _ => _ end] ] =>
+    if is_head_ctor b
+    then let eq := Control.hyp h in pattern $x; rewrite <- $eq
+    else softfail_s "match_w_hyp_eq" "head not constructor"
+  end.
+
+Ltac match_w_hyp_eq := ltac2:(match_w_hyp_eq ()).
+
+Ltac2 Set this_cookbook_ as old :=
+  add_cookstep ltac1:(match_w_hyp_eq) "match_w_hyp_eq" old.
 
 Section test.
-  Ltac2 Set curr_cookbook := fun () => (keep_only this_cookbook_ ["if_w_hyp_eq"]) ().
-  Ltac2 Eval print_cookbook curr_cookbook.
-  Ltac2 Set cook_debug := 2.
+  Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["match_w_hyp_eq"])).
+
   Goal forall b, b = true -> if b then True else False.
-  Proof. 
-    move=> *.
-    cook. Undo.
-    Succeed now cook. 
-  Abort.
+  Proof. move=> b ?. cook. Undo. Succeed now cook. Abort.
+
+  Goal forall b, true = b -> if b then True else False.
+  Proof. move=> b ?. cook. Abort.
+
+  Goal forall b, b = false -> if b then False else True.
+  Proof. move=> b ?. cook. Abort.
+
+  Goal forall (o : option nat), o = Some 0 -> match o with Some _ => True | None => False end.
+  Proof. move=> o ?. cook. Abort.
+
+  Goal forall (o : option nat), Some 0 = o -> match o with Some _ => True | None => False end.
+  Proof. move=> o ?. cook. Abort.
+
+  Goal forall (o : option nat), o = None -> match o with Some _ => False | None => True end.
+  Proof. move=> o ?. cook. Abort.
+
+  Goal forall (n : nat), n = S 3 -> match n with S _ => True | O => False end.
+  Proof. move=> n ?. cook. Abort.
+
+  Goal forall (b1 b2 : bool), b1 = b2 -> if b1 then b2 = true else b2 = false.
+  Proof. move=> b1 b2 ?. Fail cook. Abort.
+
+  Goal forall (f : bool -> bool) (b : bool), b = f true -> if b then True else False.
+  Proof. move=> f b ?. Fail cook. Abort.
 End test.
 
+Fact oapp_some {A B} (f: A -> B) d a: ltac2:(cbn_eq (oapp f d (Some a))). Proof. done. Qed.
+Fact oapp_none {A B} (f: A -> B) d: ltac2:(cbn_eq (oapp f d None)). Proof. done. Qed.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite ->  oapp_some) "oapp_some" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite ->  oapp_none) "oapp_none" old.
 
 (* TODO: maybe better to have  
 Example map_nil_simpl {A B} (f: A -> B) := (erefl : ltac2:(cbn_eq (map f []))). 
@@ -663,6 +753,7 @@ Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> orbT) "orbT" o
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(done) "done" old.
 
 Ltac2 this_cookbook () := this_cookbook_ ().
+Ltac local_cook := ltac2:(cook this_cookbook).
 
 (* TODO: multimatch vs lazymatch in trickbag *)
 Hint Extern 10 => multimatch goal with H : _ = _ |- _ => rewrite H end : trickbag. (* TODO: This should go somewhere good *)

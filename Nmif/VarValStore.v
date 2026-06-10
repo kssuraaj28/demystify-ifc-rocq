@@ -116,18 +116,6 @@ Section thms.
     exact: update_same_varval.
   Qed.
 
-  (* A copy `dst := · src` preserves a view `p` as long as `src` is in the view
-     whenever `dst` is (the integrity/confidentiality flow of a safe assignment /
-     safe downgrade). Generalises update_to_store_storeview_eq by case-splitting
-     on whether the destination is observed. *)
-  Lemma update_from_storeview_eq (p: pred Vars) from to s1 s2:
-    (p to -> p from) ->
-    ⟨ s1 | p ⟩ = ⟨ s2 | p ⟩ ->
-    ⟨ update_to_store s1 to (s1 from) | p ⟩ = ⟨ update_to_store s2 to (s2 from) | p ⟩.
-  Proof.
-    move=> Himp peq. case pt: (p to); [| rewrite !update_storeview_nochange //].
-    apply: update_to_store_storeview_eq; [exact: (Himp pt) | exact: peq].
-  Qed.
 End thms.
 
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> update_shadow) "update_shadow" old.

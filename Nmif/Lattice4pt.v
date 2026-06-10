@@ -2,8 +2,8 @@ Require ssreflect ssrbool.
 Import ssreflect ssrbool.
 
 From Ltac2 Require Import Ltac2.
-Require Tacs.
-Import Tacs Tacs.Cook.
+Require Tacs Util.
+Import Tacs Tacs.Cook Util.DecEq.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
@@ -31,6 +31,21 @@ Section var_lbl.
   Fact public_mk u p : ltac2:(cbn_eq (public (mk_4ptlbl u p))).
   Proof. done. Qed.
 End var_lbl.
+
+Notation ptlbl := (mk_4ptlbl false true) (only parsing).   (* trusted, public *)
+Notation stlbl := (mk_4ptlbl false false) (only parsing).  (* trusted, secret *)
+Notation pulbl := (mk_4ptlbl true true) (only parsing).    (* untrusted, public *)
+Notation sulbl := (mk_4ptlbl true false) (only parsing).   (* untrusted, secret *)
+
+#[export] Instance Label_DecEq : DecEq Label.
+Proof.
+  constructor=> [[u1 p1] [u2 p2]].
+  case: (Bool.bool_dec u1 u2)=> [-> | ne_u].
+  - case: (Bool.bool_dec p1 p2)=> [-> | ne_p].
+    + left=> //.
+    + right; case=> e_p; apply: ne_p; exact e_p.
+  - right; case=> e_u _; apply: ne_u; exact e_u.
+Defined.
 
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> untrusted_mk) "untrusted_mk" old.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> public_mk) "public_mk" old.
