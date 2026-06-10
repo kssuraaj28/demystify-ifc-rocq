@@ -333,7 +333,7 @@ Section twooneextract.
     1,2: rewrite filter_false; done.
   Qed.
 
-  Lemma extract_nrun_event b ac1 ac2 rest s1 s2 :
+  Lemma extract_stutter_event b ac1 ac2 rest s1 s2 :
     ~~ is_running (if b then ac1 else ac2) ->
     extract_one_event b ((ac1, ac2) :: rest, s1, s2) = blank_event.
   Proof.
@@ -353,6 +353,33 @@ End twooneextract.
 
 (* Given a configuration, erase what  *)
 Section cfg_erase_filter.
+  Import Util.List.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates1 AtkStates2 : Type}.
+  Variable (adv1: AdvNextStep AtkStates1) (adv2: AdvNextStep AtkStates2).
+
+  Notation twostep := (twostep adv1 adv2).
+  Notation TwoCfg := (TwoCfg (AtkStates1:=AtkStates1) (AtkStates2:=AtkStates2)).
+  Notation State1 := (State (AtkStates:=AtkStates1)).
+  Notation State2 := (State (AtkStates:=AtkStates2)).
+
+(* TODO: This was copied. Maybe make it better *)
+  Notation adv b := (if b as b' return (_ (if b' then _ else _)) then adv1 else adv2).
+  Notation step_extract c b := (extract_one_cfg b (twostep c)).
+  Notation extract_step c b := (step (adv b) (extract_one_cfg b c)).
+
+  Definition erase_filter_cfg (is_left : bool) (c : TwoCfg) : TwoCfg :=
+    let: (p, st1, st2) := c in
+    (filter (fun '(c1,c2) => let c := if is_left then c1 else c2  in is_running c) p, st1, st2).
+  
+
+  Lemma erase_filter_commute b c: 
+    let: c' := erase_filter_cfg b c in
+    step_extract c' b = extract_step  c' b .
+  Proof.
+    case: c=> - [] [] *; [case: b; done|].
+  Admitted.
+
+
 End cfg_erase_filter.
 
 

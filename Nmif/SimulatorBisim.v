@@ -24,7 +24,7 @@ Section bisim.
       s1 = extract_one_cfg true (extract_2cfg cc) /\
       s2 = extract_one_cfg false (extract_2cfg cc).
 
-  Fail Check "refactor".
+  Fail Check "refactor - common extract full".
   Theorem simulator_bisim (c : Combined.Cfg (AtkStates:=AtkStates)) :
     Invariant c ->
     let: twocfg := extract_2cfg c in
@@ -71,7 +71,7 @@ Section bisim.
         move: (extract_step_cfg adv sadv true ac1 ac2 rest cs1 cs2 r1)
               (extract_step_event adv sadv true ac1 ac2 rest cs1 cs2 r1)
               (extract_stutter_cfg adv sadv false ac1 ac2 rest cs1 cs2 (negbT r2))
-              (extract_nrun_event adv sadv false ac1 ac2 rest cs1 cs2 (negbT r2))
+              (extract_stutter_event adv sadv false ac1 ac2 rest cs1 cs2 (negbT r2))
           => Sc Se SSc SSe.
         right; left; split.
         * exists (cfg_step adv cc); split; [exact: Hinv'|].
@@ -81,7 +81,7 @@ Section bisim.
         move: (extract_step_cfg adv sadv false ac1 ac2 rest cs1 cs2 r2)
               (extract_step_event adv sadv false ac1 ac2 rest cs1 cs2 r2)
               (extract_stutter_cfg adv sadv true ac1 ac2 rest cs1 cs2 (negbT r1))
-              (extract_nrun_event adv sadv true ac1 ac2 rest cs1 cs2 (negbT r1))
+              (extract_stutter_event adv sadv true ac1 ac2 rest cs1 cs2 (negbT r1))
           => Sc Se SSc SSe.
         right; right; split.
         * exists (cfg_step adv cc); split; [exact: Hinv'|].
