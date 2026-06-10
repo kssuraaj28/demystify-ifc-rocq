@@ -54,8 +54,8 @@ Section sim_restriction.
       split; inv_auto.
       rewrite -extract_step_commute ?extract_erase_commute; inv_auto.
       move: (extract_2cfg _)=> ?.
-
-      admit. }
+      rewrite extract_one_erase_idem.
+      rewrite erase_filter_step_commute. done. }
     subst inv final=> {rch} /= - []; clear cinv c.
     case=> - [? idlst ? ? lst] [].
     rewrite/Invariant=> - [] lstinv.
@@ -116,6 +116,6 @@ Section sim_restriction.
     rewrite/sim_post.
     pattern_eq_2 [sim_step _ _ _ _ _ _] [sim_step _ _ _ _ _ _]=> [|-> //].
     rewrite/sim_step decl {}dsteq //. 
-  Admitted.
+  Qed.
 
 End sim_restriction.
