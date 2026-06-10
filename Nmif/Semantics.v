@@ -364,8 +364,8 @@ Section cfg_erase_filter.
 
 (* TODO: This was copied. Maybe make it better *)
   Notation adv b := (if b as b' return (_ (if b' then _ else _)) then adv1 else adv2).
-  Notation step_extract c b := (extract_one_cfg b (twostep c)).
-  Notation extract_step c b := (step (adv b) (extract_one_cfg b c)).
+  Notation step_extract c b := (extract_one_cfg b (twostep c))(only parsing).
+  Notation extract_step c b := (step (adv b) (extract_one_cfg b c)) (only parsing).
 
   Definition erase_filter_cfg (is_left : bool) (c : TwoCfg) : TwoCfg :=
     let: (p, st1, st2) := c in
@@ -376,9 +376,16 @@ Section cfg_erase_filter.
     let: c' := erase_filter_cfg b c in
     step_extract c' b = extract_step  c' b .
   Proof.
-    case: c=> - [] [] *; [case: b; done|].
-  Admitted.
-
+    case: c=> - [].
+    case: b=> *.
+    1,2: rewrite /erase_filter_cfg. 
+    1,2: move eqn: (filter _ _)=> [| [? ?] ?] //.
+    1,2: rewrite extract_step_cfg=> //.
+    1,2: move: eqn; move: (X in filter _ X); clear. 
+    1,2: elim=> // - [] > /= ?. (* TODO: Lemma *)
+    1,2: case e: (is_running _)=> // - [] e1 e2.
+    1,2: rewrite -?e1 -?e2 //.
+  Qed.
 
 End cfg_erase_filter.
 
