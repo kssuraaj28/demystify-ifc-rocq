@@ -166,12 +166,11 @@ Section erase_extract.
 
   Notation CombCfg := (Combined.Cfg (AtkStates:= AtkStates)).
 
-  Notation test b := (if b then real_active else ideal_active).
 
-  #[refine] Definition erase_filter_cfg (is_left : bool) (c : CombCfg) : CombCfg :=
+  Definition erase_filter_cfg (is_left : bool) (c : CombCfg) : CombCfg :=
+    let test := fun c => (if is_left then real_active c else ideal_active c) in
     let: (st,cmdlst) := c in
-    (st, _).
-  Abort.
+    (st,  filter test cmdlst).
 
 End erase_extract.
 
@@ -255,7 +254,7 @@ Ltac2 this_cookbook () := this_cookbook_ ().
 Ltac local_cook := ltac2:(cook this_cookbook).
 
 Section invprf.
-  Import Attacker Util Util.List.
+  Import Util.List.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
   Variable (adv: AdvNextStep AtkStates). 
   Notation CmbState := (CmbState (AtkStates := AtkStates)).
@@ -387,3 +386,21 @@ Section invprf.
 
   Print Assumptions cfg_step_inv.
 End invprf.
+
+Section invfilter.
+  Import Util.List.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
+  Variable (adv: AdvNextStep AtkStates). 
+  Notation Cfg := (Cfg (AtkStates := AtkStates)).
+  Notation CmbState := (CmbState (AtkStates := AtkStates)).
+
+  Theorem erase_filter_inv (c :Cfg) b:
+    Invariant c ->
+    Invariant (erase_filter_cfg  b c).
+  Proof.
+    case: c=> >.
+    rewrite/Invariant/erase_filter_cfg=> - [] + + /ltac:(split;auto).
+    move=> + _. rewrite/CmbCmdInv=> ?.
+    exact: Forall_filter.
+  Qed.
+End invfilter.
