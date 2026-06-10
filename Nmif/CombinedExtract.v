@@ -5,7 +5,7 @@ From Ltac2 Require Import Ltac2.
 
 
 Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade Combined Simulator WfFinisher.
-Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade WfFinisher Tacs.Cook.
+Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade Combined Simulator WfFinisher Tacs.Cook.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!". 
@@ -16,28 +16,6 @@ Set Mangle Names. Set Mangle Names Light.
 #[local] Ltac2 mutable this_cookbook_ := create_new_cookbook.
 Ltac2 Set this_cookbook_ := create_new_cookbook.
 
-Section sim_active.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
-  Import Combined.
-
-  Definition sim_active' (rcmd: option Cmd) (ratk: bool) (is_pubpc: bool) : bool :=
-    ratk || (is_pubpc && if rcmd is None then false else true).
-
-  (* This is bidirectional; we only state/use the forward direction. *)
-  Lemma sim_active'_false rcmd ratk pub :
-    sim_active' rcmd ratk pub = false ->
-    ratk = false /\ (pub = false \/ rcmd = None).
-  Proof.
-    rewrite /sim_active'.
-    case: ratk=> //=.
-    case: pub=> //=; [| move=> _; repeat constructor; done ].
-    case: rcmd=> [c | ] //=.
-    move=> _; repeat constructor; done.
-  Qed.
-
-  Definition sim_active (c: CmbCmd) : bool :=
-    sim_active' (real_cmd c) (real_atk_bit c) (public (pc_lbl c)).
-End sim_active.
 
 Section cmd_map.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
@@ -91,7 +69,6 @@ Ltac2 Set this_cookbook_ as old :=
   add_cookstep ltac1:(rewrite -> cmd_map_sim_app ) "cmd_map_sim_app" old.
 
 Section extract.
-  Import Combined Simulator.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
 
   Notation CombCfg := (Combined.Cfg (AtkStates:= AtkStates)).
@@ -103,6 +80,7 @@ Section extract.
     let: simprog := cmd_map_sim cmblst in
     (cfg2prog, (rst, atkst), (ist, mk_simstate atkst simst simprog)).
 End extract.
+
 
 Section extract_step_commute.
   Import TypeSystem Simulator.
@@ -447,3 +425,4 @@ Section extract_step_commute.
     cook.
   Qed.
 End extract_step_commute.
+

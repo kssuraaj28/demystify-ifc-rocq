@@ -128,6 +128,52 @@ Section cmb_step.
   End step.
 End cmb_step.
 
+Section sim_active.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+
+  Definition sim_active' (rcmd: option Cmd) (ratk: bool) (is_pubpc: bool) : bool :=
+    ratk || (is_pubpc && if rcmd is None then false else true).
+
+  (* This is bidirectional; we only state/use the forward direction. *)
+  Lemma sim_active'_false rcmd ratk pub :
+    sim_active' rcmd ratk pub = false ->
+    ratk = false /\ (pub = false \/ rcmd = None).
+  Proof.
+    rewrite /sim_active'.
+    case: ratk=> //=.
+    case: pub=> //=; [| move=> _; repeat constructor; done ].
+    case: rcmd=> [c | ] //=.
+    move=> _; repeat constructor; done.
+  Qed.
+
+  Definition sim_active (c: CmbCmd) : bool :=
+    sim_active' (real_cmd c) (real_atk_bit c) (public (pc_lbl c)).
+End sim_active.
+
+Section erase_filters.
+  Context `{!VarPrm, !ValPrm}.
+  Definition real_active (c: CmbCmd) : bool := 
+    let: mk_cmbcmd rl rltak _ _ := c in
+    isSome rl || rltak.
+
+  Definition ideal_active (c: CmbCmd) : bool := 
+    let: mk_cmbcmd _ _ idl _ := c in
+    isSome idl || sim_active c.
+End erase_filters.
+
+Section erase_extract.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
+
+  Notation CombCfg := (Combined.Cfg (AtkStates:= AtkStates)).
+
+  Notation test b := (if b then real_active else ideal_active).
+
+  #[refine] Definition erase_filter_cfg (is_left : bool) (c : CombCfg) : CombCfg :=
+    let: (st,cmdlst) := c in
+    (st, _).
+  Abort.
+
+End erase_extract.
 
 Section inv.
   Import VarValStore.Notations Util.List.
@@ -194,7 +240,6 @@ Section thm.
      apply: Forall_impl; [case; case=> > h; exact h|].
      exact: ActiveInv_combine_extend3.
    Qed.
-
 End thm.
 
 Ltac2 Set this_cookbook_ as old :=

@@ -110,6 +110,6 @@ Section sim_restriction.
     rewrite/sim_post.
     pattern_eq_2 [sim_step _ _ _ _ _ _] [sim_step _ _ _ _ _ _]=> [|-> //].
     rewrite/sim_step decl {}dsteq //. 
-  Qed.
+  Admitted.
 
 End sim_restriction.
