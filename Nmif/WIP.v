@@ -37,6 +37,7 @@ Section sim_restriction.
 
   Import Util.List VarValStore.Notations.
 
+  Ltac inv_auto := auto using cfg_step_inv, erase_filter_inv.
   Lemma sim_learn_restiction c: 
     (exists comb, (Invariant comb /\ c = extract_one_cfg false (extract_2cfg comb))) ->
     idealatk_learn_restriction (construct_simulator adv) c.
@@ -47,9 +48,14 @@ Section sim_restriction.
     move=> cmd > /=. 
     set final := (X in reachable _ _ X)=> rch. 
     have: inv final.
-     { apply:reachable_invariant; [eassumption| |eassumption].
-     clear. rewrite{}/inv=> twocfg [comb [invcomb ->]].
-     admit. }
+      { apply:reachable_invariant; [eassumption| |eassumption].
+      clear. rewrite{}/inv=> twocfg [comb [invcomb ->]].
+      exists (cfg_step adv (erase_filter_cfg false comb)).
+      split; inv_auto.
+      rewrite -extract_step_commute ?extract_erase_commute; inv_auto.
+      move: (extract_2cfg _)=> ?.
+
+      admit. }
     subst inv final=> {rch} /= - []; clear cinv c.
     case=> - [? idlst ? ? lst] [].
     rewrite/Invariant=> - [] lstinv.

@@ -507,6 +507,13 @@ Module List.
       + exact: IH Pt.
   Qed.
 
+  Lemma filter_filter {A} (p q : A -> bool) l :
+    filter p (filter q l) = filter (fun x => p x && q x) l.
+  Proof.
+    elim: l => [|h t IH] //=.
+    case: (q h); rewrite /= ?andbT ?andbF -?IH //.
+  Qed.
+
   Lemma Forall_combine2_disj {A B}
     (Pa : A -> Prop) (Pb : B -> Prop)
     (la : list A) (lb : list B) (da : A) (db : B) :

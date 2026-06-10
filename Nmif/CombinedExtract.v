@@ -81,6 +81,38 @@ Section extract.
     (cfg2prog, (rst, atkst), (ist, mk_simstate atkst simst simprog)).
 End extract.
 
+Section erase_filter_commute.
+  Import Util.List.
+  Context `{!VarPrm, !ValPrm}  {AtkStates: Type}.
+  Notation extract_2cfg := (extract_2cfg (AtkStates := AtkStates)).
+  Notation comb_erase := (Combined.erase_filter_cfg (AtkStates := AtkStates)).
+  Notation twocfg_erase := (Semantics.erase_filter_cfg).
+
+  Theorem extract_erase_commute c b:
+    extract_2cfg (comb_erase b c) = twocfg_erase b (extract_2cfg c).
+  Proof.
+    case: c=> cst clst.
+    rewrite/comb_erase/twocfg_erase/extract_2cfg.
+    rewrite/cmd_map filter_map_swap.
+    cnstrct_eq_gl;Util.local_cook.
+      { congr map.
+      rewrite/is_running.
+      apply: filter_ext=> - [rl ratk idl pc].
+      case: b; Combined.local_cook. 
+        { move=> /=. rewrite -/(isSome _). (* This should be automagic *)
+        case: isSome; case: ratk=> //. }
+      move=> /=. rewrite -!/(isSome _).
+      case: isSome; case: ratk=> //;
+      case: isSome; case: (public _)=> //. }
+    rewrite/cmd_map_sim.
+    congr map. rewrite filter_filter.
+    apply: filter_ext=> ?.
+    rewrite/real_active/ideal_active.
+    rewrite/sim_active/sim_active' -!/(isSome _). (* Abuse *)
+    case: b; case: (isSome _); case: (real_atk_bit _)=> //;
+    case: (public _)=> //; case: (isSome _)=> //.
+  Qed.
+End erase_filter_commute.
 
 Section extract_step_commute.
   Import TypeSystem Simulator.

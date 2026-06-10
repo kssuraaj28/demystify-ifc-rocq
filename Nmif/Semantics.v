@@ -372,9 +372,9 @@ Section cfg_erase_filter.
     (filter (fun '(c1,c2) => let c := if is_left then c1 else c2  in is_running c) p, st1, st2).
   
 
-  Lemma erase_filter_commute b c: 
+  Lemma erase_filter_step_commute b c: 
     let: c' := erase_filter_cfg b c in
-    step_extract c' b = extract_step  c' b .
+    step_extract c' b = extract_step  c' b . (* TODO: I think that this should be c *)
   Proof.
     case: c=> - [].
     case: b=> *.
