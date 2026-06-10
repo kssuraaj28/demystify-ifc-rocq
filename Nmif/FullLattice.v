@@ -120,7 +120,7 @@ Section full_lattice.
      the attacker controls the confidentiality principal; corruptible iff it
      controls the integrity principal. *)
   Definition to4pt (A : AttackerLabel) (l : FLabel) : Lattice4pt.Label :=
-    mk_4ptlbl (atk_i A ≽ integ l) (atk_c A ≽ conf l).
+    mk_lbl (atk_i A ≽ integ l) (atk_c A ≽ conf l).
 
   Lemma to4pt_mono A l1 l2 :
     fflows_to l1 l2 -> flows_to (to4pt A l1) (to4pt A l2).
@@ -162,7 +162,7 @@ Section full_lattice.
   Lemma to4pt_endorse_canonical (A : AttackerLabel) from to :
     conf from = conf to -> uncompromised from ->
     ~~ flows_to (to4pt A from) (to4pt A to) ->
-    to4pt A from = mk_4ptlbl true true /\ to4pt A to = mk_4ptlbl false true.
+    to4pt A from = mk_lbl true true /\ to4pt A to = mk_lbl false true.
   Proof.
     move=> Hc Hunc Hnf.
     rewrite /to4pt /flows_to /= flows_to_intE flows_to_confE Hc implybb andbT negb_imply in Hnf.
@@ -180,7 +180,7 @@ Section full_lattice.
   Lemma to4pt_declassify_canonical (A : AttackerLabel) from to :
     integ from = integ to -> uncompromised from ->
     ~~ flows_to (to4pt A from) (to4pt A to) ->
-    to4pt A from = mk_4ptlbl false false /\ to4pt A to = mk_4ptlbl false true.
+    to4pt A from = mk_lbl false false /\ to4pt A to = mk_lbl false true.
   Proof.
     move=> Hi Hunc Hnf.
     rewrite /to4pt /flows_to /= flows_to_intE flows_to_confE Hi implybb andTb negb_imply in Hnf.
@@ -228,6 +228,6 @@ Section sanity.
 
   (* The projection of a public-untrusted label (true public conf, true
      untrusted integ) lands on the 4-point public-untrusted point. *)
-  Goal @to4pt bool_plat semihonest (true, true) = mk_4ptlbl true true.
+  Goal @to4pt bool_plat semihonest (true, true) = mk_lbl true true.
   Proof. exact: erefl. Qed.
 End sanity.

@@ -84,7 +84,7 @@ Arguments AdvNextStep {_ _ _ _} AtkStates.
 Ltac2 Set this_cookbook_ as old :=
   add_cookstep
     ltac1:(match goal with
-      | H: var_lbl ?x = mk_4ptlbl _ _ |- _ =>
+      | H: var_lbl ?x = mk_lbl _ _ |- _ =>
         lazymatch goal with
         | |- is_true (is_public x)       => rewrite/is_public
         | |- is_true (~~ is_public x)    => rewrite/is_public
@@ -106,33 +106,33 @@ Section test.
   Generalizable All Variables.
   Ltac cook := ltac2:(cook this_cookbook).
 
-  Goal forall x, var_lbl x = mk_4ptlbl true true -> is_public x.
+  Goal forall x, var_lbl x = mk_lbl true true -> is_public x.
   Proof. move=> x H. cook. Abort.
 
-  Goal forall x, var_lbl x = mk_4ptlbl false false -> is_secret x.
+  Goal forall x, var_lbl x = mk_lbl false false -> is_secret x.
   Proof. move=> x H. cook. Abort.
 
-  Goal forall x, var_lbl x = mk_4ptlbl false true -> is_trusted x.
+  Goal forall x, var_lbl x = mk_lbl false true -> is_trusted x.
   Proof. move=> x H. cook. Abort.
 
-  Goal forall x, var_lbl x = mk_4ptlbl true false -> is_untrusted x.
+  Goal forall x, var_lbl x = mk_lbl true false -> is_untrusted x.
   Proof. move=> x H. cook. Abort.
 
-  Goal forall x y, var_lbl x = mk_4ptlbl true false -> var_lbl y = mk_4ptlbl false true -> is_public y.
+  Goal forall x y, var_lbl x = mk_lbl true false -> var_lbl y = mk_lbl false true -> is_public y.
   Proof. move=> x y Hx Hy. cook. Abort.
 
-  Goal forall x, var_lbl x = mk_4ptlbl true true -> is_secret x -> False.
+  Goal forall x, var_lbl x = mk_lbl true true -> is_secret x -> False.
   Proof. move=> x H. Fail cook. Abort.
 
-  Goal forall x, var_lbl x = mk_4ptlbl true false -> ~~ is_public x.
+  Goal forall x, var_lbl x = mk_lbl true false -> ~~ is_public x.
   Proof. move=> x H. cook. Abort.
 
-  Goal forall x, var_lbl x = mk_4ptlbl true true -> ~~ is_trusted x.
+  Goal forall x, var_lbl x = mk_lbl true true -> ~~ is_trusted x.
   Proof. move=> x H. cook. Abort.
 
-  Goal forall x, var_lbl x = mk_4ptlbl false false -> ~~ is_untrusted x.
+  Goal forall x, var_lbl x = mk_lbl false false -> ~~ is_untrusted x.
   Proof. move=> x H. cook. Abort.
 
-  Goal forall x, var_lbl x = mk_4ptlbl false true -> ~~ is_secret x.
+  Goal forall x, var_lbl x = mk_lbl false true -> ~~ is_secret x.
   Proof. move=> x H. cook. Abort.
 End test.

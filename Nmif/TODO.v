@@ -53,8 +53,8 @@ Section ni.
 
   Lemma declassify_pubeq {AtkStates} (adv : AdvNextStep AtkStates) ast
     from to real_store ideal_store sim_store :
-    var_lbl from = mk_4ptlbl false false ->
-    var_lbl to = mk_4ptlbl false true ->
+    var_lbl from = mk_lbl false false ->
+    var_lbl to = mk_lbl false true ->
     ⟨ real_store | is_trusted ⟩ = ⟨ ideal_store | is_trusted ⟩ ->
     ⟨ real_store | is_public ⟩ = ⟨ sim_store | is_public ⟩ ->
     ⟨ update_to_store (pre_cmd_action adv ast sim_store) to (ideal_store from) | is_public ⟩ =

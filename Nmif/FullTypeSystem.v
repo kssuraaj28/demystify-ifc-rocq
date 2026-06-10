@@ -169,7 +169,7 @@ Section ts.
       + (* canonical PU→PT, pc forced to PT *)
         move: (to4pt_endorse_canonical A (fvar_lbl from) (fvar_lbl to) Hce
                  (uncompromised_join_l _ _ Hunc) (negbT Hfl)) => [Hfrom4 Hto4].
-        have Hpc4 : to4pt A pc' = mk_4ptlbl false true.
+        have Hpc4 : to4pt A pc' = mk_lbl false true.
         { apply: flows_to_pt. rewrite -Hto4. exact: (to4pt_mono _ _ _ Hpcto). }
         rewrite Hpc4. apply: wf_endorse; rewrite proj_adv_var; [exact: Hfrom4 | exact: Hto4].
     - (* declassify *)
@@ -181,7 +181,7 @@ Section ts.
       + (* canonical ST→PT, pc forced to PT *)
         move: (to4pt_declassify_canonical A (fvar_lbl from) (fvar_lbl to) Hie
                  (uncompromised_join_l _ _ Hunc) (negbT Hfl)) => [Hfrom4 Hto4].
-        have Hpc4 : to4pt A pc' = mk_4ptlbl false true.
+        have Hpc4 : to4pt A pc' = mk_lbl false true.
         { apply: flows_to_pt. rewrite -Hto4. exact: (to4pt_mono _ _ _ Hpcto). }
         rewrite Hpc4. apply: wf_declassify; rewrite proj_adv_var; [exact: Hfrom4 | exact: Hto4].
     - (* assign: the generalized wf_assign splits into a source-join flow and a pc flow *)

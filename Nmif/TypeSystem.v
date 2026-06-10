@@ -177,11 +177,11 @@ Section new_pc.
   Proof. done. Qed.
 
   Lemma compute_new_pc_secret untr c :
-    public (compute_new_pc (mk_4ptlbl untr false) c) = false.
+    public (compute_new_pc (mk_lbl untr false) c) = false.
   Proof. case: c=> // - []  *; rewrite pub_join //.  Qed.
 
   Fact compute_new_pc_opt_secret untr c :
-    public (compute_new_pc_opt (mk_4ptlbl untr false) c) = false.
+    public (compute_new_pc_opt (mk_lbl untr false) c) = false.
   Proof.
     rewrite /compute_new_pc_opt.
     case: c => [c | ] //.
@@ -205,7 +205,7 @@ Section test.
   Import Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
   Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["compute_new_pc_opt_secret"])).
-  Goal forall untr c (P: _ -> Prop), P (public (compute_new_pc_opt (mk_4ptlbl untr false) c)).
+  Goal forall untr c (P: _ -> Prop), P (public (compute_new_pc_opt (mk_lbl untr false) c)).
   Proof. move=> *. cook. Abort.
 End test.
 
@@ -270,10 +270,10 @@ Section untrusted_dst.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
 
   Lemma wf_untr_cmd_dst_untr p c a:
-    WellFormedCmd (mk_4ptlbl true p) c -> c = assign a ->
+    WellFormedCmd (mk_lbl true p) c -> c = assign a ->
     untrusted (var_lbl (get_assign_dest a)).
   Proof. 
-    move=> >; move e: (mk_4ptlbl _ _)=> ?; move:e=> /[swap].
+    move=> >; move e: (mk_lbl _ _)=> ?; move:e=> /[swap].
     case=> // > + + e1 e2. rewrite -{}e1. case: e2=> -> ?.
     move:(flows_from_untr)=> /[apply] /=.
     evar_spec_toph=> //.
@@ -285,7 +285,7 @@ Section step_soundness.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
   Lemma compute_new_pc_untr p c:
     exists p',
-      compute_new_pc (mk_4ptlbl true p) c = (mk_4ptlbl true p').
+      compute_new_pc (mk_lbl true p) c = (mk_lbl true p').
   Proof.
   case: c; eauto; cbn; case=> *.
     1-2: case: (var_lbl _) => u pg. (* TODO: This could be a lemma *)
@@ -293,7 +293,7 @@ Section step_soundness.
   Qed.
 
  Fact untr_compute_new_pc p c:
-   untrusted (compute_new_pc (mk_4ptlbl true p) c).
+   untrusted (compute_new_pc (mk_lbl true p) c).
  Proof.
    case: c=> //=; case=> * ; rewrite untr_join //.
  Qed.
@@ -313,10 +313,10 @@ Section step_soundness.
 
   Lemma step_soundness_pubuntr:
     forall c st,
-      WellFormedCmd (mk_4ptlbl true true) c ->
-      WellFormedProg (mk_4ptlbl true true) (clean_cmd_stp_cnt c st).
+      WellFormedCmd (mk_lbl true true) c ->
+      WellFormedProg (mk_lbl true true) (clean_cmd_stp_cnt c st).
   Proof.
-    rewrite/WellFormedProg=> >;  move l: (mk_4ptlbl _ _)=> ?; move: l=> /[swap].
+    rewrite/WellFormedProg=> >;  move l: (mk_lbl _ _)=> ?; move: l=> /[swap].
     case=> //= >; rewrite  -!/(WellFormedProg _ _)=>>.
     1: move=> ++ e; rewrite -{}e => *.
     2: move=> + e; rewrite -{}e => *.
@@ -336,7 +336,7 @@ Section test.
   Import Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
   Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["untr_compute_new_pc"])).
-  Goal forall p c (P : _ -> Prop), P (untrusted (compute_new_pc (mk_4ptlbl true p) c)).
+  Goal forall p c (P : _ -> Prop), P (untrusted (compute_new_pc (mk_lbl true p) c)).
   Proof. move=> *. cook. Abort.
 End test.
 

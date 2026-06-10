@@ -145,7 +145,7 @@ Section inv.
   Definition TypeInv '(rcmd, icmd,pclbl) : Prop :=
     pclbl ⊢ rcmd /\ 
     (if (untrusted pclbl) is true 
-      then (mk_4ptlbl true true) ⊢ icmd  (* icmd is still a good public untrusted *)
+      then (mk_lbl true true) ⊢ icmd  (* icmd is still a good public untrusted *)
       else rcmd = icmd). (* The rcmd is still well typed *)
 
   Definition CmbCmdInv (cmb_cmd: CmbCmd) : Prop :=
@@ -234,7 +234,7 @@ Section invprf.
     Ltac2 Eval print_cookbook curr_cookbook.
 
     Hint Extern 10 => lazymatch goal with
-           |- context [compute_new_pc (mk_4ptlbl true ?p) ?c] =>
+           |- context [compute_new_pc (mk_lbl true ?p) ?c] =>
               move: ([elaborate compute_new_pc_untr p c])=> [] + ->
            end: core.
     Hint Extern 10 => lazymatch goal with |- _ => apply:step_soundness end: core.

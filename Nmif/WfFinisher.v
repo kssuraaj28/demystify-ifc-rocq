@@ -48,11 +48,11 @@ Section ni.
   (* In a secret context, the public view is constant *)
   Lemma wf_sec_cmd_st_conf_ni:
     forall c i st,
-      WellFormedCmd (mk_4ptlbl i false) c ->
+      WellFormedCmd (mk_lbl i false) c ->
       ⟨ clean_cmd_stp_store c st | is_public ⟩ =
       ⟨ st | is_public ⟩.
   Proof. 
-    move=> >; move e: (mk_4ptlbl _ _)=> ?; move:e=> /[swap].
+    move=> >; move e: (mk_lbl _ _)=> ?; move:e=> /[swap].
     case=> //= > ++e; rewrite -{}e => *.
     rewrite update_storeview_nochange=> //.
     rewrite/is_public.
@@ -115,16 +115,16 @@ Section ni.
   Qed.
 
   Fact wf_sec_optcmd_st_conf_ni i oc s:
-    mk_4ptlbl i false ⊢ oc ->
+    mk_lbl i false ⊢ oc ->
     ⟨ optcmd_stp_store oc s | is_public ⟩ = ⟨ s | is_public ⟩.
   Proof. case: oc => //= c wf. exact: wf_sec_cmd_st_conf_ni wf. Qed.
 
   Lemma wf_untr_cmd_st_int_ni:
     forall p c st,
-    WellFormedCmd (mk_4ptlbl true p) c ->
+    WellFormedCmd (mk_lbl true p) c ->
     ⟨ clean_cmd_stp_store c st | is_trusted ⟩ = ⟨ st | is_trusted ⟩.
   Proof.
-    move=> >; move e: (mk_4ptlbl _ _)=> ?; move:e=> /[swap].
+    move=> >; move e: (mk_lbl _ _)=> ?; move:e=> /[swap].
     case=> //= > ++ /ltac:(dotop [idtac])=> <- /[swap].
     move/flows_from_untr=> /=. evar_spec_toph=> // + _.
     rewrite/asgn_dst_lbl-/(get_assign_dest _).
@@ -134,17 +134,17 @@ Section ni.
   Qed.
 
   Fact wf_untr_optcmd_st_int_ni p oc s:
-    mk_4ptlbl true p ⊢ oc ->
+    mk_lbl true p ⊢ oc ->
     ⟨ optcmd_stp_store oc s | is_trusted ⟩ = ⟨ s | is_trusted ⟩.
   Proof. case: oc => //= c wf. exact: wf_untr_cmd_st_int_ni wf. Qed.
 
   Lemma wf_tr_cmd_cnt_ni p p' c st1 st2:
-      WellFormedCmd (mk_4ptlbl false p) c ->
-      compute_new_pc (mk_4ptlbl false p) c = mk_4ptlbl false p' ->
+      WellFormedCmd (mk_lbl false p) c ->
+      compute_new_pc (mk_lbl false p) c = mk_lbl false p' ->
       ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
       clean_cmd_stp_cnt c st1 = clean_cmd_stp_cnt c st2.
   Proof. 
-    move=> >; move e: (mk_4ptlbl _ _)=> ?; move:e=> /[swap].
+    move=> >; move e: (mk_lbl _ _)=> ?; move:e=> /[swap].
     case=> // > => [++ <- | + <- ]=> * /=.
     1,2: pattern_eq_2 [X in _ = (if (_ X) then _ else _)] [X in (if (_ X) then _ else _) = _]=> [|->] //.
     1,2: apply:storeview_eq; [symmetry;eassumption | ].
@@ -251,11 +251,11 @@ Section test.
     ⟨ clean_cmd_stp_store c st1 | is_trusted ⟩ = ⟨ clean_cmd_stp_store c st2 | is_trusted ⟩.
   Proof. move=> *. wf_finisher. Qed.
 
-  Goal forall i c st, WellFormedCmd (mk_4ptlbl i false) c ->
+  Goal forall i c st, WellFormedCmd (mk_lbl i false) c ->
     ⟨ clean_cmd_stp_store c st | is_public ⟩ = ⟨ st | is_public ⟩.
   Proof. move=> *. wf_finisher. Qed.
 
-  Goal forall p c st, WellFormedCmd (mk_4ptlbl true p) c ->
+  Goal forall p c st, WellFormedCmd (mk_lbl true p) c ->
     ⟨ clean_cmd_stp_store c st | is_trusted ⟩ = ⟨ st | is_trusted ⟩.
   Proof. move=> *. wf_finisher. Qed.
 
@@ -276,13 +276,13 @@ Section test.
   Proof. move=> *. wf_finisher. Qed.
 
   Goal forall {AtkStates} (adv : AdvNextStep AtkStates) ast i oc s,
-    mk_4ptlbl i false ⊢ oc ->
+    mk_lbl i false ⊢ oc ->
     post_cmd_action adv ast (optcmd_stp_store oc s) = post_cmd_action adv ast s.
   Proof. move=> *. wf_finisher. Qed.
 
   Goal forall p p' c st1 st2,
-    WellFormedCmd (mk_4ptlbl false p) c ->
-    compute_new_pc (mk_4ptlbl false p) c = mk_4ptlbl false p' ->
+    WellFormedCmd (mk_lbl false p) c ->
+    compute_new_pc (mk_lbl false p) c = mk_lbl false p' ->
     ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
     clean_cmd_stp_cnt c st1 = clean_cmd_stp_cnt c st2.
   Proof. move=> *. wf_finisher. Qed.
@@ -380,8 +380,8 @@ Section test.
     wf_finisher. Qed.
 
   Goal forall {AtkStates} (adv : AdvNextStep AtkStates) ast p p' c s1 s2,
-    WellFormedCmd (mk_4ptlbl false p) c ->
-    compute_new_pc (mk_4ptlbl false p) c = mk_4ptlbl false p' ->
+    WellFormedCmd (mk_lbl false p) c ->
+    compute_new_pc (mk_lbl false p) c = mk_lbl false p' ->
     ⟨ s1 | is_trusted ⟩ = ⟨ s2 | is_trusted ⟩ ->
     clean_cmd_stp_cnt c (pre_cmd_action adv ast s1) = clean_cmd_stp_cnt c s2.
   Proof. move=> *. wf_finisher_guess [RHS] with _=> ->. wf_finisher. Qed.

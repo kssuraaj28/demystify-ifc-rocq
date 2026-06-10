@@ -191,7 +191,7 @@ Section extract_step_commute.
 
 (* TODO: All these need to go to TODO.v *)
   Lemma public_compute_new_pc_opt untr pub rcmd :
-    public (compute_new_pc_opt (mk_4ptlbl untr pub) rcmd) = ~~ is_secret_guard rcmd && pub.
+    public (compute_new_pc_opt (mk_lbl untr pub) rcmd) = ~~ is_secret_guard rcmd && pub.
   Proof.
     rewrite /compute_new_pc_opt /is_secret_guard.
     case: rcmd => [c | ] //=.

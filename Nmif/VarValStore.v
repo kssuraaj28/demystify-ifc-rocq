@@ -115,7 +115,6 @@ Section thms.
     have ->: s1 src = s2 src; [apply: storeview_eq; [exact: pubeq | exact: psrc] |].
     exact: update_same_varval.
   Qed.
-
 End thms.
 
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> update_shadow) "update_shadow" old.
