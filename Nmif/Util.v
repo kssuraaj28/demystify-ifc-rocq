@@ -496,6 +496,17 @@ Module List.
     ltac1:(lazymatch goal with |- Forall _ (combine_extend2 _ _ _ _) => apply:Forall_combine2_same end)
     "Forall_combine2_same" old.
 
+  Lemma Forall_filter {A} (P : A -> Prop) (f : A -> bool) l :
+    Forall P l -> Forall P (filter f l).
+  Proof.
+    elim: l => [|h t IH] HF /=.
+    - exact: Forall_nil.
+    - move: (Forall_inv HF) (Forall_inv_tail HF) => Ph Pt.
+      case: (f h).
+      + apply: Forall_cons; [exact: Ph | exact: IH Pt].
+      + exact: IH Pt.
+  Qed.
+
   Lemma Forall_combine2_disj {A B}
     (Pa : A -> Prop) (Pb : B -> Prop)
     (la : list A) (lb : list B) (da : A) (db : B) :
@@ -640,6 +651,20 @@ Module List.
   Ltac local_cook := ltac2:(cook this_cookbook).
   Hint Extern 10 => lazymatch goal with _ =>  apply/Forall_forall end : trickbag.
 End List.
+
+
+Definition reachable {State} (step : State -> State) (init final : State) : Prop :=
+  exists n, final = Nat.iter n step init.
+
+Lemma reachable_invariant {State} (step : State -> State) (Inv : State -> Prop) init :
+  Inv init ->
+  (forall c, Inv c -> Inv (step c)) ->
+  forall final, reachable step init final -> Inv final.
+Proof.
+  move=> Hinit Hstep final [n ->].
+  elim: n => [|n IH] //=.
+  exact: Hstep _ IH.
+Qed.
 
 
 (* This is a decent forward reasoning tactic *)

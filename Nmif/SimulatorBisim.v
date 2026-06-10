@@ -24,6 +24,7 @@ Section bisim.
       s1 = extract_one_cfg true (extract_2cfg cc) /\
       s2 = extract_one_cfg false (extract_2cfg cc).
 
+  Fail Check "refactor".
   Theorem simulator_bisim (c : Combined.Cfg (AtkStates:=AtkStates)) :
     Invariant c ->
     let: twocfg := extract_2cfg c in
@@ -43,26 +44,51 @@ Section bisim.
     { rewrite /extract_one_event Hev //. }
     have Hef : extract_one_event adv sadv false (extract_2cfg cc) = Combined.cmb_event adv cc.
     { rewrite /extract_one_event Hev //. }
-    case: (extract_two_one_soundness adv sadv (extract_2cfg cc) Hrun).
-    - (* match: both sides step *)
-      move=> Hm. move: (Hm true) (Hm false) => [Dtc Dte] [Dfc Dfe].
-      left. split.
-      + exists (cfg_step adv cc). split; [exact: Hinv'|].
-        split; [rewrite -Dtc Hcom // | rewrite -Dfc Hcom //].
-      + rewrite -Dte -Dfe Het Hef //.
-    - (* skip: b steps, ~~b stutters *)
-      move=> [b [[Sc Se] [SSc SSe]]].
-      case: b Sc Se SSc SSe => /= Sc Se SSc SSe.
-      + (* b = true steps, false stutters: skip_l *)
-        right; left. split.
-        * exists (cfg_step adv cc). split; [exact: Hinv'|].
+    have [cl [cs1 [cs2 Ec]]] : exists cl cs1 cs2, extract_2cfg cc = (cl, cs1, cs2).
+    { case: (extract_2cfg cc)=> [[l z1] z2]; exists l, z1, z2; reflexivity. }
+    case: cl Ec => [Ec | [ac1 ac2] rest Ec].
+    - (* empty: both terminated, match with blank events *)
+      rewrite Ec in Hcom Het Hef. rewrite Ec.
+      left; split.
+      + exists cc; split; [exact: Hinv|].
+        rewrite Ec /=; split=> //.
+      + rewrite /= //.
+    - rewrite Ec in Hcom Het Hef. rewrite Ec.
+      rewrite Ec /= in Hrun.
+      have Hor := Forall_inv Hrun.
+      case r1: (is_running ac1); case r2: (is_running ac2).
+      + (* both run: match *)
+        move: (extract_step_cfg adv sadv true ac1 ac2 rest cs1 cs2 r1)
+              (extract_step_event adv sadv true ac1 ac2 rest cs1 cs2 r1)
+              (extract_step_cfg adv sadv false ac1 ac2 rest cs1 cs2 r2)
+              (extract_step_event adv sadv false ac1 ac2 rest cs1 cs2 r2)
+          => Dtc Dte Dfc Dfe.
+        left; split.
+        * exists (cfg_step adv cc); split; [exact: Hinv'|].
+          split; [rewrite -Dtc Hcom // | rewrite -Dfc Hcom //].
+        * rewrite -Dte -Dfe Het Hef //.
+      + (* only ac1 steps: skip_l *)
+        move: (extract_step_cfg adv sadv true ac1 ac2 rest cs1 cs2 r1)
+              (extract_step_event adv sadv true ac1 ac2 rest cs1 cs2 r1)
+              (extract_stutter_cfg adv sadv false ac1 ac2 rest cs1 cs2 (negbT r2))
+              (extract_nrun_event adv sadv false ac1 ac2 rest cs1 cs2 (negbT r2))
+          => Sc Se SSc SSe.
+        right; left; split.
+        * exists (cfg_step adv cc); split; [exact: Hinv'|].
           split; [rewrite -Sc Hcom // | rewrite -Hcom SSc //].
         * rewrite -Se Het -Hef SSe //.
-      + (* b = false steps, true stutters: skip_r *)
-        right; right. split.
-        * exists (cfg_step adv cc). split; [exact: Hinv'|].
+      + (* only ac2 steps: skip_r *)
+        move: (extract_step_cfg adv sadv false ac1 ac2 rest cs1 cs2 r2)
+              (extract_step_event adv sadv false ac1 ac2 rest cs1 cs2 r2)
+              (extract_stutter_cfg adv sadv true ac1 ac2 rest cs1 cs2 (negbT r1))
+              (extract_nrun_event adv sadv true ac1 ac2 rest cs1 cs2 (negbT r1))
+          => Sc Se SSc SSe.
+        right; right; split.
+        * exists (cfg_step adv cc); split; [exact: Hinv'|].
           split; [rewrite -Hcom SSc // | rewrite -Sc Hcom //].
         * rewrite -Se Hef -Het SSe //.
+      + (* neither runs: contradicts Hrun head *)
+        move: Hor; rewrite /= r1 r2 //.
   Qed.
   Print Assumptions simulator_bisim.
 End bisim.

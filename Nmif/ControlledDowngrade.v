@@ -3,8 +3,8 @@ Import List ListNotations ssreflect ssrfun ssrbool.
 
 From Ltac2 Require Import Ltac2.
 
-Require Tacs Util VarValStore Attacker Syntax Lattice4pt.
-Import Tacs Util VarValStore Attacker Syntax Lattice4pt Tacs.Cook.
+Require Tacs Util VarValStore Attacker Syntax Lattice4pt TypeSystem.
+Import Tacs Util VarValStore Attacker Syntax Lattice4pt TypeSystem Tacs.Cook.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
@@ -69,6 +69,22 @@ Section preds.
       /\ var_lbl from = stlbl /\ var_lbl to = ptlbl.
   Proof.
     case: oc=> //= c /extr_decl_eq [-> ?]; by [].
+  Qed.
+
+  Lemma extr_decl_wf_opt c from to lbl :
+    oapp extract_controlled_declassify None c = Some (from, to) ->
+    lbl ⊢ c -> lbl = ptlbl.
+  Proof.
+    move=> /extr_decl_opt [-> [efrom eto]] wf.
+    exact: wf_declassify_pc _ _ _ efrom eto wf.
+  Qed.
+
+  Lemma extr_endorse_wf_opt c from to lbl :
+    oapp extract_controlled_endorse None c = Some (from, to) ->
+    lbl ⊢ c -> lbl = ptlbl.
+  Proof.
+    move=> /extr_endorse_opt [-> [efrom eto]] wf.
+    exact: wf_endorse_pc _ _ _ efrom eto wf.
   Qed.
 
   Fact extract_endorse_decl from to :

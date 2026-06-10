@@ -207,6 +207,7 @@ Ltac2 Set this_cookbook_ as old :=
   add_cookstep ltac1:(rewrite -> pc_lbl_mk) "pc_lbl_mk" old.
 
 Ltac2 this_cookbook () := this_cookbook_ ().
+Ltac local_cook := ltac2:(cook this_cookbook).
 
 Section invprf.
   Import Attacker Util Util.List.
