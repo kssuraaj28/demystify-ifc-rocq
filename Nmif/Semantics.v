@@ -370,9 +370,18 @@ Section cfg_erase_filter.
   Definition erase_filter_cfg (is_left : bool) (c : TwoCfg) : TwoCfg :=
     let: (p, st1, st2) := c in
     (filter (fun '(c1,c2) => let c := if is_left then c1 else c2  in is_running c) p, st1, st2).
-  
 
-  Lemma erase_filter_step_commute b c: 
+  Lemma extract_one_erase_idem b c :
+    extract_one_cfg b c = extract_one_cfg b (erase_filter_cfg b c).
+  Proof.
+    case: c => [[p st1] st2]; rewrite /extract_one_cfg /erase_filter_cfg.
+    case: b => /=; Util.local_cook.
+    1,2: rewrite !filter_map_swap.
+    1,2: rewrite filter_filter; congr map.
+    1,2: apply: filter_ext=> - [] /= *; Util.local_cook.
+  Qed.
+
+  Lemma erase_filter_step_commute b c:
     let: c' := erase_filter_cfg b c in
     step_extract c' b = extract_step  c' b . (* TODO: I think that this should be c *)
   Proof.

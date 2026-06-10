@@ -781,6 +781,7 @@ Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> andbF) "andbF"
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> andbT) "andbT" old.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> orbF) "orbF" old.
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> orbT) "orbT" old.
+Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> Bool.andb_diag) "andb_diag" old.
 
 Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(done) "done" old.
 
