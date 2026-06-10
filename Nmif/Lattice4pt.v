@@ -71,8 +71,7 @@ Definition join (l1 l2: Label) : Label :=
   let: mk_lbl untr2 pub2 := l2 in
   mk_lbl (untr1 || untr2) (pub1 && pub2). (* Is this correct?*)
 
-(* The per-component flow checks are just boolean implications. These bridges let
-   clients reason about flows_to through ==>. *)
+(* Flows to bool reflection *)
 Lemma flows_to_intE u1 u2 : flows_to_int u1 u2 = (u1 ==> u2).
 Proof. case: u1; case: u2=> //. Qed.
 
