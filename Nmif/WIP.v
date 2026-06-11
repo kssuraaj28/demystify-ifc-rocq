@@ -22,7 +22,7 @@ Section sim_restriction.
   Notation acmd_step := (acmd_step adv).
   
   #[refine] Definition idealatk_restriction: Prop :=
-    exists ast_trans : States -> Vals (* declassified value *) -> States,  
+    exists ast_trans : States -> Vals (* declassified value *) -> (States * nat),
 
     forall cmd rstcmd store ast, 
       let: acmd := mk_atkcmd true cmd in  
@@ -31,11 +31,13 @@ Section sim_restriction.
       reachable step initc c  ->
 
       (* Learner restriction *)
-      let: (_, (_, ast'), atk_substeps) := acmd_step acmd state in
+      let: atk_output := 
+         let: (_, (_, ast'), atk_substeps) := acmd_step acmd state in
+         (ast', atk_substeps) in
 
       match cmd with (* We use the same function because we want to confuse the ideal attacker *)
-      | Some (assign (declassify from to)) => ast' = ast_trans ast (store from) 
-      | _ => forall garbage, ast' = ast_trans ast garbage
+      | Some (assign (declassify from to)) => atk_output = ast_trans ast (store from) 
+      | _ => forall garbage, atk_output = ast_trans ast garbage
       end 
 
       /\
@@ -99,16 +101,17 @@ Section sim_restriction.
       exact: Forall_filter. }
     clear. case: hd=> >.
     rewrite/CmbCmdInv/TypeInv=> - [] [] ? ? _. Combined.local_cook=> asteq.
-    set simst' := sim_post _ _ _. set f_ast := f _. set cmd := (X in match X with | Some _ => _ | _ => _ end).
-    pose ctrldecl := [elaborate oapp extract_controlled_declassify None cmd].
     split. 
-    - suff:  match ctrldecl with | Some (from, to) => simst'.1 = f_ast (idlst from) | _ => forall garbage, simst'.1 = f_ast garbage  end.
+    - rewrite -surjective_pairing.
+      set simst' := sim_post _ _ _. set f_ast := f _. set cmd := (X in match X with | Some _ => _ | _ => _ end).
+      pose ctrldecl := [elaborate oapp extract_controlled_declassify None cmd].
+      suff:  match ctrldecl with | Some (from, to) => simst' = f_ast (idlst from) | _ => forall garbage, simst' = f_ast garbage  end.
         { clear. move:f f_ast simst'=> > _ >. rewrite{}/ctrldecl.
         move e: (oapp _ _ _)=> [[? ?]| ]; [|clear;case: cmd=> // - [] // [] //].
         move: e=>/extr_decl_opt=> -[] -> //. }
       rewrite {}/ctrldecl {}/cmd {}/simst' {}/f_ast {}/f.
-      instantiate (ast_trans :=( fun st val => (sim_post adv st (fun => val)).1)).
-      move is_decl : (oapp _ _ _)=> x; move: x is_decl; case=> [[src dst] ? | ? ? ]; congr _.1; rewrite {}asteq; cycle 1.
+      instantiate (ast_trans :=( fun st val => (sim_post adv st (fun => val)))).
+      move is_decl : (oapp _ _ _)=> x; move: x is_decl; case=> [[src dst] ? | ? ? ]; rewrite {}asteq; cycle 1.
         { move: (optcmd_stp_store _ _)=> ?.
         rewrite/sim_post.
         pattern_eq_2 [sim_step _ _ _ _ _ _] [sim_step _ _ _ _ _ _]=> [|-> //].
