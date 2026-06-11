@@ -48,8 +48,9 @@ Section sim_restriction.
             else update_to_store store var val in
          
         let: ast_corr_restriction :=
-          if cmd is Some (assign (endorse from to)) then True else
-          ast_corr_output = None in
+          if cmd isn't Some (assign (endorse from to)) then ast_corr_output = None else
+          if ast_corr_output is Some (var, val) then var = from else
+          True in
         ast_corr_match /\ ast_corr_restriction in
 
       learner_restriction /\ corruptor_restriction.
@@ -144,8 +145,39 @@ Section sim_restriction.
       rewrite/sim_post.
       pattern_eq_2 [sim_step _ _ _ _ _ _] [sim_step _ _ _ _ _ _]=> [|-> //].
       rewrite/sim_step decl dsteq //. 
-   - split; cycle 1.
-       {
-  Admitted.
+   - split. 
+      { rewrite/sim_pre {}asteq {}/ast_corr.
+      unshelve instantiate (ast_corr :=  _).
+        { let x := open_constr:(fun ast hd isatk sim_st => ?[ast_corr]) in 
+        refine  (fun '(mk_simstate ast sim_st prg) =>   if prg isn't (hd, isatk) :: _ then None else  x ast hd isatk sim_st ). }
+      move=> /=.
+      unshelve instantiate (ast_corr :=  _).
+        { refine (if oapp extract_controlled_endorse None hd is Some (to,from) then Some (to, ?[ast_corr]) else None); shelve.  }
+      move=> /=.
+      move endeq: (oapp extract_controlled_endorse _ _)=> [ [? ?] | //].
+      congr update_to_store. move: (if _ then _ else _)=> ?. reflexivity. } (* What did I just do lmao *)
+     set cmd := (X in match X with Some _ => _ | _ => _ end). set astcorval := (ast_corr _).
+     pose ctrlend := [elaborate oapp extract_controlled_endorse None cmd].
+     suff:  match ctrlend with 
+       | Some (from, to) => if astcorval is Some (var, _) then  var = from else  True
+       | _ => astcorval = None 
+       end; subst ctrlend astcorval.
+       { move: cmd ast_corr=> c ?; clear.
+       case: c=> // - [] // [] // >. 
+       move e: (oapp _ _ _)=> [ [? ?] | ?];[|rewrite e //].
+       move: e=> /extr_endorse_eq=> - [] [->] _ _.
+       case: (X in match X with | None => True | _ => _ end)=> // - []//. }
+     rewrite {}asteq {}/ast_corr {}/cmd /=.
+     move ende: (oapp _ _ _)=> [[? ?] | ].
+       { revert_hyp_pat [Label, (_ ⊢ _), (_ = _), (if _ then _ else _)]; clear.
+       case=> + [] //=; case; [move=> + _ _ | move=> + + e; rewrite {}e=> + ->  //].
+       move ?: (oapp _ _ _)=>  [[?] | ] //.
+       move/extr_endorse_wf_opt/[apply]=> //. }
+     pattern_eq [oapp _ _ _] with None=> [|-> //].
+     revert_hyp_pat [Label, (_ ⊢ _), (_ = _), (if _ then _ else _)]; clear.
+     case=> + [] //= => - [+ _ _| + + -> //].
+     move ?: (oapp _ _ _)=> [[?] | //].
+     move=>/extr_endorse_wf_opt /[apply] //.
+  Qed.
 
 End sim_restriction.
