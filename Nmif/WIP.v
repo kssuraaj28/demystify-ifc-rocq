@@ -26,12 +26,16 @@ Section sim_restriction.
       let: c := (((mk_atkcmd true cmd) :: rstcmd), (store,ast)) in
       reachable step initc c  ->
 
+      (* Learner restriction *)
       let: (_, (_, ast')) := step c in
-
       match cmd with (* We use the same function because we want to confuse the ideal attacker *)
       | Some (assign (declassify from to)) => ast' = ast_trans ast (store from) 
       | _ => forall garbage, ast' = ast_trans ast garbage
-      end.
+      end 
+
+      /\
+
+      False.
 End sim_restriction.
 
 Section sim_restriction.
@@ -92,35 +96,37 @@ Section sim_restriction.
     rewrite/CmbCmdInv/TypeInv=> - [] [] ? ? _. Combined.local_cook=> asteq.
     set simst' := sim_post _ _ _. set f_ast := f _. set cmd := (X in match X with | Some _ => _ | _ => _ end).
     pose ctrldecl := [elaborate oapp extract_controlled_declassify None cmd].
-    suff:  match ctrldecl with | Some (from, to) => simst'.1 = f_ast (idlst from) | _ => forall garbage, simst'.1 = f_ast garbage  end.
-      { clear. move:f f_ast simst'=> > _ >. rewrite{}/ctrldecl.
-      move e: (oapp _ _ _)=> [[? ?]| ]; [|clear;case: cmd=> // - [] // [] //].
-      move: e=>/extr_decl_opt=> -[] -> //. }
-    rewrite {}/ctrldecl {}/cmd {}/simst' {}/f_ast {}/f.
-    instantiate (ast_trans :=( fun st val => (sim_post adv st (fun => val)).1)).
-    move is_decl : (oapp _ _ _)=> x; move: x is_decl; case=> [[src dst] ? | ? ? ]; congr _.1; rewrite {}asteq; cycle 1.
-      { move: (optcmd_stp_store _ _)=> ?.
+    split. 
+    - suff:  match ctrldecl with | Some (from, to) => simst'.1 = f_ast (idlst from) | _ => forall garbage, simst'.1 = f_ast garbage  end.
+        { clear. move:f f_ast simst'=> > _ >. rewrite{}/ctrldecl.
+        move e: (oapp _ _ _)=> [[? ?]| ]; [|clear;case: cmd=> // - [] // [] //].
+        move: e=>/extr_decl_opt=> -[] -> //. }
+      rewrite {}/ctrldecl {}/cmd {}/simst' {}/f_ast {}/f.
+      instantiate (ast_trans :=( fun st val => (sim_post adv st (fun => val)).1)).
+      move is_decl : (oapp _ _ _)=> x; move: x is_decl; case=> [[src dst] ? | ? ? ]; congr _.1; rewrite {}asteq; cycle 1.
+        { move: (optcmd_stp_store _ _)=> ?.
+        rewrite/sim_post.
+        pattern_eq_2 [sim_step _ _ _ _ _ _] [sim_step _ _ _ _ _ _]=> [|-> //].
+        case pubpc: (public _)=> //.
+        rewrite/sim_step. 
+        pattern_eq [oapp extract_controlled_declassify _ _] with None=> [|-> //].
+        revert_hyp_pat (if _ then _ else _). case untr:  (untrusted _); [move=> _|move=> -> //].
+        revert_hyp_pat [Label, (public _ = _), (untrusted _ = _), (_ ⊢ _)]; clear.
+        case=> ? ? /= -> ->.
+        move e: (oapp _ _ _)=>  x; move: e; case: x=> // - [] > /extr_decl_wf_opt /[apply] //. }
+      revert_hyp_pat [Label, (_ ⊢ _), (_ = _), (if _ then _ else _)]; clear.
+      case=> - []; [move=> > _ + +  /ltac:(exfalso)=> /extr_decl_wf_opt /[apply] //|].
+      move=> ? + + /ltac:(dotop [cbn])=> -> /[swap] /[dup] + /[swap] /[dup].
+      move=> /extr_decl_wf_opt /[apply] - [] ->; clear=> wt decl.
+      set s1 := (optcmd_stp_store _ _). set s2 := (fun => idlst src).
+      have: s1 dst = s2 dst; [subst s1 s2| move: s1 s2=> ? ?].
+        { move=> /=. move: (decl) => /extr_decl_opt=> - [->] _ /=. 
+        exact:update_to_store_same. } (* Finisher? *)
+      move=> dsteq.
       rewrite/sim_post.
       pattern_eq_2 [sim_step _ _ _ _ _ _] [sim_step _ _ _ _ _ _]=> [|-> //].
-      case pubpc: (public _)=> //.
-      rewrite/sim_step. 
-      pattern_eq [oapp extract_controlled_declassify _ _] with None=> [|-> //].
-      revert_hyp_pat (if _ then _ else _). case untr:  (untrusted _); [move=> _|move=> -> //].
-      revert_hyp_pat [Label, (public _ = _), (untrusted _ = _), (_ ⊢ _)]; clear.
-      case=> ? ? /= -> ->.
-      move e: (oapp _ _ _)=>  x; move: e; case: x=> // - [] > /extr_decl_wf_opt /[apply] //. }
-    revert_hyp_pat [Label, (_ ⊢ _), (_ = _), (if _ then _ else _)]; clear.
-    case=> - []; [move=> > _ + +  /ltac:(exfalso)=> /extr_decl_wf_opt /[apply] //|].
-    move=> ? + + /ltac:(dotop [cbn])=> -> /[swap] /[dup] + /[swap] /[dup].
-    move=> /extr_decl_wf_opt /[apply] - [] ->; clear=> wt decl.
-    set s1 := (optcmd_stp_store _ _). set s2 := (fun => idlst src).
-    have: s1 dst = s2 dst; [subst s1 s2| move: s1 s2=> ? ?].
-      { move=> /=. move: (decl) => /extr_decl_opt=> - [->] _ /=. 
-      exact:update_to_store_same. } (* Finisher? *)
-    move=> dsteq.
-    rewrite/sim_post.
-    pattern_eq_2 [sim_step _ _ _ _ _ _] [sim_step _ _ _ _ _ _]=> [|-> //].
-    rewrite/sim_step decl dsteq //. 
-  Qed.
+      rewrite/sim_step decl dsteq //. 
+   - admit.
+  Admitted.
 
 End sim_restriction.
