@@ -20,9 +20,11 @@ Section sim_restriction.
 
   Notation step := (step adv).
   Notation acmd_step := (acmd_step adv).
+  Notation pre_cmd_action := (pre_cmd_action adv).
   
-  #[refine] Definition idealatk_restriction: Prop :=
-    exists ast_trans : States -> Vals (* declassified value *) -> (States * nat),
+  Definition idealatk_restriction: Prop :=
+    exists ast_trans : States -> Vals (* declassified value *) -> (States * nat) (* ast , substeps *),
+    exists ast_corr : States -> option (Vars * Vals) (* endorsed value *),
 
     forall cmd rstcmd store ast, 
       let: acmd := mk_atkcmd true cmd in  
@@ -34,16 +36,23 @@ Section sim_restriction.
         let: atk_output := 
            let: (_, (_, ast'), atk_substeps) := acmd_step acmd state in
            (ast', atk_substeps) in
-        match cmd with (* We use the same function because we want to confuse the ideal attacker *)
-        | Some (assign (declassify from to)) => atk_output = ast_trans ast (store from) 
-        | _ => forall garbage, atk_output = ast_trans ast garbage
-        end  in
+        if cmd is Some (assign (declassify from to)) then atk_output = ast_trans ast (store from) else
+        forall garbage, atk_output = ast_trans ast garbage in
       
-      let: corruptor_restriction := True in
+      let: corruptor_restriction := 
+        let: ast_corr_output := ast_corr ast in
 
+        let: ast_corr_match :=
+          pre_cmd_action ast store = 
+            if ast_corr_output isn't Some (var, val) then store 
+            else update_to_store store var val in
+         
+        let: ast_corr_restriction :=
+          if cmd is Some (assign (endorse from to)) then True else
+          ast_corr_output = None in
+        ast_corr_match /\ ast_corr_restriction in
 
       learner_restriction /\ corruptor_restriction.
-  Defined.
 End sim_restriction.
 
 Section sim_restriction.
@@ -60,7 +69,8 @@ Section sim_restriction.
   Proof.
     move=> cinv. pattern c in cinv. (* Normal rocq tactic *) revert cinv. set inv := (X in (X c) ->_)=> /= cinv.
     rewrite/idealatk_restriction. 
-    let t := open_constr:(?[ast_trans]) in pose f:= t; exists f.
+    let t := open_constr:(?[ast_trans]) in pose ast_trans:= t; exists ast_trans.
+    let t := open_constr:(?[ast_corr]) in pose ast_corr:= t; exists ast_corr.
     move=> cmd > /=. 
     set final := (X in reachable _ _ X)=> rch. 
     have: inv final.
@@ -103,13 +113,13 @@ Section sim_restriction.
     rewrite/CmbCmdInv/TypeInv=> - [] [] ? ? _. Combined.local_cook=> asteq.
     split. 
     - rewrite -surjective_pairing.
-      set simst' := sim_post _ _ _. set f_ast := f _. set cmd := (X in match X with | Some _ => _ | _ => _ end).
+      set simst' := sim_post _ _ _. set f_ast := ast_trans _. set cmd := (X in match X with | Some _ => _ | _ => _ end).
       pose ctrldecl := [elaborate oapp extract_controlled_declassify None cmd].
       suff:  match ctrldecl with | Some (from, to) => simst' = f_ast (idlst from) | _ => forall garbage, simst' = f_ast garbage  end.
-        { clear. move:f f_ast simst'=> > _ >. rewrite{}/ctrldecl.
+        { clear. move: ast_trans f_ast simst'=> > _ >. rewrite{}/ctrldecl.
         move e: (oapp _ _ _)=> [[? ?]| ]; [|clear;case: cmd=> // - [] // [] //].
         move: e=>/extr_decl_opt=> -[] -> //. }
-      rewrite {}/ctrldecl {}/cmd {}/simst' {}/f_ast {}/f.
+      rewrite {}/ctrldecl {}/cmd {}/simst' {}/f_ast {}/ast_trans.
       instantiate (ast_trans :=( fun st val => (sim_post adv st (fun => val)))).
       move is_decl : (oapp _ _ _)=> x; move: x is_decl; case=> [[src dst] ? | ? ? ]; rewrite {}asteq; cycle 1.
         { move: (optcmd_stp_store _ _)=> ?.
@@ -134,7 +144,8 @@ Section sim_restriction.
       rewrite/sim_post.
       pattern_eq_2 [sim_step _ _ _ _ _ _] [sim_step _ _ _ _ _ _]=> [|-> //].
       rewrite/sim_step decl dsteq //. 
-   - admit.
+   - split; cycle 1.
+       {
   Admitted.
 
 End sim_restriction.
