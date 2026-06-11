@@ -18,12 +18,16 @@ Section sim_restriction.
 
   Variable (adv : AdvNextStep States)  (initc : Cfg (AtkStates:= States)).
 
+  Notation step := (step adv).
+  
   Definition idealatk_learn_restriction: Prop :=
     exists ast_trans : States -> Vals (* declassified value *) -> States,  
     forall cmd rstcmd store ast, 
       let: c := (((mk_atkcmd true cmd) :: rstcmd), (store,ast)) in
-      let: (_, (_, ast')) := step adv c in
-      reachable (step adv) initc c  ->
+      reachable step initc c  ->
+
+      let: (_, (_, ast')) := step c in
+
       match cmd with (* We use the same function because we want to confuse the ideal attacker *)
       | Some (assign (declassify from to)) => ast' = ast_trans ast (store from) 
       | _ => forall garbage, ast' = ast_trans ast garbage
@@ -43,8 +47,8 @@ Section sim_restriction.
     idealatk_learn_restriction (construct_simulator adv) c.
   Proof.
     move=> cinv. pattern c in cinv. (* Normal rocq tactic *) revert cinv. set inv := (X in (X c) ->_)=> /= cinv.
-    rewrite/idealatk_learn_restriction.
-    let t := constr:( fun st val => (sim_post adv st (fun => val)).1) in pose f:= t; exists f.
+    rewrite/idealatk_learn_restriction. 
+    let t := open_constr:(?[ast_trans]) in pose f:= t; exists f.
     move=> cmd > /=. 
     set final := (X in reachable _ _ X)=> rch. 
     have: inv final.
@@ -93,6 +97,7 @@ Section sim_restriction.
       move e: (oapp _ _ _)=> [[? ?]| ]; [|clear;case: cmd=> // - [] // [] //].
       move: e=>/extr_decl_opt=> -[] -> //. }
     rewrite {}/ctrldecl {}/cmd {}/simst' {}/f_ast {}/f.
+    instantiate (ast_trans :=( fun st val => (sim_post adv st (fun => val)).1)).
     move is_decl : (oapp _ _ _)=> x; move: x is_decl; case=> [[src dst] ? | ? ? ]; congr _.1; rewrite {}asteq; cycle 1.
       { move: (optcmd_stp_store _ _)=> ?.
       rewrite/sim_post.
@@ -115,7 +120,7 @@ Section sim_restriction.
     move=> dsteq.
     rewrite/sim_post.
     pattern_eq_2 [sim_step _ _ _ _ _ _] [sim_step _ _ _ _ _ _]=> [|-> //].
-    rewrite/sim_step decl {}dsteq //. 
+    rewrite/sim_step decl dsteq //. 
   Qed.
 
 End sim_restriction.
