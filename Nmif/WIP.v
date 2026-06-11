@@ -30,19 +30,19 @@ Section sim_restriction.
       let: c := ((acmd :: rstcmd), state) in
       reachable step initc c  ->
 
-      (* Learner restriction *)
-      let: atk_output := 
-         let: (_, (_, ast'), atk_substeps) := acmd_step acmd state in
-         (ast', atk_substeps) in
+      let: learner_restriction :=
+        let: atk_output := 
+           let: (_, (_, ast'), atk_substeps) := acmd_step acmd state in
+           (ast', atk_substeps) in
+        match cmd with (* We use the same function because we want to confuse the ideal attacker *)
+        | Some (assign (declassify from to)) => atk_output = ast_trans ast (store from) 
+        | _ => forall garbage, atk_output = ast_trans ast garbage
+        end  in
+      
+      let: corruptor_restriction := True in
 
-      match cmd with (* We use the same function because we want to confuse the ideal attacker *)
-      | Some (assign (declassify from to)) => atk_output = ast_trans ast (store from) 
-      | _ => forall garbage, atk_output = ast_trans ast garbage
-      end 
 
-      /\
-
-      True.
+      learner_restriction /\ corruptor_restriction.
   Defined.
 End sim_restriction.
 
