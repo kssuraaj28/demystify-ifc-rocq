@@ -17,17 +17,19 @@ Section sim_restriction.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
 
   Variable (adv : AdvNextStep States)  (initc : Cfg (AtkStates:= States)).
+      Print step.
 
   Notation step := (step adv).
   
-  Definition idealatk_learn_restriction: Prop :=
+  #[refine] Definition idealatk_restriction: Prop :=
     exists ast_trans : States -> Vals (* declassified value *) -> States,  
     forall cmd rstcmd store ast, 
-      let: c := (((mk_atkcmd true cmd) :: rstcmd), (store,ast)) in
+      let: acmd := mk_atkcmd true cmd in 
+      let: c := ((acmd :: rstcmd), (store,ast)) in
       reachable step initc c  ->
 
       (* Learner restriction *)
-      let: (_, (_, ast')) := step c in
+      let: (_, (x, ast')) := step c in
       match cmd with (* We use the same function because we want to confuse the ideal attacker *)
       | Some (assign (declassify from to)) => ast' = ast_trans ast (store from) 
       | _ => forall garbage, ast' = ast_trans ast garbage
@@ -35,7 +37,8 @@ Section sim_restriction.
 
       /\
 
-      False.
+      True.
+  Defined.
 End sim_restriction.
 
 Section sim_restriction.
@@ -48,10 +51,10 @@ Section sim_restriction.
   Ltac inv_auto := auto using cfg_step_inv, erase_filter_inv.
   Lemma sim_learn_restiction c: 
     (exists comb, (Invariant comb /\ c = extract_one_cfg false (extract_2cfg comb))) ->
-    idealatk_learn_restriction (construct_simulator adv) c.
+    idealatk_restriction (construct_simulator adv) c.
   Proof.
     move=> cinv. pattern c in cinv. (* Normal rocq tactic *) revert cinv. set inv := (X in (X c) ->_)=> /= cinv.
-    rewrite/idealatk_learn_restriction. 
+    rewrite/idealatk_restriction. 
     let t := open_constr:(?[ast_trans]) in pose f:= t; exists f.
     move=> cmd > /=. 
     set final := (X in reachable _ _ X)=> rch. 
@@ -62,8 +65,7 @@ Section sim_restriction.
       split; inv_auto.
       rewrite -extract_step_commute ?extract_erase_commute; inv_auto.
       move: (extract_2cfg _)=> ?.
-      rewrite extract_one_erase_idem.
-      rewrite erase_filter_step_commute. done. }
+      rewrite extract_one_erase_idem erase_filter_step_commute //. }
     subst inv final=> {rch} /= - []; clear cinv c.
     case=> - [? idlst ? ? lst] [].
     rewrite/Invariant=> - [] lstinv.
