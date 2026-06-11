@@ -17,19 +17,22 @@ Section sim_restriction.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
 
   Variable (adv : AdvNextStep States)  (initc : Cfg (AtkStates:= States)).
-      Print step.
 
   Notation step := (step adv).
+  Notation acmd_step := (acmd_step adv).
   
   #[refine] Definition idealatk_restriction: Prop :=
     exists ast_trans : States -> Vals (* declassified value *) -> States,  
+
     forall cmd rstcmd store ast, 
-      let: acmd := mk_atkcmd true cmd in 
-      let: c := ((acmd :: rstcmd), (store,ast)) in
+      let: acmd := mk_atkcmd true cmd in  
+      let: state := (store, ast) in
+      let: c := ((acmd :: rstcmd), state) in
       reachable step initc c  ->
 
       (* Learner restriction *)
-      let: (_, (x, ast')) := step c in
+      let: (_, (_, ast'), atk_substeps) := acmd_step acmd state in
+
       match cmd with (* We use the same function because we want to confuse the ideal attacker *)
       | Some (assign (declassify from to)) => ast' = ast_trans ast (store from) 
       | _ => forall garbage, ast' = ast_trans ast garbage
