@@ -176,7 +176,7 @@ Section full_lattice.
   Qed.
 
   (* Dual for declassify: from ⋢ to forces secret-trusted source / public-trusted
-     target (an uncompromised source is never untrusted-and-secret). *)
+     target (an uncompromised source is never secret-untrusted). *)
   Lemma to4pt_declassify_canonical (A : AttackerLabel) from to :
     integ from = integ to -> uncompromised from ->
     ~~ flows_to (to4pt A from) (to4pt A to) ->
