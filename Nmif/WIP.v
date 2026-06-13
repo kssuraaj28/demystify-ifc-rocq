@@ -12,7 +12,7 @@ Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
 #[local] Notation Cfg := Semantics.Cfg.
-
+(*
 Section passive_corruptor.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
 
@@ -48,6 +48,8 @@ Section passive_corruptor.
 
   
 End passive_corruptor.
+*)
+
 
 Section sim_restriction.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
@@ -58,7 +60,7 @@ Section sim_restriction.
   Notation acmd_step := (acmd_step adv).
   Notation pre_cmd_action := (pre_cmd_action adv).
   
-  Definition idealatk_restriction: Prop :=
+  Definition idealcfg_restriction: Prop :=
     exists ast_trans : States -> Vals (* declassified value *) -> (States * nat) (* ast , substeps *),
     exists ast_corr : States -> option (Vars * Vals) (* endorsed value *),
 
@@ -92,7 +94,7 @@ Section sim_restriction.
       learner_restriction /\ corruptor_restriction.
 End sim_restriction.
 
-Section sim_restriction.
+Section sim_inv_restriction.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
 
   Variable (adv : AdvNextStep (AtkStates := States)).
@@ -102,10 +104,10 @@ Section sim_restriction.
   Ltac inv_auto := auto using cfg_step_inv, erase_filter_inv.
   Lemma sim_learn_restiction c: 
     (exists comb, (Invariant comb /\ c = extract_one_cfg false (extract_2cfg comb))) ->
-    idealatk_restriction (construct_simulator adv) c.
+    idealcfg_restriction (construct_simulator adv) c.
   Proof.
     move=> cinv. pattern c in cinv. (* Normal rocq tactic *) revert cinv. set inv := (X in (X c) ->_)=> /= cinv.
-    rewrite/idealatk_restriction. 
+    rewrite/idealcfg_restriction. 
     let t := open_constr:(?[ast_trans]) in pose ast_trans:= t; exists ast_trans.
     let t := open_constr:(?[ast_corr]) in pose ast_corr:= t; exists ast_corr.
     move=> cmd > /=. 
@@ -216,4 +218,24 @@ Section sim_restriction.
      move=>/extr_endorse_wf_opt /[apply] //.
   Qed.
 
+End sim_inv_restriction.
+
+Section sim_restriction.
+  Import Attacker Semantics.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+
+  Definition idealatk_restriction (p : Prog) (a : Attacker) : Prop :=
+    forall inp, idealcfg_restriction (Attacker.step a) (init_cfg p (Attacker.init a) inp).
+
+  Theorem sim_restriction p a :
+    WellFormedProg ptlbl p ->
+    idealatk_restriction p (construct_full_simulator p a).
+  Proof.
+    rewrite /idealatk_restriction /construct_full_simulator /=.
+    move=> wt inp.
+    apply: sim_learn_restiction. (* TODO: Bad name *)
+    exists (Combined.init_cfg p (Attacker.init a) inp); split; eauto using init_inv.
+    rewrite /= /cmd_map !map_map filter_map_swap /= /is_running filter_true.
+    rewrite/cmd_map_sim filter_map_swap !map_map //.
+  Qed.
 End sim_restriction.
