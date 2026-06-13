@@ -107,8 +107,8 @@ Section sim_trace_eq.
     pose cc := Combined.init_cfg p (init a) init_st.
     have ccinv: Invariant cc; eauto using init_inv.
     let t := open_constr:(_) in pattern_eq [init_cfg p (init _) _] with t=> [|->]; 
-    [|let t := open_constr:(_) in pattern_eq [init_cfg p (simulator_init p _) _] with t=> [|->]]; 
-    [..|apply/ simulator_bisim/ccinv].
+      [|let t := open_constr:(_) in pattern_eq [init_cfg p (simulator_init p _) _] with t=> [|->]]; 
+      [..|apply/simulator_bisim/ccinv].
     1,2: subst cc=> /=; clear=> /=. 
     1,2: rewrite/cmd_map/cmd_map_sim !map_map !filter_map_swap /is_running filter_true // map_map //.
   Qed.
