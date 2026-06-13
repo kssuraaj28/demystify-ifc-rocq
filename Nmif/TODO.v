@@ -13,7 +13,8 @@ Set Mangle Names. Set Mangle Names Light.
 
 Section ni.
   Import VarValStore.Notations Lattice4pt.Notations.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
+  Notation AdvNextStep := (AdvNextStep (AtkStates := AtkStates)).
 
   Lemma update_untr_keep_view s1 s2 v vl :
       is_untrusted v ->
@@ -51,7 +52,7 @@ Section ni.
     exact: update_same_varval treq.
   Qed.
 
-  Lemma declassify_pubeq {AtkStates} (adv : AdvNextStep AtkStates) ast
+  Lemma declassify_pubeq  (adv : AdvNextStep) ast
     from to real_store ideal_store sim_store :
     var_lbl from = mk_lbl false false ->
     var_lbl to = mk_lbl false true ->

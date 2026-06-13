@@ -46,6 +46,7 @@ End cmb_cmd.
 
 Section cmb_step.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
+  Notation AdvNextStep := (AdvNextStep (AtkStates := AtkStates)).
 
   Definition zip (real_cont: list Cmd) (ideal_cont: list Cmd) (atk_steps: nat) (pc_lbl: Label): list CmbCmd :=
     let: real_cont := map Some real_cont in
@@ -71,7 +72,7 @@ Section cmb_step.
 
 
   Section step.
-    Variable (adv: AdvNextStep AtkStates).
+    Variable (adv: AdvNextStep).
     Fail Check "delete_this".
     (* Notation AcmdEvent := (Semantics.Event). *)
     Notation pre_cmd_action := (pre_cmd_action adv).
@@ -178,7 +179,8 @@ Section inv.
   Import VarValStore.Notations Util.List.
 
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
-  Variable (adv: AdvNextStep AtkStates). 
+  Notation AdvNextStep := (AdvNextStep (AtkStates := AtkStates)).
+  Variable (adv: AdvNextStep). 
   Notation CmbState := (CmbState (AtkStates := AtkStates)).
   Notation Cfg := (Cfg (AtkStates := AtkStates)).
   Notation cfg_step := (cfg_step adv).
@@ -256,7 +258,9 @@ Ltac local_cook := ltac2:(cook this_cookbook).
 Section invprf.
   Import Util.List.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
-  Variable (adv: AdvNextStep AtkStates). 
+  Notation AdvNextStep := (AdvNextStep (AtkStates := AtkStates)).
+  Variable (adv: AdvNextStep).
+
   Notation CmbState := (CmbState (AtkStates := AtkStates)).
   Notation Cfg := (Cfg (AtkStates := AtkStates)).
   Notation cfg_step := (cfg_step adv).
@@ -390,9 +394,13 @@ End invprf.
 Section invfilter.
   Import Util.List.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
-  Variable (adv: AdvNextStep AtkStates). 
+
+  Notation AdvNextStep := (AdvNextStep (AtkStates := AtkStates)).
   Notation Cfg := (Cfg (AtkStates := AtkStates)).
   Notation CmbState := (CmbState (AtkStates := AtkStates)).
+
+  Variable (adv: AdvNextStep).
+
 
   Theorem erase_filter_inv (c :Cfg) b:
     Invariant c ->

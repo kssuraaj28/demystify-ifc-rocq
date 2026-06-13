@@ -117,7 +117,7 @@ End erase_filter_commute.
 Section extract_step_commute.
   Import TypeSystem Simulator.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
-  Variable adv : (AdvNextStep AtkStates).
+  Variable adv : (AdvNextStep (AtkStates :=  AtkStates)).
 
   Notation CombCfg := Combined.Cfg.
   Notation comb_step := (Combined.cfg_step adv).

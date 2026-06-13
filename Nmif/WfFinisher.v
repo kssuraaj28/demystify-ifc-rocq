@@ -234,7 +234,8 @@ Goal 5 = 5. wf_finisher.  Abort.  (* TODO!!!  assert_fails also succeeds!!  WHAT
 
 Section test.
   Import VarValStore.Notations Lattice4pt.Notations.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
+  Notation AdvNextStep := (AdvNextStep (AtkStates := AtkStates)).
 
   Goal forall l c st1 st2, WellFormedCmd l c ->
     ⟨ st1 | is_public ⟩ = ⟨ st2 | is_public ⟩ ->    extract_controlled_declassify c = None ->
@@ -259,7 +260,7 @@ Section test.
     ⟨ clean_cmd_stp_store c st | is_trusted ⟩ = ⟨ st | is_trusted ⟩.
   Proof. move=> *. wf_finisher. Qed.
 
-  Goal forall {AtkStates} (adv : AdvNextStep AtkStates) ast l c s1 s2,
+  Goal forall (adv : AdvNextStep ) ast l c s1 s2,
     WellFormedCmd l c ->
     extract_controlled_declassify c = None ->
     ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
@@ -267,7 +268,7 @@ Section test.
     post_cmd_action adv ast (clean_cmd_stp_store c (pre_cmd_action adv ast s2)).
   Proof. move=> *. wf_finisher. Qed.
 
-  Goal forall {AtkStates} (adv : AdvNextStep AtkStates) ast l oc s1 s2,
+  Goal forall (adv : AdvNextStep ) ast l oc s1 s2,
     l ⊢ oc ->
     oapp extract_controlled_declassify None oc = None ->
     ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
@@ -275,7 +276,7 @@ Section test.
     post_cmd_action adv ast (optcmd_stp_store oc (pre_cmd_action adv ast s2)).
   Proof. move=> *. wf_finisher. Qed.
 
-  Goal forall {AtkStates} (adv : AdvNextStep AtkStates) ast i oc s,
+  Goal forall  (adv : AdvNextStep) ast i oc s,
     mk_lbl i false ⊢ oc ->
     post_cmd_action adv ast (optcmd_stp_store oc s) = post_cmd_action adv ast s.
   Proof. move=> *. wf_finisher. Qed.
@@ -287,16 +288,16 @@ Section test.
     clean_cmd_stp_cnt c st1 = clean_cmd_stp_cnt c st2.
   Proof. move=> *. wf_finisher. Qed.
 
-  Goal forall {AtkStates} (adv : AdvNextStep AtkStates) ast s,
+  Goal forall  (adv : AdvNextStep) ast s,
     ⟨ pre_cmd_action adv ast s | is_trusted ⟩ = ⟨ s | is_trusted ⟩.
   Proof. move=> *. wf_finisher. Qed.
 
-  Goal forall {AtkStates} (adv : AdvNextStep AtkStates) ast s1 s2,
+  Goal forall  (adv : AdvNextStep) ast s1 s2,
     ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
     ⟨ pre_cmd_action adv ast s1 | is_public ⟩ = ⟨ pre_cmd_action adv ast s2 | is_public ⟩.
   Proof. move=> *. wf_finisher. Qed.
 
-  Goal forall {AtkStates} (adv : AdvNextStep AtkStates) ast s1 s2,
+  Goal forall  (adv : AdvNextStep) ast s1 s2,
     ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
     post_cmd_action adv ast (pre_cmd_action adv ast s1) =
     post_cmd_action adv ast (pre_cmd_action adv ast s2).
@@ -362,9 +363,10 @@ Tactic Notation "wf_finisher_guess" "[" ssrpatternarg(p) "]" "with" uconstr(u) :
 
 Section test.
   Import VarValStore.Notations Lattice4pt.Notations.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
+  Notation AdvNextStep := (AdvNextStep (AtkStates := AtkStates)).
 
-  Goal forall {AtkStates} (adv : AdvNextStep AtkStates) ast l c s1 s2,
+  Goal forall  (adv : AdvNextStep) ast l c s1 s2,
     WellFormedCmd l c ->
     extract_controlled_endorse c = None ->
     ⟨ s1 | is_trusted ⟩ = ⟨ s2 | is_trusted ⟩ ->
@@ -376,17 +378,19 @@ Section test.
     wf_finisher.
     Restart.
     move=> ????? st *.
-    wf_finisher_guess [LHS] with ⟨ clean_cmd_stp_store _ st | _ ⟩ => ->.
-    wf_finisher. Qed.
+    wf_finisher_guess [LHS] with ⟨ clean_cmd_stp_store _ _ | _ ⟩ => ->.
+    (* At c0e71ae, this was st, which breaks. TODO: Investigate later *)
+    wf_finisher.
+  Qed.
 
-  Goal forall {AtkStates} (adv : AdvNextStep AtkStates) ast p p' c s1 s2,
+  Goal forall  (adv : AdvNextStep) ast p p' c s1 s2,
     WellFormedCmd (mk_lbl false p) c ->
     compute_new_pc (mk_lbl false p) c = mk_lbl false p' ->
     ⟨ s1 | is_trusted ⟩ = ⟨ s2 | is_trusted ⟩ ->
     clean_cmd_stp_cnt c (pre_cmd_action adv ast s1) = clean_cmd_stp_cnt c s2.
   Proof. move=> *. wf_finisher_guess [RHS] with _=> ->. wf_finisher. Qed.
 
-  Goal forall {AtkStates} (adv : AdvNextStep AtkStates) ast s1 s2,
+  Goal forall  (adv : AdvNextStep) ast s1 s2,
     ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
     post_cmd_action adv ast (pre_cmd_action adv ast s1) =
     post_cmd_action adv ast (pre_cmd_action adv ast s2).

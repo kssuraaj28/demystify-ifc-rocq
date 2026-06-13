@@ -13,7 +13,7 @@ Set Mangle Names. Set Mangle Names Light.
 
 Section bisim.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
-  Variable adv : AdvNextStep AtkStates.
+  Variable adv : AdvNextStep (AtkStates := AtkStates).
 
 
   Notation sadv := (construct_simulator adv).

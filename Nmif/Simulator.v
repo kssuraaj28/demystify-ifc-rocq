@@ -30,9 +30,9 @@ Section sim_constr.
 
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
   Notation SimStates := (SimStates (AtkStates:=AtkStates)).
-  Notation SimStateMachine := (AdvNextStep SimStates).
+  Notation SimStateMachine := (AdvNextStep (AtkStates := SimStates)).
 
-  Variables (atk: AdvNextStep AtkStates)(* (prog: Prog) You only need this when you do the init*).
+  Variables (atk: (AdvNextStep (AtkStates := AtkStates))).
 
   (* `c` has a guard and is secret.. *)
   Definition is_secret_guard (c: option Cmd) : bool :=
@@ -49,10 +49,9 @@ Section sim_constr.
          mk_simstate (init_state atk init_sv) store (map (fun c => (Some c, true)) prog).
      Dropped along with the init_state field of AdvNextStep. *)
 
-  Fail Check "delete_this".
   Definition sim_step
     (ideal_st : Store) (ocmd: option Cmd) (isatk: bool) (sim_st : Store) (ast: AtkStates):
-    (Store (* sim_st *) * AtkStates (* * AdvEvent *) * list ((option Cmd) * bool)) :=
+    (Store (* sim_st *) * AtkStates * list ((option Cmd) * bool)) :=
 
     let: sim_st := if isatk is true then (pre_cmd_action atk ast sim_st) else sim_st in
     let: sim_st := optcmd_stp_store ocmd sim_st in 
@@ -61,7 +60,6 @@ Section sim_constr.
 
     let: post_atk := post_cmd_action atk ast sim_st in
     let: ast := if isatk is true then post_atk.1 else ast in
-    (* let: event := if isatk is true then post_atk.1.2 else None in *)
     let: steps := if isatk is true then post_atk.2 else 0 in
 
 
@@ -69,15 +67,14 @@ Section sim_constr.
     let: cont_atk := repeat true steps in
     let: cont_full := combine_extend2 cont_prog cont_atk None false in
 
-    (sim_st, ast (*, event *), cont_full).
+    (sim_st, ast, cont_full).
 
   
-  Fail Check "delete_this".
   Definition sim_post st ideal_st :=
     let: (mk_simstate ast sim_st prg) :=  st in
-    if prg isn't (ocmd, isatk) :: rest then (st (*, None *), 0) else
-    let: (sim_st, new_ast (*, evnt *), cont) := sim_step ideal_st ocmd isatk sim_st ast in
-    (mk_simstate new_ast sim_st (cont ++ rest) (*, evnt *), length cont).
+    if prg isn't (ocmd, isatk) :: rest then (st , 0) else
+    let: (sim_st, new_ast , cont) := sim_step ideal_st ocmd isatk sim_st ast in
+    (mk_simstate new_ast sim_st (cont ++ rest), length cont).
 
   Definition sim_pre st ideal_st :=
     let: (mk_simstate ast sim_st prg) :=  st in
@@ -99,7 +96,7 @@ Section sim_constr.
       pre_cmd_action := sim_pre;
       pre_cmd_event := sim_evnt;
       post_cmd_action := sim_post;
-    |}. (* TODO: Why 11 obligations. *)
+    |}.
   Next Obligation. 
     case=> ? ? [] //= - [] [] // [] // [] // *. Util.local_cook. 
     move t: (extract_controlled_endorse _)=> t'; move: t' t; case=> // - [] >. (* this move + equation happens a lot*)
@@ -148,6 +145,20 @@ Import VarValStore.Notations.
   Qed.
 End sim_constr.
 
+Section full_sim_constr.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+
+  Variable (p : Prog) (a: Attacker).
+  Notation AtkStates := (States a). 
+  Notation adv_step := (Attacker.step a).
+
+  (* TODO: In some places, I have explcit args, someplacse implicit. Make it uniform.  *)
+  (* TODO: construct_simulator -> construct_simulator_step *)
+  #[refine] Definition construct_full_simulator: Attacker :=
+    mk_attacker (SimStates (AtkStates := AtkStates)) _ (construct_simulator adv_step).
+  Abort.
+  
+End full_sim_constr.
 
 Ltac2 this_cookbook () := this_cookbook_ ().
 Ltac local_cook := ltac2:(cook this_cookbook).

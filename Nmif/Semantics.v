@@ -114,7 +114,7 @@ End test.
 
 Section acmd.
   Context `{!VarPrm, !ValPrm, !AdvLeakPrm, !AdvLvlPrm} {AtkStates : Type}.
-  Variable (adv: AdvNextStep AtkStates).
+  Variable (adv: AdvNextStep (AtkStates := AtkStates)).
   Record AtkCmd := mk_atkcmd {is_attacked: bool; ocmd : option Cmd}.
   Definition State := (Store * AtkStates)%type.
 
@@ -147,7 +147,7 @@ Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(rewrite -> acmd_step_noat
 Section event_helper.
   Import VarValStore.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
-  Variable (adv : AdvNextStep AtkStates).
+  Variable (adv: AdvNextStep (AtkStates := AtkStates)).
 
   Definition CmdEvent := option (Vars * Vals).
 
@@ -169,7 +169,7 @@ End event_helper.
 Section cfg.
   Import Util.List.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
-  Variable (adv : AdvNextStep AtkStates).
+  Variable (adv: AdvNextStep (AtkStates := AtkStates)).
 
   Definition Cfg := (list AtkCmd * State (AtkStates:=AtkStates))%type.
 
@@ -192,7 +192,7 @@ End cfg.
 
 Section cfg_trace.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
-  Variable (adv : AdvNextStep AtkStates).
+  Variable (adv : AdvNextStep (AtkStates := AtkStates)).
 
   Fail Check ltac:(exact Trace).
   Instance event_prm : EventPrm := {
@@ -210,7 +210,7 @@ Section trace_proper.
 
 
   Variable (p : Prog) (a: Attacker) (init_store: Store).
-  Notation AtkStates := (States a). (* TODO: *)
+  Notation AtkStates := (States a).
   Notation Cfg := (Cfg (AtkStates := AtkStates)).
   Notation adv_step := (Attacker.step a). (* TODO: Change adv to adv_step everywhere *)
 
@@ -236,7 +236,9 @@ End running.
 Section twocfg.
   Import Util.List.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates1 AtkStates2 : Type}.
-  Variable (adv1: AdvNextStep AtkStates1) (adv2: AdvNextStep AtkStates2).
+  Variable  
+    (adv1: AdvNextStep (AtkStates := AtkStates1)) 
+    (adv2: AdvNextStep (AtkStates := AtkStates2)).
 
   Notation State1 := (State (AtkStates:=AtkStates1)).
   Notation State2 := (State (AtkStates:=AtkStates2)).
@@ -277,7 +279,9 @@ End twocfg.
 Section twooneextract.
   Import Util.List.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates1 AtkStates2 : Type}.
-  Variable (adv1: AdvNextStep AtkStates1) (adv2: AdvNextStep AtkStates2).
+  Variable  
+    (adv1: AdvNextStep (AtkStates := AtkStates1)) 
+    (adv2: AdvNextStep (AtkStates := AtkStates2)).
 
   Notation TwoCfg := (TwoCfg (AtkStates1:=AtkStates1) (AtkStates2:=AtkStates2)).
   Notation State1 := (State (AtkStates:=AtkStates1)).
@@ -379,7 +383,9 @@ End twooneextract.
 Section cfg_erase_filter.
   Import Util.List.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates1 AtkStates2 : Type}.
-  Variable (adv1: AdvNextStep AtkStates1) (adv2: AdvNextStep AtkStates2).
+  Variable  
+    (adv1: AdvNextStep (AtkStates := AtkStates1)) 
+    (adv2: AdvNextStep (AtkStates := AtkStates2)).
 
   Notation twostep := (twostep adv1 adv2).
   Notation TwoCfg := (TwoCfg (AtkStates1:=AtkStates1) (AtkStates2:=AtkStates2)).

@@ -16,7 +16,7 @@ Set Mangle Names. Set Mangle Names Light.
 Section passive_corruptor.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
 
-  Variable (adv : AdvNextStep States)  (initc : Cfg (AtkStates:= States)).
+  Variable (adv : AdvNextStep (AtkStates := States))  (initc : Cfg (AtkStates:= States)).
 
   Notation step := (step adv).
   Notation acmd_step := (acmd_step adv).
@@ -52,7 +52,7 @@ End passive_corruptor.
 Section sim_restriction.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
 
-  Variable (adv : AdvNextStep States)  (initc : Cfg (AtkStates:= States)).
+  Variable (adv : AdvNextStep (AtkStates := States))  (initc : Cfg (AtkStates:= States)).
 
   Notation step := (step adv).
   Notation acmd_step := (acmd_step adv).
@@ -95,7 +95,7 @@ End sim_restriction.
 Section sim_restriction.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
 
-  Variable (adv : AdvNextStep States).
+  Variable (adv : AdvNextStep (AtkStates := States)).
 
   Import Util.List VarValStore.Notations.
 

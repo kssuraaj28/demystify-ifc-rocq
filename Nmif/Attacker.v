@@ -142,21 +142,14 @@ Section adv.
     }.
 End adv.
 
-Arguments AdvInit: clear implicits.
-Arguments AdvInit {_ _ _} AtkStates.
 
-Arguments AdvNextStep: clear implicits.
-Arguments AdvNextStep {_ _ _ _} AtkStates.
-
-
-Check AdvInit.
 (* Wrapper for full attacker *)
 Section full_atk.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
-  Record Attacker :=  { 
+  Record Attacker :=  mk_attacker { 
       States : Type;
-      init : AdvInit States;
-      step : AdvNextStep States;
+      init : AdvInit (AtkStates := States);
+      step : AdvNextStep (AtkStates := States);
     }.
 End full_atk.
