@@ -103,10 +103,11 @@ End test.
 Section adv.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
   Definition AdvEvent := option LeakVals.
-  (*
-  Record AdvInit {AtkStates} :=  {
-    init_fn :  _;
-  }.*)
+
+  Record AdvInit  :=  {
+    init_fn : Store -> AtkStates;
+    init_wf : Noninterfering (store_to_view is_public) (init_fn) id
+  }.
 
 (* Previously this record also carried
      init_state : StoreView -> AtkStates
@@ -141,8 +142,21 @@ Section adv.
     }.
 End adv.
 
+Arguments AdvInit: clear implicits.
+Arguments AdvInit {_ _ _} AtkStates.
+
 Arguments AdvNextStep: clear implicits.
 Arguments AdvNextStep {_ _ _ _} AtkStates.
 
 
+Check AdvInit.
+(* Wrapper for full attacker *)
+Section full_atk.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
+  Record Attacker :=  { 
+      states : Type;
+      init : AdvInit states;
+      step : AdvNextStep states;
+    }.
+End full_atk.
