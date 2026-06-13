@@ -155,8 +155,8 @@ Section full_atk.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
   Record Attacker :=  { 
-      states : Type;
-      init : AdvInit states;
-      step : AdvNextStep states;
+      States : Type;
+      init : AdvInit States;
+      step : AdvNextStep States;
     }.
 End full_atk.

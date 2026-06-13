@@ -190,20 +190,42 @@ Section cfg.
     event_helper adv ac new_store old_ast.
 End cfg.
 
-Section trace.
+Section cfg_trace.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
   Variable (adv : AdvNextStep AtkStates).
 
+  Fail Check ltac:(exact Trace).
   Instance event_prm : EventPrm := {
     Events := Event;
     stutter := blank_event;
-  }.
+  }.  Check ltac:(exact Trace).
 
   Definition cfg_trace (c : Cfg (AtkStates := AtkStates)) : Trace :=
     build (step adv) (event adv) c.
-End trace.
+End cfg_trace.
 
 
+Section trace_proper.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+
+
+  Variable (p : Prog) (a: Attacker) (init_store: Store).
+  Notation AtkStates := (States a). (* TODO: *)
+  Notation Cfg := (Cfg (AtkStates := AtkStates)).
+  Notation adv_step := (Attacker.step a). (* TODO: Change adv to adv_step everywhere *)
+
+  (* 
+    The program is known by the attacker, and we have the attacker active in all steps here.
+    Changing this does not fundamentally change anything
+  *)
+  Definition init_cfg : Cfg :=
+    (map (fun c => mk_atkcmd true (Some c)) p, (init_store, init_fn (init a) init_store)). 
+
+  Definition trace := let initc := init_cfg in cfg_trace adv_step initc.
+End trace_proper.
+
+Notation "⟦ p | a ⟧" := (trace p a).
+Check ⟦_ | _ ⟧ : Store -> Trace.
 
 Section running.
   Context `{!VarPrm, !ValPrm}.
