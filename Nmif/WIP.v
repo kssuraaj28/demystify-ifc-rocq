@@ -13,6 +13,42 @@ Set Mangle Names. Set Mangle Names Light.
 
 #[local] Notation Cfg := Semantics.Cfg.
 
+Section passive_corruptor.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
+
+  Variable (adv : AdvNextStep States)  (initc : Cfg (AtkStates:= States)).
+
+  Notation step := (step adv).
+  Notation acmd_step := (acmd_step adv).
+  Notation pre_cmd_action := (pre_cmd_action adv).
+
+  (* TODO: These definitions need to be deleted. I can do better *)
+  (* TODO: These definitions share a bunch in common *)
+  (* Form initc, is the adversary passive? *)
+  Definition is_passive: Prop :=  
+    forall cmd rstcmd store ast, 
+      let: acmd := mk_atkcmd true cmd in  
+      let: state := (store, ast) in
+      let: c := ((acmd :: rstcmd), state) in
+      reachable step initc c  ->
+      pre_cmd_action ast store = store.
+  
+  (* Basically, does it satisfy confidentiality ni? *)
+  Definition is_incurious: Prop :=
+    exists ast_trans: States -> (States * nat),
+    forall cmd rstcmd store ast,  (* TODO: There is code repetition. I don't know whether  *)
+      let: acmd := mk_atkcmd true cmd in  
+      let: state := (store, ast) in
+      let: c := ((acmd :: rstcmd), state) in
+      reachable step initc c  ->
+      let: atk_output := 
+         let: (_, (_, ast'), atk_substeps) := acmd_step acmd state in
+         (ast', atk_substeps) in
+      atk_output = ast_trans ast.
+
+  
+End passive_corruptor.
+
 Section sim_restriction.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
 

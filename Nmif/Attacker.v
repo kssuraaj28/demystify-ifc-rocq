@@ -27,59 +27,6 @@ End defs.
 
 
 
-(* 
-  TODO
-  You need to eventually corrupt store,
-  Learn from store etc 
-*)
-(* 
-  The attacker is sandwiched between the normal code... 
-  corrupt ; cmd;  learn ; leak || substeps
-
-  Another thing we could do is something where
-  you also get access to pc?  TODO
-
-  Prm naming scheme? TODO
-*)
-
-Definition AdvEvent `{!AdvLeakPrm} := option LeakVals.
-
-(* Previously this record also carried
-     init_state : StoreView -> AtkStates
-   (the attacker only sees the untrusted view) together with a TODO for an
-   init_state well-formedness obligation. Dropped during the rename to
-   AdvNextStep — initial-state construction now lives outside this record. *)
-Record AdvNextStep `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}
-    {AtkStates : Type} := {
-    (* Corruption *)
-    pre_cmd_action: AtkStates -> Store -> Store;
-    pre_cmd_event: AtkStates -> AdvEvent;
-    post_cmd_action: AtkStates -> Store -> (AtkStates * nat); (* New state and substeps *)
-
-    pre_cmd_wf_int: 
-      forall ast, 
-        let: ast_corr := pre_cmd_action ast in
-        let: tr_view := (store_to_view is_trusted) in
-        (forall st, tr_view (ast_corr st) = (tr_view st));  (* The adversary does not touch trusted computation. This is a little bit ugly *)
-
-    pre_cmd_wf_conf: 
-      forall ast, 
-        let: ast_corr := pre_cmd_action ast in
-        let: pub_view := (store_to_view is_public) in 
-        Noninterfering pub_view ast_corr pub_view; (* public outputs don't chnage if public inputs don't *)
-
-
-    post_cmd_wf:
-      forall ast,
-        let: ast_lrn := post_cmd_action ast in
-        let: pub_view := store_to_view is_public in
-        Noninterfering pub_view ast_lrn id;
-
-  }.
-
-Arguments AdvNextStep: clear implicits.
-Arguments AdvNextStep {_ _ _ _} AtkStates.
-
 (* Instead, we could do uniform unfold. cbn.  *)
 Ltac2 Set this_cookbook_ as old :=
   add_cookstep
@@ -136,3 +83,66 @@ Section test.
   Goal forall x, var_lbl x = mk_lbl false true -> ~~ is_secret x.
   Proof. move=> x H. cook. Abort.
 End test.
+
+(* 
+  TODO
+  You need to eventually corrupt store,
+  Learn from store etc 
+*)
+(* 
+  The attacker is sandwiched between the normal code... 
+  corrupt ; cmd;  learn ; leak || substeps
+
+  Another thing we could do is something where
+  you also get access to pc?  TODO
+
+  Prm naming scheme? TODO
+*)
+
+
+Section adv.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
+  Definition AdvEvent := option LeakVals.
+  (*
+  Record AdvInit {AtkStates} :=  {
+    init_fn :  _;
+  }.*)
+
+(* Previously this record also carried
+     init_state : StoreView -> AtkStates
+   (the attacker only sees the untrusted view) together with a TODO for an
+   init_state well-formedness obligation. Dropped during the rename to
+   AdvNextStep — initial-state construction now lives outside this record. *)
+  Record AdvNextStep := {
+      (* Corruption *)
+      pre_cmd_action: AtkStates -> Store -> Store;
+      pre_cmd_event: AtkStates -> AdvEvent;
+      post_cmd_action: AtkStates -> Store -> (AtkStates * nat); (* New state and substeps *)
+  
+      pre_cmd_wf_int: 
+        forall ast, 
+          let: ast_corr := pre_cmd_action ast in
+          let: tr_view := (store_to_view is_trusted) in
+          (forall st, tr_view (ast_corr st) = (tr_view st));  (* The adversary does not touch trusted computation. This is a little bit ugly *)
+  
+      pre_cmd_wf_conf: 
+        forall ast, 
+          let: ast_corr := pre_cmd_action ast in
+          let: pub_view := (store_to_view is_public) in 
+          Noninterfering pub_view ast_corr pub_view; (* public outputs don't chnage if public inputs don't *)
+  
+  
+      post_cmd_wf:
+        forall ast,
+          let: ast_lrn := post_cmd_action ast in
+          let: pub_view := store_to_view is_public in
+          Noninterfering pub_view ast_lrn id;
+  
+    }.
+End adv.
+
+Arguments AdvNextStep: clear implicits.
+Arguments AdvNextStep {_ _ _ _} AtkStates.
+
+
+
