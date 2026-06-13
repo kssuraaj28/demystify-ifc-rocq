@@ -71,12 +71,18 @@ Section cmb_step.
   End comb_state.
 
   Section init.
-    Variable (prog: Prog) (advinit : AdvInit).
+    Import VarValStore.Notations.
+    Variable (prog: Prog) (advinit : AdvInit) (init_store: Store).
 
-    #[refine] Definition init_cfg : Cfg := 
-      (_, _).
-      Abort.
-    
+    Definition init_cfg : Cfg := 
+      (mk_cmbstate 
+        init_store 
+        init_store 
+        ( let: blank := fun _ => val_ne in 
+          let: pubsv := ⟨ init_store | is_public ⟩ in
+          ⟨ pubsv → blank ⟩ )
+        (init_fn advinit init_store), 
+      map (fun c => mk_cmbcmd (Some c) true (Some c) ptlbl) prog). 
   End init.
 
 
@@ -258,6 +264,26 @@ Ltac2 Set this_cookbook_ as old :=
 
 Ltac2 this_cookbook () := this_cookbook_ ().
 Ltac local_cook := ltac2:(cook this_cookbook).
+
+Section init_inv.
+  Import VarValStore.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
+  Notation AdvInit := (AdvInit (AtkStates := AtkStates)).
+    
+  Theorem init_inv p (advinit : AdvInit) init_store: 
+    WellFormedProg ptlbl p ->
+    Invariant (init_cfg p advinit init_store).
+  Proof.
+    move=> wf.
+    rewrite/Invariant/init_cfg; split; cycle 1.
+      { rewrite/StateInv. split=>//.
+      rewrite /⟨_→_⟩.
+      apply:storeview_eq_ext=> > e. (* TODO: lemma *)
+      rewrite /⟨_|_⟩ e //. }
+    rewrite Forall_map.
+    move: wf. exact: Forall_impl.
+  Qed.
+End init_inv.
 
 Section invprf.
   Import Util.List.
