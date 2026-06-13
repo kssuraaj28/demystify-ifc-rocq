@@ -146,17 +146,28 @@ Import VarValStore.Notations.
 End sim_constr.
 
 Section full_sim_constr.
+  Import VarValStore VarValStore.Notations Noninterference Datatypes.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
   Variable (p : Prog) (a: Attacker).
   Notation AtkStates := (States a). 
+  Notation SimStates := (SimStates (AtkStates := AtkStates)).
   Notation adv_step := (Attacker.step a).
 
-  (* TODO: In some places, I have explcit args, someplacse implicit. Make it uniform.  *)
-  (* TODO: construct_simulator -> construct_simulator_step *)
-  #[refine] Definition construct_full_simulator: Attacker :=
-    mk_attacker (SimStates (AtkStates := AtkStates)) _ (construct_simulator adv_step).
-  Abort.
+  Obligation Tactic := idtac.
+  Program Definition simulator_init : AdvInit (AtkStates := SimStates) := {|
+      init_fn st := 
+        mk_simstate 
+          (init_fn (init a) st) 
+          ( let: blanksv := fun _ => val_ne in
+            let: pubsv := ⟨ st | is_public ⟩ in 
+            ⟨ pubsv → blanksv ⟩)
+          (map (fun c => (Some c,  true)) p);
+    |}.
+  Next Obligation.  
+    rewrite/Noninterference.Noninterfering/id=>  > /[dup] + ->=> ?.
+    Util.local_cook. exact: init_wf.
+  Qed.
   
 End full_sim_constr.
 
