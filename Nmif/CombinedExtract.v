@@ -81,6 +81,7 @@ Section extract.
     (cfg2prog, (rst, atkst), (ist, mk_simstate atkst simst simprog)).
 End extract.
 
+
 Section erase_filter_commute.
   Import Util.List.
   Context `{!VarPrm, !ValPrm}  {AtkStates: Type}.

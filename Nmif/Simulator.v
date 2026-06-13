@@ -138,20 +138,17 @@ Import VarValStore.Notations.
   Qed.
 End sim_constr.
 
-Section full_sim_constr.
-  Import VarValStore VarValStore.Notations Noninterference Datatypes.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+Section sim_init.
+  Import VarValStore VarValStore.Notations Noninterference Datatypes Attacker.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
 
-  Variable (p : Prog) (a: Attacker).
-  Notation AtkStates := (States a). 
-  Notation SimStates := (SimStates (AtkStates := AtkStates)).
-  Notation adv_step := (Attacker.step a).
+  Variable (p : Prog) (ainit: AdvInit (AtkStates := AtkStates)).
 
   Obligation Tactic := idtac.
   Program Definition simulator_init : AdvInit (AtkStates := SimStates) := {|
       init_fn st := 
         mk_simstate 
-          (init_fn (init a) st) 
+          (init_fn ainit st) 
           ( let: blanksv := fun _ => val_ne in
             let: pubsv := ⟨ st | is_public ⟩ in 
             ⟨ pubsv → blanksv ⟩)
@@ -161,7 +158,25 @@ Section full_sim_constr.
     rewrite/Noninterference.Noninterfering/id=>  > /[dup] + ->=> ?.
     Util.local_cook. exact: init_wf.
   Qed.
-  
+
+End sim_init.
+
+Section full_sim_constr.
+  Import VarValStore VarValStore.Notations Noninterference Datatypes Attacker.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+  Variable (p : Prog) (a: Attacker).
+  Notation AtkStates := (States a). 
+  Notation SimStates := (SimStates (AtkStates := AtkStates)).
+  Notation adv_init := (init a).
+  Notation adv_step := (step a).
+
+  Definition construct_full_simulator : Attacker := {| 
+      States := SimStates ;
+      init := (simulator_init p adv_init);
+      step := construct_simulator adv_step ;
+    |}. 
+
+
 End full_sim_constr.
 
 Ltac2 this_cookbook () := this_cookbook_ ().

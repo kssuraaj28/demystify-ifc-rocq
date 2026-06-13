@@ -92,3 +92,12 @@ Section bisim.
   Qed.
   Print Assumptions simulator_bisim.
 End bisim.
+
+
+Section sim_trace_eq.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+
+  #[refine] Definition simulator_trace_eq p a := 
+    WellFormedProg ptlbl p -> _.  Abort.
+
+End sim_trace_eq.
