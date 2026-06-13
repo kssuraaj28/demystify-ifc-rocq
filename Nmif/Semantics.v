@@ -199,9 +199,11 @@ Section trace.
     stutter := blank_event;
   }.
 
-  Definition trace (c : Cfg (AtkStates := AtkStates)) : Trace :=
+  Definition cfg_trace (c : Cfg (AtkStates := AtkStates)) : Trace :=
     build (step adv) (event adv) c.
 End trace.
+
+
 
 Section running.
   Context `{!VarPrm, !ValPrm}.

@@ -30,9 +30,9 @@ Section bisim.
     let: twocfg := extract_2cfg c in
     let: left_cfg := extract_one_cfg true twocfg in
     let: right_cfg := extract_one_cfg false twocfg in
-    trace adv left_cfg  ≈  trace sadv right_cfg.
+    cfg_trace adv left_cfg  ≈  cfg_trace sadv right_cfg.
   Proof.
-    rewrite/trace=> cinv.
+    rewrite/cfg_trace=> cinv.
     apply: (trace_bisim _ _ _ _ bisim_rel); [| eexists; eauto].
     move=> s1 s2 [cc [Hinv [-> ->]]].
     have Hrun : Forall (fun '(a,b)=> is_running a || is_running b) (extract_2cfg cc).1.1.
