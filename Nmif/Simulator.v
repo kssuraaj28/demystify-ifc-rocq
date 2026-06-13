@@ -42,13 +42,6 @@ Section sim_constr.
     | _ =>  false
     end. 
 
-  (* sim_init forwarded the underlying attacker's init_state to build a
-     SimStates from the public store view:
-       Definition sim_init (init_sv : StoreView) : SimStates :=
-         let: store := fun v => if (init_sv v) is Some vl then vl else val_ne in
-         mk_simstate (init_state atk init_sv) store (map (fun c => (Some c, true)) prog).
-     Dropped along with the init_state field of AdvNextStep. *)
-
   Definition sim_step
     (ideal_st : Store) (ocmd: option Cmd) (isatk: bool) (sim_st : Store) (ast: AtkStates):
     (Store (* sim_st *) * AtkStates * list ((option Cmd) * bool)) :=

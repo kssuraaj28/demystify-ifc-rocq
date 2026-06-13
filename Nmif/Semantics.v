@@ -204,6 +204,13 @@ Section cfg_trace.
     build (step adv) (event adv) c.
 End cfg_trace.
 
+Section init.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
+  Variable (p : Prog) (ainit: AdvInit (AtkStates := AtkStates)) (init_store: Store).
+
+  Definition init_cfg : Cfg :=
+    (map (fun c => mk_atkcmd true (Some c)) p, (init_store, init_fn (ainit) init_store)). 
+End init.
 
 Section trace_proper.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
@@ -213,15 +220,10 @@ Section trace_proper.
   Notation AtkStates := (States a).
   Notation Cfg := (Cfg (AtkStates := AtkStates)).
   Notation adv_step := (Attacker.step a). (* TODO: Change adv to adv_step everywhere *)
+  Notation adv_init := (Attacker.init a). 
 
-  (* 
-    The program is known by the attacker, and we have the attacker active in all steps here.
-    Changing this does not fundamentally change anything
-  *)
-  Definition init_cfg : Cfg :=
-    (map (fun c => mk_atkcmd true (Some c)) p, (init_store, init_fn (init a) init_store)). 
 
-  Definition trace := let initc := init_cfg in cfg_trace adv_step initc.
+  Definition trace := let initc := init_cfg p adv_init init_store in cfg_trace adv_step initc.
 End trace_proper.
 
 Notation "⟦ p | a ⟧" := (trace p a).

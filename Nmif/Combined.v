@@ -47,6 +47,7 @@ End cmb_cmd.
 Section cmb_step.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
   Notation AdvNextStep := (AdvNextStep (AtkStates := AtkStates)).
+  Notation AdvInit := (AdvInit (AtkStates := AtkStates)).
 
   Definition zip (real_cont: list Cmd) (ideal_cont: list Cmd) (atk_steps: nat) (pc_lbl: Label): list CmbCmd :=
     let: real_cont := map Some real_cont in
@@ -69,23 +70,28 @@ Section cmb_step.
     Definition Cfg := (CmbState * list CmbCmd)%type.
   End comb_state.
 
+  Section init.
+    Variable (prog: Prog) (advinit : AdvInit).
+
+    #[refine] Definition init_cfg : Cfg := 
+      (_, _).
+      Abort.
+    
+  End init.
 
 
   Section step.
     Variable (adv: AdvNextStep).
-    Fail Check "delete_this".
-    (* Notation AcmdEvent := (Semantics.Event). *)
     Notation pre_cmd_action := (pre_cmd_action adv).
     Notation post_cmd_action := (post_cmd_action adv).
 
-    Fail Check "delete_this".
-    Definition cmbcmd_step (c: CmbCmd) (s: CmbState) : Cfg (* * AcmdEvent *) :=
+    Definition cmbcmd_step (c: CmbCmd) (s: CmbState) : Cfg :=
       let: mk_cmbcmd real_cmd real_atk_bit ideal_cmd pc_lbl := c in
       let: mk_cmbstate real_st ideal_st sim_st atk_st := s in
 
       (* Corruption first. TODO: When there is endorsement, there will need to be an update to the ideal store as well *)
       let: real_st := if real_atk_bit is false then real_st else pre_cmd_action atk_st real_st in
-      let: (real_cnt, real_st (*, real_event *)) := (optcmd_stp_cnt real_cmd real_st,  optcmd_stp_store real_cmd real_st (*, optcmd_evnt real_cmd real_st *)) in (* TODO: The proof breaks when you update real_st before real_cnt. Why? *)
+      let: (real_cnt, real_st ) := (optcmd_stp_cnt real_cmd real_st,  optcmd_stp_store real_cmd real_st) in (* TODO: The proof breaks when you update real_st before real_cnt. Why? *)
 
 
       let: sim_st := if real_atk_bit is false then sim_st else pre_cmd_action atk_st sim_st in
@@ -105,18 +111,16 @@ Section cmb_step.
 
       let: atk_pst := (post_cmd_action atk_st real_st) in (* Not having this was quite painful. TODO *)
       let: atk_st := if real_atk_bit is false then atk_st else atk_pst.1 in
-      (* let: atk_event := if real_atk_bit is false then None else atk_pst.1.2 in *)
       let: atk_substeps := if real_atk_bit is false then 0 else atk_pst.2 in
 
       let: new_pc := compute_new_pc_opt pc_lbl real_cmd in
-      (mk_cmbstate real_st ideal_st sim_st atk_st, zip real_cnt ideal_cnt atk_substeps new_pc) (*, mk_acmd_evnt real_event atk_event *).
+      (mk_cmbstate real_st ideal_st sim_st atk_st, zip real_cnt ideal_cnt atk_substeps new_pc).
 
-    Fail Check "delete_this".
-    Definition cfg_step (cfg: Cfg) : Cfg (* * AcmdEvent *) :=
+    Definition cfg_step (cfg: Cfg) : Cfg :=
       let: (st, cmdlst) := cfg in
       if cmdlst isn't (cmd :: cmdlst') then cfg (*, blank_event *) else
       let: (st', cmdlst'' (*, evnt *)) := cmbcmd_step cmd st in
-      (st', cmdlst'' ++ cmdlst') (*, evnt *).
+      (st', cmdlst'' ++ cmdlst').
 
     Definition cmb_event (c: Cfg) : Event :=
       let: (st, cmdlst) := c in
