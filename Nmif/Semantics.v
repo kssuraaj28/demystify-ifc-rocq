@@ -195,10 +195,9 @@ Section cfg_trace.
   Variable (adv : AdvNextStep (AtkStates := AtkStates)).
 
   Fail Check ltac:(exact Trace).
-  Instance event_prm : EventPrm := {
-    Events := Event;
-    stutter := blank_event;
-  }.  Check ltac:(exact Trace).
+  Instance event_prm : EventPrm := Event.
+  Instance stutter_prm : StutterPrm := blank_event.
+  Check ltac:(exact Trace).
 
   Definition cfg_trace (c : Cfg (AtkStates := AtkStates)) : Trace :=
     build (step adv) (event adv) c.
