@@ -144,8 +144,6 @@ Section step_update.
     post_cmd_wf     := post_cmd_wf adv;
   |}.
 
-  Lemma remove_corruptor_passive (adv : AdvNextStep) : Passive (remove_corruptor adv).
-  Proof. done. Qed.
 
   Program Definition replace_learner
       (adv : AdvNextStep) (learn : States -> (States * nat)) : AdvNextStep := {|
@@ -156,8 +154,6 @@ Section step_update.
     pre_cmd_wf_conf := pre_cmd_wf_conf adv;
   |}.
 
-  Lemma replace_learner_incurious (adv : AdvNextStep) (learn : States -> (States * nat)) : Incurious (replace_learner adv learn).
-  Proof. done. Qed.
 
 End step_update.
 
@@ -166,133 +162,85 @@ Section ts_restr_implication.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
 
   Variable (adv : AdvNextStep (AtkStates := States))  (cfg : Cfg (AtkStates:= States)).
-  Hypothesis (idl_rest : idealcfg_restriction adv cfg).
+  Variable noend nodecl : bool.
 
-  Lemma ts_nmif:
-    exists adv', 
-    NMIFRestr adv' /\
-    forall cmd rstcmd store ast, 
-      let: acmd := mk_atkcmd true cmd in  
-      let: state := (store, ast) in
-      let: c := ((acmd :: rstcmd), state) in
-      reachable (step adv) cfg c ->
-      step adv c = step adv' c /\ event adv c = event adv' c.
+  Notation adv_restr adv := 
+    (match noend, nodecl with
+      | true, true => NIRestr adv
+      | true, false => RDRestr adv
+      | false, true => TERestr adv
+      | false, false => NMIFRestr adv
+    end).
+  
+  Notation witness_constr adv corr_fn learn_fn :=
+    (match noend, nodecl with
+      | true, true => replace_learner (remove_corruptor adv) (fun st => learn_fn st val_ne)
+      | true, false => remove_corruptor adv
+      | false, true => replace_learner (replace_corruptor adv corr_fn) (fun st => learn_fn st val_ne)
+      | false, false => replace_corruptor adv corr_fn
+    end).
+
+  Notation cmd_restr cmd :=
+    (match noend, nodecl with
+      | true, true => 
+         match cmd with
+         | Some(assign(endorse _ _)) | Some(assign(declassify _ _))  =>  False
+         | _ => True
+         end
+      | true, false => 
+         match cmd with
+         | Some(assign(endorse _ _)) => False
+         | _ => True
+         end
+      | false, true => 
+         match cmd with
+         | Some(assign(declassify _ _)) => False
+         | _ => True
+         end
+      | false, false => True
+    end).
+
+  Lemma ts_sem_impl:
+    idealcfg_restriction adv cfg ->
+    exists adv',
+      adv_restr adv' /\
+      forall cmd rstcmd store ast, 
+        let: acmd := mk_atkcmd true cmd in  
+        let: state := (store, ast) in
+        let: c := ((acmd :: rstcmd), state) in
+        (cmd_restr cmd) ->
+        reachable (step adv) cfg c ->
+        step adv c = step adv' c /\ event adv c = event adv' c.
   Proof.
-    revert idl_rest; rewrite /idealcfg_restriction/NMIFRestr => - [?] [wt] p.
-    exists (replace_corruptor adv wt); split; auto using replace_corruptor_nonmauling.
-    move=> ? ? str states.
+    rewrite /idealcfg_restriction/NMIFRestr/RDRestr/TERestr/NIRestr.
+    move=> - [trns] [wt] p.
+    exists (witness_constr adv wt trns).
+    split.
+      { move: noend nodecl=> [] [] //; [split|]=> //; exact: replace_corruptor_nonmauling. }
+    move=> cmd ? str states cmdrest.
     move: p=> /[apply].
-    case=> _ [] e1 e2.
-    rewrite/event/step.
-    pattern_eq_2 [acmd_step _ _ _] [acmd_step _ _ _]=> [|-> //].
+    case=> nodecl' [] precmdeq  noend'.
+    rewrite /event/step.
+    pattern_eq_2 [acmd_step _ _ _] [acmd_step _ _ _]; [|clear; case: noend; case: nodecl=> -> //].
+    rewrite/acmd_step -!surjective_pairing in nodecl'.
     rewrite/acmd_step.
-    pattern_eq_2 [pre_cmd_action _ _ _] [pre_cmd_action _ _ _]=> [|-> //].
+    pattern_eq_2 [pre_cmd_action _ _ _] [pre_cmd_action _ _ _]; cycle 1. 
+      { move=> <- {precmdeq}.
+      pattern_eq_2 [post_cmd_action _ _ _] [post_cmd_action _ _ _]=> [|-> //].
+      move: noend nodecl cmdrest nodecl'. 
+      clear=> - [] [] //; case: cmd => //= - [] // [] //. } (* Very interesting that you need //= *)
     move: (pre_cmd_wf_int adv)=>/(_ states str).
-    rewrite {}e1 /replace_corruptor /=.
-    move wte: (wt _)=> [ [vr vl] |//]; clear=> wf. 
-    case untr : is_untrusted=> //. (* TODO: Lemma *)
-    suff: (str vr = vl); [move=> <-; exact: update_to_store_id|].
-    move: wf=> /equal_f /(_ vr).
-    rewrite/⟨_|_⟩ /is_trusted untr /=.
-    case=> <-.  exact: update_to_store_same.
-  Qed.
-
-  Lemma ts_rd:
-    exists adv', 
-    RDRestr adv' /\
-    forall cmd rstcmd store ast, 
-      let: acmd := mk_atkcmd true cmd in  
-      let: state := (store, ast) in
-      let: c := ((acmd :: rstcmd), state) in
-      (if cmd is Some(assign(endorse _ _)) then False else True) ->
-      reachable (step adv) cfg c ->
-      step adv c = step adv' c /\ event adv c = event adv' c.
-  Proof.
-    revert idl_rest; rewrite /idealcfg_restriction/RDRestr => - [?] [wt] p.
-    exists (remove_corruptor adv); split; auto using remove_corruptor_passive.
-    move=> ? ? str states noend.
-    move: p=> /[apply].
-    case=> _ [] e1 e2.
-    have {}e2 : (wt states = None).
-      { move: noend e2.
-      case: (X in match X with Some _ => _ | _ => True  end)=> //-  [] // [] //. }
-    rewrite {}e2 in e1.
-    rewrite/event/step.
-    pattern_eq_2 [acmd_step _ _ _] [acmd_step _ _ _]=> [|-> //].
-    rewrite/acmd_step.
-    pattern_eq_2 [pre_cmd_action _ _ _] [pre_cmd_action _ _ _]=> [|-> //].
-    auto.
-  Qed.
-  (* TODO: Generalize this for ni, rd , and te etc..  *)
-
-  Lemma ts_te:
-    exists adv', 
-    TERestr adv' /\
-    forall cmd rstcmd store ast, 
-      let: acmd := mk_atkcmd true cmd in  
-      let: state := (store, ast) in
-      let: c := ((acmd :: rstcmd), state) in
-      (if cmd is Some(assign(declassify _ _)) then False else True) ->
-      reachable (step adv) cfg c ->
-      step adv c = step adv' c /\ event adv c = event adv' c.
-  Proof.
-    revert idl_rest; rewrite /idealcfg_restriction/TERestr => - [trns] [wt] p.
-    exists (replace_learner (replace_corruptor adv wt)  (fun st => trns st val_ne)).
-    split.
-      { split; exact: replace_learner_incurious  ||  exact: replace_corruptor_nonmauling. }
-    move=> cmd ? str states nodecl.
-    move: p=> /[apply] - [e1] [e2] _.
-    rewrite/event/step.
-    pattern_eq_2 [acmd_step _ _ _] [acmd_step _ _ _]=> [|-> //].
-    rewrite/acmd_step -!surjective_pairing in e1.
-    rewrite/acmd_step.
-    pattern_eq_2 [pre_cmd_action _ _ _] [pre_cmd_action _ _ _]=> [|<- //].
-      { move: (pre_cmd_wf_int adv)=>/(_ states str).
-      rewrite {}e2 /replace_corruptor /=.
-      move wte: (wt _)=> [ [vr vl] |//]; clear=> wf. 
-      case untr : is_untrusted=> //. (* TODO: Lemma *)
-      suff: (str vr = vl); [move=> <-; exact: update_to_store_id|].
-      move: wf=> /equal_f /(_ vr).
-      rewrite/⟨_|_⟩ /is_trusted untr /=.
-      case=> <-.  exact: update_to_store_same. } (* Copied *)
-    move=> {e2}.
-    pattern_eq_2 [post_cmd_action _ _ _] [post_cmd_action _ _ _]=> [|-> //].
-    move=> /=.
-    move: nodecl e1.
-    case: cmd=> //- [] // [] //.
-  Qed.
-
-  Lemma ts_ni:
-    exists adv', 
-    NIRestr adv' /\
-    forall cmd rstcmd store ast, 
-      let: acmd := mk_atkcmd true cmd in  
-      let: state := (store, ast) in
-      let: c := ((acmd :: rstcmd), state) in
-      (if cmd is Some(assign(declassify _ _)) then False else True) ->
-      (if cmd is Some(assign(endorse _ _)) then False else True) ->
-      reachable (step adv) cfg c ->
-      step adv c = step adv' c /\ event adv c = event adv' c.
-  Proof.
-    revert idl_rest; rewrite /idealcfg_restriction/NIRestr => - [trns] [wt] p.
-    exists (replace_learner (remove_corruptor adv)  (fun st => trns st val_ne)).
-    split.
-      { split; exact: replace_learner_incurious  ||  exact: remove_corruptor_passive. } (* Maybe I should rewrite/-.. . I'd like to use convertibility and auto*)
-    move=> cmd ? str states nodecl noend.
-    move: p=> /[apply] - [e1] [e2] e3.
-    rewrite/event/step.
-    pattern_eq_2 [acmd_step _ _ _] [acmd_step _ _ _]=> [|-> //].
-    rewrite/acmd_step -!surjective_pairing in e1.
-    rewrite/acmd_step.
-    pattern_eq_2 [pre_cmd_action _ _ _] [pre_cmd_action _ _ _]=> [|<- //].
-      { rewrite {}e2. 
-      suff: wt states = None=> [-> //|].
-      move: noend e3; clear.
-      case: cmd=> // - [] // [] //. }
-    pattern_eq_2 [post_cmd_action _ _ _] [post_cmd_action _ _ _]=> [|-> //].
-    move=> /=.
-    move: nodecl e1; clear.
-    case: cmd=> //- [] // [] //. 
+    rewrite {}precmdeq /= in nodecl' *.
+    case: noend cmdrest=> /= cmdrest.
+      { suff: wt states = None; [move=> -> _; clear; case: nodecl=> //|].
+      move: noend' cmdrest; clear.
+      case: nodecl; case: cmd=> // - [] // [] //. } 
+    move wte: (wt _)=> [ [vr vl] |]; move: wte; clear; case: nodecl=> /= -> //.
+    1,2: case untr : is_untrusted=> // wf. (* TODO: Lemma *)
+    1,2: suff: (str vr = vl); [move=> <-; exact: update_to_store_id|].
+    1,2: move: wf=> /equal_f /(_ vr).
+    1,2: rewrite/⟨_|_⟩ /is_trusted untr /=.
+    1,2: case=> <-;  exact: update_to_store_same. 
   Qed.
 
 End ts_restr_implication.
