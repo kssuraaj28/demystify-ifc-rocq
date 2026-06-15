@@ -13,60 +13,32 @@ Set Mangle Names. Set Mangle Names Light.
 
 #[local] Notation Cfg := Semantics.Cfg.
 
-(* This is a predicate over attacker 'next'.
-  TODO: Maybe we should define it as a predicate over just pre_cmd_action.
-*)
-Section semantic_preds.
-  Import Noninterference VarValStore.Notations.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
-  Notation AdvNextStep := (AdvNextStep (AtkStates := States)).
+Section idlatk_pred.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
-  Variable adv : AdvNextStep.
+  Variables (p: Prog) (a: Attacker).
 
-  (* TODO: Am i respective these prop naming rules? *)
-  Definition Passive : Prop :=
-    let: corr_fn :=  pre_cmd_action adv in
-    forall ast store, corr_fn ast store = store.
+  Notation AtkStates := (States a).
+  Notation ainit := (Attacker.init a).
+  Notation astep := (Attacker.step a).
+  Notation step := (step astep).
+  Notation acmd_step := (acmd_step astep).
+  Notation pre_cmd_action := (pre_cmd_action astep).
+  Notation init_cfg_fn inp := ((Semantics.init_cfg p ainit inp)). 
 
-  Definition Nonmauling : Prop :=
-    let: corr_fn :=  pre_cmd_action adv in
-    exists nm_corr_fn : States -> StoreView,
-    forall ast store, corr_fn ast store = ⟨ (nm_corr_fn ast)  → store ⟩.
-  
-  Definition Incurious : Prop :=
-    forall st,
-    let: learn_fn :=  post_cmd_action adv st in
-    Noninterfering id learn_fn id.  (* Maybe I should just define and write constant? *)
+  (* TODO: Definition vs Notation? *)
+  Notation IdealAstTrans := (AtkStates -> Vals (* declassified value *) -> (AtkStates * nat) (* ast , substeps *)).
+  Notation IdealAstCorr := (AtkStates -> option (Vars * Vals) (* endorsed value *)).
 
-
-  Definition NMIFRestr :=  Nonmauling.
-  Definition TERestr :=  Nonmauling /\ Incurious.
-  Definition RDRestr := Passive.
-  Definition NIRestr := Passive /\ Incurious.
-End semantic_preds.
-
-Section sim_restriction.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
-
-  Variable (adv : AdvNextStep (AtkStates := States))  (initc : Cfg (AtkStates:= States)).
-
-  Notation step := (step adv).
-  Notation acmd_step := (acmd_step adv).
-  Notation pre_cmd_action := (pre_cmd_action adv).
-
-  (* TODO: Maybe naming is not useful *)
-  Definition IdealAstTrans := States -> Vals (* declassified value *) -> (States * nat) (* ast , substeps *).
-  Definition IdealAstCorr := States -> option (Vars * Vals) (* endorsed value *).
-  
-  Definition idealcfg_restriction: Prop :=
-    exists ast_trans : IdealAstTrans,
-    exists ast_corr : IdealAstCorr,
-
-    forall cmd rstcmd store ast, 
+  Definition IdlAtkDowngradeRestr : Prop :=
+    exists (ast_trans: IdealAstTrans)  (ast_corr : IdealAstCorr),
+    forall inp, 
+      let: init_cfg := init_cfg_fn inp in
+      forall cmd rstcmd store ast, 
       let: acmd := mk_atkcmd true cmd in  
       let: state := (store, ast) in
       let: c := ((acmd :: rstcmd), state) in
-      reachable step initc c  ->
+      reachable step init_cfg c  ->
 
       let: learner_restriction :=
         let: atk_output := 
@@ -90,190 +62,45 @@ Section sim_restriction.
         ast_corr_match /\ ast_corr_restriction in
 
       learner_restriction /\ corruptor_restriction.
-End sim_restriction.
-
-Section step_update.
-  Import VarValStore.Notations Noninterference Util.DecEq.Notations.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
-  Notation AdvNextStep := (AdvNextStep (AtkStates := States)).
-
-  Obligation Tactic := try easy.
-  Program Definition replace_corruptor
-      (adv : AdvNextStep) (corr : IdealAstCorr (States := States)) : AdvNextStep := {|
-    pre_cmd_action  := fun ast store =>
-      if corr ast is Some (var, val) then
-        (if is_untrusted var then update_to_store store var val else store)
-      else store;
-    pre_cmd_event   := pre_cmd_event adv;
-    post_cmd_action := post_cmd_action adv;
-    post_cmd_wf     := post_cmd_wf adv;
-  |}.
-  Next Obligation.
-    move=> ? corr ast /= st. case e: (corr ast)=> [[var val]|] //.
-    case eu: (is_untrusted var)=> //.
-    apply: update_storeview_nochange. rewrite /is_trusted eu //.
-  Qed.
-  Next Obligation.
-    move=> ? corr ast /=. rewrite /Noninterfering=> i1 i2 heq.
-    case: (corr ast)=> [[var val]|]; [|exact: heq].
-    case: (is_untrusted var); [exact: update_same_varval heq | exact: heq].
-  Qed.
-
-  Lemma replace_corruptor_nonmauling
-      (adv : AdvNextStep) (corr : IdealAstCorr (States := States)) :
-      Nonmauling (replace_corruptor adv corr).
-  Proof.
-    rewrite/Nonmauling. eexists.
-    rewrite /pre_cmd_action/replace_corruptor=> ast store.
-    instantiate (1 := fun ast => if corr ast is Some (var, val) then _ else _).
-    move e: (corr _)=> [ [var val] | ]; rewrite {}e /=; [|instantiate (1 := fun _ => None); done].
-    instantiate (1 := if is_untrusted var then _ else _).
-    case e: (is_untrusted _); [|instantiate (1 := fun _ => None); done].
-    rewrite/⟨ _ → _ ⟩/update_to_store.
-    instantiate (1 := fun var' => if var =? var' then _ else _).
-    apply: store_eq_ext=> v.
-    case: (var =? v); [|instantiate (1 := None);done].
-    instantiate (1 := Some _); done.
-  Qed.
-
-  (* Record update!! *)
-  Program Definition remove_corruptor (adv : AdvNextStep) : AdvNextStep := {|
-    pre_cmd_action  := fun _ store => store;
-    pre_cmd_event   := pre_cmd_event adv;
-    post_cmd_action := post_cmd_action adv;
-    post_cmd_wf     := post_cmd_wf adv;
-  |}.
+End idlatk_pred.
 
 
-  Program Definition replace_learner
-      (adv : AdvNextStep) (learn : States -> (States * nat)) : AdvNextStep := {|
-    pre_cmd_action  := pre_cmd_action adv;
-    pre_cmd_event   := pre_cmd_event adv;
-    post_cmd_action := fun ast _ => learn ast;
-    pre_cmd_wf_int  := pre_cmd_wf_int adv;
-    pre_cmd_wf_conf := pre_cmd_wf_conf adv;
-  |}.
+Section wt_idlatk_rest.
+  Import Util.List.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
+  Variables (p: Prog) (a: Attacker).
 
-End step_update.
-
-Section ts_restr_implication.
-  Import VarValStore.Notations Util.DecEq Util.DecEq.Notations.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
-
-  Variable (adv : AdvNextStep (AtkStates := States))  (cfg : Cfg (AtkStates:= States)).
-  Variable noend nodecl : bool.
-
-  Notation adv_restr adv := 
-    (match noend, nodecl with
-      | true, true => NIRestr adv
-      | true, false => RDRestr adv
-      | false, true => TERestr adv
-      | false, false => NMIFRestr adv
-    end).
-  
-  Notation witness_constr adv corr_fn learn_fn :=
-    (match noend, nodecl with
-      | true, true => replace_learner (remove_corruptor adv) (fun st => learn_fn st val_ne)
-      | true, false => remove_corruptor adv
-      | false, true => replace_learner (replace_corruptor adv corr_fn) (fun st => learn_fn st val_ne)
-      | false, false => replace_corruptor adv corr_fn
-    end).
-
-  Notation cmd_restr cmd :=
-    (match noend, nodecl with
-      | true, true => 
-         match cmd with
-         | Some(assign(endorse _ _)) | Some(assign(declassify _ _))  =>  False
-         | _ => True
-         end
-      | true, false => 
-         match cmd with
-         | Some(assign(endorse _ _)) => False
-         | _ => True
-         end
-      | false, true => 
-         match cmd with
-         | Some(assign(declassify _ _)) => False
-         | _ => True
-         end
-      | false, false => True
-    end).
-
-  Lemma ts_sem_impl:
-    idealcfg_restriction adv cfg ->
-    exists adv',
-      adv_restr adv' /\
-      forall cmd rstcmd store ast, 
-        let: acmd := mk_atkcmd true cmd in  
-        let: state := (store, ast) in
-        let: c := ((acmd :: rstcmd), state) in
-        (cmd_restr cmd) ->
-        reachable (step adv) cfg c ->
-        step adv c = step adv' c /\ event adv c = event adv' c.
-  Proof.
-    rewrite /idealcfg_restriction/NMIFRestr/RDRestr/TERestr/NIRestr.
-    move=> - [trns] [wt] p.
-    exists (witness_constr adv wt trns).
-    split.
-      { move: noend nodecl=> [] [] //; [split|]=> //; exact: replace_corruptor_nonmauling. }
-    move=> cmd ? str states cmdrest.
-    move: p=> /[apply].
-    case=> nodecl' [] precmdeq  noend'.
-    rewrite /event/step.
-    pattern_eq_2 [acmd_step _ _ _] [acmd_step _ _ _]; [|clear; case: noend; case: nodecl=> -> //].
-    rewrite/acmd_step -!surjective_pairing in nodecl'.
-    rewrite/acmd_step.
-    pattern_eq_2 [pre_cmd_action _ _ _] [pre_cmd_action _ _ _]; cycle 1. 
-      { move=> <- {precmdeq}.
-      pattern_eq_2 [post_cmd_action _ _ _] [post_cmd_action _ _ _]=> [|-> //].
-      move: noend nodecl cmdrest nodecl'. 
-      clear=> - [] [] //; case: cmd => //= - [] // [] //. } (* Very interesting that you need //= *)
-    move: (pre_cmd_wf_int adv)=>/(_ states str).
-    rewrite {}precmdeq /= in nodecl' *.
-    case: noend cmdrest=> /= cmdrest.
-      { suff: wt states = None; [move=> -> _; clear; case: nodecl=> //|].
-      move: noend' cmdrest; clear.
-      case: nodecl; case: cmd=> // - [] // [] //. } 
-    move wte: (wt _)=> [ [vr vl] |]; move: wte; clear; case: nodecl=> /= -> //.
-    1,2: case untr : is_untrusted=> // wf. (* TODO: Lemma *)
-    1,2: suff: (str vr = vl); [move=> <-; exact: update_to_store_id|].
-    1,2: move: wf=> /equal_f /(_ vr).
-    1,2: rewrite/⟨_|_⟩ /is_trusted untr /=.
-    1,2: case=> <-;  exact: update_to_store_same. 
-  Qed.
-
-  (* TODO: What is next? Need to have a full thing  *)
-
-End ts_restr_implication.
-
-Section sim_inv_restriction.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
-
-  Variable (adv : AdvNextStep (AtkStates := States)).
-
-  Import Util.List VarValStore.Notations.
+  Notation AtkStates := (States a).
+  Notation CombCfg := (Combined.Cfg (AtkStates := AtkStates)).
+  Notation ainit := (Attacker.init a).
+  Notation astep := (Attacker.step a).
 
   Ltac inv_auto := auto using cfg_step_inv, erase_filter_inv.
-  Lemma sim_learn_restiction c: 
-    (exists comb, (Invariant comb /\ c = extract_one_cfg false (extract_2cfg comb))) ->
-    idealcfg_restriction (construct_simulator adv) c.
+  Theorem wt_idlatk_rest :
+    WellFormedProg ptlbl p ->
+    IdlAtkDowngradeRestr p (construct_full_simulator p a).
   Proof.
-    move=> cinv. pattern c in cinv. (* Normal rocq tactic *) revert cinv. set inv := (X in (X c) ->_)=> /= cinv.
-    rewrite/idealcfg_restriction. 
+    move=> wt.
+    rewrite/IdlAtkDowngradeRestr.
     let t := open_constr:(?[ast_trans]) in pose ast_trans:= t; exists ast_trans.
     let t := open_constr:(?[ast_corr]) in pose ast_corr:= t; exists ast_corr.
-    move=> cmd > /=. 
-    set final := (X in reachable _ _ X)=> rch. 
+    move=> /= inp > rch.
+    pose inv c := [elaborate (exists comb : CombCfg,  Invariant comb /\ (c = extract_one_cfg false (extract_2cfg comb)))].
+    set init := (X in reachable _ X _) in rch. set final := (X in reachable _ _ X) in rch.
     have: inv final.
-      { apply:reachable_invariant; [eassumption| |eassumption].
-      clear. rewrite{}/inv=> twocfg [comb [invcomb ->]].
-      exists (cfg_step adv (erase_filter_cfg false comb)).
-      split; inv_auto.
-      rewrite -extract_step_commute ?extract_erase_commute; inv_auto.
-      move: (extract_2cfg _)=> ?.
-      rewrite extract_one_erase_idem erase_filter_step_commute //. }
-    subst inv final=> {rch} /= - []; clear cinv c.
+      { apply: reachable_invariant; [..|exact: rch].
+      - rewrite {}/inv /init.  exists (Combined.init_cfg p ainit inp).
+        split; auto using init_inv.
+        rewrite /= /cmd_map !map_map filter_map_swap /= /is_running filter_true.
+        rewrite/cmd_map_sim filter_map_swap !map_map //. 
+      - clear. rewrite{}/inv=> _ [cmb] [cmbinv] ->.
+        exists (cfg_step astep (erase_filter_cfg false cmb)).
+        split; inv_auto.
+        rewrite -extract_step_commute ?extract_erase_commute; inv_auto.
+        move: (extract_2cfg _)=> ?.
+        rewrite extract_one_erase_idem erase_filter_step_commute //. }
+    clear rch init wt. rewrite{}/inv {}/final. clear. case.
     case=> - [? idlst ? ? lst] [].
     rewrite/Invariant=> - [] lstinv.
     rewrite/StateInv=> _.
@@ -312,7 +139,7 @@ Section sim_inv_restriction.
         move e: (oapp _ _ _)=> [[? ?]| ]; [|clear;case: cmd=> // - [] // [] //].
         move: e=>/extr_decl_opt=> -[] -> //. }
       rewrite {}/ctrldecl {}/cmd {}/simst' {}/f_ast {}/ast_trans.
-      instantiate (ast_trans :=( fun st val => (sim_post adv st (fun => val)))).
+      instantiate (ast_trans :=( fun st val => (sim_post astep st (fun => val)))).
       move is_decl : (oapp _ _ _)=> x; move: x is_decl; case=> [[src dst] ? | ? ? ]; rewrite {}asteq; cycle 1.
         { move: (optcmd_stp_store _ _)=> ?.
         rewrite/sim_post.
@@ -371,24 +198,199 @@ Section sim_inv_restriction.
      move=>/extr_endorse_wf_opt /[apply] //.
   Qed.
 
-End sim_inv_restriction.
+End wt_idlatk_rest.
 
-Section sim_restriction.
-  Import Attacker Semantics.
+
+Section semantic_preds.
+  Import Noninterference VarValStore.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
+  Notation AdvNextStep := (AdvNextStep (AtkStates := AtkStates)).
+
+  Variable adv_step : AdvNextStep.
+
+  (* TODO: Am i respective these prop naming rules? *)
+  Definition Passive : Prop :=
+    let: corr_fn :=  pre_cmd_action adv_step in
+    forall ast store, corr_fn ast store = store.
+
+  Definition Nonmauling : Prop :=
+    let: corr_fn :=  pre_cmd_action adv_step in
+    exists nm_corr_fn : AtkStates -> StoreView,
+    forall ast store, corr_fn ast store = ⟨ (nm_corr_fn ast)  → store ⟩.
+  
+  Definition Incurious : Prop :=
+    forall st,
+    let: learn_fn :=  post_cmd_action adv_step st in
+    Noninterfering id learn_fn id.  (* Maybe I should just define and write constant? *)
+
+
+  Definition NMIFRestr :=  Nonmauling.
+  Definition TERestr :=  Nonmauling /\ Incurious.
+  Definition RDRestr := Passive.
+  Definition NIRestr := Passive /\ Incurious.
+End semantic_preds.
+
+Section atk_step_update.
+  Import VarValStore.Notations Noninterference Util.DecEq.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
+  Notation AdvNextStep := (AdvNextStep (AtkStates := AtkStates)).
+
+  Notation ReplCorrInp := (AtkStates -> option (Vars * Vals) (* endorsed value *)).
+
+  Obligation Tactic := try easy.
+  Program Definition replace_corruptor
+      (adv : AdvNextStep) (corr : ReplCorrInp ) : AdvNextStep := {|
+    pre_cmd_action  := fun ast store =>
+      if corr ast is Some (var, val) then
+        (if is_untrusted var then update_to_store store var val else store)
+      else store;
+    pre_cmd_event   := pre_cmd_event adv;
+    post_cmd_action := post_cmd_action adv;
+    post_cmd_wf     := post_cmd_wf adv;
+  |}.
+  Next Obligation.
+    move=> ? corr ast /= st. case e: (corr ast)=> [[var val]|] //.
+    case eu: (is_untrusted var)=> //.
+    apply: update_storeview_nochange. rewrite /is_trusted eu //.
+  Qed.
+  Next Obligation.
+    move=> ? corr ast /=. rewrite /Noninterfering=> i1 i2 heq.
+    case: (corr ast)=> [[var val]|]; [|exact: heq].
+    case: (is_untrusted var); [exact: update_same_varval heq | exact: heq].
+  Qed.
+
+  Lemma replace_corruptor_nonmauling
+      (adv : AdvNextStep) (corr : ReplCorrInp):
+      Nonmauling (replace_corruptor adv corr).
+  Proof.
+    rewrite/Nonmauling. eexists.
+    rewrite /pre_cmd_action/replace_corruptor=> ast store.
+    instantiate (1 := fun ast => if corr ast is Some (var, val) then _ else _).
+    move e: (corr _)=> [ [var val] | ]; rewrite {}e /=; [|instantiate (1 := fun _ => None); done].
+    instantiate (1 := if is_untrusted var then _ else _).
+    case e: (is_untrusted _); [|instantiate (1 := fun _ => None); done].
+    rewrite/⟨ _ → _ ⟩/update_to_store.
+    instantiate (1 := fun var' => if var =? var' then _ else _).
+    apply: store_eq_ext=> v.
+    case: (var =? v); [|instantiate (1 := None);done].
+    instantiate (1 := Some _); done.
+  Qed.
+
+  Program Definition remove_corruptor (adv : AdvNextStep) : AdvNextStep := {|
+    pre_cmd_action  := fun _ store => store;
+    pre_cmd_event   := pre_cmd_event adv;
+    post_cmd_action := post_cmd_action adv;
+    post_cmd_wf     := post_cmd_wf adv;
+  |}.
+
+
+  Notation ReplLrnInp := (AtkStates -> (AtkStates * nat)).
+  (* Record update!! *)
+
+
+  Program Definition replace_learner
+      (adv : AdvNextStep) (learn : AtkStates -> (AtkStates * nat)) : AdvNextStep := {|
+    pre_cmd_action  := pre_cmd_action adv;
+    pre_cmd_event   := pre_cmd_event adv;
+    post_cmd_action := fun ast _ => learn ast;
+    pre_cmd_wf_int  := pre_cmd_wf_int adv;
+    pre_cmd_wf_conf := pre_cmd_wf_conf adv;
+  |}.
+
+End atk_step_update.
+
+Section ts_restr_implication.
+  Import VarValStore.Notations Util.DecEq Util.DecEq.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
-  Definition idealatk_restriction (p : Prog) (a : Attacker) : Prop :=
-    forall inp, idealcfg_restriction (Attacker.step a) (init_cfg p (Attacker.init a) inp).
+  Variable (adv : Attacker) (prog : Prog).
+  Variable noend nodecl : bool.
 
-  Theorem sim_restriction p a :
-    WellFormedProg ptlbl p ->
-    idealatk_restriction p (construct_full_simulator p a).
+  Notation adv_init := (Attacker.init adv).
+  Notation adv_step := (Attacker.step adv).
+
+  Notation adv_restr adv_step := 
+    (match noend, nodecl with
+      | true, true => NIRestr adv_step
+      | true, false => RDRestr adv_step
+      | false, true => TERestr adv_step
+      | false, false => NMIFRestr adv_step
+    end).
+  
+  Notation witness_constr adv_step corr_fn learn_fn :=
+    (match noend, nodecl with
+      | true, true => replace_learner (remove_corruptor adv_step) (fun st => learn_fn st val_ne)
+      | true, false => remove_corruptor adv_step
+      | false, true => replace_learner (replace_corruptor adv_step corr_fn) (fun st => learn_fn st val_ne)
+      | false, false => replace_corruptor adv_step corr_fn
+    end).
+
+  Notation cmd_restr cmd :=
+    (match noend, nodecl with
+      | true, true => 
+         match cmd with
+         | Some(assign(endorse _ _)) | Some(assign(declassify _ _))  =>  False
+         | _ => True
+         end
+      | true, false => 
+         match cmd with
+         | Some(assign(endorse _ _)) => False
+         | _ => True
+         end
+      | false, true => 
+         match cmd with
+         | Some(assign(declassify _ _)) => False
+         | _ => True
+         end
+      | false, false => True
+    end).
+
+  (* TODO: Copy? *)
+  Notation init_cfg_fn inp := ((Semantics.init_cfg prog adv_init inp)). 
+  Lemma ts_sem_impl:
+    IdlAtkDowngradeRestr prog adv ->
+    exists adv_step',
+      adv_restr adv_step' /\
+      forall inp, let: cfg := init_cfg_fn inp in
+      forall cmd rstcmd store ast, 
+        let: acmd := mk_atkcmd true cmd in  
+        let: state := (store, ast) in
+        let: c := ((acmd :: rstcmd), state) in
+        (cmd_restr cmd) ->
+        reachable (step adv_step) (init_cfg_fn inp) c ->
+        step adv_step c = step adv_step' c /\ event adv_step c = event adv_step' c.
   Proof.
-    rewrite /idealatk_restriction /construct_full_simulator /=.
-    move=> wt inp.
-    apply: sim_learn_restiction. (* TODO: Bad name *)
-    exists (Combined.init_cfg p (Attacker.init a) inp); split; eauto using init_inv.
-    rewrite /= /cmd_map !map_map filter_map_swap /= /is_running filter_true.
-    rewrite/cmd_map_sim filter_map_swap !map_map //.
+    rewrite /IdlAtkDowngradeRestr/NMIFRestr/RDRestr/TERestr/NIRestr.
+    move=> - [trns] [wt] p.
+    exists (witness_constr adv_step wt trns).
+    split.
+      { move: noend nodecl=> [] [] //; [split|]=> //; exact: replace_corruptor_nonmauling. }
+    move=> ? cmd ? str states cmdrest.
+    move: p=> /[apply].
+    case=> nodecl' [] precmdeq  noend'.
+    rewrite /event/step.
+    pattern_eq_2 [acmd_step _ _ _] [acmd_step _ _ _]; [|clear; case: noend; case: nodecl=> -> //].
+    rewrite/acmd_step -!surjective_pairing in nodecl'.
+    rewrite/acmd_step.
+    pattern_eq_2 [pre_cmd_action _ _ _] [pre_cmd_action _ _ _]; cycle 1. 
+      { move=> <- {precmdeq}.
+      pattern_eq_2 [post_cmd_action _ _ _] [post_cmd_action _ _ _]=> [|-> //].
+      move: noend nodecl cmdrest nodecl'. 
+      clear=> - [] [] //; case: cmd => //= - [] // [] //. } (* Very interesting that you need //= *)
+    move: (pre_cmd_wf_int adv_step)=>/(_ states str).
+    rewrite {}precmdeq /= in nodecl' *.
+    case: noend cmdrest=> /= cmdrest.
+      { suff: wt states = None; [move=> -> _; clear; case: nodecl=> //|].
+      move: noend' cmdrest; clear.
+      case: nodecl; case: cmd=> // - [] // [] //. } 
+    move wte: (wt _)=> [ [vr vl] |]; move: wte; clear; case: nodecl=> /= -> //.
+    1,2: case untr : is_untrusted=> // wf. (* TODO: Lemma *)
+    1,2: suff: (str vr = vl); [move=> <-; exact: update_to_store_id|].
+    1,2: move: wf=> /equal_f /(_ vr).
+    1,2: rewrite/⟨_|_⟩ /is_trusted untr /=.
+    1,2: case=> <-;  exact: update_to_store_same. 
   Qed.
-End sim_restriction.
+
+  (* TODO: What is next? Need to have a full thing  *)
+
+End ts_restr_implication.
