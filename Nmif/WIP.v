@@ -181,7 +181,7 @@ Section ts_restr_implication.
     revert idl_rest; rewrite /idealcfg_restriction/NMIFRestr => - [?] [wt] p.
     exists (replace_corruptor adv wt); split; auto using replace_corruptor_nonmauling.
     move=> ? ? str states.
-    move/p.
+    move: p=> /[apply].
     case=> _ [] e1 e2.
     rewrite/event/step.
     pattern_eq_2 [acmd_step _ _ _] [acmd_step _ _ _]=> [|-> //].
@@ -210,11 +210,11 @@ Section ts_restr_implication.
   Proof.
     revert idl_rest; rewrite /idealcfg_restriction/RDRestr => - [?] [wt] p.
     exists (remove_corruptor adv); split; auto using remove_corruptor_passive.
-    move=> ? ? str states nodecl.
+    move=> ? ? str states noend.
     move: p=> /[apply].
     case=> _ [] e1 e2.
     have {}e2 : (wt states = None).
-      { move: nodecl e2.
+      { move: noend e2.
       case: (X in match X with Some _ => _ | _ => True  end)=> //-  [] // [] //. }
     rewrite {}e2 in e1.
     rewrite/event/step.
@@ -236,7 +236,30 @@ Section ts_restr_implication.
       reachable (step adv) cfg c ->
       step adv c = step adv' c /\ event adv c = event adv' c.
   Proof.
-  (* Here, youre adversary needs to be replace_corruptor + replace_learner ... ? *)
+    revert idl_rest; rewrite /idealcfg_restriction/TERestr => - [trns] [wt] p.
+    exists (replace_learner (replace_corruptor adv wt)  (fun st => trns st val_ne)).
+    split.
+      { split; auto using replace_learner_incurious. admit. }
+    move=> cmd ? str states nodecl.
+    move: p=> /[apply] - [e1] [e2] _.
+    rewrite/event/step.
+    pattern_eq_2 [acmd_step _ _ _] [acmd_step _ _ _]=> [|-> //].
+    rewrite/acmd_step -!surjective_pairing in e1.
+    rewrite/acmd_step.
+    pattern_eq_2 [pre_cmd_action _ _ _] [pre_cmd_action _ _ _]=> [|<- //].
+      { move: (pre_cmd_wf_int adv)=>/(_ states str).
+      rewrite {}e2 /replace_corruptor /=.
+      move wte: (wt _)=> [ [vr vl] |//]; clear=> wf. 
+      case untr : is_untrusted=> //. (* TODO: Lemma *)
+      suff: (str vr = vl); [move=> <-; exact: update_to_store_id|].
+      move: wf=> /equal_f /(_ vr).
+      rewrite/⟨_|_⟩ /is_trusted untr /=.
+      case=> <-.  exact: update_to_store_same. } (* Copied *)
+    move=> {e2}.
+    pattern_eq_2 [post_cmd_action _ _ _] [post_cmd_action _ _ _]=> [|-> //].
+    move=> /=.
+    move: nodecl e1.
+    case: cmd=> //- [] // [] //.
   Admitted.
 
   Lemma ts_ni:
@@ -251,6 +274,25 @@ Section ts_restr_implication.
       reachable (step adv) cfg c ->
       step adv c = step adv' c /\ event adv c = event adv' c.
   Proof.
+    revert idl_rest; rewrite /idealcfg_restriction/NIRestr => - [trns] [wt] p.
+    exists (replace_learner (remove_corruptor adv)  (fun st => trns st val_ne)).
+    split.
+      { split; auto using replace_learner_incurious. admit. }
+    move=> cmd ? str states nodecl noend.
+    move: p=> /[apply] - [e1] [e2] e3.
+    rewrite/event/step.
+    pattern_eq_2 [acmd_step _ _ _] [acmd_step _ _ _]=> [|-> //].
+    rewrite/acmd_step -!surjective_pairing in e1.
+    rewrite/acmd_step.
+    pattern_eq_2 [pre_cmd_action _ _ _] [pre_cmd_action _ _ _]=> [|<- //].
+      { rewrite {}e2. 
+      suff: wt states = None=> [-> //|].
+      move: noend e3; clear.
+      case: cmd=> // - [] // [] //. }
+    pattern_eq_2 [post_cmd_action _ _ _] [post_cmd_action _ _ _]=> [|-> //].
+    move=> /=.
+    move: nodecl e1; clear.
+    case: cmd=> //- [] // [] //. 
   Admitted.
 
 End ts_restr_implication.
