@@ -54,6 +54,7 @@ Section sim_restriction.
   Notation acmd_step := (acmd_step adv).
   Notation pre_cmd_action := (pre_cmd_action adv).
 
+  (* TODO: Maybe naming is not useful *)
   Definition IdealAstTrans := States -> Vals (* declassified value *) -> (States * nat) (* ast , substeps *).
   Definition IdealAstCorr := States -> option (Vars * Vals) (* endorsed value *).
   
@@ -96,10 +97,9 @@ Section step_update.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
   Notation AdvNextStep := (AdvNextStep (AtkStates := States)).
 
-  Variable (adv : AdvNextStep) (corr : IdealAstCorr (States := States)).
-
   Obligation Tactic := try easy.
-  Program Definition replace_corruptor : AdvNextStep := {|
+  Program Definition replace_corruptor
+      (adv : AdvNextStep) (corr : IdealAstCorr (States := States)) : AdvNextStep := {|
     pre_cmd_action  := fun ast store =>
       if corr ast is Some (var, val) then
         (if is_untrusted var then update_to_store store var val else store)
@@ -109,33 +109,56 @@ Section step_update.
     post_cmd_wf     := post_cmd_wf adv;
   |}.
   Next Obligation.
-    move=> ast /= st. case e: (corr ast)=> [[var val]|] //.
+    move=> ? corr ast /= st. case e: (corr ast)=> [[var val]|] //.
     case eu: (is_untrusted var)=> //.
     apply: update_storeview_nochange. rewrite /is_trusted eu //.
   Qed.
   Next Obligation.
-    move=> ast /=. rewrite /Noninterfering=> i1 i2 heq.
+    move=> ? corr ast /=. rewrite /Noninterfering=> i1 i2 heq.
     case: (corr ast)=> [[var val]|]; [|exact: heq].
     case: (is_untrusted var); [exact: update_same_varval heq | exact: heq].
   Qed.
 
-  Lemma replace_corruptor_nonmauling : Nonmauling replace_corruptor.
+  Lemma replace_corruptor_nonmauling
+      (adv : AdvNextStep) (corr : IdealAstCorr (States := States)) :
+      Nonmauling (replace_corruptor adv corr).
   Proof.
     rewrite/Nonmauling. eexists.
     rewrite /pre_cmd_action/replace_corruptor=> ast store.
     instantiate (1 := fun ast => if corr ast is Some (var, val) then _ else _).
-    move e: (corr _)=> [ [var val] | ]; rewrite {}e /=; cycle 1.
-      { instantiate (1 := fun _ => None). done. }
+    move e: (corr _)=> [ [var val] | ]; rewrite {}e /=; [|instantiate (1 := fun _ => None); done].
     instantiate (1 := if is_untrusted var then _ else _).
-    case e: (is_untrusted _); cycle 1.
-      { instantiate (1 := fun _ => None). done. }
+    case e: (is_untrusted _); [|instantiate (1 := fun _ => None); done].
     rewrite/⟨ _ → _ ⟩/update_to_store.
     instantiate (1 := fun var' => if var =? var' then _ else _).
     apply: store_eq_ext=> v.
-    case: (var =? v); cycle 1.
-      { instantiate (1 := None). done. }
-    instantiate (1 := Some val). done.
+    case: (var =? v); [|instantiate (1 := None);done].
+    instantiate (1 := Some _); done.
   Qed.
+
+  (* Record update!! *)
+  Program Definition remove_corruptor (adv : AdvNextStep) : AdvNextStep := {|
+    pre_cmd_action  := fun _ store => store;
+    pre_cmd_event   := pre_cmd_event adv;
+    post_cmd_action := post_cmd_action adv;
+    post_cmd_wf     := post_cmd_wf adv;
+  |}.
+
+  Lemma remove_corruptor_passive (adv : AdvNextStep) : Passive (remove_corruptor adv).
+  Proof. done. Qed.
+
+  Program Definition replace_learner
+      (adv : AdvNextStep) (learn : States -> (States * nat)) : AdvNextStep := {|
+    pre_cmd_action  := pre_cmd_action adv;
+    pre_cmd_event   := pre_cmd_event adv;
+    post_cmd_action := fun ast _ => learn ast;
+    pre_cmd_wf_int  := pre_cmd_wf_int adv;
+    pre_cmd_wf_conf := pre_cmd_wf_conf adv;
+  |}.
+
+  Lemma replace_learner_incurious (adv : AdvNextStep) (learn : States -> (States * nat)) : Incurious (replace_learner adv learn).
+  Proof. done. Qed.
+
 End step_update.
 
 Section ts_restr_implication.
@@ -152,16 +175,9 @@ Section ts_restr_implication.
       forall n, Nat.iter n (step adv) cfg = Nat.iter n (step adv') cfg.
   Proof.
     revert idl_rest.
-    rewrite /idealcfg_restriction=> - [?] [wt] ?.
-    unshelve eexists.
-      { clear - adv wt.
-      rewrite/IdealAstCorr in wt.
-      unshelve refine {|
-         pre_cmd_action ast st :=  let t := wt ast in ⟨ _ → st ⟩;
-         pre_cmd_event := pre_cmd_event adv;
-         post_cmd_action := post_cmd_action adv;
-         post_cmd_wf := post_cmd_wf adv
-      |}.
+    rewrite /idealcfg_restriction/reachable=> - [?] [wt] ?.
+    exists (replace_corruptor adv wt); split; auto using replace_corruptor_nonmauling.
+    elim=> // ? ih /=.
   Abort.
 End ts_restr_implication.
 
