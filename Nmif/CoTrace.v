@@ -18,6 +18,18 @@ Section trace.
   CoInductive Trace : Type := tcons : Events -> Trace -> Trace.
 End trace.
 
+Section build.
+  Context `{!EventPrm} {State : Type} (step : State -> State) (event : State -> Events).
+
+  CoFixpoint build (s : State) : Trace := tcons (event s) (build (step s)).
+
+  Lemma build_unfold s : build s = tcons (event s) (build (step s)).
+  Proof.
+    suff: (build s = match build s with tcons e t' => tcons e t' end)=> //.
+    case: (build s)=> //.
+  Qed.
+End build.
+
 Section trace_weq.
   Context `{!EventPrm}.
 
@@ -52,17 +64,6 @@ End trace_weq.
 
 Notation "t1 ≈ t2" := (Trace_weq t1 t2) (at level 70, no associativity).
 
-Section build.
-  Context `{!EventPrm} {State : Type} (step : State -> State) (event : State -> Events).
-
-  CoFixpoint build (s : State) : Trace := tcons (event s) (build (step s)).
-
-  Lemma build_unfold s : build s = tcons (event s) (build (step s)).
-  Proof.
-    suff: (build s = match build s with tcons e t' => tcons e t' end)=> //.
-    case: (build s)=> //.
-  Qed.
-End build.
 
 Section bisim.
   Context `{!EventPrm} {S1 S2 : Type}

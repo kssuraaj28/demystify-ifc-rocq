@@ -354,11 +354,16 @@ Section ts_restr_implication.
 
   (* TODO: Copy? *)
   Notation init_cfg_fn inp := ((Semantics.init_cfg prog adv_init inp)). 
-  Lemma ts_sem_impl:
-    IdlAtkDowngradeRestr prog adv ->
+
+
+  Definition RuntimeCmdRestr :=
     (forall inp cfg, 
       reachable (step adv_step) (init_cfg_fn inp) cfg ->
-      CfgListRestr cfg) ->
+      CfgListRestr cfg).
+
+  Lemma ts_sem_impl':
+    IdlAtkDowngradeRestr prog adv ->
+    RuntimeCmdRestr ->
     exists adv_step', adv_restr adv_step' /\
     forall inp cfg, 
       reachable (step adv_step) (init_cfg_fn inp) cfg ->
@@ -395,6 +400,19 @@ Section ts_restr_implication.
     1,2: rewrite/⟨_|_⟩ /is_trusted untr /=.
     1,2: case=> <-;  exact: update_to_store_same. 
   Qed.
+  
+  Lemma ts_sem_impl:
+    IdlAtkDowngradeRestr prog adv ->  RuntimeCmdRestr ->
+    exists adv', adv_restr (Attacker.step adv') /\
+    forall inp, ⟦ prog | adv  ⟧ inp ≈ ⟦prog | adv' ⟧ inp.
+  Proof.
+    move: ts_sem_impl'=> /[apply] /[apply] - [] step' [restr1 restr2].
+    exists {|States := States adv; init := init adv ; Attacker.step :=  step' |}.
+    move=> /=; split=> // {restr1}.
+    move=> inp; move: restr2=> /(_ inp). (* Why no apply *)
+    rewrite /⟦_|_ ⟧ /=.
+    move: (init_cfg_fn _)=> ?.
+  Admitted.
 
   (* TODO: What is next? Need to have a full thing 
 
