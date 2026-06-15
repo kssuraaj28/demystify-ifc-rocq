@@ -404,18 +404,21 @@ Section ts_restr_implication.
   Lemma ts_sem_impl:
     IdlAtkDowngradeRestr prog adv ->  RuntimeCmdRestr ->
     exists adv', adv_restr (Attacker.step adv') /\
-    forall inp, ⟦ prog | adv  ⟧ inp ≈ʷ ⟦prog | adv' ⟧ inp.
+    forall inp, ⟦ prog | adv  ⟧ inp ≈ˢ ⟦prog | adv' ⟧ inp.
   Proof.
     move: ts_sem_impl'=> /[apply] /[apply] - [] step' [restr1 restr2].
     exists {|States := States adv; init := init adv ; Attacker.step :=  step' |}.
     move=> /=; split=> // {restr1}.
     move=> inp; move: restr2=> /(_ inp). (* Why no apply *)
     rewrite /⟦_|_ ⟧ /=.
-    move: (init_cfg_fn _)=> ?.
-  Admitted.
-
-  (* TODO: What is next? Need to have a full thing 
-
-  *)
+    set initcfg := (init_cfg_fn _)=> inv.
+    pose bsirel cfg cfg' := cfg = cfg' /\ reachable (step adv_step) initcfg cfg. (* Can I use evar magic *)
+    unshelve apply: trace_sbisim; [exact bsirel| ..]; subst bsirel; cycle 1.
+      { rewrite /= /initcfg. split=> //. move. exists 0. done. } (* TODO: Lemma *)
+    move=> s1 s2 [<- rch].
+    move: (inv _ rch)=> [? ?].
+    do 2 split=> //.
+    move: rch=> [n ->]. exists (S n)=> //. (* Should be a lemma. TODO *) (* I don't know what I did here *)
+  Qed.
 
 End ts_restr_implication.
