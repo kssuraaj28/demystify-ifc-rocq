@@ -1,5 +1,5 @@
-From Stdlib Require List ssreflect ssrfun ssrbool.
-Import List ListNotations ssreflect ssrfun ssrbool.
+From Stdlib Require List ssreflect ssrfun ssrbool FunctionalExtensionality.
+Import List ListNotations ssreflect ssrfun ssrbool FunctionalExtensionality.
 
 From Ltac2 Require Import Ltac2.
 
@@ -162,34 +162,98 @@ Section step_update.
 End step_update.
 
 Section ts_restr_implication.
-  Import VarValStore.Notations Util.DecEq.Notations.
+  Import VarValStore.Notations Util.DecEq Util.DecEq.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
 
   Variable (adv : AdvNextStep (AtkStates := States))  (cfg : Cfg (AtkStates:= States)).
   Hypothesis (idl_rest : idealcfg_restriction adv cfg).
 
-
-  Lemma ts_nonmaul:
-    exists adv',
-      Nonmauling adv' /\
-      forall n, Nat.iter n (step adv) cfg = Nat.iter n (step adv') cfg.
+  Lemma ts_nmif:
+    exists adv', 
+    NMIFRestr adv' /\
+    forall cmd rstcmd store ast, 
+      let: acmd := mk_atkcmd true cmd in  
+      let: state := (store, ast) in
+      let: c := ((acmd :: rstcmd), state) in
+      reachable (step adv) cfg c ->
+      step adv c = step adv' c /\ event adv c = event adv' c.
   Proof.
-    revert idl_rest.
-    rewrite /idealcfg_restriction/reachable=> - [?] [wt] ?.
+    revert idl_rest; rewrite /idealcfg_restriction/NMIFRestr => - [?] [wt] p.
     exists (replace_corruptor adv wt); split; auto using replace_corruptor_nonmauling.
-    elim=> // ? ih /=.
-  Abort.
+    move=> ? ? str states.
+    move/p.
+    case=> _ [] e1 e2.
+    rewrite/event/step.
+    pattern_eq_2 [acmd_step _ _ _] [acmd_step _ _ _]=> [|-> //].
+    rewrite/acmd_step.
+    pattern_eq_2 [pre_cmd_action _ _ _] [pre_cmd_action _ _ _]=> [|-> //].
+    move: (pre_cmd_wf_int adv)=>/(_ states str).
+    rewrite {}e1 /replace_corruptor /=.
+    move wte: (wt _)=> [ [vr vl] |//]; clear=> wf. 
+    case untr : is_untrusted=> //. (* TODO: Lemma *)
+    suff: (str vr = vl); [move=> <-; exact: update_to_store_id|].
+    move: wf=> /equal_f /(_ vr).
+    rewrite/⟨_|_⟩ /is_trusted untr /=.
+    case=> <-.  exact: update_to_store_same.
+  Qed.
+
+  Lemma ts_rd:
+    exists adv', 
+    RDRestr adv' /\
+    forall cmd rstcmd store ast, 
+      let: acmd := mk_atkcmd true cmd in  
+      let: state := (store, ast) in
+      let: c := ((acmd :: rstcmd), state) in
+      (if cmd is Some(assign(endorse _ _)) then False else True) ->
+      reachable (step adv) cfg c ->
+      step adv c = step adv' c /\ event adv c = event adv' c.
+  Proof.
+    revert idl_rest; rewrite /idealcfg_restriction/RDRestr => - [?] [wt] p.
+    exists (remove_corruptor adv); split; auto using remove_corruptor_passive.
+    move=> ? ? str states nodecl.
+    move: p=> /[apply].
+    case=> _ [] e1 e2.
+    have {}e2 : (wt states = None).
+      { move: nodecl e2.
+      case: (X in match X with Some _ => _ | _ => True  end)=> //-  [] // [] //. }
+    rewrite {}e2 in e1.
+    rewrite/event/step.
+    pattern_eq_2 [acmd_step _ _ _] [acmd_step _ _ _]=> [|-> //].
+    rewrite/acmd_step.
+    pattern_eq_2 [pre_cmd_action _ _ _] [pre_cmd_action _ _ _]=> [|-> //].
+    auto.
+  Qed.
+  (* TODO: Generalize this for ni, rd , and te etc..  *)
+
+  Lemma ts_te:
+    exists adv', 
+    TERestr adv' /\
+    forall cmd rstcmd store ast, 
+      let: acmd := mk_atkcmd true cmd in  
+      let: state := (store, ast) in
+      let: c := ((acmd :: rstcmd), state) in
+      (if cmd is Some(assign(declassify _ _)) then False else True) ->
+      reachable (step adv) cfg c ->
+      step adv c = step adv' c /\ event adv c = event adv' c.
+  Proof.
+  (* Here, youre adversary needs to be replace_corruptor + replace_learner ... ? *)
+  Admitted.
+
+  Lemma ts_ni:
+    exists adv', 
+    NIRestr adv' /\
+    forall cmd rstcmd store ast, 
+      let: acmd := mk_atkcmd true cmd in  
+      let: state := (store, ast) in
+      let: c := ((acmd :: rstcmd), state) in
+      (if cmd is Some(assign(declassify _ _)) then False else True) ->
+      (if cmd is Some(assign(endorse _ _)) then False else True) ->
+      reachable (step adv) cfg c ->
+      step adv c = step adv' c /\ event adv c = event adv' c.
+  Proof.
+  Admitted.
+
 End ts_restr_implication.
-
-Check idealcfg_restriction.
-Check cfg_trace.
-Check Nat.iter _ (step _).
-(* 
-  TODO: Need to show that idealcfg_restriction implies that the adversary step is nonmauling?
-  - This is not exactly true though.
-  Maybe I need to show this,
-
-*)
 
 Section sim_inv_restriction.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.

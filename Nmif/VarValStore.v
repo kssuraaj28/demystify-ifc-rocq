@@ -104,6 +104,13 @@ Section thms.
     update_to_store s v val v = val.
   Proof. rewrite /update_to_store dec_eq_refl. done. Qed.
 
+  Lemma update_to_store_id s v:
+    update_to_store s v (s v) = s.
+  Proof.
+    apply: store_eq_ext=> v'. rewrite /update_to_store.
+    case: (dec_eq v v')=> [->|]//.
+  Qed.
+
   Lemma update_shadow s v a b:
     update_to_store (update_to_store s v a) v b = update_to_store s v b.
   Proof.
