@@ -416,9 +416,9 @@ Section ts_restr_implication.
     unshelve apply: trace_sbisim; [exact bsirel| ..]; subst bsirel; cycle 1.
       { rewrite /= /initcfg. split=> //. move. exists 0. done. } (* TODO: Lemma *)
     move=> s1 s2 [<- rch].
-    move: (inv _ rch)=> [? ?].
+    move: inv (rch)=> /[apply]=> [] [] <- <-.
     do 2 split=> //.
-    move: rch=> [n ->]. exists (S n)=> //. (* Should be a lemma. TODO *) (* I don't know what I did here *)
+    move: rch=> [n ->]. exists (S n)=> //. (* Should be a lemma. TODO *) 
   Qed.
 
 End ts_restr_implication.
