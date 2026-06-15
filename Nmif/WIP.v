@@ -12,6 +12,38 @@ Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
 #[local] Notation Cfg := Semantics.Cfg.
+
+(* This is a predicate over attacker 'next'.
+  TODO: Maybe we should define it as a predicate over just pre_cmd_action.
+*)
+Section semantic_preds.
+  Import Noninterference VarValStore.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
+  Notation AdvNextStep := (AdvNextStep (AtkStates := States)).
+
+  Variable adv : AdvNextStep.
+
+  (* TODO: Am i respective these prop naming rules? *)
+  Definition Passive : Prop :=
+    let: corr_fn :=  pre_cmd_action adv in
+    forall ast store, corr_fn ast store = store.
+
+  Definition Nonmauling : Prop :=
+    let: corr_fn :=  pre_cmd_action adv in
+    exists nm_corr_fn : States -> StoreView,
+    forall ast store, corr_fn ast store = ⟨ (nm_corr_fn ast)  → store ⟩.
+  
+  Definition Incurious : Prop :=
+    forall st,
+    let: learn_fn :=  post_cmd_action adv st in
+    Noninterfering id learn_fn id.  (* Maybe I should just define and write constant? *)
+
+
+  Definition NMIFRestr :=  Nonmauling.
+  Definition TERestr :=  Nonmauling /\ Incurious.
+  Definition RDRestr := Passive.
+  Definition NIRestr := Passive /\ Incurious.
+End semantic_preds.
 (*
 Section passive_corruptor.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
@@ -59,10 +91,13 @@ Section sim_restriction.
   Notation step := (step adv).
   Notation acmd_step := (acmd_step adv).
   Notation pre_cmd_action := (pre_cmd_action adv).
+
+  Definition IdealAstTrans := States -> Vals (* declassified value *) -> (States * nat) (* ast , substeps *).
+  Definition IdealAstCorr := States -> option (Vars * Vals) (* endorsed value *).
   
   Definition idealcfg_restriction: Prop :=
-    exists ast_trans : States -> Vals (* declassified value *) -> (States * nat) (* ast , substeps *),
-    exists ast_corr : States -> option (Vars * Vals) (* endorsed value *),
+    exists ast_trans : IdealAstTrans,
+    exists ast_corr : IdealAstCorr,
 
     forall cmd rstcmd store ast, 
       let: acmd := mk_atkcmd true cmd in  
@@ -93,6 +128,43 @@ Section sim_restriction.
 
       learner_restriction /\ corruptor_restriction.
 End sim_restriction.
+
+Section step_update.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
+
+  (* Need a function here to construct a new AdvNextStep from an existing advnextstep 
+  *)
+
+End step_update.
+
+Section ts_restr_implication.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
+
+  Variable (adv : AdvNextStep (AtkStates := States))  (cfg : Cfg (AtkStates:= States)).
+  Hypothesis (idl_rest : idealcfg_restriction adv cfg).
+
+
+  Lemma ts_nonmaul:
+    exists adv',
+      Nonmauling adv' /\
+      forall n, Nat.iter n (step adv) cfg = Nat.iter n (step adv') cfg.
+  Proof.
+    revert idl_rest.
+    rewrite /idealcfg_restriction=> - [?] [wt] ?.
+    Check wt.
+    idtac.
+  Abort.
+End ts_restr_implication.
+
+Check idealcfg_restriction.
+Check cfg_trace.
+Check Nat.iter _ (step _).
+(* 
+  TODO: Need to show that idealcfg_restriction implies that the adversary step is nonmauling?
+  - This is not exactly true though.
+  Maybe I need to show this,
+
+*)
 
 Section sim_inv_restriction.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
