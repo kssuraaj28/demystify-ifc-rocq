@@ -84,6 +84,33 @@ End trace_seq.
 
 Notation "t1 ≈ˢ t2" := (Trace_seq t1 t2) (at level 70, no associativity).
 
+Section trace_lemmas.
+  Context `{!EventPrm}.
+
+  Lemma Trace_seq_inv {e t1 t2} :
+    Trace_seq (tcons e t1) t2 -> exists t2', t2 = tcons e t2' /\ Trace_seq t1 t2'.
+  Proof.
+    move E: (tcons e t1)=> t H.
+    case: H E=> e0 u1 u2 Hs [-> ->].
+    exists u2; split=> //.
+  Qed.
+
+  Lemma weq_seq_trans t1 t2 t3 :
+    t1 ≈ʷ t2 -> t2 ≈ˢ t3 -> t1 ≈ʷ t3.
+  Proof.
+    move=> Hw Hs.
+    apply: (Trace_weq_coind (fun a c => exists b, Trace_weq a b /\ Trace_seq b c));
+      [| exists t2; split=> //].
+    move=> a c [b [Hab Hbc]].
+    case: Hab Hbc=> [e a' b' Hab' | a' b' Hab' | a' b' Hab'] Hbc.
+    - move: (Trace_seq_inv Hbc)=> [c' [-> Hb'c']].
+      left. exists e, a', c'. split=> //. split=> //. exists b'; split=> //.
+    - right; left. exists a'. split=> //. exists b'; split=> //.
+    - move: (Trace_seq_inv Hbc)=> [c' [-> Hb'c']].
+      right; right. exists c'. split=> //. exists b'; split=> //.
+  Qed.
+End trace_lemmas.
+
 
 Section bisim.
   Context `{!EventPrm} {S1 S2 : Type}
@@ -95,7 +122,7 @@ Section bisim.
          (R (step1 s1) (step2 s2) /\ event1 s1 = event2 s2)
       \/ (R (step1 s1) s2 /\ event1 s1 = stutter)
       \/ (R s1 (step2 s2) /\ event2 s2 = stutter)) ->
-    forall s1 s2, R s1 s2 -> Trace_weq (build step1 event1 s1) (build step2 event2 s2).
+    forall s1 s2, R s1 s2 ->  (build step1 event1 s1) ≈ʷ (build step2 event2 s2).
   Proof.
     move=> Hstep s1 s2 HR.
     pose R' (t1 t2 : Trace) :=
@@ -121,7 +148,7 @@ Section bisim.
 
   Lemma trace_sbisim (R : S1 -> S2 -> Prop) :
     (forall s1 s2, R s1 s2 -> R (step1 s1) (step2 s2) /\ event1 s1 = event2 s2) ->
-    forall s1 s2, R s1 s2 -> Trace_seq (build step1 event1 s1) (build step2 event2 s2).
+    forall s1 s2, R s1 s2 -> (build step1 event1 s1) ≈ˢ (build step2 event2 s2).
   Proof.
     move=> Hstep s1 s2 HR.
     pose R' (t1 t2 : Trace) :=
