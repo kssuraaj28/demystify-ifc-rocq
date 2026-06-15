@@ -4,7 +4,7 @@ Import List ListNotations ssreflect ssrfun ssrbool FunctionalExtensionality.
 From Ltac2 Require Import Ltac2.
 
 Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade Combined Simulator WfFinisher CombinedExtract CoTrace.
-Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade Combined Simulator WfFinisher CombinedExtract CoTrace Tacs.Cook.
+Import Tacs Util Util.List VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade Combined Simulator WfFinisher CombinedExtract CoTrace Tacs.Cook.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
@@ -230,7 +230,7 @@ Section semantic_preds.
   Definition NIRestr := Passive /\ Incurious.
 End semantic_preds.
 
-Section atk_step_update.
+Section atk_step_record_update.
   Import VarValStore.Notations Noninterference Util.DecEq.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
   Notation AdvNextStep := (AdvNextStep (AtkStates := AtkStates)).
@@ -297,7 +297,7 @@ Section atk_step_update.
     pre_cmd_wf_conf := pre_cmd_wf_conf adv;
   |}.
 
-End atk_step_update.
+End atk_step_record_update.
 
 Section ts_restr_implication.
   Import VarValStore.Notations Util.DecEq Util.DecEq.Notations.
@@ -325,47 +325,49 @@ Section ts_restr_implication.
       | false, false => replace_corruptor adv_step corr_fn
     end).
 
-  Notation cmd_restr cmd :=
-    (match noend, nodecl with
+  Notation CmdRestr  :=
+    (fun cmd => match noend, nodecl with
       | true, true => 
          match cmd with
-         | Some(assign(endorse _ _)) | Some(assign(declassify _ _))  =>  False
+         | (assign(endorse _ _)) | (assign(declassify _ _))  =>  False
          | _ => True
          end
       | true, false => 
          match cmd with
-         | Some(assign(endorse _ _)) => False
+         | (assign(endorse _ _)) => False
          | _ => True
          end
       | false, true => 
          match cmd with
-         | Some(assign(declassify _ _)) => False
+         | (assign(declassify _ _)) => False
          | _ => True
          end
       | false, false => True
     end).
 
+  (*Notation ProgRestr := (Forall CmdRestr).  This is tricky *)
+  Notation AcmdProgListRestr := (fun list => Forall (fun '(mk_atkcmd _ ocmd) => oapp CmdRestr True ocmd) list).
+
   (* TODO: Copy? *)
   Notation init_cfg_fn inp := ((Semantics.init_cfg prog adv_init inp)). 
   Lemma ts_sem_impl:
     IdlAtkDowngradeRestr prog adv ->
-    exists adv_step',
-      adv_restr adv_step' /\
-      forall inp, let: cfg := init_cfg_fn inp in
-      forall cmd rstcmd store ast, 
-        let: acmd := mk_atkcmd true cmd in  
-        let: state := (store, ast) in
-        let: c := ((acmd :: rstcmd), state) in
-        (cmd_restr cmd) ->
-        reachable (step adv_step) (init_cfg_fn inp) c ->
-        step adv_step c = step adv_step' c /\ event adv_step c = event adv_step' c.
+    exists adv_step', adv_restr adv_step' /\
+    forall inp, 
+      let: cfg := init_cfg_fn inp in
+      forall cfg',
+        reachable (step adv_step) (init_cfg_fn inp) cfg' ->
+        let: (clst, state) := cfg' in
+        AcmdProgListRestr clst ->
+        step adv_step cfg' = step adv_step' cfg' /\ event adv_step cfg' = event adv_step' cfg'.
   Proof.
     rewrite /IdlAtkDowngradeRestr/NMIFRestr/RDRestr/TERestr/NIRestr.
     move=> - [trns] [wt] p.
     exists (witness_constr adv_step wt trns).
     split.
       { move: noend nodecl=> [] [] //; [split|]=> //; exact: replace_corruptor_nonmauling. }
-    move=> ? cmd ? str states cmdrest.
+    move=> inp [] + [str states] => - [] // [] [] // cmd ?.
+    move=> /[swap]. Forall_inv_toph=> cmdrest _.
     move: p=> /[apply].
     case=> nodecl' [] precmdeq  noend'.
     rewrite /event/step.
@@ -391,6 +393,8 @@ Section ts_restr_implication.
     1,2: case=> <-;  exact: update_to_store_same. 
   Qed.
 
-  (* TODO: What is next? Need to have a full thing  *)
+  (* TODO: What is next? Need to have a full thing 
+
+  *)
 
 End ts_restr_implication.
