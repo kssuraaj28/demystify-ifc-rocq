@@ -62,7 +62,7 @@ Section trace_weq.
   Qed.
 End trace_weq.
 
-Notation "t1 ≈ t2" := (Trace_weq t1 t2) (at level 70, no associativity).
+Notation "t1 ≈ʷ t2" := (Trace_weq t1 t2) (at level 70, no associativity).
 
 
 Section bisim.

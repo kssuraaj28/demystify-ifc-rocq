@@ -404,7 +404,7 @@ Section ts_restr_implication.
   Lemma ts_sem_impl:
     IdlAtkDowngradeRestr prog adv ->  RuntimeCmdRestr ->
     exists adv', adv_restr (Attacker.step adv') /\
-    forall inp, ⟦ prog | adv  ⟧ inp ≈ ⟦prog | adv' ⟧ inp.
+    forall inp, ⟦ prog | adv  ⟧ inp ≈ʷ ⟦prog | adv' ⟧ inp.
   Proof.
     move: ts_sem_impl'=> /[apply] /[apply] - [] step' [restr1 restr2].
     exists {|States := States adv; init := init adv ; Attacker.step :=  step' |}.
