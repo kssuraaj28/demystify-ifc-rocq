@@ -64,13 +64,33 @@ End trace_weq.
 
 Notation "t1 ≈ʷ t2" := (Trace_weq t1 t2) (at level 70, no associativity).
 
+Section trace_seq.
+  Context `{!EventPrm}.
+
+  CoInductive Trace_seq : Trace -> Trace -> Prop :=
+    | seq_match : forall e t1 t2,
+        Trace_seq t1 t2 ->
+        Trace_seq (tcons e t1) (tcons e t2).
+
+  Lemma Trace_seq_coind (R : Trace -> Trace -> Prop) :
+    (forall t1 t2, R t1 t2 ->
+       exists e t1' t2', t1 = tcons e t1' /\ t2 = tcons e t2' /\ R t1' t2') ->
+    forall t1 t2, R t1 t2 -> Trace_seq t1 t2.
+  Proof.
+    move=> Hstep. cofix self=> t1 t2 /Hstep [e [t1' [t2' [-> [-> HR]]]]].
+    apply: seq_match. exact: self _ _ HR.
+  Qed.
+End trace_seq.
+
+Notation "t1 ≈ˢ t2" := (Trace_seq t1 t2) (at level 70, no associativity).
+
 
 Section bisim.
   Context `{!EventPrm} {S1 S2 : Type}
           (step1 : S1 -> S1) (event1 : S1 -> Events)
           (step2 : S2 -> S2) (event2 : S2 -> Events).
 
-  Lemma trace_bisim (R : S1 -> S2 -> Prop) :
+  Lemma trace_wbisim (R : S1 -> S2 -> Prop) :
     (forall s1 s2, R s1 s2 ->
          (R (step1 s1) (step2 s2) /\ event1 s1 = event2 s2)
       \/ (R (step1 s1) s2 /\ event1 s1 = stutter)
@@ -96,6 +116,24 @@ Section bisim.
       + right; right. exists (build step2 event2 (step2 s2')).
         split; [rewrite build_unfold Hstut //|].
         exists s1', (step2 s2'). split=> //.
+    - exists s1, s2. split=> //.
+  Qed.
+
+  Lemma trace_sbisim (R : S1 -> S2 -> Prop) :
+    (forall s1 s2, R s1 s2 -> R (step1 s1) (step2 s2) /\ event1 s1 = event2 s2) ->
+    forall s1 s2, R s1 s2 -> Trace_seq (build step1 event1 s1) (build step2 event2 s2).
+  Proof.
+    move=> Hstep s1 s2 HR.
+    pose R' (t1 t2 : Trace) :=
+      exists s1' s2', R s1' s2' /\ t1 = build step1 event1 s1' /\ t2 = build step2 event2 s2'.
+    apply: (Trace_seq_coind R').
+    - move=> t1 t2 [s1' [s2' [HRss [-> ->]]]].
+      case: (Hstep s1' s2' HRss)=> HR' Heq.
+      exists (event1 s1'),
+        (build step1 event1 (step1 s1')), (build step2 event2 (step2 s2')).
+      split; [rewrite build_unfold //|].
+      split; [rewrite build_unfold -Heq //|].
+      exists (step1 s1'), (step2 s2'). split=> //.
     - exists s1, s2. split=> //.
   Qed.
 End bisim.

@@ -33,7 +33,7 @@ Section bisim.
     cfg_trace adv left_cfg  ≈ʷ  cfg_trace sadv right_cfg.
   Proof.
     rewrite/cfg_trace=> cinv.
-    apply: (trace_bisim _ _ _ _ bisim_rel); [| eexists; eauto].
+    apply: (trace_wbisim _ _ _ _ bisim_rel); [| eexists; eauto].
     move=> s1 s2 [cc [Hinv [-> ->]]].
     have Hrun : Forall (fun '(a,b)=> is_running a || is_running b) (extract_2cfg cc).1.1.
     { move: (extract_step_running cc Hinv); case: (extract_2cfg cc) => [[l z1] z2] /= H; exact: H. }
