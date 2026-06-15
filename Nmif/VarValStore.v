@@ -67,6 +67,11 @@ Section thms.
     rewrite /store_to_view. case pe: (p v)=> //. f_equal. exact: H _ pe.
   Qed.
 
+  Lemma store_eq_ext (s1 s2 : Store):
+    (forall v, s1 v = s2 v) ->
+    s1 = s2.
+  Proof. exact: functional_extensionality. Qed.
+
   Lemma update_storeview_nochange p st var val:
       p var = false ->
       ⟨ update_to_store st var val | p⟩ = ⟨ st | p ⟩.
@@ -93,7 +98,7 @@ Section thms.
   Lemma update_to_store_ext s1 s2 v1 v2 vl1 vl2:
     (forall v, update_to_store s1 v1 vl1 v = update_to_store s2 v2 vl2 v) ->
     update_to_store s1 v1 vl1 = update_to_store s2 v2 vl2.
-  Proof. exact: functional_extensionality. Qed.
+  Proof. exact: store_eq_ext. Qed.
 
   Lemma update_to_store_same s v val:
     update_to_store s v val v = val.

@@ -6,8 +6,11 @@ Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
-Class EventPrm := Events : Type.
-Class StutterPrm `{!EventPrm} := stutter : Events.
+(* Would be good to have this unbundled *)
+Class EventPrm := {
+  Events : Type;
+  stutter : Events;
+}.
 
 Section trace.
   Context `{!EventPrm}.
@@ -16,7 +19,7 @@ Section trace.
 End trace.
 
 Section trace_weq.
-  Context `{!EventPrm, !StutterPrm}.
+  Context `{!EventPrm}.
 
   CoInductive Trace_weq : Trace -> Trace -> Prop :=
     | weq_match : forall e t1 t2,
@@ -62,7 +65,7 @@ Section build.
 End build.
 
 Section bisim.
-  Context `{!EventPrm, !StutterPrm} {S1 S2 : Type}
+  Context `{!EventPrm} {S1 S2 : Type}
           (step1 : S1 -> S1) (event1 : S1 -> Events)
           (step2 : S2 -> S2) (event2 : S2 -> Events).
 

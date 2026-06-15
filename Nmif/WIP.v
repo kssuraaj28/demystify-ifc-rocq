@@ -44,44 +44,6 @@ Section semantic_preds.
   Definition RDRestr := Passive.
   Definition NIRestr := Passive /\ Incurious.
 End semantic_preds.
-(*
-Section passive_corruptor.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
-
-  Variable (adv : AdvNextStep (AtkStates := States))  (initc : Cfg (AtkStates:= States)).
-
-  Notation step := (step adv).
-  Notation acmd_step := (acmd_step adv).
-  Notation pre_cmd_action := (pre_cmd_action adv).
-
-  (* TODO: These definitions need to be deleted. I can do better *)
-  (* TODO: These definitions share a bunch in common *)
-  (* Form initc, is the adversary passive? *)
-  Definition is_passive: Prop :=  
-    forall cmd rstcmd store ast, 
-      let: acmd := mk_atkcmd true cmd in  
-      let: state := (store, ast) in
-      let: c := ((acmd :: rstcmd), state) in
-      reachable step initc c  ->
-      pre_cmd_action ast store = store.
-  
-  (* Basically, does it satisfy confidentiality ni? *)
-  Definition is_incurious: Prop :=
-    exists ast_trans: States -> (States * nat),
-    forall cmd rstcmd store ast,  (* TODO: There is code repetition. I don't know whether  *)
-      let: acmd := mk_atkcmd true cmd in  
-      let: state := (store, ast) in
-      let: c := ((acmd :: rstcmd), state) in
-      reachable step initc c  ->
-      let: atk_output := 
-         let: (_, (_, ast'), atk_substeps) := acmd_step acmd state in
-         (ast', atk_substeps) in
-      atk_output = ast_trans ast.
-
-  
-End passive_corruptor.
-*)
-
 
 Section sim_restriction.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
@@ -130,14 +92,54 @@ Section sim_restriction.
 End sim_restriction.
 
 Section step_update.
+  Import VarValStore.Notations Noninterference Util.DecEq.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
+  Notation AdvNextStep := (AdvNextStep (AtkStates := States)).
 
-  (* Need a function here to construct a new AdvNextStep from an existing advnextstep 
-  *)
+  Variable (adv : AdvNextStep) (corr : IdealAstCorr (States := States)).
 
+  Obligation Tactic := try easy.
+  Program Definition replace_corruptor : AdvNextStep := {|
+    pre_cmd_action  := fun ast store =>
+      if corr ast is Some (var, val) then
+        (if is_untrusted var then update_to_store store var val else store)
+      else store;
+    pre_cmd_event   := pre_cmd_event adv;
+    post_cmd_action := post_cmd_action adv;
+    post_cmd_wf     := post_cmd_wf adv;
+  |}.
+  Next Obligation.
+    move=> ast /= st. case e: (corr ast)=> [[var val]|] //.
+    case eu: (is_untrusted var)=> //.
+    apply: update_storeview_nochange. rewrite /is_trusted eu //.
+  Qed.
+  Next Obligation.
+    move=> ast /=. rewrite /Noninterfering=> i1 i2 heq.
+    case: (corr ast)=> [[var val]|]; [|exact: heq].
+    case: (is_untrusted var); [exact: update_same_varval heq | exact: heq].
+  Qed.
+
+  Lemma replace_corruptor_nonmauling : Nonmauling replace_corruptor.
+  Proof.
+    rewrite/Nonmauling. eexists.
+    rewrite /pre_cmd_action/replace_corruptor=> ast store.
+    instantiate (1 := fun ast => if corr ast is Some (var, val) then _ else _).
+    move e: (corr _)=> [ [var val] | ]; rewrite {}e /=; cycle 1.
+      { instantiate (1 := fun _ => None). done. }
+    instantiate (1 := if is_untrusted var then _ else _).
+    case e: (is_untrusted _); cycle 1.
+      { instantiate (1 := fun _ => None). done. }
+    rewrite/⟨ _ → _ ⟩/update_to_store.
+    instantiate (1 := fun var' => if var =? var' then _ else _).
+    apply: store_eq_ext=> v.
+    case: (var =? v); cycle 1.
+      { instantiate (1 := None). done. }
+    instantiate (1 := Some val). done.
+  Qed.
 End step_update.
 
 Section ts_restr_implication.
+  Import VarValStore.Notations Util.DecEq.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {States: Type}.
 
   Variable (adv : AdvNextStep (AtkStates := States))  (cfg : Cfg (AtkStates:= States)).
@@ -151,8 +153,15 @@ Section ts_restr_implication.
   Proof.
     revert idl_rest.
     rewrite /idealcfg_restriction=> - [?] [wt] ?.
-    Check wt.
-    idtac.
+    unshelve eexists.
+      { clear - adv wt.
+      rewrite/IdealAstCorr in wt.
+      unshelve refine {|
+         pre_cmd_action ast st :=  let t := wt ast in ⟨ _ → st ⟩;
+         pre_cmd_event := pre_cmd_event adv;
+         post_cmd_action := post_cmd_action adv;
+         post_cmd_wf := post_cmd_wf adv
+      |}.
   Abort.
 End ts_restr_implication.
 
