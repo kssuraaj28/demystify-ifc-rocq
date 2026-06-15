@@ -239,7 +239,7 @@ Section ts_restr_implication.
     revert idl_rest; rewrite /idealcfg_restriction/TERestr => - [trns] [wt] p.
     exists (replace_learner (replace_corruptor adv wt)  (fun st => trns st val_ne)).
     split.
-      { split; auto using replace_learner_incurious. admit. }
+      { split; exact: replace_learner_incurious  ||  exact: replace_corruptor_nonmauling. }
     move=> cmd ? str states nodecl.
     move: p=> /[apply] - [e1] [e2] _.
     rewrite/event/step.
@@ -260,7 +260,7 @@ Section ts_restr_implication.
     move=> /=.
     move: nodecl e1.
     case: cmd=> //- [] // [] //.
-  Admitted.
+  Qed.
 
   Lemma ts_ni:
     exists adv', 
@@ -277,7 +277,7 @@ Section ts_restr_implication.
     revert idl_rest; rewrite /idealcfg_restriction/NIRestr => - [trns] [wt] p.
     exists (replace_learner (remove_corruptor adv)  (fun st => trns st val_ne)).
     split.
-      { split; auto using replace_learner_incurious. admit. }
+      { split; exact: replace_learner_incurious  ||  exact: remove_corruptor_passive. } (* Maybe I should rewrite/-.. . I'd like to use convertibility and auto*)
     move=> cmd ? str states nodecl noend.
     move: p=> /[apply] - [e1] [e2] e3.
     rewrite/event/step.
@@ -293,7 +293,7 @@ Section ts_restr_implication.
     move=> /=.
     move: nodecl e1; clear.
     case: cmd=> //- [] // [] //. 
-  Admitted.
+  Qed.
 
 End ts_restr_implication.
 
