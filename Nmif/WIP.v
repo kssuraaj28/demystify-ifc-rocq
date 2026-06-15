@@ -346,29 +346,32 @@ Section ts_restr_implication.
     end).
 
   (*Notation ProgRestr := (Forall CmdRestr).  This is tricky *)
-  Notation AcmdProgListRestr := (fun list => Forall (fun '(mk_atkcmd _ ocmd) => oapp CmdRestr True ocmd) list).
+  Notation CfgListRestr cmd := 
+    (let: (lst, st) := cmd  in 
+    if lst isn't (mk_atkcmd _ (Some cmd )) :: _ then True else
+    CmdRestr cmd).
+  Check CfgListRestr _.
 
   (* TODO: Copy? *)
   Notation init_cfg_fn inp := ((Semantics.init_cfg prog adv_init inp)). 
   Lemma ts_sem_impl:
     IdlAtkDowngradeRestr prog adv ->
+    (forall inp cfg, 
+      reachable (step adv_step) (init_cfg_fn inp) cfg ->
+      CfgListRestr cfg) ->
     exists adv_step', adv_restr adv_step' /\
-    forall inp, 
-      let: cfg := init_cfg_fn inp in
-      forall cfg',
-        reachable (step adv_step) (init_cfg_fn inp) cfg' ->
-        let: (clst, state) := cfg' in
-        AcmdProgListRestr clst ->
-        step adv_step cfg' = step adv_step' cfg' /\ event adv_step cfg' = event adv_step' cfg'.
+    forall inp cfg, 
+      reachable (step adv_step) (init_cfg_fn inp) cfg ->
+      step adv_step cfg = step adv_step' cfg /\ event adv_step cfg = event adv_step' cfg.
   Proof.
     rewrite /IdlAtkDowngradeRestr/NMIFRestr/RDRestr/TERestr/NIRestr.
-    move=> - [trns] [wt] p.
+    move=> - [trns] [wt] idlrst synrst.
     exists (witness_constr adv_step wt trns).
     split.
       { move: noend nodecl=> [] [] //; [split|]=> //; exact: replace_corruptor_nonmauling. }
     move=> inp [] + [str states] => - [] // [] [] // cmd ?.
-    move=> /[swap]. Forall_inv_toph=> cmdrest _.
-    move: p=> /[apply].
+    move=> /[dup]. 
+    move: synrst idlrst => + /[swap]=> /[apply] + /[apply] cmdrest.
     case=> nodecl' [] precmdeq  noend'.
     rewrite /event/step.
     pattern_eq_2 [acmd_step _ _ _] [acmd_step _ _ _]; [|clear; case: noend; case: nodecl=> -> //].
