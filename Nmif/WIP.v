@@ -243,6 +243,8 @@ Section ts_restr_implication.
     1,2: case=> <-;  exact: update_to_store_same. 
   Qed.
 
+  (* TODO: What is next? Need to have a full thing  *)
+
 End ts_restr_implication.
 
 Section sim_inv_restriction.
@@ -272,6 +274,7 @@ Section sim_inv_restriction.
       move: (extract_2cfg _)=> ?.
       rewrite extract_one_erase_idem erase_filter_step_commute //. }
     subst inv final=> {rch} /= - []; clear cinv c.
+    case.
     case=> - [? idlst ? ? lst] [].
     rewrite/Invariant=> - [] lstinv.
     rewrite/StateInv=> _.
