@@ -274,7 +274,6 @@ Section sim_inv_restriction.
       move: (extract_2cfg _)=> ?.
       rewrite extract_one_erase_idem erase_filter_step_commute //. }
     subst inv final=> {rch} /= - []; clear cinv c.
-    case.
     case=> - [? idlst ? ? lst] [].
     rewrite/Invariant=> - [] lstinv.
     rewrite/StateInv=> _.
