@@ -65,6 +65,7 @@ Section idlatk_pred.
 End idlatk_pred.
 
 
+(* Should go to sim.. *)
 Section wt_idlatk_rest.
   Import Util.List.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
