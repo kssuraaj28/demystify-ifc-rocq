@@ -214,7 +214,7 @@ Section inv.
     ⟨ real_st | is_trusted ⟩ = ⟨ ideal_st | is_trusted ⟩ /\
     ⟨ real_st | is_public ⟩ = ⟨ sim_st | is_public ⟩.
 
-  Definition Invariant (c : Cfg): Prop :=
+  Definition CombinedInvariant (c : Cfg): Prop :=
     let: (cmbst, cmdlst) := c in
     Forall CmbCmdInv cmdlst /\
     StateInv cmbst.
@@ -272,10 +272,10 @@ Section init_inv.
     
   Theorem init_inv p (advinit : AdvInit) init_store: 
     WellFormedProg ptlbl p ->
-    Invariant (init_cfg p advinit init_store).
+    CombinedInvariant (init_cfg p advinit init_store).
   Proof.
     move=> wf.
-    rewrite/Invariant/init_cfg; split; cycle 1.
+    rewrite/CombinedInvariant/init_cfg; split; cycle 1.
       { rewrite/StateInv. split=>//.
       rewrite /⟨_→_⟩.
       apply:storeview_eq_ext=> > e. (* TODO: lemma *)
@@ -409,10 +409,10 @@ Section invprf.
     Qed. 
   End cook.
 
-  Theorem cfg_step_inv: forall c, Invariant c ->  Invariant (cfg_step c).
+  Theorem cfg_step_inv: forall c, CombinedInvariant c ->  CombinedInvariant (cfg_step c).
   Proof.
     case=> + [] //.
-    rewrite/Invariant/cfg_step=> cst ccmd rst  []. Forall_inv_toph=> cmdinv restinv stinv.
+    rewrite/CombinedInvariant/cfg_step=> cst ccmd rst  []. Forall_inv_toph=> cmdinv restinv stinv.
     move:cmbcmd_step_inv=> /(_ ccmd cst cmdinv stinv).
     case: cmbcmd_step=> > [] *. 
     split=> //; apply/Forall_app=> //.
@@ -433,11 +433,11 @@ Section invfilter.
 
 
   Theorem erase_filter_inv (c :Cfg) b:
-    Invariant c ->
-    Invariant (erase_filter_cfg  b c).
+    CombinedInvariant c ->
+    CombinedInvariant (erase_filter_cfg  b c).
   Proof.
     case: c=> >.
-    rewrite/Invariant/erase_filter_cfg=> - [] + + /ltac:(split;auto).
+    rewrite/CombinedInvariant/erase_filter_cfg=> - [] + + /ltac:(split;auto).
     move=> + _. rewrite/CmbCmdInv=> ?.
     exact: Forall_filter.
   Qed.

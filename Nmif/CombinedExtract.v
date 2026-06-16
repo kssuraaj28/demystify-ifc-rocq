@@ -154,11 +154,11 @@ Section extract_step_commute.
     (from to : Vars):
     oapp extract_controlled_endorse None (real_cmd c) = Some (from, to) \/
     oapp extract_controlled_declassify None (real_cmd c) = Some (from, to) ->
-    Invariant (st, c :: restcmd) ->
+    CombinedInvariant (st, c :: restcmd) ->
     step (extract_2cfg (st, c :: restcmd)) = extract_2cfg (comb_step (st, c :: restcmd)).
   Proof.
     case: c=> >.  case: st=> >.
-    cook. rewrite/Invariant=> downgrade. case. cook.
+    cook. rewrite/CombinedInvariant=> downgrade. case. cook.
     rewrite/CmbCmdInv/StateInv=> + + [].
     case: downgrade=> /[dup] downgrade=> + [] + _.
     1,2: move=> /[swap] + /[swap] + /[swap] + /[swap].
@@ -267,7 +267,7 @@ Section extract_step_commute.
       end) "acmd_pubeq" old.
 
   Theorem extract_step_commute c:
-    Invariant c ->
+    CombinedInvariant c ->
     step (extract_2cfg c) = extract_2cfg (comb_step c).
   Proof.
     case: c. case=> rst ist simst atkst.
@@ -409,15 +409,15 @@ Section extract_step_commute.
   Print Assumptions extract_step_commute.
 
   Theorem extract_step_commute_event c:
-    Invariant c ->
+    CombinedInvariant c ->
     two_event (extract_2cfg c) = (comb_event c, comb_event c).
   Proof. 
     move=> cinv.
     rewrite/two_event extract_step_commute // /comb_event.
     set cstp := comb_step c.
-    have csinv: Invariant cstp; [exact: cfg_step_inv|].
+    have csinv: CombinedInvariant cstp; [exact: cfg_step_inv|].
     case: c cinv cstp csinv. (* TODO: we lose info*)
-    rewrite/Invariant/extract_2cfg.
+    rewrite/CombinedInvariant/extract_2cfg.
     move=> ? [] // ? ? []. Forall_inv_toph.
     rewrite cmd_map_cons=> cc1i _ cs1i []. 
     move=> ? ? [] _ cs2i.
@@ -445,12 +445,12 @@ Section extract_step_commute.
 
   
   Theorem extract_step_running c:
-    Invariant c ->
+    CombinedInvariant c ->
     let: twocfg := extract_2cfg c  in
     let: (lst ,_, _) := twocfg in
     Forall (fun '(a,b)=> is_running a || is_running b) lst.
   Proof.
-    case: c=> >. rewrite/Invariant. case=> + _.
+    case: c=> >. rewrite/CombinedInvariant. case=> + _.
     rewrite/CmbCmdInv/extract_2cfg/cmd_map Forall_map.
     apply: Forall_impl=> > [] _.
     rewrite/ActiveInv/sim_active/sim_active'. clear.
