@@ -147,7 +147,7 @@ Section extract_step_commute.
        cookbook is not enough — the importing file must also `Import` the
        module so the bare name resolves at fire time, otherwise the rewrite
        errors and `cook` silently drops the step. Figure out a cleaner fix. *)
-  Ltac2 mutable curr_cookbook () := this_cookbook_ (). Ltac cook := ltac2:(cook curr_cookbook).
+  Ltac2 mutable curr_cookbook () := this_cookbook_ (). 
   Ltac2 Set curr_cookbook as old := join_cookbooks Combined.this_cookbook old.
   Ltac2 Set curr_cookbook as old := join_cookbooks Semantics.this_cookbook old.
   Ltac2 Set curr_cookbook as old := join_cookbooks TypeSystem.this_cookbook old.
@@ -159,8 +159,8 @@ Section extract_step_commute.
   Ltac2 Set curr_cookbook as old := join_cookbooks Syntax.this_cookbook old.
   Ltac2 Set curr_cookbook as old := join_cookbooks ControlledDowngrade.this_cookbook old.
 
-
   Ltac2 Set cook_debug := 0.
+  Ltac cook := ltac2:(cook curr_cookbook).
 
   Lemma extract_step_commute_downgrade (st: CmbState) (c: CmbCmd) (restcmd: list CmbCmd)
     (from to : Vars):
@@ -433,9 +433,8 @@ Section extract_step_commute.
     move=> ? [] // ? ? []. Forall_inv_toph.
     rewrite cmd_map_cons=> cc1i _ cs1i []. 
     move=> ? ? [] _ cs2i.
-    congr (_,_).
     rewrite/event_helper.
-    cnstrct_eq_gl; cycle 1.
+    do 2 cnstrct_eq_gl; cycle 1.
       { rewrite/pre_cmd_event/construct_simulator/sim_evnt cmd_map_sim_cons -/(pre_cmd_event _)/sim_active.
       case e: sim_active'=> //.
       move: e=> /sim_active'_false [] -> //. }
