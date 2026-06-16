@@ -81,6 +81,18 @@ Section extract.
     (cfg2prog, (rst, atkst), (ist, mk_simstate atkst simst simprog)).
 End extract.
 
+Section init_extract_commute.
+  Import VarValStore.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm} {AtkStates : Type} .
+  Notation AdvInit := (AdvInit (AtkStates := AtkStates)).
+
+  Theorem init_extract_commute p (ainit: AdvInit) inist:
+    extract_2cfg (init_cfg p ainit inist) = init_twocfg p inist ainit (simulator_init p ainit).
+  Proof.
+    rewrite /init_cfg
+      /init_twocfg/=/cmd_map !map_map /= /cmd_map_sim filter_map_swap /= filter_true map_map //.
+  Qed.
+End init_extract_commute.
 
 Section erase_filter_commute.
   Import Util.List.
