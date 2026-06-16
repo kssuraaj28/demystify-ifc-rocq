@@ -226,8 +226,7 @@ Section trace_proper.
   Definition trace := let initc := init_cfg p adv_init init_store in cfg_trace adv_step initc.
 End trace_proper.
 
-Notation "⟦ p | a ⟧" := (trace p a).
-Check ⟦_ | _ ⟧ : Store -> Trace.
+Notation "⟦ p | a ⟧" := (trace p a). Check ⟦_ | _ ⟧ : Store -> Trace.
 
 Section running.
   Context `{!VarPrm, !ValPrm}.
@@ -236,18 +235,34 @@ Section running.
 End running.
 
 Section twocfg.
-  Import Util.List.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates1 AtkStates2 : Type}.
-  Variable  
-    (adv1: AdvNextStep (AtkStates := AtkStates1)) 
-    (adv2: AdvNextStep (AtkStates := AtkStates2)).
 
-  Notation State1 := (State (AtkStates:=AtkStates1)).
-  Notation State2 := (State (AtkStates:=AtkStates2)).
+  Notation State1 := (State (AtkStates:=AtkStates1)).  Notation State2 := (State (AtkStates:=AtkStates2)).
 
   Definition TwoCfg := (list (AtkCmd * AtkCmd) * State1 * State2)%type.
+End twocfg.
 
-  Definition twostep (c: TwoCfg): TwoCfg (* * (Event * Event) *) :=
+Section twoinit.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates1 AtkStates2 : Type}.
+  Variable 
+     (p : Prog) (init_store: Store)
+     (adv1: AdvInit (AtkStates := AtkStates1)) 
+     (adv2: AdvInit (AtkStates := AtkStates2)).
+
+  Notation TwoCfg := (TwoCfg (AtkStates1 := AtkStates1) (AtkStates2 := AtkStates2)).
+
+  Definition init_twocfg : TwoCfg :=
+    (map (fun c => let ac := mk_atkcmd true (Some c) in (ac ,ac) ) p,  
+    (init_store, init_fn adv1 init_store), (init_store, init_fn adv2 init_store)).
+End twoinit.
+
+
+
+Section twostep.
+  Import Util.List.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates1 AtkStates2 : Type}.
+  Variable  (adv1: AdvNextStep (AtkStates := AtkStates1))  (adv2: AdvNextStep (AtkStates := AtkStates2)).
+  Definition twostep (c: TwoCfg): TwoCfg :=
     let: (c2lst, s1, s2) := c in
     if c2lst isn't (ac1, ac2) :: rest then c (*, (blank_event, blank_event) *) else
     let: (p1, st1 (*, ev1 *), steps1) := (acmd_step adv1 ac1 s1) in
@@ -258,12 +273,8 @@ Section twocfg.
                    (map Some p2) (repeat true steps2)
                    None false None false in
     let: cont := map (fun '(oc1, a1, oc2, a2) => (mk_atkcmd a1 oc1, mk_atkcmd a2 oc2)) cont in
-    (cont ++ rest, st1, st2) (*, (ev1, ev2) *).
+    (cont ++ rest, st1, st2).
 
-
-
-
-  Import VarValStore.Notations.
 
   Definition twoevent (c: TwoCfg): Event * Event :=
     let: (c2lst, s1, s2) := c in
@@ -276,7 +287,8 @@ Section twocfg.
     let: e1 := event_helper adv1 ac1 new_store1 old_ast1 in
     let: e2 := event_helper adv2 ac2 new_store2 old_ast2 in
     (e1, e2).
-End twocfg.
+End twostep.
+
 
 Section twooneextract.
   Import Util.List.
@@ -289,7 +301,7 @@ Section twooneextract.
   Notation State1 := (State (AtkStates:=AtkStates1)).
   Notation State2 := (State (AtkStates:=AtkStates2)).
 
-  Definition extract_one_cfg (is_left : bool) (c : TwoCfg ) :=
+  Definition extract_one_cfg (is_left : bool) (c : TwoCfg) :=
     let: (aclst, s1, s2) := c in
     let: aclst :=
       filter is_running
@@ -301,6 +313,35 @@ Section twooneextract.
     let: (e1, e2) := twoevent adv1 adv2 c in
     if is_left then e1 else e2.
 
+End twooneextract.
+
+Section twooneinitsound.
+  Import Util.List.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates1 AtkStates2 : Type}.
+
+  Variable 
+     (p : Prog) (init_store: Store)
+     (adv1: AdvInit (AtkStates := AtkStates1)) 
+     (adv2: AdvInit (AtkStates := AtkStates2)).
+
+  Fail Check "TODO: Have bisim init proofs to come through this ".
+  Goal  init_twocfg p init_store adv1 adv2 =  init_twocfg p init_store adv1 adv2.
+  Abort.
+
+End twooneinitsound.
+
+Section twoonestepsound.
+  Import Util.List.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates1 AtkStates2 : Type}.
+  Variable  
+    (adv1: AdvNextStep (AtkStates := AtkStates1)) 
+    (adv2: AdvNextStep (AtkStates := AtkStates2)).
+
+  Notation TwoCfg := (TwoCfg (AtkStates1:=AtkStates1) (AtkStates2:=AtkStates2)).
+  Notation State1 := (State (AtkStates:=AtkStates1)).
+  Notation State2 := (State (AtkStates:=AtkStates2)).
+
+  Notation extract_one_event := (extract_one_event adv1 adv2).
   Notation adv b := (if b as b' return (_ (if b' then _ else _)) then adv1 else adv2).
   Notation step_extract c b := (extract_one_cfg b (twostep adv1 adv2 c)).
   Notation extract_step c b := (step (adv b) (extract_one_cfg b c)).
@@ -379,9 +420,9 @@ Section twooneextract.
     1: revert_hyp_pat State2. 2: revert_hyp_pat State1. 
     1,2: case; done.
   Qed.
-End twooneextract.
+End twoonestepsound.
 
-(* Given a configuration, erase what  *)
+(* Another function from twocfg to onecfg *)
 Section cfg_erase_filter.
   Import Util.List.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates1 AtkStates2 : Type}.

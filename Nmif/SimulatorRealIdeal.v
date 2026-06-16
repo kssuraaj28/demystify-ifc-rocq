@@ -114,7 +114,6 @@ Section sim_trace_eq.
 End sim_trace_eq.
 
 
-(* Should go to sim.. *)
 Section sim_idlatkrest.
   Import Util.List.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
@@ -136,7 +135,7 @@ Section sim_idlatkrest.
     let t := open_constr:(?[ast_trans]) in pose ast_trans:= t; exists ast_trans.
     let t := open_constr:(?[ast_corr]) in pose ast_corr:= t; exists ast_corr.
     move=> /= inp > rch.
-    pose inv c := [elaborate (exists comb : CombCfg,  Invariant comb /\ (c = extract_one_cfg false (extract_2cfg comb)))].
+    pose inv c := [elaborate (exists comb : CombCfg,  Invariant comb /\ (c = extract_one_cfg false (extract_2cfg comb)))]. (* TODO: Lemmas *)
     set init := (X in reachable _ X _) in rch. set final := (X in reachable _ _ X) in rch.
     have: inv final.
       { apply: reachable_invariant; [..|exact: rch].
@@ -249,3 +248,15 @@ Section sim_idlatkrest.
   Qed.
 
 End sim_idlatkrest.
+
+Section fairness.
+  Import Util.List.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+
+  Variables (p: Prog) (areal aideal: Attacker).
+  Notation TwoCfg := (TwoCfg (AtkStates1 := (States areal)) (AtkStates2 := States aideal)).
+
+  Print Semantics.TwoCfg.
+  Fail Check "should go to semantics".
+
+End fairness.
