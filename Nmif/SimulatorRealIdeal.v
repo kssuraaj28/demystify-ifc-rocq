@@ -249,6 +249,8 @@ Section sim_idlatkrest.
 
 End sim_idlatkrest.
 
+
+(* TODO: Where should this be defined actually? *)
 Section fairness.
   Import Util.List.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
@@ -256,7 +258,59 @@ Section fairness.
   Variables (p: Prog) (areal aideal: Attacker).
   Notation TwoCfg := (TwoCfg (AtkStates1 := (States areal)) (AtkStates2 := States aideal)).
 
-  Print Semantics.TwoCfg.
-  Fail Check "should go to semantics".
+  Notation cfg_init_fn inp := (init_twocfg p inp (init areal) (init aideal)).
+  Notation twostep := (twostep (Attacker.step areal) (Attacker.step aideal)).
 
+  Definition FairIdlAtk := forall inp, 
+    let: init_cfg := cfg_init_fn inp in 
+    forall final_cfg, 
+      reachable twostep init_cfg final_cfg ->
+      let: (cmdlst, _, _) := final_cfg in
+      let: pred := 
+        fun '(mk_atkcmd ratk rcmd,mk_atkcmd iatk icmd) => 
+          (iatk -> icmd || rcmd || ratk)  in (* I could do iatk => ..  \/ .. \/ .. too *)
+      Forall pred cmdlst.
 End fairness.
+
+Section sim_fair.
+  Import Util.List.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+
+  Variables (p: Prog) (a: Attacker).
+
+  Notation AtkStates := (States a).
+  Notation CombCfg := (Combined.Cfg (AtkStates := AtkStates)).
+
+  Theorem sim_fair :
+    WellFormedProg ptlbl p ->
+    FairIdlAtk p a (construct_full_simulator p a).
+  Proof.
+    pose inv c := [elaborate (exists comb : CombCfg, Invariant comb /\ (c = (extract_2cfg comb)))]. (* TODO: Lemmas. Maybe rename Invariant to something else, which will help me flag *)
+    move=> wt.
+    rewrite/FairIdlAtk=> inp ? rch.
+    set init := (X in _ _ X _) in rch.  set final := (X in _ _ _ X) in rch.
+    have: inv final; subst inv init final. (* I think that these only appear in this file, so we can do it.. *)
+      { apply: reachable_invariant rch. 
+        - exists (Combined.init_cfg p (init a) inp).
+          split; auto using init_inv. (* Lemma.. *)
+          rewrite/init_twocfg/extract_2cfg /=.
+          do ! cnstrct_eq_gl.
+          1: rewrite/cmd_map map_map.
+          2: rewrite/cmd_map_sim filter_map_swap /= map_map filter_true.
+          1,2: apply: map_ext=> //. 
+        - move=> ? [] cmb [] inv ->.
+          exists (cfg_step (Attacker.step a) cmb).
+          split; [exact: cfg_step_inv|].
+          exact: extract_step_commute. }
+    clear=> /= - [] [] ? clst [].
+    rewrite/Invariant=> - [] + _.
+    rewrite/CmbCmdInv=> inv -> /=.
+    rewrite/cmd_map Forall_map.
+    apply: Forall_impl inv. clear.
+    rewrite/TypeInv/ActiveInv. 
+    case=> /= rcmd ratk > [] [] _ _. 
+    case: ratk; case: rcmd; Util.local_cook=> ?; Util.local_cook.
+  Qed.
+
+End sim_fair.
+
