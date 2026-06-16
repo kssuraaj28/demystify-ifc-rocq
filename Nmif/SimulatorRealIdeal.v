@@ -15,7 +15,7 @@ Set Mangle Names. Set Mangle Names Light.
 Section comb_to_onecfg.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
   Notation extract_2cfg :=  (extract_2cfg (AtkStates := AtkStates)).
-  Definition comb_to_real cc := extract_one_cfg true (extract_2cfg cc).
+  Definition comb_to_real cc := extract_one_cfg true (extract_2cfg cc). (* TODO: What things use extract_one_cfg *)
   Definition comb_to_ideal cc := extract_one_cfg false (extract_2cfg cc).
 End comb_to_onecfg.
 
@@ -27,17 +27,15 @@ Section bisim.
   Notation sadv := (construct_simulator adv).
   Notation CombCfg := (Combined.Cfg (AtkStates := AtkStates)).
 
-  Fail Check "refactor - common extract full".
-  Fail Check "Rename - combined bisim".
-  Theorem simulator_bisim (c : CombCfg):
+  Fail Check "This is a sus proof".
+  Theorem combined_bisim (c : CombCfg):
     CombinedInvariant c ->
     cfg_trace adv (comb_to_real c)  ≈ʷ  cfg_trace sadv (comb_to_ideal c).
   Proof.
     rewrite/cfg_trace=> cinv.
     pose bisim_rel s1 s2 := 
-      [elaborate exists cc : CombCfg, CombinedInvariant cc /\
-        s1 = extract_one_cfg true (extract_2cfg cc) /\
-        s2 = extract_one_cfg false (extract_2cfg cc)].
+      [elaborate exists cc : CombCfg, CombinedInvariant cc /\ s1 = comb_to_real cc /\ s2 = comb_to_ideal cc].
+    unfold comb_to_real,comb_to_ideal in bisim_rel. (* TODO: *) 
     apply: (trace_wbisim _ _ _ _ bisim_rel); [| eexists; eauto].
     move=> s1 s2 [cc [Hinv [-> ->]]].
     have Hrun : Forall (fun '(a,b)=> is_running a || is_running b) (extract_2cfg cc).1.1.
@@ -94,7 +92,7 @@ Section bisim.
       + (* neither runs: contradicts Hrun head *)
         move: Hor; rewrite /= r1 r2 //.
   Qed.
-  Print Assumptions simulator_bisim.
+  Print Assumptions combined_bisim.
 End bisim.
 
 Section sim_trace_eq.
@@ -111,7 +109,7 @@ Section sim_trace_eq.
     have ccinv: CombinedInvariant cc; eauto using init_inv.
     let t := open_constr:(_) in pattern_eq [init_cfg p (init _) _] with t=> [|->]; 
       [|let t := open_constr:(_) in pattern_eq [init_cfg p (simulator_init p _) _] with t=> [|->]]; 
-      [..|apply/simulator_bisim/ccinv].
+      [..|apply/combined_bisim/ccinv].
     1,2: rewrite/comb_to_real/comb_to_ideal {ccinv} /cc extract_combinit extract_inittwo //.
   Qed.
 
@@ -139,17 +137,17 @@ Section sim_idlatkrest.
     let t := open_constr:(?[ast_trans]) in pose ast_trans:= t; exists ast_trans.
     let t := open_constr:(?[ast_corr]) in pose ast_corr:= t; exists ast_corr.
     move=> /= inp > rch.
-    pose inv c := [elaborate (exists comb : CombCfg,  CombinedInvariant comb /\ (c = extract_one_cfg false (extract_2cfg comb)))]. (* TODO: Lemmas *)
+    pose inv c := [elaborate (exists comb : CombCfg,  CombinedInvariant comb /\ (c = comb_to_ideal comb))].
     set init := (X in reachable _ X _) in rch. set final := (X in reachable _ _ X) in rch.
     have: inv final.
       { apply: reachable_invariant; [..|exact: rch].
-        { rewrite {}/inv /init.  exists (Combined.init_cfg p ainit inp).
-        split; auto using init_inv.
+        { rewrite {}/inv /init /comb_to_ideal.  
+        eexists; split; eauto using init_inv.
         rewrite extract_combinit extract_inittwo //. }
       clear. rewrite{}/inv=> _ [cmb] [cmbinv] ->.
       exists (cfg_step astep (erase_filter_cfg false cmb)).
       split; inv_auto.
-      rewrite -extract_step_commute ?extract_erase_commute; inv_auto.
+      rewrite /comb_to_ideal -extract_step_commute ?extract_erase_commute; inv_auto.
       move: (extract_2cfg _)=> ?.
       rewrite extract_one_erase_idem erase_filter_step_commute //. }
     clear rch init wt. rewrite{}/inv {}/final. clear. case.
@@ -293,15 +291,10 @@ Section sim_fair.
     rewrite/FairIdlAtk=> inp ? rch.
     set init := (X in _ _ X _) in rch.  set final := (X in _ _ _ X) in rch.
     have: inv final; subst inv init final. (* I think that these only appear in this file, so we can do it.. *)
-      { apply: reachable_invariant rch. 
-        { exists (Combined.init_cfg p (init a) inp).
-        split; auto using init_inv. (* Lemma.. *)
-        rewrite extract_combinit //.  }
-      move=> ? [] cmb [] inv ->.
-      exists (cfg_step (Attacker.step a) cmb).
-      split; [exact: cfg_step_inv|].
-      exact: extract_step_commute. }
-    clear=> /= - [] [] ? clst [].
+      { apply: reachable_invariant rch; [eexists; eauto using init_inv, extract_combinit|].
+      move=> ? [?] [?] ->.
+      eexists;eauto using cfg_step_inv, extract_step_commute. }
+    clear=> /= - [] [] ? ? [].
     rewrite/CombinedInvariant=> - [] + _.
     rewrite/CmbCmdInv=> inv -> /=.
     rewrite/cmd_map Forall_map.
