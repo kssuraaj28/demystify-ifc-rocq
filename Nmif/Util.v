@@ -660,18 +660,37 @@ Module List.
 End List.
 
 
-Definition reachable {State} (step : State -> State) (init final : State) : Prop :=
-  exists n, final = Nat.iter n step init.
+Section reachable.
+  Context {State : Type}.
+  Definition reachable (step : State -> State) (init final : State) : Prop :=
+    exists n, final = Nat.iter n step init.
 
-Lemma reachable_invariant {State} (step : State -> State) (Inv : State -> Prop) init :
-  Inv init ->
-  (forall c, Inv c -> Inv (step c)) ->
-  forall final, reachable step init final -> Inv final.
-Proof.
-  move=> Hinit Hstep final [n ->].
-  elim: n => [|n IH] //=.
-  exact: Hstep _ IH.
-Qed.
+  Lemma reachable_invariant step init (Inv : State -> Prop) :
+    Inv init ->
+    (forall c, Inv c -> Inv (step c)) ->
+    forall final, reachable step init final -> Inv final.
+  Proof.
+    move=> Hinit Hstep final [n ->].
+    elim: n => [|n IH] //=.
+    exact: Hstep _ IH.
+  Qed.
+
+  Lemma reachable_init step init:
+    reachable step init init.
+  Proof. unshelve eexists; [constructor|]; done.  Qed.
+
+  Lemma reachable_step step init st:
+    reachable step init st ->
+    reachable step init (step st).
+  Proof. 
+    case=> ? ->.  
+    unshelve eexists; [constructor;assumption|]; done.   (* What a badass proof *)
+  Qed.
+
+End reachable.
+
+
+  
 
 
 (* This is a decent forward reasoning tactic *)

@@ -320,14 +320,18 @@ Section twooneinitsound.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates1 AtkStates2 : Type}.
 
   Variable 
-     (p : Prog) (init_store: Store)
+     (p : Prog) (init_st: Store) (b: bool)
      (adv1: AdvInit (AtkStates := AtkStates1)) 
      (adv2: AdvInit (AtkStates := AtkStates2)).
 
-  Fail Check "TODO: Have bisim init proofs to come through this ".
-  Goal  init_twocfg p init_store adv1 adv2 =  init_twocfg p init_store adv1 adv2.
-  Abort.
+  Notation adv b := (if b as b' return (_ (if b' then _ else _)) then adv1 else adv2).
 
+  Lemma extract_inittwo:
+    extract_one_cfg b (init_twocfg p init_st adv1 adv2) = init_cfg p (adv b) init_st.
+  Proof.
+    rewrite/extract_one_cfg/init_cfg/= map_map filter_map_swap /is_running /= . 
+    case: b=> /=; rewrite filter_true //.
+  Qed.
 End twooneinitsound.
 
 Section twoonestepsound.

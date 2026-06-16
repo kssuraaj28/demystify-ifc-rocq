@@ -86,7 +86,7 @@ Section init_extract_commute.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm} {AtkStates : Type} .
   Notation AdvInit := (AdvInit (AtkStates := AtkStates)).
 
-  Theorem init_extract_commute p (ainit: AdvInit) inist:
+  Theorem extract_combinit p (ainit: AdvInit) inist:
     extract_2cfg (init_cfg p ainit inist) = init_twocfg p inist ainit (simulator_init p ainit).
   Proof.
     rewrite /init_cfg

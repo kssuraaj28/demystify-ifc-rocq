@@ -230,11 +230,6 @@ Section restriction_impl.
 
   Notation AdvRestr :=  (AdvRestr noend nodecl).  Check AdvRestr : AdvNextStep -> Prop.
 
-
-
-  (* Witness consturu *)
-
-
   (* TODO: Add the constructions should come here *)
   Notation witness_constr adv_step corr_fn learn_fn :=
     (match noend, nodecl with
@@ -245,7 +240,7 @@ Section restriction_impl.
     end).
 
 
-  Lemma ts_sem_impl':
+  Lemma restriction_impl':
     IdlAtkDowngradeRestr ->    RuntimeCmdRestr ->
     exists adv_step', AdvRestr adv_step' /\
     forall inp cfg, 
@@ -284,24 +279,22 @@ Section restriction_impl.
     1,2: case=> <-;  exact: update_to_store_same. 
   Qed.
   
-  Lemma ts_sem_impl:
+  Lemma restriction_impl:
     IdlAtkDowngradeRestr ->  RuntimeCmdRestr ->
     exists adv', AdvRestr (Attacker.step adv') /\
     forall inp, ⟦ prog | adv  ⟧ inp ≈ˢ ⟦prog | adv' ⟧ inp.
   Proof.
-    move: ts_sem_impl'=> /[apply] /[apply] - [] step' [restr1 restr2].
+    move: restriction_impl'=> /[apply] /[apply] - [] step' [restr1 restr2].
     exists {|States := States adv; init := init adv ; Attacker.step :=  step' |}.
     move=> /=; split=> // {restr1}.
     move=> inp; move: restr2=> /(_ inp). (* Why no apply *)
     rewrite /⟦_|_ ⟧ /=.
     set initcfg := (init_cfg_fn _)=> inv.
-    pose bsirel cfg cfg' := cfg = cfg' /\ reachable (step adv_step) initcfg cfg. (* Can I use evar magic *)
-    unshelve apply: trace_sbisim; [exact bsirel| ..]; subst bsirel; cycle 1.
-      { rewrite /= /initcfg. split=> //. move. exists 0. done. } (* TODO: Lemma *)
+    pose bsimrel cfg cfg' := cfg = cfg' /\ reachable (step adv_step) initcfg cfg. (* Can I use evar magic *)
+    unshelve apply: trace_sbisim; [exact bsimrel| ..]; rewrite {}/bsimrel /=; [| auto using reachable_init].
     move=> s1 s2 [<- rch].
     move: inv (rch)=> /[apply]=> [] [] <- <-.
-    do 2 split=> //.
-    move: rch=> [n ->]. exists (S n)=> //. (* Should be a lemma. TODO *) 
+    auto using reachable_step.
   Qed.
 
 End restriction_impl.
