@@ -91,77 +91,6 @@ Section semantic_preds.
   Definition NIRestr := Passive /\ Incurious.
 End semantic_preds.
 
-(* Utility functions to show  how IdlAtkDowngradeRestr impled that other four *)
-Section atk_step_record_update.
-  Import VarValStore.Notations Noninterference Util.DecEq.Notations.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
-  Notation AdvNextStep := (AdvNextStep (AtkStates := AtkStates)).
-
-  Notation ReplCorrInp := (AtkStates -> option (Vars * Vals) (* endorsed value *)).
-
-  Obligation Tactic := try easy.
-  Program Definition replace_corruptor
-      (adv : AdvNextStep) (corr : ReplCorrInp ) : AdvNextStep := {|
-    pre_cmd_action  := fun ast store =>
-      if corr ast is Some (var, val) then
-        (if is_untrusted var then update_to_store store var val else store)
-      else store;
-    pre_cmd_event   := pre_cmd_event adv;
-    post_cmd_action := post_cmd_action adv;
-    post_cmd_wf     := post_cmd_wf adv;
-  |}.
-  Next Obligation.
-    move=> ? corr ast /= st. case e: (corr ast)=> [[var val]|] //.
-    case eu: (is_untrusted var)=> //.
-    apply: update_storeview_nochange. rewrite /is_trusted eu //.
-  Qed.
-  Next Obligation.
-    move=> ? corr ast /=. rewrite /Noninterfering=> i1 i2 heq.
-    case: (corr ast)=> [[var val]|]; [|exact: heq].
-    case: (is_untrusted var); [exact: update_same_varval heq | exact: heq].
-  Qed.
-
-  Lemma replace_corruptor_nonmauling
-      (adv : AdvNextStep) (corr : ReplCorrInp):
-      Nonmauling (replace_corruptor adv corr).
-  Proof.
-    rewrite/Nonmauling. eexists.
-    rewrite /pre_cmd_action/replace_corruptor=> ast store.
-    instantiate (1 := fun ast => if corr ast is Some (var, val) then _ else _).
-    move e: (corr _)=> [ [var val] | ]; rewrite {}e /=; [|instantiate (1 := fun _ => None); done].
-    instantiate (1 := if is_untrusted var then _ else _).
-    case e: (is_untrusted _); [|instantiate (1 := fun _ => None); done].
-    rewrite/⟨ _ → _ ⟩/update_to_store.
-    instantiate (1 := fun var' => if var =? var' then _ else _).
-    apply: store_eq_ext=> v.
-    case: (var =? v); [|instantiate (1 := None);done].
-    instantiate (1 := Some _); done.
-  Qed.
-
-  Program Definition remove_corruptor (adv : AdvNextStep) : AdvNextStep := {|
-    pre_cmd_action  := fun _ store => store;
-    pre_cmd_event   := pre_cmd_event adv;
-    post_cmd_action := post_cmd_action adv;
-    post_cmd_wf     := post_cmd_wf adv;
-  |}.
-
-
-  Notation ReplLrnInp := (AtkStates -> (AtkStates * nat)).
-  (* Record update!! *)
-
-
-
-  Program Definition replace_learner
-      (adv : AdvNextStep) (learn : AtkStates -> (AtkStates * nat)) : AdvNextStep := {|
-    pre_cmd_action  := pre_cmd_action adv;
-    pre_cmd_event   := pre_cmd_event adv;
-    post_cmd_action := fun ast _ => learn ast;
-    pre_cmd_wf_int  := pre_cmd_wf_int adv;
-    pre_cmd_wf_conf := pre_cmd_wf_conf adv;
-  |}.
-End atk_step_record_update.
-
-
 (* The theorem:
   IdlAtkDowngradeRestr -> NMIFRestr / ... has parameters
 *)
@@ -217,6 +146,73 @@ Section restriction_impl_prm.
       CfgListRestr cfg).
 End restriction_impl_prm.
 
+Check CmdRestr.
+
+(* Utility functions to show  how IdlAtkDowngradeRestr impled that other four *)
+Section atk_step_record_update.
+  Import VarValStore.Notations Noninterference Util.DecEq.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
+  Notation AdvNextStep := (AdvNextStep (AtkStates := AtkStates)).
+
+  Notation ReplCorrInp := (AtkStates -> option (Vars * Vals) (* endorsed value *)).
+
+  Obligation Tactic := try easy.
+  Program Definition replace_corruptor
+      (adv : AdvNextStep) (corr : ReplCorrInp ) : AdvNextStep := {|
+    pre_cmd_action  := fun ast store =>
+      if corr ast is Some (var, val) then
+        (if is_untrusted var then update_to_store store var val else store)
+      else store;
+    pre_cmd_event   := pre_cmd_event adv;
+    post_cmd_action := post_cmd_action adv;
+    post_cmd_wf     := post_cmd_wf adv;
+  |}.
+  Next Obligation.
+    move=> ? corr ast /= st. case e: (corr ast)=> [[var val]|] //.
+    case eu: (is_untrusted var)=> //.
+    apply: update_storeview_nochange. rewrite /is_trusted eu //.
+  Qed.
+  Next Obligation.
+    move=> ? corr ast /=. rewrite /Noninterfering=> i1 i2 heq.
+    case: (corr ast)=> [[var val]|]; [|exact: heq].
+    case: (is_untrusted var); [exact: update_same_varval heq | exact: heq].
+  Qed.
+
+  Lemma replace_corruptor_nonmauling
+      (adv : AdvNextStep) (corr : ReplCorrInp):
+      Nonmauling (replace_corruptor adv corr).
+  Proof.
+    rewrite/Nonmauling. eexists.
+    rewrite /pre_cmd_action/replace_corruptor=> ast store.
+    instantiate (1 := fun ast => if corr ast is Some (var, val) then _ else _).
+    move e: (corr _)=> [ [var val] | ]; rewrite {}e /=; [|instantiate (1 := fun _ => None); done].
+    instantiate (1 := if is_untrusted var then _ else _).
+    case e: (is_untrusted _); [|instantiate (1 := fun _ => None); done].
+    rewrite/⟨ _ → _ ⟩/update_to_store.
+    instantiate (1 := fun var' => if var =? var' then _ else _).
+    apply: store_eq_ext=> v.
+    case: (var =? v); [|instantiate (1 := None);done].
+    instantiate (1 := Some _); done.
+  Qed.
+
+  Program Definition remove_corruptor (adv : AdvNextStep) : AdvNextStep := {|
+    pre_cmd_action  := fun _ store => store;
+    pre_cmd_event   := pre_cmd_event adv;
+    post_cmd_action := post_cmd_action adv;
+    post_cmd_wf     := post_cmd_wf adv;
+  |}.
+
+
+  Notation ReplLrnInp := (AtkStates -> (AtkStates * nat)). (* Record update!! *)
+  Program Definition replace_learner
+      (adv : AdvNextStep) (learn : AtkStates -> (AtkStates * nat)) : AdvNextStep := {|
+    pre_cmd_action  := pre_cmd_action adv;
+    pre_cmd_event   := pre_cmd_event adv;
+    post_cmd_action := fun ast _ => learn ast;
+    pre_cmd_wf_int  := pre_cmd_wf_int adv;
+    pre_cmd_wf_conf := pre_cmd_wf_conf adv;
+  |}.
+End atk_step_record_update.
 
 Section restriction_impl.
   Import VarValStore.Notations Util.DecEq Util.DecEq.Notations.
@@ -234,6 +230,9 @@ Section restriction_impl.
 
   Notation AdvRestr :=  (AdvRestr noend nodecl).  Check AdvRestr : AdvNextStep -> Prop.
 
+
+
+  (* Witness consturu *)
 
 
   (* TODO: Add the constructions should come here *)
@@ -305,4 +304,4 @@ Section restriction_impl.
     move: rch=> [n ->]. exists (S n)=> //. (* Should be a lemma. TODO *) 
   Qed.
 
-End rest_implication.
+End restriction_impl.

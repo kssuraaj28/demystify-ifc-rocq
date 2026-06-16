@@ -15,7 +15,6 @@ Section bisim.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
   Variable adv : AdvNextStep (AtkStates := AtkStates).
 
-
   Notation sadv := (construct_simulator adv).
 
   Definition bisim_rel (s1 : Semantics.Cfg (AtkStates:=AtkStates))

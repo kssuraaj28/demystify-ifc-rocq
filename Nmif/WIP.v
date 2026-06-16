@@ -13,6 +13,7 @@ Set Mangle Names. Set Mangle Names Light.
 
 #[local] Notation Cfg := Semantics.Cfg.
 
+(* Moved *)
 Section idlatk_pred.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
