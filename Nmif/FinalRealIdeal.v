@@ -20,27 +20,27 @@ Section statements.
   Fail Check "rename".
   Definition NMIFCRealIdeal prog :=
     forall (rlatk : Attacker), exists (idlatk: Attacker),
-      IdlAtkDowngradeRestr prog idlatk /\  FairIdlAtk prog rlatk idlatk /\ (* TODO: NMIFC restriction *)
+      IdlAtkDowngradeRestr prog idlatk /\  FairIdlAtkRestr prog rlatk idlatk /\ (* TODO: NMIFC restriction *)
       forall inp, ⟦ prog | rlatk ⟧ inp ≈ʷ ⟦ prog | idlatk  ⟧ inp.
 
   Definition NMIFRealIdeal prog :=
     forall (rlatk : Attacker), exists (idlatk: Attacker),
-      NMIFRestr idlatk /\  FairIdlAtk prog rlatk idlatk /\
+      NMIFRestr idlatk /\  FairIdlAtkRestr prog rlatk idlatk /\
       forall inp, ⟦ prog  | rlatk ⟧ inp ≈ʷ ⟦ prog | idlatk  ⟧ inp.
 
   Definition RDRealIdeal prog :=
     forall (rlatk : Attacker), exists (idlatk: Attacker),
-      RDRestr idlatk /\  FairIdlAtk prog rlatk idlatk /\
+      RDRestr idlatk /\  FairIdlAtkRestr prog rlatk idlatk /\
       forall inp, ⟦ prog  | rlatk ⟧ inp ≈ʷ ⟦ prog | idlatk  ⟧ inp.
 
   Definition TERealIdeal prog :=
     forall (rlatk : Attacker), exists (idlatk: Attacker),
-      TERestr idlatk /\  FairIdlAtk prog rlatk idlatk /\
+      TERestr idlatk /\  FairIdlAtkRestr prog rlatk idlatk /\
       forall inp, ⟦ prog  | rlatk ⟧ inp ≈ʷ ⟦ prog | idlatk  ⟧ inp.
 
   Definition NIRealIdeal prog :=
     forall (rlatk : Attacker), exists (idlatk: Attacker),
-      NIRestr idlatk /\  FairIdlAtk prog rlatk idlatk /\
+      NIRestr idlatk /\  FairIdlAtkRestr prog rlatk idlatk /\
       forall inp, ⟦ prog  | rlatk ⟧ inp ≈ʷ ⟦ prog | idlatk  ⟧ inp.
 End statements.
 
@@ -71,12 +71,11 @@ Section nmif.
     rewrite/NMIFCRealIdeal/NMIFRealIdeal=> + x=> /(_ x); move: x=> ?.
     case=> ? [] + []=> /restriction_impl=> /(_ false false).
     evar_spec_toph; [move=> + + _=> _ [] [] // [] ? [] //|].
-    rewrite/AdvRestr=> - [atk] [restr] ? ? ?.
+    rewrite/AdvRestr => -  [atk]  [restr] [fair] + {}/fair=> ? ? ?.  
     exists atk.
-    split=> //.
-    split; [admit|].
+    do 2 split=> //.
     revert_hyp_pat [(forall st, _ ≈ˢ _), (forall st, _ ≈ʷ _)]; clear.
     move=> + + inp=> /(_ inp) + /(_ inp)=> *.
     apply: weq_seq_trans; eauto.
-  Admitted.
+  Qed.
 End nmif.

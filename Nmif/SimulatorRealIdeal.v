@@ -266,7 +266,7 @@ Section sim_fair.
   Proof.
     pose inv c := [elaborate (exists comb : CombCfg, CombinedInvariant comb /\ (c = (extract_2cfg comb)))].
     move=> wt.
-    rewrite/FairIdlAtk=> inp ? rch.
+    rewrite/FairIdlAtkRestr=> inp ? rch.
     set init := (X in _ _ X _) in rch.  set final := (X in _ _ _ X) in rch.
     have: inv final; subst inv init final. (* I think that these only appear in this file, so we can do it.. *)
       { apply: reachable_invariant rch; [eexists; eauto using init_inv, extract_combinit|].

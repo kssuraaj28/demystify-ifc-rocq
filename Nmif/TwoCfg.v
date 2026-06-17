@@ -277,7 +277,7 @@ Section twocfg_swap_atk.
 
   Notation StepEqHyp :=
     (forall inp final_cfg, 
-      reachable step1 (init_fn inp) final_cfg ->
+      (reachable step1 (init_fn inp) final_cfg) ->
       step1 final_cfg = step2 final_cfg /\ event1 final_cfg = event2 final_cfg) (only parsing).
 
 
@@ -285,12 +285,8 @@ Section twocfg_swap_atk.
   Lemma twocfg_swap_atk:
     StepEqHyp ->
     forall inp final_cfg, 
-      reachable twostep1 (twoinit_fn inp) final_cfg ->
-      twostep1 final_cfg = twostep2 final_cfg /\ twoevent1 final_cfg = twoevent2 final_cfg.
+      (reachable twostep2 (twoinit_fn inp) final_cfg) ->
+      (reachable twostep1 (twoinit_fn inp) final_cfg).
   Proof.
-    move=> + x=> /(_ x); move: x=> ?. (* TODO: Should just be apply*)
-    move=> ih [] [] [] // [].
-    move=> c1 c2 > rch.
-    rewrite/twostep1/twostep2 /step1/step2 in ih *.
   Admitted.
 End twocfg_swap_atk.

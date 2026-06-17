@@ -244,6 +244,7 @@ Section restriction_impl.
 
   Notation RuntimeCmdRestr := (RuntimeCmdRestr noend nodecl prog adv_init adv_step).  Check RuntimeCmdRestr : Prop.
   Notation IdlAtkDowngradeRestr := (IdlAtkDowngradeRestr prog adv). Check IdlAtkDowngradeRestr : Prop.
+  Notation FairIdlAtkRestr := (FairIdlAtkRestr prog).
 
   Notation AdvRestr :=  (AdvRestr noend nodecl).  Check AdvRestr : AdvNextStep -> Prop.
 
@@ -261,7 +262,7 @@ Section restriction_impl.
     IdlAtkDowngradeRestr ->  RuntimeCmdRestr ->
     exists adv_step', AdvRestr adv_step' /\
     forall inp cfg, 
-      reachable (step adv_step) (init_cfg_fn inp) cfg ->
+      reachable (step adv_step) (init_cfg_fn inp) cfg  ->
       step adv_step cfg = step adv_step' cfg /\ event adv_step cfg = event adv_step' cfg.
   Proof.
     rewrite /IdlAtkDowngradeRestr/NMIFRestr/RDRestr/TERestr/NIRestr.
@@ -299,12 +300,20 @@ Section restriction_impl.
   Lemma restriction_impl:
     IdlAtkDowngradeRestr ->  
     RuntimeCmdRestr ->
-    exists adv', AdvRestr (Attacker.step adv') /\
-    forall inp, ⟦ prog | adv  ⟧ inp ≈ˢ ⟦prog | adv' ⟧ inp.
+    exists adv', 
+    AdvRestr (Attacker.step adv') /\
+    (forall oldadv, FairIdlAtkRestr oldadv adv -> FairIdlAtkRestr oldadv adv') /\
+    (forall inp, ⟦ prog | adv  ⟧ inp ≈ˢ ⟦prog | adv' ⟧ inp).
   Proof.
     move: restriction_impl'=> /[apply] /[apply] - [] step' [restr1 restr2].
     exists {|States := States adv; init := init adv ; Attacker.step :=  step' |}.
     move=> /=; split=> // {restr1}.
+    split.
+      { move: restr2; clear=> + adv'.
+      move/(twocfg_swap_atk _ adv').
+      move=> h1. rewrite/FairIdlAtkRestr /==> h2 inp final rch.
+      move=> /(_ inp final) in h1. move=> /(_ inp final) in h2.
+      move: h1 => /(_ rch). done. } 
     move=> inp; move: restr2=> /(_ inp). (* Why no apply *)
     rewrite /⟦_|_ ⟧ /=.
     set initcfg := (init_cfg_fn _)=> inv.
