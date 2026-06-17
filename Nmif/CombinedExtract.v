@@ -4,8 +4,8 @@ Import List ListNotations ssreflect ssrfun ssrbool.
 From Ltac2 Require Import Ltac2.
 
 
-Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade Combined Simulator WfFinisher.
-Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade Combined Simulator WfFinisher Tacs.Cook.
+Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TwoCfg TypeSystem ControlledDowngrade Combined Simulator WfFinisher.
+Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TwoCfg TypeSystem ControlledDowngrade Combined Simulator WfFinisher Tacs.Cook.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!". 
@@ -99,7 +99,7 @@ Section erase_filter_commute.
   Context `{!VarPrm, !ValPrm}  {AtkStates: Type}.
   Notation extract_2cfg := (extract_2cfg (AtkStates := AtkStates)).
   Notation comb_erase := (Combined.erase_filter_cfg (AtkStates := AtkStates)).
-  Notation twocfg_erase := (Semantics.erase_filter_cfg).
+  Notation twocfg_erase := (TwoCfg.erase_filter_cfg).
 
   Theorem extract_erase_commute c b:
     extract_2cfg (comb_erase b c) = twocfg_erase b (extract_2cfg c).
@@ -137,7 +137,7 @@ Section extract_step_commute.
   Notation comb_event := (Combined.cmb_event adv).
   Notation extract_2cfg := (extract_2cfg (AtkStates := AtkStates)).
   Notation step := (twostep adv (construct_simulator adv)).
-  Notation two_event := (Semantics.twoevent adv (construct_simulator adv)).
+  Notation two_event := (TwoCfg.twoevent adv (construct_simulator adv)).
 
   Import Util.List Combined VarValStore.Notations.
 

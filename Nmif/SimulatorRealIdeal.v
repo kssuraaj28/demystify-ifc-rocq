@@ -3,8 +3,8 @@ Import List ListNotations ssreflect ssrfun ssrbool.
 
 From Ltac2 Require Import Ltac2.
 
-Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem Combined Simulator CombinedExtract CoTrace IdlAtkPreds ControlledDowngrade.
-Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem Combined Simulator CombinedExtract CoTrace IdlAtkPreds ControlledDowngrade.
+Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TwoCfg TypeSystem Combined Simulator CombinedExtract CoTrace IdlAtkPreds ControlledDowngrade.
+Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TwoCfg TypeSystem Combined Simulator CombinedExtract CoTrace IdlAtkPreds ControlledDowngrade.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
