@@ -12,23 +12,71 @@ Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
 
-Section thm.
+Section statements.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
-  Variable (p : Prog).
-  Hypothesis (wtprogram : WellFormedProg ptlbl p).
 
-  Definition TypeSysRealIdl :=
+  Coercion Attacker.step : Attacker >-> AdvNextStep.
+
+  Fail Check "rename".
+  Definition NMIFCRealIdeal prog :=
     forall (rlatk : Attacker), exists (idlatk: Attacker),
-      IdlAtkDowngradeRestr p idlatk /\  FairIdlAtk p rlatk idlatk /\
-      forall inp, ⟦ p | rlatk ⟧ inp ≈ʷ ⟦ p | idlatk  ⟧ inp.
+      IdlAtkDowngradeRestr prog idlatk /\  FairIdlAtk prog rlatk idlatk /\ (* TODO: NMIFC restriction *)
+      forall inp, ⟦ prog | rlatk ⟧ inp ≈ʷ ⟦ prog | idlatk  ⟧ inp.
+
+  Definition NMIFRealIdeal prog :=
+    forall (rlatk : Attacker), exists (idlatk: Attacker),
+      NMIFRestr idlatk /\  FairIdlAtk prog rlatk idlatk /\
+      forall inp, ⟦ prog  | rlatk ⟧ inp ≈ʷ ⟦ prog | idlatk  ⟧ inp.
+
+  Definition RDRealIdeal prog :=
+    forall (rlatk : Attacker), exists (idlatk: Attacker),
+      RDRestr idlatk /\  FairIdlAtk prog rlatk idlatk /\
+      forall inp, ⟦ prog  | rlatk ⟧ inp ≈ʷ ⟦ prog | idlatk  ⟧ inp.
+
+  Definition TERealIdeal prog :=
+    forall (rlatk : Attacker), exists (idlatk: Attacker),
+      TERestr idlatk /\  FairIdlAtk prog rlatk idlatk /\
+      forall inp, ⟦ prog  | rlatk ⟧ inp ≈ʷ ⟦ prog | idlatk  ⟧ inp.
+
+  Definition NIRealIdeal prog :=
+    forall (rlatk : Attacker), exists (idlatk: Attacker),
+      NIRestr idlatk /\  FairIdlAtk prog rlatk idlatk /\
+      forall inp, ⟦ prog  | rlatk ⟧ inp ≈ʷ ⟦ prog | idlatk  ⟧ inp.
+End statements.
+
+Section nmifc.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+
+  Notation "⊢ p" := (WellFormedProg ptlbl p) (at level 10).
   
-  Theorem typesys_real_ideal: TypeSysRealIdl.
+  Theorem nmifc_real_ideal p: 
+    ⊢ p -> 
+    NMIFCRealIdeal p.
   Proof.
-    move=> rl. 
+    move=> ? rl. 
     eexists; repeat split;
       exact: sim_idlatkrest ||
       exact: sim_fair ||
       exact: simulator_trace_eq.
   Qed.
+End nmifc.
 
-End thm.
+Section nmif.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+
+  Theorem nmif_real_ideal p: 
+    NMIFCRealIdeal p -> 
+    NMIFRealIdeal p.
+  Proof.
+    rewrite/NMIFCRealIdeal/NMIFRealIdeal=> + x=> /(_ x); move: x=> ?.
+    case=> ? [] + []=> /restriction_impl=> /(_ false false).
+    evar_spec_toph; [move=> + + _=> _ [] [] // [] ? [] //|].
+    rewrite/AdvRestr=> - [atk] [restr] ? ? ?.
+    exists atk.
+    split=> //.
+    split; [admit|].
+    revert_hyp_pat [(forall st, _ ≈ˢ _), (forall st, _ ≈ʷ _)]; clear.
+    move=> + + inp=> /(_ inp) + /(_ inp)=> *.
+    apply: weq_seq_trans; eauto.
+  Admitted.
+End nmif.
