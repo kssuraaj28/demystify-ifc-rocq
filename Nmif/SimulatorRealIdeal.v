@@ -262,7 +262,7 @@ Section sim_fair.
 
   Theorem sim_fair :
     WellFormedProg ptlbl p ->
-    FairIdlAtk p a (construct_full_simulator p a).
+    FairIdlAtkRestr p a (construct_full_simulator p a).
   Proof.
     pose inv c := [elaborate (exists comb : CombCfg, CombinedInvariant comb /\ (c = (extract_2cfg comb)))].
     move=> wt.

@@ -100,7 +100,7 @@ Section fairness.
   Notation cfg_init_fn inp := (init_twocfg p inp (init areal) (init aideal)).
   Notation twostep := (twostep (Attacker.step areal) (Attacker.step aideal)).
 
-  Definition FairIdlAtk := forall inp, 
+  Definition FairIdlAtkRestr := forall inp, 
     let: init_cfg := cfg_init_fn inp in 
     forall final_cfg, 
       reachable twostep init_cfg final_cfg ->
@@ -111,10 +111,6 @@ Section fairness.
       Forall pred cmdlst.
 End fairness.
 
-
-(* The theorem:
-  IdlAtkDowngradeRestr -> NMIFRestr / ... has parameters
-*)
 Section restriction_impl_prm.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates: Type}.
 
@@ -301,7 +297,8 @@ Section restriction_impl.
   Qed.
   
   Lemma restriction_impl:
-    IdlAtkDowngradeRestr ->  RuntimeCmdRestr ->
+    IdlAtkDowngradeRestr ->  
+    RuntimeCmdRestr ->
     exists adv', AdvRestr (Attacker.step adv') /\
     forall inp, ⟦ prog | adv  ⟧ inp ≈ˢ ⟦prog | adv' ⟧ inp.
   Proof.
