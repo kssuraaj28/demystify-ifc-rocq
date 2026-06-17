@@ -152,7 +152,7 @@ Section ts.
   Definition proj_adv (A : AttackerLabel) : AdvLvlPrm := fun v => to4pt A (fvar_lbl v).
 
   Lemma proj_adv_var (A : AttackerLabel) v : @var_lbl _ (proj_adv A) v = to4pt A (fvar_lbl v).
-  Proof. exact: erefl. Qed.
+  Proof. done. Qed.
 
   (* A full typing derivation projects to a 4-point derivation for any attacker. *)
   Theorem full_to_4pt_cmd (A : AttackerLabel) pc c :

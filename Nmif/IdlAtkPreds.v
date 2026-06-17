@@ -241,7 +241,7 @@ Section restriction_impl.
 
 
   Lemma restriction_impl':
-    IdlAtkDowngradeRestr ->    RuntimeCmdRestr ->
+    IdlAtkDowngradeRestr ->  RuntimeCmdRestr ->
     exists adv_step', AdvRestr adv_step' /\
     forall inp cfg, 
       reachable (step adv_step) (init_cfg_fn inp) cfg ->

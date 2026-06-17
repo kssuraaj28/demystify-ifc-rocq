@@ -252,3 +252,45 @@ Section cfg_erase_filter.
 
 End cfg_erase_filter.
 
+
+Section twocfg_swap_atk.
+  Import VarValStore.Notations Util.DecEq Util.DecEq.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}. 
+  
+  Context (prog: Prog).
+  Context (nonswpatk : Attacker).
+  Notation ainitold := (init nonswpatk).
+  Notation astepold := (Attacker.step nonswpatk).
+
+  Context {AtkStatesSwp : Type} 
+    (ainitnew : AdvInit (AtkStates := AtkStatesSwp)) 
+    (astep1: AdvNextStep (AtkStates := AtkStatesSwp))
+    (astep2: AdvNextStep (AtkStates := AtkStatesSwp)).
+
+  Notation init_fn inp := (init_cfg prog ainitnew inp).
+  Notation step1 := (step astep1).  Notation event1 := (event astep1).
+  Notation step2 := (step astep2).  Notation event2 := (event astep2).
+
+  Notation twoinit_fn inp := (init_twocfg prog inp ainitold ainitnew).
+  Notation twostep1 := (twostep astepold astep1).  Notation twoevent1 := (twoevent astepold astep1).
+  Notation twostep2 := (twostep astepold astep2).  Notation twoevent2 := (twoevent astepold astep2).
+
+  Notation StepEqHyp :=
+    (forall inp final_cfg, 
+      reachable step1 (init_fn inp) final_cfg ->
+      step1 final_cfg = step2 final_cfg /\ event1 final_cfg = event2 final_cfg) (only parsing).
+
+
+  (* TODO: Parameterize eventually *)
+  Lemma twocfg_swap_atk:
+    StepEqHyp ->
+    forall inp final_cfg, 
+      reachable twostep1 (twoinit_fn inp) final_cfg ->
+      twostep1 final_cfg = twostep2 final_cfg /\ twoevent1 final_cfg = twoevent2 final_cfg.
+  Proof.
+    move=> + x=> /(_ x); move: x=> ?. (* TODO: Should just be apply*)
+    move=> ih [] [] [] // [].
+    move=> c1 c2 > rch.
+    rewrite/twostep1/twostep2 /step1/step2 in ih *.
+  Admitted.
+End twocfg_swap_atk.
