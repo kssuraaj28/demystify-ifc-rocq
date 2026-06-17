@@ -251,28 +251,6 @@ Section sim_idlatkrest.
 End sim_idlatkrest.
 
 
-(* TODO: Where should this be defined actually? *)
-Section fairness.
-  Import Util.List.
-  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
-
-  Variables (p: Prog) (areal aideal: Attacker).
-  Notation TwoCfg := (TwoCfg (AtkStates1 := (States areal)) (AtkStates2 := States aideal)).
-
-  Notation cfg_init_fn inp := (init_twocfg p inp (init areal) (init aideal)).
-  Notation twostep := (twostep (Attacker.step areal) (Attacker.step aideal)).
-
-  Definition FairIdlAtk := forall inp, 
-    let: init_cfg := cfg_init_fn inp in 
-    forall final_cfg, 
-      reachable twostep init_cfg final_cfg ->
-      let: (cmdlst, _, _) := final_cfg in
-      let: pred := 
-        fun '(mk_atkcmd ratk rcmd,mk_atkcmd iatk icmd) => 
-          (iatk -> icmd || rcmd || ratk)  in (* I could do iatk => ..  \/ .. \/ .. too *)
-      Forall pred cmdlst.
-End fairness.
-
 Section sim_fair.
   Import Util.List.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
