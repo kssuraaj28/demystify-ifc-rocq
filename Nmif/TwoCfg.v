@@ -263,7 +263,18 @@ Section twocfg_reachable.
 
   Lemma twocfg_reachable final_cfg:
     reachable (twostep (Attacker.step adv1) (Attacker.step adv2)) (twoinit) final_cfg ->
-    reachable (step (Attacker.step adv1)) init1 (extract_one_cfg true final_cfg) /\ reachable (step (Attacker.step adv2)) init2 (extract_one_cfg false final_cfg). 
+    reachable (step (Attacker.step adv1)) init1 (extract_one_cfg true final_cfg) /\ 
+    reachable (step (Attacker.step adv2)) init2 (extract_one_cfg false final_cfg). 
   Proof.
-  Admitted.
+    rewrite /reachable=> - [] + ->.
+    move=> n; split; move: n.
+    1,2: elim; [rewrite /= /is_running map_map filter_map_swap /= filter_true; unshelve eexists; [constructor|]; done|]=> ?.
+    1,2: case=> n /=; move: (Nat.iter _ (twostep _ _) _)=> cfg.
+    1,2: move: cfg=> [] [] []; [eexists; eauto|].
+    1: case=> ac. 2: case=> + ac.
+    1,2: move=> >.
+    1,2: move: (orbN (is_running ac))=> /orP [] acrun.
+    1-4: (rewrite extract_step_cfg + rewrite extract_stutter_cfg); [done|]=> ->.
+    1-4: unshelve eexists; [(idtac + constructor)|]; auto; fail.
+  Qed.
 End twocfg_reachable.
