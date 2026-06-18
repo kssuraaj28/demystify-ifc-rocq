@@ -79,3 +79,34 @@ Section nmif.
     apply: weq_seq_trans; eauto.
   Qed.
 End nmif.
+
+Section te.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+
+  Theorem te_real_ideal p: 
+    NMIFCRealIdeal p -> 
+    TERealIdeal p.
+  Proof.
+  Admitted.
+End te.
+
+Section rd.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+
+  Theorem rd_real_ideal p: 
+    NMIFCRealIdeal p -> 
+    RDRealIdeal p.
+  Proof.
+  Admitted.
+End rd.
+
+
+Section ni.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
+
+  Theorem ni_real_ideal p: 
+    NMIFCRealIdeal p -> 
+    NIRealIdeal p.
+  Proof.
+  Admitted.
+End ni.
