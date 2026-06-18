@@ -69,7 +69,7 @@ Section nmif.
     NMIFRealIdeal p.
   Proof.
     rewrite/NMIFCRealIdeal/NMIFRealIdeal=> + x=> /(_ x); move: x=> ?.
-    case=> ? [] + []=> /restriction_impl=> /(_ false false).
+    case=> ? [] + []=> /restriction_impl=> /(_ false false); rewrite/AdvRestr.
     evar_spec_toph; [move=> + + _=> _ [] [] // [] ? [] //|].
     rewrite/AdvRestr => -  [atk]  [restr] [fair] + {}/fair=> ? ? ?.  
     exists atk.
@@ -87,6 +87,15 @@ Section te.
     NMIFCRealIdeal p -> 
     TERealIdeal p.
   Proof.
+    rewrite/NMIFCRealIdeal/TERealIdeal=> + x=> /(_ x); move: x=> ?.
+    case=> ? [] + []=> /restriction_impl=> /(_ false true); rewrite/AdvRestr.
+    evar_spec_toph; [admit|].
+    rewrite/AdvRestr => -  [atk]  [restr] [fair] + {}/fair=> ? ? ?.  
+    exists atk.
+    do 2 split=> //.
+    revert_hyp_pat [(forall st, _ ≈ˢ _), (forall st, _ ≈ʷ _)]; clear.
+    move=> + + inp=> /(_ inp) + /(_ inp)=> *.
+    apply: weq_seq_trans; eauto.
   Admitted.
 End te.
 
@@ -97,6 +106,15 @@ Section rd.
     NMIFCRealIdeal p -> 
     RDRealIdeal p.
   Proof.
+    rewrite/NMIFCRealIdeal/RDRealIdeal=> + x=> /(_ x); move: x=> ?.
+    case=> ? [] + []=> /restriction_impl=> /(_ true false); rewrite/AdvRestr.
+    evar_spec_toph; [admit|].
+    rewrite/AdvRestr => -  [atk]  [restr] [fair] + {}/fair=> ? ? ?.  
+    exists atk.
+    do 2 split=> //.
+    revert_hyp_pat [(forall st, _ ≈ˢ _), (forall st, _ ≈ʷ _)]; clear.
+    move=> + + inp=> /(_ inp) + /(_ inp)=> *.
+    apply: weq_seq_trans; eauto.
   Admitted.
 End rd.
 
@@ -108,5 +126,14 @@ Section ni.
     NMIFCRealIdeal p -> 
     NIRealIdeal p.
   Proof.
+    rewrite/NMIFCRealIdeal/NIRealIdeal=> + x=> /(_ x); move: x=> ?.
+    case=> ? [] + []=> /restriction_impl=> /(_ true true); rewrite/AdvRestr.
+    evar_spec_toph; [admit|].
+    rewrite/AdvRestr => -  [atk]  [restr] [fair] + {}/fair=> ? ? ?.  
+    exists atk.
+    do 2 split=> //.
+    revert_hyp_pat [(forall st, _ ≈ˢ _), (forall st, _ ≈ʷ _)]; clear.
+    move=> + + inp=> /(_ inp) + /(_ inp)=> *.
+    apply: weq_seq_trans; eauto.
   Admitted.
 End ni.
