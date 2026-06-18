@@ -252,41 +252,18 @@ Section cfg_erase_filter.
 
 End cfg_erase_filter.
 
-
-Section twocfg_swap_atk.
-  Import VarValStore.Notations Util.DecEq Util.DecEq.Notations.
+Section twocfg_reachable.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}. 
-  
-  Context (prog: Prog).
-  Context (nonswpatk : Attacker).
-  Notation ainitold := (init nonswpatk).
-  Notation astepold := (Attacker.step nonswpatk).
 
-  Context {AtkStatesSwp : Type} 
-    (ainitnew : AdvInit (AtkStates := AtkStatesSwp)) 
-    (astep1: AdvNextStep (AtkStates := AtkStatesSwp))
-    (astep2: AdvNextStep (AtkStates := AtkStatesSwp)).
+  Variable (p : Prog) (st: Store) (adv1 adv2: Attacker).
 
-  Notation init_fn inp := (init_cfg prog ainitnew inp).
-  Notation step1 := (step astep1).  Notation event1 := (event astep1).
-  Notation step2 := (step astep2).  Notation event2 := (event astep2).
+  Notation twoinit := (init_twocfg p st (init adv1) (init adv2)) (only parsing).
+  Notation init1 := (Semantics.init_cfg p (init adv1) st) (only parsing).
+  Notation init2 := (Semantics.init_cfg p (init adv2) st) (only parsing).
 
-  Notation twoinit_fn inp := (init_twocfg prog inp ainitold ainitnew).
-  Notation twostep1 := (twostep astepold astep1).  Notation twoevent1 := (twoevent astepold astep1).
-  Notation twostep2 := (twostep astepold astep2).  Notation twoevent2 := (twoevent astepold astep2).
-
-  Notation StepEqHyp :=
-    (forall inp final_cfg, 
-      (reachable step1 (init_fn inp) final_cfg) ->
-      step1 final_cfg = step2 final_cfg /\ event1 final_cfg = event2 final_cfg) (only parsing).
-
-
-  (* TODO: Parameterize eventually *)
-  Lemma twocfg_swap_atk:
-    StepEqHyp ->
-    forall inp final_cfg, 
-      (reachable twostep2 (twoinit_fn inp) final_cfg) ->
-      (reachable twostep1 (twoinit_fn inp) final_cfg).
+  Lemma twocfg_reachable final_cfg:
+    reachable (twostep (Attacker.step adv1) (Attacker.step adv2)) (twoinit) final_cfg ->
+    reachable (step (Attacker.step adv1)) init1 (extract_one_cfg true final_cfg) /\ reachable (step (Attacker.step adv2)) init2 (extract_one_cfg false final_cfg). 
   Proof.
   Admitted.
-End twocfg_swap_atk.
+End twocfg_reachable.

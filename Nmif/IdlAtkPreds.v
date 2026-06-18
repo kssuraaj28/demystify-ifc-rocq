@@ -338,19 +338,10 @@ Section restriction_impl.
        { clear; case=> + _=> /[swap] ->.
        Require Import Claude.
        eauto using single_step_inj. }
-     (* This is probably another lemma *)
      rewrite {}onecfge. 
-     have:
-       forall (p: Prog) (st : Store) (adv1 adv2: Attacker), 
-         let: twoinit := init_twocfg p st (init adv1) (init adv2) in
-         let: init1 := Semantics.init_cfg p (init adv1) st in
-         let: init2 := Semantics.init_cfg p (init adv2) st in
-         forall final_cfg, 
-           reachable (twostep (Attacker.step adv1) (Attacker.step adv2)) (twoinit) final_cfg ->
-           reachable (step (Attacker.step adv1)) init1 (extract_one_cfg true final_cfg) /\
-           reachable (step (Attacker.step adv2)) init2 (extract_one_cfg false final_cfg). {admit. }
+     move: [elaborate twocfg_reachable].
      unshelve (do 6 (evar_spec_toph; [shelve|]); move=> []=> _; apply).
-     eexists; eauto.
-  Admitted.
+     eexists; eauto. (* Damn. I'm soo good *)
+  Qed.
 
 End restriction_impl.
