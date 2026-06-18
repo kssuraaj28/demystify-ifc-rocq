@@ -338,8 +338,7 @@ Section restriction_impl.
        { clear; case=> + _=> /[swap] ->.
        eauto using single_step_inj. }
      rewrite {}onecfge. 
-     move: [elaborate twocfg_reachable].
-     unshelve (do 6 (evar_spec_toph; [shelve|]); move=> []=> _; apply).
+     apply: proj2; apply: twocfg_reachable.
      eexists; eauto. (* Damn. I'm soo good *)
   Qed.
 
