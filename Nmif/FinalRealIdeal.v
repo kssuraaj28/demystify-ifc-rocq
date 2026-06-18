@@ -17,10 +17,9 @@ Section statements.
 
   Coercion Attacker.step : Attacker >-> AdvNextStep.
 
-  Fail Check "rename".
   Definition NMIFCRealIdeal prog :=
     forall (rlatk : Attacker), exists (idlatk: Attacker),
-      IdlAtkDowngradeRestr prog idlatk /\  FairIdlAtkRestr prog rlatk idlatk /\ (* TODO: NMIFC restriction *)
+      NMIFCRestr prog idlatk /\  FairIdlAtkRestr prog rlatk idlatk /\ (* TODO: NMIFC restriction *)
       forall inp, ⟦ prog | rlatk ⟧ inp ≈ʷ ⟦ prog | idlatk  ⟧ inp.
 
   Definition NMIFRealIdeal prog :=

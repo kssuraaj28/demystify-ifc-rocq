@@ -130,10 +130,10 @@ Section sim_idlatkrest.
   Ltac inv_auto := auto using cfg_step_inv, erase_filter_inv.
   Theorem sim_idlatkrest :
     WellFormedProg ptlbl p ->
-    IdlAtkDowngradeRestr p (construct_full_simulator p a).
+    NMIFCRestr p (construct_full_simulator p a).
   Proof.
     move=> wt.
-    rewrite/IdlAtkDowngradeRestr.
+    rewrite/NMIFCRestr.
     let t := open_constr:(?[ast_trans]) in pose ast_trans:= t; exists ast_trans.
     let t := open_constr:(?[ast_corr]) in pose ast_corr:= t; exists ast_corr.
     move=> /= inp > rch.

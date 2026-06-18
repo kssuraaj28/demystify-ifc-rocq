@@ -28,7 +28,7 @@ Section idldowngrade_prd.
   Notation IdealAstTrans := (AtkStates -> Vals (* declassified value *) -> (AtkStates * nat) (* ast , substeps *)).
   Notation IdealAstCorr := (AtkStates -> option (Vars * Vals) (* endorsed value *)).
 
-  Definition IdlAtkDowngradeRestr : Prop :=
+  Definition NMIFCRestr : Prop :=
     exists (ast_trans: IdealAstTrans)  (ast_corr : IdealAstCorr),
     forall inp, 
       let: init_cfg := init_cfg_fn inp in
@@ -243,7 +243,7 @@ Section restriction_impl.
   Notation init_cfg_fn inp := ((Semantics.init_cfg prog adv_init inp)).   (* TODO: Copy? *)
 
   Notation RuntimeCmdRestr := (RuntimeCmdRestr noend nodecl prog adv_init adv_step).  Check RuntimeCmdRestr : Prop.
-  Notation IdlAtkDowngradeRestr := (IdlAtkDowngradeRestr prog adv). Check IdlAtkDowngradeRestr : Prop.
+  Notation IdlAtkDowngradeRestr := (NMIFCRestr prog adv). Check IdlAtkDowngradeRestr : Prop.
   Notation FairIdlAtkRestr := (FairIdlAtkRestr prog).
 
   Notation AdvRestr :=  (AdvRestr noend nodecl).  Check AdvRestr : AdvNextStep -> Prop.
