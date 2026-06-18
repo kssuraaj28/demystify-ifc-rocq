@@ -308,20 +308,49 @@ Section restriction_impl.
     move: restriction_impl'=> /[apply] /[apply] - [] step' [restr1 restr2].
     exists {|States := States adv; init := init adv ; Attacker.step :=  step' |}.
     move=> /=; split=> // {restr1}.
-    split.
-      { move: restr2; clear=> + adv'.
-      move/(twocfg_swap_atk _ adv').
-      move=> h1. rewrite/FairIdlAtkRestr /==> h2 inp final rch.
-      move=> /(_ inp final) in h1. move=> /(_ inp final) in h2.
-      move: h1 => /(_ rch). done. } 
-    move=> inp; move: restr2=> /(_ inp). (* Why no apply *)
-    rewrite /⟦_|_ ⟧ /=.
-    set initcfg := (init_cfg_fn _)=> inv.
-    pose bsimrel cfg cfg' := cfg = cfg' /\ reachable (step adv_step) initcfg cfg. (* Can I use evar magic *)
-    unshelve apply: trace_sbisim; [exact bsimrel| ..]; rewrite {}/bsimrel /=; [| auto using reachable_init].
-    move=> s1 s2 [<- rch].
-    move: inv (rch)=> /[apply]=> [] [] <- <-.
-    auto using reachable_step.
-  Qed.
+    split; cycle 1.
+      { move=> inp; move: restr2=> /(_ inp). (* Why no apply *)
+      rewrite /⟦_|_ ⟧ /=.
+      set initcfg := (init_cfg_fn _)=> inv.
+      pose bsimrel cfg cfg' := cfg = cfg' /\ reachable (step adv_step) initcfg cfg. (* Can I use evar magic *)
+      unshelve apply: trace_sbisim; [exact bsimrel| ..]; rewrite {}/bsimrel /=; [| auto using reachable_init].
+      move=> s1 s2 [<- rch].
+      move: inv (rch)=> /[apply]=> [] [] <- <-.
+      auto using reachable_step. }
+     move: restr2=> + adv'.
+     move=> h1.
+     rewrite/FairIdlAtkRestr /==> h2 inp final rch.
+     unshelve apply: h2; [exact: inp|].
+     move: h1 rch; clear. (* Can be a separate theorem, but *)
+     evar_spec_toph; [exact inp|].
+     move=> smeq.
+     rewrite/reachable=> - [n] ->. exists n.
+     elim: n=> //= ?; clear -smeq.
+     move=> ->. move cfgitereq: (Nat.iter _ _ _)=> cfg. move/esym in cfgitereq.
+     move cfge: cfg=> [[[| [? acmd] ?] ?] ?] => //=.
+     pattern_eq_2 [acmd_step _ acmd _] [acmd_step _ acmd _]=> [|->//].
+     move: cfge. case: acmd=> - [] // ? cfge.
+     move onecfge: (extract_one_cfg false cfg)=> onecfg. 
+     move/esym in  onecfge. move: (onecfge).
+     rewrite {}cfge. rewrite [extract_one_cfg _ _]/=.
+     move: smeq=> /(_ onecfg).
+     evar_spec_toph; cycle 1.
+       { clear; case=> + _=> /[swap] ->.
+       Require Import Claude.
+       eauto using single_step_inj. }
+     (* This is probably another lemma *)
+     rewrite {}onecfge. 
+     have:
+       forall (p: Prog) (st : Store) (adv1 adv2: Attacker), 
+         let: twoinit := init_twocfg p st (init adv1) (init adv2) in
+         let: init1 := Semantics.init_cfg p (init adv1) st in
+         let: init2 := Semantics.init_cfg p (init adv2) st in
+         forall final_cfg, 
+           reachable (twostep (Attacker.step adv1) (Attacker.step adv2)) (twoinit) final_cfg ->
+           reachable (step (Attacker.step adv1)) init1 (extract_one_cfg true final_cfg) /\
+           reachable (step (Attacker.step adv2)) init2 (extract_one_cfg false final_cfg). {admit. }
+     unshelve (do 6 (evar_spec_toph; [shelve|]); move=> []=> _; apply).
+     eexists; eauto.
+  Admitted.
 
 End restriction_impl.
