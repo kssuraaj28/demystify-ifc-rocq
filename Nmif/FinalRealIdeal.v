@@ -3,8 +3,8 @@ Import List ListNotations ssreflect ssrfun ssrbool.
 
 From Ltac2 Require Import Ltac2.
 
-Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem IdlAtkPreds CoTrace SimulatorRealIdeal.
-Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem IdlAtkPreds CoTrace SimulatorRealIdeal.
+Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem IdlAtkPreds CoTrace SimulatorRealIdeal DowngradeSyntaxRestriction.
+Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem IdlAtkPreds CoTrace SimulatorRealIdeal DowngradeSyntaxRestriction.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
@@ -84,38 +84,40 @@ Section te.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
   Theorem te_real_ideal p: 
-    NMIFCRealIdeal p -> 
+    NMIFCRealIdeal p -> declassify_absent p ->
     TERealIdeal p.
   Proof.
-    rewrite/NMIFCRealIdeal/TERealIdeal=> + x=> /(_ x); move: x=> ?.
+    rewrite/NMIFCRealIdeal/TERealIdeal=> + ?=> + x=> /(_ x); move: x=> ?.
     case=> ? [] + []=> /restriction_impl=> /(_ false true); rewrite/AdvRestr.
-    evar_spec_toph; [admit|].
+    evar_spec_toph; [exact:dwnrd_rstrct_sound|].
     rewrite/AdvRestr => -  [atk]  [restr] [fair] + {}/fair=> ? ? ?.  
     exists atk.
     do 2 split=> //.
     revert_hyp_pat [(forall st, _ ≈ˢ _), (forall st, _ ≈ʷ _)]; clear.
     move=> + + inp=> /(_ inp) + /(_ inp)=> *.
     apply: weq_seq_trans; eauto.
-  Admitted.
+  Qed.
+
 End te.
 
 Section rd.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
   Theorem rd_real_ideal p: 
-    NMIFCRealIdeal p -> 
+    NMIFCRealIdeal p -> endorse_absent p ->
     RDRealIdeal p.
   Proof.
-    rewrite/NMIFCRealIdeal/RDRealIdeal=> + x=> /(_ x); move: x=> ?.
+    rewrite/NMIFCRealIdeal/RDRealIdeal=> + ? => + x=> /(_ x); move: x=> ?.
     case=> ? [] + []=> /restriction_impl=> /(_ true false); rewrite/AdvRestr.
-    evar_spec_toph; [admit|].
+    evar_spec_toph; [exact:dwnrd_rstrct_sound|].
     rewrite/AdvRestr => -  [atk]  [restr] [fair] + {}/fair=> ? ? ?.  
     exists atk.
     do 2 split=> //.
     revert_hyp_pat [(forall st, _ ≈ˢ _), (forall st, _ ≈ʷ _)]; clear.
     move=> + + inp=> /(_ inp) + /(_ inp)=> *.
     apply: weq_seq_trans; eauto.
-  Admitted.
+  Qed.
+
 End rd.
 
 
@@ -123,17 +125,18 @@ Section ni.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
   Theorem ni_real_ideal p: 
-    NMIFCRealIdeal p -> 
+    NMIFCRealIdeal p -> downgrade_absent p ->
     NIRealIdeal p.
   Proof.
-    rewrite/NMIFCRealIdeal/NIRealIdeal=> + x=> /(_ x); move: x=> ?.
+    rewrite/NMIFCRealIdeal/NIRealIdeal=> + ? => + x=> /(_ x); move: x=> ?.
     case=> ? [] + []=> /restriction_impl=> /(_ true true); rewrite/AdvRestr.
-    evar_spec_toph; [admit|].
+    evar_spec_toph; [exact:dwnrd_rstrct_sound|].
     rewrite/AdvRestr => -  [atk]  [restr] [fair] + {}/fair=> ? ? ?.  
     exists atk.
     do 2 split=> //.
     revert_hyp_pat [(forall st, _ ≈ˢ _), (forall st, _ ≈ʷ _)]; clear.
     move=> + + inp=> /(_ inp) + /(_ inp)=> *.
     apply: weq_seq_trans; eauto.
-  Admitted.
+  Qed.
+
 End ni.
