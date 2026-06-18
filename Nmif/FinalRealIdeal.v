@@ -19,7 +19,7 @@ Section statements.
 
   Definition NMIFCRealIdeal prog :=
     forall (rlatk : Attacker), exists (idlatk: Attacker),
-      NMIFCRestr prog idlatk /\  FairIdlAtkRestr prog rlatk idlatk /\ (* TODO: NMIFC restriction *)
+      NMIFCRestr prog idlatk /\  FairIdlAtkRestr prog rlatk idlatk /\ 
       forall inp, ⟦ prog | rlatk ⟧ inp ≈ʷ ⟦ prog | idlatk  ⟧ inp.
 
   Definition NMIFRealIdeal prog :=
