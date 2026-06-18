@@ -496,6 +496,13 @@ Module List.
     ltac1:(lazymatch goal with |- Forall _ (combine_extend2 _ _ _ _) => apply:Forall_combine2_same end)
     "Forall_combine2_same" old.
 
+  Lemma map_inj {A B} {f : A -> B} (Hf : injective f) l1 l2 :
+    map f l1 = map f l2 -> l1 = l2.
+  Proof.
+    elim: l1 l2 => [|x l1 IH] [|y l2] //=.
+    move=> [/Hf -> /IH ->] //.
+  Qed.
+
   Lemma Forall_filter {A} (P : A -> Prop) (f : A -> bool) l :
     Forall P l -> Forall P (filter f l).
   Proof.

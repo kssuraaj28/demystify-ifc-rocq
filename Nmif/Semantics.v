@@ -190,6 +190,43 @@ Section cfg.
     event_helper adv ac new_store old_ast.
 End cfg.
 
+Section step_inj.
+  Import Util.List.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
+  Notation AdvNextStep := (AdvNextStep (AtkStates := AtkStates)).
+
+  Lemma single_step_inj (a a' : AdvNextStep) ac tl s :
+    step a (ac :: tl, s) = step a' (ac :: tl, s) ->
+    acmd_step a ac s = acmd_step a' ac s.
+  Proof.
+    rewrite /step.
+    move: (acmd_step a ac s) => [[p st] n].
+    move: (acmd_step a' ac s) => [[p' st'] m].
+    move=> [] /app_inv_tail /map_inj.
+    evar_spec_toph=> [ [? ?] [? ?] [-> ->] //|].
+    move=> + ->=> leq.
+    suff: (p = p' /\ n = m)=> [[-> ->] // |].
+    split; move: leq; clear. (* TODO: Lemma? *)
+
+    + elim: p p' (repeat _ _) (repeat _ _).
+        1: case=> // ? ?. 2: move=> ? ? ih [].
+        1,2: move=> r1 r2 + /ltac:(exfalso).
+        1,2: rewrite ![map Some []]/= ![map Some (_ :: _)]/= combine_extend2_consl. (* Can be cook rules *)
+        1,2: (case: r1 + case: r2); done.
+      move=> >. rewrite ![map Some (_ :: _)]/= !combine_extend2_consl.
+      case=> -> _ /ih -> //.
+
+    + elim: n m (map _ _) (map _ _).
+        1: case=> // ?. 2: move=> ? ih [].
+        1,2: move=> m1 m2 + /ltac:(exfalso).
+        1,2: rewrite ![repeat true 0]/= ![repeat true (S _)]/= combine_extend2_consr.
+        1,2: (case: m1 + case: m2); done.
+      move=> >. rewrite ![repeat _ (S _)]/= !combine_extend2_consr.
+      case=> _ /ih -> //.
+  Qed.
+
+End step_inj.
+
 Section cfg_trace.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
   Variable (adv : AdvNextStep (AtkStates := AtkStates)).

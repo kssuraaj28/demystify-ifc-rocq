@@ -336,7 +336,6 @@ Section restriction_impl.
      move: smeq=> /(_ onecfg).
      evar_spec_toph; cycle 1.
        { clear; case=> + _=> /[swap] ->.
-       Require Import Claude.
        eauto using single_step_inj. }
      rewrite {}onecfge. 
      move: [elaborate twocfg_reachable].
