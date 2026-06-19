@@ -22,10 +22,8 @@ Section ni.
       ⟨ s1 | is_trusted ⟩ = ⟨ update_to_store s2 v vl | is_trusted ⟩.
   Proof.
     move=> untrv treq.
-    have htv : is_trusted v = false.
-    { rewrite /is_trusted; move: untrv; case: (is_untrusted v) => //. }
-    rewrite (update_storeview_nochange _ _ _ _ htv).
-    exact: treq.
+    rewrite update_storeview_nochange=> //.
+    rewrite /is_trusted; move: untrv; case: (is_untrusted v) => //.
   Qed.
 
   Lemma endorse_pre_read_eq from to s1 s2:
