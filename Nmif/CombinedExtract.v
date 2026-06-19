@@ -343,7 +343,7 @@ Section extract_step_commute.
         { do [move=> /negbT; rewrite negb_and negbK=> /orP] in newpce.
         case: pub in rwt newpce *; move=> /= in newpce. 
         1: move=> /=; move: newpce=> [] // ->.
-        2: wf_finisher_guess [post_cmd_action _ _ (optcmd_stp_store _ _)] with (post_cmd_action _ _ (if _ then _ else _))=> ->. (* How does this even work? *)
+        2: wf_finisher_guess [post_cmd_action _ _ (optcmd_stp_store _ _)] with (post_cmd_action _ _ (if _ then _ else _))=> ->. (* TODO: There is a wf_finisher_guess bug here. repacing with _ should fail *)
         1-2: move=> /=; cook. 
         1-2: rewrite combine_extend3_splitl combine_extend2_same map_map. 
         1-2: erewrite combine_extend2_map_r; [|done]; rewrite map_map.
@@ -391,8 +391,7 @@ Section extract_step_commute.
         { erewrite filter_ext; [|case; case=> ? ? ?; rewrite /sim_active' /= Bool.orb_false_r; instantiate (1 := fun '(_,_,_) => _); reflexivity].
         do [move=> /negbT; rewrite negb_and negbK=> /orP] in newpce.
         case: pub in rwt newpce *; move=> /= in newpce. 
-
-        2: wf_finisher_guess [post_cmd_action _ _ (optcmd_stp_store _ _)] with (post_cmd_action _ _ (if _ then _ else _))=> -> /=; cook. (* How does this even work? *)
+        2: wf_finisher_guess [post_cmd_action _ _ (optcmd_stp_store _ _)] with (post_cmd_action _ _ (if _ then _ else _))=> -> /=; cook. (* TODO: There is a wf_finisher_guess bug here. repacing with _ should fail *)
         1: move: newpce=> [] // ->.
         1: rewrite combine_extend2_nil_l.
         1: cook; set l1 := filter _ _; set l2 := repeat true _.

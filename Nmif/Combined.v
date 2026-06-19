@@ -342,8 +342,8 @@ Section invprf.
         1,2: repeat split; cook.
         1,2,5: enter (idtac; wf_finisher).
           {apply: Forall_CmbCmd_zip; cook. } 
-          { let v := open_constr:(_) in pattern_eq [RHS] with v; [wf_finisher|move=> ->]. cook.  (* Simulating rewrite with apply:. I'm a god *)
-          let v := open_constr:(_) in pattern_eq [LHS] with v; [wf_finisher|move=> ->]. cook. }
+          {  wf_finisher_guess [RHS] with ⟨ ideal_store _ | is_trusted ⟩=> ->. cook.
+          wf_finisher_guess [LHS] with ⟨ real_store _ | is_trusted ⟩=> ->. cook. }
         apply: Forall_CmbCmd_zip; cook.
         move=> /=. 
         apply/Forall_and; cook; auto with trickbag.

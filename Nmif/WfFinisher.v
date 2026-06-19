@@ -147,11 +147,6 @@ Section ni.
 
 End ni.
 
-Ltac optcmd_stp_store_lift :=
-  lazymatch goal with
-  |- ⟨ optcmd_stp_store ?oc _ | _⟩ = ⟨ optcmd_stp_store ?oc _ | _⟩ => destruct oc; [|done]
-  end.
-
 Ltac2 mutable wf_finisher_debug : int := 0.
 (* Print [msg] when wf_finisher_debug is at least [lvl]. *)
 Ltac2 wf_dbg (lvl : int) (msg : message) : unit :=
