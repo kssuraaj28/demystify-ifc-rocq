@@ -4,7 +4,7 @@ Import List ListNotations ssreflect ssrfun ssrbool.
 From Ltac2 Require Import Ltac2 Printf.
 
 Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade.
-Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade Tacs.Cook.
+Import Tacs Util VarValStore VarValStore.Notations Lattice4pt.Notations Attacker Syntax Lattice4pt Semantics TypeSystem ControlledDowngrade Tacs.Cook.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
@@ -12,7 +12,6 @@ Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
 Section ni.
-  Import VarValStore.Notations Lattice4pt.Notations.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
   Lemma wf_cmd_st_conf_ni c l st1 st2:
@@ -87,21 +86,6 @@ Section ni.
           rewrite /eval_val_exp /= (storeview_eq _ _ _ v1 treq pv1) (storeview_eq _ _ _ v2 treq pv2) //. }
       rewrite /clean_assign_stp_store Hval. apply: update_same_varval; exact: treq. }
   Qed.
-  (* TODO repair (constructors changed shape):
-    move=> [] // d s1 s2 ? ?.
-      { apply: update_to_store_storeview_eq. rewrite /is_trusted /is_untrusted s2 //. }
-    case de: ([elaborate is_untrusted d])=> fs1d fs2d _ _ treq /=;
-      [do 2 (rewrite update_storeview_nochange{1}/is_trusted; [rewrite de //|])=> //|].
-    rewrite/is_trusted/is_untrusted/= in de.
-    move: de=>/untrusted_false td.
-    move: (flows_to_tr _ _ td fs1d)=> {fs1d} ts1.
-    move: (flows_to_tr _ _ td fs2d)=> {fs2d} ts2.
-    set v1 := (X in ⟨update_to_store _ _ X | _ ⟩ = _ ).
-    set v2 := (X in _ = ⟨update_to_store _ _ X | _ ⟩).
-    suff: v1 = v2; [move=> ->; apply/update_same_varval=> //|subst v1 v2].
-    rewrite /get_assign_val /eval_val_exp /=.
-    f_equal; eauto using storeview_eq.
-  *)
 
 
   Fact wf_optcmd_st_conf_ni l oc st1 st2:
@@ -163,6 +147,11 @@ Section ni.
 
 End ni.
 
+Ltac optcmd_stp_store_lift :=
+  lazymatch goal with
+  |- ⟨ optcmd_stp_store ?oc _ | _⟩ = ⟨ optcmd_stp_store ?oc _ | _⟩ => destruct oc; [|done]
+  end.
+
 Ltac2 mutable wf_finisher_debug : int := 0.
 (* Print [msg] when wf_finisher_debug is at least [lvl]. *)
 Ltac2 wf_dbg (lvl : int) (msg : message) : unit :=
@@ -185,19 +174,24 @@ Ltac2 wf_finisher_arms () : unit :=
     reference:(post_cmd_wf)
   ] in
   let apply_lemma (c : constr) : unit := ltac1:(c |- apply: [elaborate c]) (Ltac1.of_constr c) in (* ssr apply: fails in some other file. TODO: Debug *)
+  let lemma_arms : ((unit -> unit) * string) list :=
+    List.map (fun r =>
+       let c := Env.instantiate r in
+       ((fun () => apply_lemma c),
+        Message.to_string (fprintf "%t" c)))
+       lemmas in
   let rec or_all l :=
     match l with
-    | [] => softfail_s "wf_finisher_arms" "no lemma applies"
-    | r :: rest =>
+    | [] => softfail_s "wf_finisher_arms" "no arm applies"
+    | (tac, name) :: rest =>
       Control.plus
       (fun _ =>
-        let c := Env.instantiate r in
-        wf_dbg 3 (fprintf "wf_finisher_arms: trying %t" c);
-        apply_lemma c)
+        wf_dbg 3 (fprintf "wf_finisher_arms: trying %s" name);
+        tac ())
       (fun _ =>
         or_all rest)
     end in
-  or_all lemmas.
+  or_all lemma_arms.
 
 Ltac2 wf_finisher_close () : unit :=
   goal_assertion 1 "wf_finisher_rec";
