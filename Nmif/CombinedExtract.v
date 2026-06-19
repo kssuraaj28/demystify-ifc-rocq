@@ -194,7 +194,7 @@ Section extract_step_commute.
     1,2: rewrite/clean_assign_stp_store/get_assign_val/get_assign_dest; cook.
     1,2: pattern_eq_2 [post_cmd_action _ _ (update_to_store _ _ _)] [post_cmd_action _ _ (update_to_store _ _ _)]=> [|<-]; swap 2 3.
         { apply/post_cmd_wf/update_to_store_storeview_eq; cook. wf_finisher. } (* TODO : wf_finisher this *)
-        { apply/post_cmd_wf. Require Import TODO. exact:declassify_pubeq. }
+        { wf_finisher. }
     1,2: rewrite/clean_assign_stp_store/get_assign_val/get_assign_dest; cook.
     1,2: move: (post_cmd_action _ _ (update_to_store _ _ _));case=> >; cook.
     1,2: rewrite/zip.

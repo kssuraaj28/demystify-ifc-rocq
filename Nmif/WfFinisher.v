@@ -147,12 +147,77 @@ Section ni.
 
 End ni.
 
+Section to_sort.
+  Import VarValStore.Notations Lattice4pt.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm} {AtkStates : Type}.
+  Notation AdvNextStep := (AdvNextStep (AtkStates := AtkStates)).
+
+  Lemma update_untr_keep_view s1 s2 v vl :
+      is_untrusted v ->
+      ⟨ s1 | is_trusted ⟩ = ⟨ s2 | is_trusted ⟩ ->
+      ⟨ s1 | is_trusted ⟩ = ⟨ update_to_store s2 v vl | is_trusted ⟩.
+  Proof.
+    move=> untrv treq.
+    rewrite update_storeview_nochange=> //.
+    rewrite /is_trusted; move: untrv; case: (is_untrusted v) => //.
+  Qed.
+
+  Lemma endorse_pre_read_eq from to s1 s2:
+      is_public from ->
+      ⟨ s1 | is_public ⟩ = ⟨ s2 | is_public ⟩ ->
+      clean_assign_stp_store (endorse from to) s2 from = s1 from.
+  Proof.
+    move=> pubfrom pubeq.
+    have ->: clean_assign_stp_store (endorse from to) s2 from = s2 from.
+    { rewrite /clean_assign_stp_store /get_assign_dest /get_assign_val /update_to_store /=.
+      case: (Util.DecEq.dec_eq _ _) => //. }
+    apply: storeview_eq; eauto.
+  Qed.
+
+  Lemma wf_endorse_st_int from to st1 st2:
+      st1 from = st2 from ->
+      ⟨ st1 | is_trusted ⟩ = ⟨ st2 | is_trusted ⟩ ->
+      ⟨ clean_cmd_stp_store (assign (endorse from to)) st1 | is_trusted ⟩ =
+      ⟨ clean_cmd_stp_store (assign (endorse from to)) st2 | is_trusted ⟩.
+  Proof.
+    move=> eqfrom treq.
+    rewrite /clean_cmd_stp_store /= /clean_assign_stp_store /get_assign_dest /get_assign_val /=.
+    rewrite eqfrom.
+    exact: update_same_varval treq.
+  Qed.
+
+  Lemma declassify_pubeq  (adv : AdvNextStep) ast
+    from to real_store ideal_store sim_store :
+    var_lbl from = mk_lbl false false ->
+    var_lbl to = mk_lbl false true ->
+    ⟨ real_store | is_trusted ⟩ = ⟨ ideal_store | is_trusted ⟩ ->
+    ⟨ real_store | is_public ⟩ = ⟨ sim_store | is_public ⟩ ->
+    ⟨ update_to_store (pre_cmd_action adv ast sim_store) to (ideal_store from) | is_public ⟩ =
+    ⟨ update_to_store (pre_cmd_action adv ast real_store) to (pre_cmd_action adv ast real_store from) | is_public ⟩.
+  Proof.
+    move=> Hfrom Hto treq pubeq.
+    have tfrom : is_trusted from; [rewrite /is_trusted /is_untrusted Hfrom //|].
+    have valeq : pre_cmd_action adv ast real_store from = ideal_store from.
+    { rewrite (storeview_eq _ _ _ from (pre_cmd_wf_int adv ast real_store) tfrom).
+      exact: (storeview_eq _ _ _ from treq tfrom). }
+    rewrite valeq.
+    apply: update_same_varval.
+    exact: (pre_cmd_wf_conf adv ast _ _ (esym pubeq)).
+  Qed.
+End to_sort.
+
 Ltac2 mutable wf_finisher_debug : int := 0.
 (* Print [msg] when wf_finisher_debug is at least [lvl]. *)
 Ltac2 wf_dbg (lvl : int) (msg : message) : unit :=
   if Int.ge wf_finisher_debug lvl then Message.print msg else ().
 
 (* TODO: Eventually, we should have a pattern that let's us not have these versions for optional cmd and so on *)
+(* This tactic does TOOO much. Very complex, and hard to debug
+- Combined.v or Combined_extract.v define their own cook rules, so a lot has to be cleaned up
+- The order of Control.focus matters when evars are involved.
+- There is some existing bug in Combined / Combined_extract.v
+- Sort out the TODOs. They are not modular
+*)
 Ltac2 wf_finisher_arms () : unit :=
   goal_assertion 1 "wf_finisher_rec";
   let lemmas : Std.reference list := [
@@ -166,7 +231,13 @@ Ltac2 wf_finisher_arms () : unit :=
     reference:(wf_tr_cmd_cnt_ni);
     reference:(pre_cmd_wf_int);
     reference:(pre_cmd_wf_conf);
-    reference:(post_cmd_wf)
+    reference:(post_cmd_wf);
+
+    (* TODO: Clean these up *)
+    reference:(update_untr_keep_view);
+    reference:(endorse_pre_read_eq);
+    reference:(wf_endorse_st_int);
+    reference:(declassify_pubeq)
   ] in
   let apply_lemma (c : constr) : unit := ltac1:(c |- apply: [elaborate c]) (Ltac1.of_constr c) in (* ssr apply: fails in some other file. TODO: Debug *)
   let lemma_arms : ((unit -> unit) * string) list :=

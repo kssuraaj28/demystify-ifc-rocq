@@ -357,8 +357,8 @@ Section invprf.
           { move=>e; rewrite -> e in *=> {e} /[dup] ? /[swap] /[dup] ? /[swap].
           revert_hyp_pat (WellFormedCmd _ _)=> /wf_endorse_pc /[apply] /[apply] e; rewrite -> e in *=> {e}.
           revert_hyp_pat (if _ then _ else _)=>  <-. cook.
-          Require Import TODO. (* TODO: This should be automated. But how to automate? *)
-          apply: wf_endorse_st_int; cook.
+
+          apply: wf_endorse_st_int; cook. (* TODO: Clean this up *)
             { symmetry. apply: endorse_pre_read_eq; cook. wf_finisher. }
           apply: update_untr_keep_view; cook. 
           wf_finisher_guess [RHS] with _=> ->. wf_finisher. } 
