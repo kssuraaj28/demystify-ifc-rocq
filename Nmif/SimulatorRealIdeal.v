@@ -182,13 +182,7 @@ Section sim_idlatkrest.
     rewrite/CmbCmdInv/TypeInv=> - [] [] ? ? _. Combined.local_cook=> asteq.
     split. 
     - rewrite -surjective_pairing.
-      set simst' := sim_post _ _ _. set f_ast := ast_trans _. set cmd := (X in match X with | Some _ => _ | _ => _ end).
-      pose ctrldecl := [elaborate oapp extract_controlled_declassify None cmd].
-      suff:  match ctrldecl with | Some (from, to) => simst' = f_ast (idlst from) | _ => forall garbage, simst' = f_ast garbage  end.
-        { clear. move: ast_trans f_ast simst'=> > _ >. rewrite{}/ctrldecl.
-        move e: (oapp _ _ _)=> [[? ?]| ]; [|clear;case: cmd=> // - [] // [] //].
-        move: e=>/extr_decl_opt=> -[] -> //. }
-      rewrite {}/ctrldecl {}/cmd {}/simst' {}/f_ast {}/ast_trans.
+      rewrite {}/ast_trans.
       instantiate (ast_trans :=( fun st val => (sim_post astep st (fun => val)))).
       move is_decl : (oapp _ _ _)=> x; move: x is_decl; case=> [[src dst] ? | ? ? ]; rewrite {}asteq; cycle 1.
         { move: (optcmd_stp_store _ _)=> ?.
@@ -224,18 +218,7 @@ Section sim_idlatkrest.
       move=> /=.
       move endeq: (oapp extract_controlled_endorse _ _)=> [ [? ?] | //].
       congr update_to_store. move: (if _ then _ else _)=> ?. reflexivity. } (* What did I just do lmao *)
-     set cmd := (X in match X with Some _ => _ | _ => _ end). set astcorval := (ast_corr _).
-     pose ctrlend := [elaborate oapp extract_controlled_endorse None cmd].
-     suff:  match ctrlend with 
-       | Some (from, to) => if astcorval is Some (var, _) then  var = from else  True
-       | _ => astcorval = None 
-       end; subst ctrlend astcorval.
-       { move: cmd ast_corr=> c ?; clear.
-       case: c=> // - [] // [] // >. 
-       move e: (oapp _ _ _)=> [ [? ?] | ?];[|rewrite e //].
-       move: e=> /extr_endorse_eq=> - [] [->] _ _.
-       case: (X in match X with | None => True | _ => _ end)=> // - []//. }
-     rewrite {}asteq {}/ast_corr {}/cmd /=.
+     rewrite {}asteq {}/ast_corr /=.
      move ende: (oapp _ _ _)=> [[? ?] | ].
        { revert_hyp_pat [Label, (_ ⊢ _), (_ = _), (if _ then _ else _)]; clear.
        case=> + [] //=; case; [move=> + _ _ | move=> + + e; rewrite {}e=> + ->  //].

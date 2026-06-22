@@ -42,7 +42,7 @@ Section idldowngrade_prd.
         let: atk_output := 
            let: (_, (_, ast'), atk_substeps) := acmd_step acmd state in
            (ast', atk_substeps) in
-        if cmd is Some (assign (declassify from to)) then atk_output = ast_trans ast (store from) else
+        if oapp extract_controlled_declassify None cmd is Some (from, _) then atk_output = ast_trans ast (store from) else
         forall garbage, atk_output = ast_trans ast garbage in
       
       let: corruptor_restriction := 
@@ -54,8 +54,8 @@ Section idldowngrade_prd.
             else update_to_store store var val in
          
         let: ast_corr_restriction :=
-          if cmd isn't Some (assign (endorse from to)) then ast_corr_output = None else
-          if ast_corr_output is Some (var, val) then var = from else
+          if oapp extract_controlled_endorse None cmd isn't Some (from, _) then ast_corr_output = None else
+          if ast_corr_output is Some (var, _) then var = from else
           True in
         ast_corr_match /\ ast_corr_restriction in
 
@@ -128,25 +128,18 @@ Section restriction_impl_prm.
       | false, false => NMIFRestr adv_step
     end).
 
-  Definition CmdRestr  :=
-    (fun cmd => match noend, nodecl with
-      | true, true => 
-         match cmd with
-         | (assign(endorse _ _)) | (assign(declassify _ _))  =>  False
-         | _ => True
-         end
-      | true, false => 
-         match cmd with
-         | (assign(endorse _ _)) => False
-         | _ => True
-         end
-      | false, true => 
-         match cmd with
-         | (assign(declassify _ _)) => False
-         | _ => True
-         end
-      | false, false => True
-    end).
+  Definition CmdRestr cmd :=
+    let: endrs_rst := 
+      match noend, extract_controlled_endorse cmd with 
+      | true , Some _ => False
+      | _ , _ => True
+      end in
+    let: decl_rst := 
+      match nodecl, extract_controlled_declassify cmd with 
+      | true , Some _ => False
+      | _ , _ => True
+      end in
+    endrs_rst /\ decl_rst.
 
   (*Notation ProgRestr := (Forall CmdRestr).  This is tricky *)
   Definition CfgListRestr (cmd : Cfg) := 
@@ -281,14 +274,19 @@ Section restriction_impl.
     pattern_eq_2 [pre_cmd_action _ _ _] [pre_cmd_action _ _ _]; cycle 1. 
       { move=> <- {precmdeq}.
       pattern_eq_2 [post_cmd_action _ _ _] [post_cmd_action _ _ _]=> [|-> //].
-      move: noend nodecl cmdrest nodecl'. 
-      clear=> - [] [] //; case: cmd => //= - [] // [] //. } (* Very interesting that you need //= *)
+      move: noend nodecl cmdrest nodecl'; clear. 
+      rewrite/CfgListRestr/CmdRestr.
+      case: cmd; [|case; case=> //=]=> cmd; Util.local_cook=> + + [] _.
+      case: (extract_controlled_declassify _)=> [[? _] | [] [] //=].
+      move=> + [] // _ /=.
+      case=> //=. } 
     move: (pre_cmd_wf_int adv_step)=>/(_ states str).
     rewrite {}precmdeq /= in nodecl' *.
     case: noend cmdrest=> /= cmdrest.
       { suff: wt states = None; [move=> -> _; clear; case: nodecl=> //|].
       move: noend' cmdrest; clear.
-      case: nodecl; case: cmd=> // - [] // [] //. } 
+      rewrite/CmdRestr; case: cmd=> //= ?.
+      case: extract_controlled_endorse=> // - [? _] + [] //. }
     move wte: (wt _)=> [ [vr vl] |]; move: wte; clear; case: nodecl=> /= -> //.
     1,2: case untr : is_untrusted=> // wf. (* TODO: Lemma *)
     1,2: suff: (str vr = vl); [move=> <-; exact: update_to_store_id|].
