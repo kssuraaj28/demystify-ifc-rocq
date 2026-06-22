@@ -83,7 +83,7 @@ Section te.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
   Theorem te_real_ideal p: 
-    NMIFCRealIdeal p -> declassify_absent p ->
+    NMIFCRealIdeal p -> nonni_declassify_absent p ->
     TERealIdeal p.
   Proof.
     rewrite/NMIFCRealIdeal/TERealIdeal=> + ?=> + x=> /(_ x); move: x=> ?.
@@ -103,7 +103,7 @@ Section rd.
   Context `{!VarPrm, !ValPrm, !AdvLvlPrm, !AdvLeakPrm}.
 
   Theorem rd_real_ideal p: 
-    NMIFCRealIdeal p -> endorse_absent p ->
+    NMIFCRealIdeal p -> nonni_endorse_absent p ->
     RDRealIdeal p.
   Proof.
     rewrite/NMIFCRealIdeal/RDRealIdeal=> + ? => + x=> /(_ x); move: x=> ?.

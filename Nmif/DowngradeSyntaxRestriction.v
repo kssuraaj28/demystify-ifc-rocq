@@ -3,8 +3,8 @@ Import List ListNotations ssreflect ssrfun ssrbool.
 
 From Ltac2 Require Import Ltac2.
 
-Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem IdlAtkPreds.
-Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem IdlAtkPreds.
+Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem IdlAtkPreds ControlledDowngrade.
+Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem IdlAtkPreds ControlledDowngrade.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
@@ -12,7 +12,7 @@ Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
 Section prog_restr.
-  Context `{!VarPrm, !ValPrm}.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
   Variable noend nodecl: bool.
 
   Notation prg_dwngrd_rstrct' cmd_fn := (forallb cmd_fn) (only parsing). 
@@ -25,17 +25,17 @@ Section prog_restr.
         prg_dwngrd_rstrct' cmd_dwngrd_rstrctd b
 
     | assign a => 
-      let: end_chk := match noend, a with true, (endorse _ _) => false | _ , _ => true  end in
-      let: decl_chk :=  match nodecl, a with  true, (declassify _ _) => false | _, _ => true  end in
+      let: end_chk := match noend, (extract_controlled_endorse c) with true, Some _  => false | _ , _ => true  end in
+      let: decl_chk :=  match nodecl, (extract_controlled_declassify c) with  true, Some _ => false | _, _ => true  end in
       end_chk && decl_chk 
     end.
   Definition prg_dwngrd_rstrct := prg_dwngrd_rstrct' cmd_dwngrd_rstrctd : Prog -> bool.
 End prog_restr.
 
 Section sugar.
-  Context `{!VarPrm, !ValPrm}.
-  Definition endorse_absent := prg_dwngrd_rstrct true false.
-  Definition declassify_absent := prg_dwngrd_rstrct false true.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
+  Definition nonni_endorse_absent := prg_dwngrd_rstrct true false.
+  Definition nonni_declassify_absent := prg_dwngrd_rstrct false true.
   Definition downgrade_absent := prg_dwngrd_rstrct true true.
 End sugar.
 
@@ -65,8 +65,10 @@ Section thm.
       rewrite/dwnrd_rstrct_lift/CfgListRestr.
       case cfg=> + _=> [] [] // cmd > /= /andP [] + _.
       case: cmd=> _ [] //=.
-      rewrite/CmdRestr/cmd_dwngrd_rstrctd.
-      move: noend nodecl=> [] [] // [] // []//. }
+      rewrite/CmdRestr/cmd_dwngrd_rstrctd=> c.
+      case: c=> [ ? |/= _ |/= _ ]; Util.local_cook.
+      move: (extract_controlled_endorse _) (extract_controlled_declassify _) noend nodecl.
+      move=> [[_ _]|] [[_ _]|] [] [] //. }
     apply: (reachable_invariant _ _ dwnrd_rstrct_lift); [.. |exact: rch]=> {rch}. (* TODO: Why I have to do this dwnrd_rstrct_lift *)
       { move: wtp; clear.
       rewrite/prg_dwngrd_rstrct/dwnrd_rstrct_lift/init_cfg.
