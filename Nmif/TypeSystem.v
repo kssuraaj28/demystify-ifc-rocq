@@ -130,7 +130,7 @@ Section sa.
       1-3: lazymatch goal with
              H: Forall _ ?b |- Forall _ ?b => elim: H=> // *
             end.
-      1-3: constructor 2=> //; auto.
+      1-3: constructor; auto; fail.
     Qed.
   End ind.
   Definition WellFormedOptCmd (pc: PcLbl) (ocmd : option Cmd): Prop :=

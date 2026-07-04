@@ -12,11 +12,6 @@ Set Mangle Names. Set Mangle Names Light.
 
 #[local] Open Scope bool_scope.
 
-(* The full security lattice is the product P × P over an abstract principal
-   lattice P, where *more powerful principals are lower in P*. A label (c, i)
-   pairs a confidentiality principal c with an integrity principal i. The
-   information-flow order is P^op × P (confidentiality flipped). *)
-
 Class PrincipalLatticePrm := {
   P : Type;
   leqP : P -> P -> bool;
@@ -33,31 +28,34 @@ Class PrincipalLatticePrm := {
   leqP_top : forall x, leqP x topP;
 }.
 
-(* "Acts for" / "at least as powerful as": since more powerful principals are
-   lower in P, A acts for B exactly when A ≤_P B. The glyph looks reversed but
-   matches the standard decentralised-label notation (A ⪰ B = A speaks for B). *)
 Notation "A ≽ B" := (leqP A B) (at level 70, no associativity).
-
-(* flows_to_intE / flows_to_confE now live in Lattice4pt and arrive via Import. *)
 
 Section full_lattice.
   Context `{!PrincipalLatticePrm}.
 
-  Definition FLabel : Type := P * P.
-  Definition conf (l : FLabel) : P := fst l.
-  Definition integ (l : FLabel) : P := snd l.
+  Definition Label : Type := P * P.
+  Definition conf (l : Label) : P := fst l.
+  Definition integ (l : Label) : P := snd l.
 
   (* Information-flow order (P^op × P): confidentiality may only increase
      (become less powerful / more secret), integrity may only decrease. *)
-  Definition fflows_to (l1 l2 : FLabel) : bool :=
+  Definition fflows_to (l1 l2 : Label) : bool :=
     leqP (conf l2) (conf l1) && leqP (integ l1) (integ l2).
 
-  Definition fjoin (l1 l2 : FLabel) : FLabel :=
+  Definition fjoin (l1 l2 : Label) : Label :=
     (meetP (conf l1) (conf l2), joinP (integ l1) (integ l2)).
 
   (* A label is uncompromised when its writers are at least as powerful as its
      readers: the integrity principal acts for the confidentiality principal. *)
-  Definition uncompromised (l : FLabel) : bool := integ l ≽ conf l.
+  Definition uncompromised (l : Label) : bool := integ l ≽ conf l.
+
+  Lemma leqreverse l1 l2 :
+    l1 ≽ l2 -> ~ l2 ≽ l1 \/ l1 = l2.
+  Proof. 
+    move: (orbN (l2 ≽ l1))=> /orP []; cycle 1.
+      { move/negP; auto. }
+    move =>/leqP_antisym /[apply] ->; auto.
+  Qed.
 
   (* Meet / join bounds, derived from the lub/glb characterisations. *)
   Lemma meet_le_l x y : leqP (meetP x y) x.
@@ -114,12 +112,12 @@ Section full_lattice.
   (* Attacker label: a pair of principals with a_c acting for a_i (confidentiality
      at least as powerful as integrity). a_c <_P a_i is the semi-honest / passive
      attacker — it can read more than it can write. *)
-  Record AttackerLabel := { atk_c : P; atk_i : P; reasonable_atk : atk_c ≽ atk_i }.
+  Record AttackerLabel := { atk_c : P; atk_i : P; reasonable_atk : atk_c ≽ atk_i; atk_notop: atk_i <> botP }.
 
   (* Componentwise projection of a full label to the 4-point lattice: visible iff
      the attacker controls the confidentiality principal; corruptible iff it
      controls the integrity principal. *)
-  Definition to4pt (A : AttackerLabel) (l : FLabel) : Lattice4pt.Label :=
+  Definition to4pt (A : AttackerLabel) (l : Label) : Lattice4pt.Label :=
     mk_lbl (atk_i A ≽ integ l) (atk_c A ≽ conf l).
 
   Lemma to4pt_mono A l1 l2 :
@@ -133,13 +131,8 @@ Section full_lattice.
     flows_to (join (to4pt A l1) (to4pt A l2)) (to4pt A (fjoin l1 l2)).
   Proof.
     rewrite /to4pt /fjoin /join /flows_to /conf /integ /= flows_to_intE flows_to_confE.
-    apply/andP; split; apply/implyP.
-    - move=> /orP[H|H].
-      + exact: (leqP_trans _ _ _ H (join_ge_l _ _)).
-      + exact: (leqP_trans _ _ _ H (join_ge_r _ _)).
-    - move=> H; apply/andP; split.
-      + exact: (leqP_trans _ _ _ H (meet_le_l _ _)).
-      + exact: (leqP_trans _ _ _ H (meet_le_r _ _)).
+    apply/andP; split; apply/implyP; [move/orP=> [] | move=> ?;apply/andP];
+    eauto using leqP_trans, join_ge_r, join_ge_l, meet_le_r, meet_le_l.
   Qed.
 
   (* A label flows to its join, so the join being uncompromised forces each
@@ -185,9 +178,9 @@ Section full_lattice.
     move=> Hi Hunc Hnf.
     rewrite /to4pt /flows_to /= flows_to_intE flows_to_confE Hi implybb andTb negb_imply in Hnf.
     move: Hnf => /andP[Hpt Hsf].
-    have Hcf := Hunc; rewrite /uncompromised in Hcf.
+    rewrite /uncompromised in Hunc.
     have Himp : leqP (atk_i A) (integ from) -> leqP (atk_c A) (conf from) :=
-      fun Huf => leqP_trans _ _ _ (reasonable_atk A) (leqP_trans _ _ _ Huf Hcf).
+      fun Huf => leqP_trans _ _ _ (reasonable_atk A) (leqP_trans _ _ _ Huf Hunc).
     have Htf : ~~ leqP (atk_i A) (integ from).
     { apply/negP => Huf. apply: (negP Hsf). exact: Himp Huf. }
     split; rewrite /to4pt.
@@ -210,7 +203,7 @@ End Notations.
    With a confidentiality principal more powerful than the integrity one
    (false ≤ true), this is exactly the semi-honest attacker. *)
 Section sanity.
-  Definition bool_plat : PrincipalLatticePrm.
+  Let bool_plat : PrincipalLatticePrm.
   Proof.
     refine {| P := bool; leqP := implb; meetP := andb; joinP := orb;
               topP := true; botP := false |}.
@@ -223,11 +216,11 @@ Section sanity.
     - case=> //.
   Defined.
 
-  Definition semihonest : @AttackerLabel bool_plat.
-  Proof. refine (@Build_AttackerLabel bool_plat false true _). exact: erefl. Defined.
+  Let semihonest : @AttackerLabel bool_plat.
+  Proof. refine (@Build_AttackerLabel bool_plat false true _ _); done. Defined.
 
   (* The projection of a public-untrusted label (true public conf, true
      untrusted integ) lands on the 4-point public-untrusted point. *)
   Goal @to4pt bool_plat semihonest (true, true) = mk_lbl true true.
-  Proof. exact: erefl. Qed.
+  Proof. done. Qed.
 End sanity.

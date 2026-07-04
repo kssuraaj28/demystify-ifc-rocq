@@ -4,18 +4,18 @@ Import List ListNotations ssreflect ssrfun ssrbool.
 From Ltac2 Require Import Ltac2.
 
 Require Tacs Util VarValStore Syntax Lattice4pt Attacker TypeSystem FullLattice.
-Import Tacs Util VarValStore Lattice4pt Attacker TypeSystem FullLattice Tacs.Cook.
-(* Qualified: requiring TypeSystem transitively loads a Stdlib module named
-   Syntax, which otherwise shadows the short name and hides Cmd. *)
-Import Nmif.Syntax.
+Import Tacs Util VarValStore Lattice4pt Attacker TypeSystem FullLattice Tacs.Cook Nmif.Syntax. (* TODO: Why fully qualified? *)
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".
 Set Mangle Names. Set Mangle Names Light.
 
-(* Each variable carries a full label (c, i) ∈ P × P; attacker-independent. *)
-Class VarFullLblPrm `{!VarPrm, !PrincipalLatticePrm} := fvar_lbl : Vars -> FLabel.
+
+#[local] Notation Label := (FullLattice.Label).
+
+(* An assignment from variables to labels *)
+Class VarFullLblPrm `{!VarPrm, !PrincipalLatticePrm} := fvar_lbl : Vars -> Label.
 
 Section ts.
   Context `{!VarPrm, !ValPrm, !PrincipalLatticePrm, !VarFullLblPrm}.
@@ -24,12 +24,8 @@ Section ts.
   Notation FullWellFormedProg' FullWellFormedCmd pclbl prog :=
     (Forall (FullWellFormedCmd pclbl) prog) (only parsing).
 
-  (* Information-flow type system over the full lattice. Downgrade rules are
-     attacker-independent: endorse keeps confidentiality and raises integrity,
-     declassify keeps integrity and lowers confidentiality, and both require the
-     source-with-pc join to be uncompromised (robust). The pc is general. *)
   Unset Elimination Schemes.
-  Inductive FullWellFormedCmd : FLabel -> Cmd -> Prop :=
+  Inductive FullWellFormedCmd : Label -> Cmd -> Prop :=
   | wff_endorse :
      forall pc from to,
        conf (fvar_lbl from) = conf (fvar_lbl to) ->
@@ -68,7 +64,7 @@ Section ts.
   Definition FullWellFormedProg pc prog := FullWellFormedProg' FullWellFormedCmd pc prog.
 
   Section ind.
-    Variable Pr : FLabel -> Cmd -> Prop.
+    Variable Pr : Label -> Cmd -> Prop.
 
     Hypothesis hyp_endorse :
       forall pc from to,
@@ -104,48 +100,27 @@ Section ts.
         Forall (FullWellFormedCmd newpc) wbody -> Forall (Pr newpc) wbody ->
         Pr pc (while (gvar, comp) wbody).
 
-    Fixpoint FullWellFormedCmd_ind p c (H : FullWellFormedCmd p c) {struct H} : Pr p c.
+    Fixpoint FullWellFormedCmd_ind:
+      forall p c, (FullWellFormedCmd p c) -> Pr p c.
     Proof.
-      case: H.
-      - exact: hyp_endorse.
-      - exact: hyp_declassify.
-      - exact: hyp_assign.
-      - move=> gvar comp pc b1 b2 H1 H2.
-        apply: hyp_cond.
-        + exact: H1.
-        + elim: H1 => // *; constructor 2 => //; auto.
-        + exact: H2.
-        + elim: H2 => // *; constructor 2 => //; auto.
-      - move=> gvar comp pc wbody H1.
-        apply: hyp_while.
-        + exact: H1.
-        + elim: H1 => // *; constructor 2 => //; auto.
+      move=> > []; [apply:hyp_endorse|apply:hyp_declassify|apply:hyp_assign|..]=> *.
+      1-2: (apply: hyp_cond; clear hyp_cond) || (apply: hyp_while; clear hyp_while)=>//.
+      1-3: lazymatch goal with
+             H: Forall _ ?b |- Forall _ ?b => elim: H=> // *
+            end.
+      1-3: constructor; auto; fail.
     Qed.
   End ind.
 
-  Definition FullWellFormedOptCmd (pc : FLabel) (ocmd : option Cmd) : Prop :=
+  Definition FullWellFormedOptCmd (pc : Label) (ocmd : option Cmd) : Prop :=
     if ocmd isn't Some cmd then True else FullWellFormedCmd pc cmd.
 
-  (* Subtyping: a lower pc is always safe. *)
   Lemma fflows_to_subtype_cmd l1 c :
     FullWellFormedCmd l1 c -> forall l2, l2 ⊑ l1 -> FullWellFormedCmd l2 c.
   Proof.
-    move=> H; elim/FullWellFormedCmd_ind: H.
-    - move=> pc from to Hce Hi Hpcto Hu l2 Hl2.
-      apply: wff_endorse;
-        [exact: Hce | exact: Hi | exact: (fflows_to_trans _ _ _ Hl2 Hpcto)
-        | exact: (uncompromised_anti _ _ _ Hl2 Hu)].
-    - move=> pc from to Hie Hcl Hpcto Hu l2 Hl2.
-      apply: wff_declassify;
-        [exact: Hie | exact: Hcl | exact: (fflows_to_trans _ _ _ Hl2 Hpcto)
-        | exact: (uncompromised_anti _ _ _ Hl2 Hu)].
-    - move=> dst src1 src2 comp pc Hs1 Hs2 Hpc l2 Hl2.
-      apply: wff_assign; [exact: Hs1 | exact: Hs2 | exact: (fflows_to_trans _ _ _ Hl2 Hpc)].
-    - move=> gvar comp pc b1 b2 _ IH1 _ IH2 l2 Hl2. apply: wff_cond.
-      + move: IH1; apply/Forall_impl => co Hco. exact: (Hco _ (fjoin_mono_r _ _ _ Hl2)).
-      + move: IH2; apply/Forall_impl => co Hco. exact: (Hco _ (fjoin_mono_r _ _ _ Hl2)).
-    - move=> gvar comp pc wbody _ IH l2 Hl2. apply: wff_while.
-      + move: IH; apply/Forall_impl => co Hco. exact: (Hco _ (fjoin_mono_r _ _ _ Hl2)).
+    elim=> *; constructor; 
+    try (apply:Forall_impl; [|eassumption]); 
+    eauto using fjoin_mono_r, fflows_to_trans, uncompromised_anti; fail.
   Qed.
 
   (* The 4-point variable labelling induced by an attacker. *)
@@ -155,66 +130,43 @@ Section ts.
   Proof. done. Qed.
 
   (* A full typing derivation projects to a 4-point derivation for any attacker. *)
-  Theorem full_to_4pt_cmd (A : AttackerLabel) pc c :
+  Lemma full_to_4pt_cmd (A : AttackerLabel) pc c :
     FullWellFormedCmd pc c ->
     @WellFormedCmd _ _ (proj_adv A) (to4pt A pc) c.
   Proof.
-    move=> H; elim/FullWellFormedCmd_ind: H.
+    elim.
+     4,5: move=>*; constructor; apply: flows_to_subtype_prog; eauto using to4pt_join_le; fail.
+     3: move=>*; constructor; rewrite /asgn_src_lbl /asgn_dst_lbl ?proj_adv_var ?join_flow; (apply/andP + idtac); eauto using to4pt_mono; fail.
+     
     - (* endorse *)
       move=> pc' from to Hce _ Hpcto Hunc.
       case Hfl: ([elaborate flows_to (to4pt A (fvar_lbl from)) (to4pt A (fvar_lbl to))]).
-      + (* harmless: from ⊑ to in the projection, an ordinary assignment flow *)
-        apply: wf_assign; rewrite /asgn_src_lbl /asgn_dst_lbl /=;
-          [exact: Hfl | exact: (to4pt_mono _ _ _ Hpcto)].
-      + (* canonical PU→PT, pc forced to PT *)
-        move: (to4pt_endorse_canonical A (fvar_lbl from) (fvar_lbl to) Hce
-                 (uncompromised_join_l _ _ Hunc) (negbT Hfl)) => [Hfrom4 Hto4].
-        have Hpc4 : to4pt A pc' = mk_lbl false true.
-        { apply: flows_to_pt. rewrite -Hto4. exact: (to4pt_mono _ _ _ Hpcto). }
-        rewrite Hpc4. apply: wf_endorse; rewrite proj_adv_var; [exact: Hfrom4 | exact: Hto4].
+        { constructor; eauto using to4pt_mono. }
+      move: (to4pt_endorse_canonical A (fvar_lbl from) (fvar_lbl to) Hce
+               (uncompromised_join_l _ _ Hunc) (negbT Hfl)) => [Hfrom4 Hto4].
+      pattern_eq [to4pt _ _] with ptlbl=> [|->]; eauto using flows_to_pt,to4pt_mono with trickbag.
+      constructor; done.
     - (* declassify *)
       move=> pc' from to Hie _ Hpcto Hunc.
       case Hfl: ([elaborate flows_to (to4pt A (fvar_lbl from)) (to4pt A (fvar_lbl to))]).
-      + (* harmless: an ordinary assignment flow *)
-        apply: wf_assign; rewrite /asgn_src_lbl /asgn_dst_lbl /=;
-          [exact: Hfl | exact: (to4pt_mono _ _ _ Hpcto)].
-      + (* canonical ST→PT, pc forced to PT *)
-        move: (to4pt_declassify_canonical A (fvar_lbl from) (fvar_lbl to) Hie
-                 (uncompromised_join_l _ _ Hunc) (negbT Hfl)) => [Hfrom4 Hto4].
-        have Hpc4 : to4pt A pc' = mk_lbl false true.
-        { apply: flows_to_pt. rewrite -Hto4. exact: (to4pt_mono _ _ _ Hpcto). }
-        rewrite Hpc4. apply: wf_declassify; rewrite proj_adv_var; [exact: Hfrom4 | exact: Hto4].
-    - (* assign: the generalized wf_assign splits into a source-join flow and a pc flow *)
-      move=> dst src1 src2 comp pc' Hs1 Hs2 Hpc.
-      apply: wf_assign.
-      + rewrite /asgn_src_lbl /asgn_dst_lbl !proj_adv_var join_flow; apply/andP; split;
-          [exact: (to4pt_mono _ _ _ Hs1) | exact: (to4pt_mono _ _ _ Hs2)].
-      + rewrite /asgn_dst_lbl !proj_adv_var; exact: (to4pt_mono _ _ _ Hpc).
-    - (* cond *)
-      move=> gvar comp pc' b1 b2 _ IH1 _ IH2.
-      apply: wf_cond.
-      + apply: (flows_to_subtype_prog _ _ _ (to4pt_join_le A (fvar_lbl gvar) pc')); exact: IH1.
-      + apply: (flows_to_subtype_prog _ _ _ (to4pt_join_le A (fvar_lbl gvar) pc')); exact: IH2.
-    - (* while *)
-      move=> gvar comp pc' wbody _ IH.
-      apply: wf_while.
-      apply: (flows_to_subtype_prog _ _ _ (to4pt_join_le A (fvar_lbl gvar) pc')); exact: IH.
+        { constructor; eauto using to4pt_mono. }
+      move: (to4pt_declassify_canonical A (fvar_lbl from) (fvar_lbl to) Hie
+               (uncompromised_join_l _ _ Hunc) (negbT Hfl)) => [Hfrom4 Hto4].
+      pattern_eq [to4pt _ _] with ptlbl=> [|->]; eauto using flows_to_pt,to4pt_mono with trickbag.
+      constructor; done.
   Qed.
 
-  Theorem full_to_4pt_prog (A : AttackerLabel) pc p :
-    FullWellFormedProg pc p ->
-    @WellFormedProg _ _ (proj_adv A) (to4pt A pc) p.
+
+  Definition full_public_trusted := (topP , botP).
+
+  Lemma fullpt_is_pt A:
+    to4pt A full_public_trusted = ptlbl.
   Proof.
-    rewrite /FullWellFormedProg /WellFormedProg.
-    apply/Forall_impl => c. exact: (full_to_4pt_cmd A pc c).
+    rewrite/to4pt /= leqP_top. Util.local_cook.
+    apply/negP=> /leqreverse [].
+      { rewrite leqP_bot //. }
+    apply: atk_notop; eauto.
   Qed.
 
-  Theorem full_to_4pt_optcmd (A : AttackerLabel) pc oc :
-    FullWellFormedOptCmd pc oc ->
-    @WellFormedOptCmd _ _ (proj_adv A) (to4pt A pc) oc.
-  Proof.
-    rewrite /FullWellFormedOptCmd /WellFormedOptCmd.
-    case: oc => [c|] //=. exact: (full_to_4pt_cmd A pc c).
-  Qed.
 End ts.
 
