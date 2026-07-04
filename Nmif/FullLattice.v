@@ -22,11 +22,15 @@ Class PrincipalLatticePrm := {
   leqP : P -> P -> bool;
   meetP : P -> P -> P;
   joinP : P -> P -> P;
+  topP : P;
+  botP : P;
   leqP_refl : forall x, leqP x x;
   leqP_trans : forall x y z, leqP x y -> leqP y z -> leqP x z;
   leqP_antisym : forall x y, leqP x y -> leqP y x -> x = y;
   leqP_meet : forall x y z, leqP z (meetP x y) = leqP z x && leqP z y;  (* glb *)
   leqP_join : forall x y z, leqP (joinP x y) z = leqP x z && leqP y z;  (* lub *)
+  leqP_bot : forall x, leqP botP x;
+  leqP_top : forall x, leqP x topP;
 }.
 
 (* "Acts for" / "at least as powerful as": since more powerful principals are
@@ -208,12 +212,15 @@ End Notations.
 Section sanity.
   Definition bool_plat : PrincipalLatticePrm.
   Proof.
-    refine {| P := bool; leqP := implb; meetP := andb; joinP := orb |}.
+    refine {| P := bool; leqP := implb; meetP := andb; joinP := orb;
+              topP := true; botP := false |}.
     - case=> //.
     - move=> x y z; case: x; case: y; case: z=> //.
     - move=> x y; case: x; case: y=> //.
     - move=> x y z; case: x; case: y; case: z=> //.
     - move=> x y z; case: x; case: y; case: z=> //.
+    - case=> //.
+    - case=> //.
   Defined.
 
   Definition semihonest : @AttackerLabel bool_plat.
