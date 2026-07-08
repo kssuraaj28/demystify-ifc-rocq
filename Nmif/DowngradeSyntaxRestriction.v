@@ -28,6 +28,7 @@ Section prog_restr.
       let: end_chk := match noend, (extract_controlled_endorse c) with true, Some _  => false | _ , _ => true  end in
       let: decl_chk :=  match nodecl, (extract_controlled_declassify c) with  true, Some _ => false | _, _ => true  end in
       end_chk && decl_chk 
+    | _ => true
     end.
   Definition prg_dwngrd_rstrct := prg_dwngrd_rstrct' cmd_dwngrd_rstrctd : Prog -> bool.
 End prog_restr.
@@ -66,7 +67,7 @@ Section thm.
       case cfg=> + _=> [] [] // cmd > /= /andP [] + _.
       case: cmd=> _ [] //=.
       rewrite/CmdRestr/cmd_dwngrd_rstrctd=> c.
-      case: c=> [ ? |/= _ |/= _ ]; Util.local_cook.
+      case: c=> [ /= _  | ? |/= _ |/= _ ]; Util.local_cook.
       move: (extract_controlled_endorse _) (extract_controlled_declassify _) noend nodecl.
       move=> [[_ _]|] [[_ _]|] [] [] //. }
     apply: (reachable_invariant _ _ dwnrd_rstrct_lift); [.. |exact: rch]=> {rch}. (* TODO: Why I have to do this dwnrd_rstrct_lift *)

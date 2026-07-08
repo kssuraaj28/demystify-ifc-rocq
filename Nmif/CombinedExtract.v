@@ -288,7 +288,7 @@ Section extract_step_commute.
       (oapp extract_controlled_endorse None rcmd = None /\ oapp extract_controlled_declassify None rcmd = None)
       \/ (exists x, oapp extract_controlled_endorse None rcmd = Some x \/
                     oapp extract_controlled_declassify None rcmd = Some x);[.. |case; case; eauto using extract_step_commute_downgrade ].
-      { clear; case: rcmd=> //=; auto. case=> [ | /=|/= ]; auto. case=> *; cook; auto; case: (_ (assign _))=> *; constructor; eauto; fail. }
+      { clear; case: rcmd=> //=; auto. case=> [ | | /=|/= ]; auto. case=> *; cook; auto; case: (_ (assign _))=> *; constructor; eauto; fail. }
     case=> noend nodecl.
     rewrite /= in inv. move: inv=> []. (Forall_inv_toph)=> i1 restinv i3.
     rewrite /CmbCmdInv/TypeInv in i1. case: i1=> - + _=>- [] rwt _.

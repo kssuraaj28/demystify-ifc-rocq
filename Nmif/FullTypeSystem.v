@@ -169,4 +169,3 @@ Section ts.
   Qed.
 
 End ts.
-
