@@ -1,3 +1,4 @@
+.*sw?
 *.conf
 *.aux
 *.vo
@@ -8,3 +9,4 @@
 *.cache
 _build
 .DS_Store
+*.zip

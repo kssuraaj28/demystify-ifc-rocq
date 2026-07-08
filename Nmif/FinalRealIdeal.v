@@ -77,6 +77,7 @@ Section nmif.
     move=> + + inp=> /(_ inp) + /(_ inp)=> *.
     apply: weq_seq_trans; eauto.
   Qed.
+  Print Assumptions nmif_real_ideal.
 End nmif.
 
 Section te.
@@ -96,6 +97,7 @@ Section te.
     move=> + + inp=> /(_ inp) + /(_ inp)=> *.
     apply: weq_seq_trans; eauto.
   Qed.
+  Print Assumptions te_real_ideal.
 
 End te.
 
@@ -116,6 +118,7 @@ Section rd.
     move=> + + inp=> /(_ inp) + /(_ inp)=> *.
     apply: weq_seq_trans; eauto.
   Qed.
+  Print Assumptions rd_real_ideal.
 
 End rd.
 
@@ -137,5 +140,7 @@ Section ni.
     move=> + + inp=> /(_ inp) + /(_ inp)=> *.
     apply: weq_seq_trans; eauto.
   Qed.
+  Print Assumptions ni_real_ideal.
 
 End ni.
+
