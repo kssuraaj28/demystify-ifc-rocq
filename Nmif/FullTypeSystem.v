@@ -26,6 +26,10 @@ Section ts.
 
   Unset Elimination Schemes.
   Inductive FullWellFormedCmd : Label -> Cmd -> Prop :=
+  | wff_output :
+     forall pc out,
+       FullWellFormedCmd pc (output out)
+
   | wff_endorse :
      forall pc from to,
        conf (fvar_lbl from) = conf (fvar_lbl to) ->
@@ -66,6 +70,10 @@ Section ts.
   Section ind.
     Variable Pr : Label -> Cmd -> Prop.
 
+    Hypothesis hyp_output :
+      forall pc v,
+        Pr pc (output v).
+
     Hypothesis hyp_endorse :
       forall pc from to,
         conf (fvar_lbl from) = conf (fvar_lbl to) ->
@@ -103,7 +111,7 @@ Section ts.
     Fixpoint FullWellFormedCmd_ind:
       forall p c, (FullWellFormedCmd p c) -> Pr p c.
     Proof.
-      move=> > []; [apply:hyp_endorse|apply:hyp_declassify|apply:hyp_assign|..]=> *.
+      move=> > []; [apply:hyp_output|apply:hyp_endorse|apply:hyp_declassify|apply:hyp_assign|..]=> *.
       1-2: (apply: hyp_cond; clear hyp_cond) || (apply: hyp_while; clear hyp_while)=>//.
       1-3: lazymatch goal with
              H: Forall _ ?b |- Forall _ ?b => elim: H=> // *
@@ -134,7 +142,7 @@ Section ts.
     FullWellFormedCmd pc c ->
     @WellFormedCmd _ _ (proj_adv A) (to4pt A pc) c.
   Proof.
-    elim.
+    elim; try (constructor; done).
      4,5: move=>*; constructor; apply: flows_to_subtype_prog; eauto using to4pt_join_le; fail.
      3: move=>*; constructor; rewrite /asgn_src_lbl /asgn_dst_lbl ?proj_adv_var ?join_flow; (apply/andP + idtac); eauto using to4pt_mono; fail.
      
