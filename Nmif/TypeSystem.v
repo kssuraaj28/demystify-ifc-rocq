@@ -48,6 +48,10 @@ Section sa.
   Notation WellFormedProg' WellFormedCmd pclbl prog :=  (Forall (WellFormedCmd pclbl) prog) (only parsing).
   Unset Elimination Schemes.
   Inductive WellFormedCmd : PcLbl -> Cmd -> Prop := 
+  | wf_output:
+     forall v lbl,
+       _ lbl (output v)
+
   | wf_endorse:
      forall from to,
        var_lbl from = pulbl -> var_lbl to = ptlbl -> (* Maybe just trusted *)
@@ -90,6 +94,11 @@ Section sa.
        However, do we even need induction? Maybe we don't need it at all.. 
        So, can we do something weaker than inductively defining this then?
     *)
+
+    Hypothesis hyp_output :
+        forall lbl v,
+          P lbl (output v).
+
     Hypothesis hyp_endorse :
         forall from to,
           var_lbl from = pulbl -> var_lbl to = ptlbl ->
@@ -125,7 +134,8 @@ Section sa.
     Fixpoint WellFormedCmd_ind :
       forall p c, WellFormedCmd p c -> P p c. 
     Proof.
-      move=> > []; [apply:hyp_endorse|apply:hyp_declassify|apply:hyp_assign|..]=> *.
+      move=> > [] *; 
+      [apply: hyp_output|apply:hyp_endorse|apply:hyp_declassify|apply:hyp_assign|..]=> * //.
       1-2: (apply: hyp_cond; clear hyp_cond) || (apply: hyp_while; clear hyp_while)=>//.
       1-3: lazymatch goal with
              H: Forall _ ?b |- Forall _ ?b => elim: H=> // *
@@ -219,7 +229,7 @@ Section flow_to_subtype.
       WellFormedCmd l2 c.
   Proof. 
     (* TODO: What does elim do? Is it just apply? *)  
-    move: l2=> ++ h. elim: h=> *; [ | | constructor=> //; eauto using flows_to_trans|..].
+    move: l2=> ++ h. elim: h=> *; try (constructor; eauto using flows_to_trans; fail).
     1-2: revert_hyp_pat  (is_true (_ ⊑ _))=> /flows_to_pt ->; constructor; assumption.
     1-2: constructor; (apply/Forall_impl;[ |eassumption])=> /= >; auto using join_mono_r.
   Qed.
