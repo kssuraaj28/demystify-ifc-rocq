@@ -56,13 +56,10 @@ Section twostep.
   Definition twoevent (c: TwoCfg): Event * Event :=
     let: (c2lst, s1, s2) := c in
     if c2lst isn't (ac1, ac2) :: rest then (blank_event, blank_event) else
-    let: (_, old_ast1) := s1 in
-    let: (_, old_ast2) := s2 in
-    let: (_, s1', s2') := twostep c in (* Here, I've defined this in terms of twostep. *)
-    let: (new_store1, _) := s1' in
-    let: (new_store2, _) := s2' in
-    let: e1 := event_helper adv1 ac1 new_store1 old_ast1 in
-    let: e2 := event_helper adv2 ac2 new_store2 old_ast2 in
+    let: (store1, ast1) := s1 in
+    let: (store2, ast2) := s2 in
+    let: e1 := event_gen adv1 ac1 store1 ast1 in
+    let: e2 := event_gen adv2 ac2 store2 ast2 in
     (e1, e2).
 End twostep.
 
@@ -159,9 +156,6 @@ Section twoonestepsound.
   Proof.
     case: b;rewrite/is_true=> ?.
     1,2: rewrite/extract_one_event /extract_one_cfg/map_cons [filter _ _]/=; Util.local_cook.
-    1,2: rewrite/event/step; move e: (acmd_step _ _ _)=> [[? [? ?]] ?].
-    1,2: rewrite/twoevent/twostep e; case: (acmd_step _ _ _)=> - [] _ [] ? _ _.
-    1,2: clear. 
     1,2: case: s1=> *; case: s2=> *; done.
   Qed.
 
@@ -194,12 +188,7 @@ Section twoonestepsound.
     1,2: case=> - [] // [] // _.
     1,2: rewrite/extract_one_event.
     1,2: rewrite/twoevent/twostep; case: s1; case: s2=> *.
-    1: pattern_focus [acmd_step adv1 _ _]=> P. 2: pattern_focus [acmd_step adv2 _ _]=> P.
-    1,2: rewrite/acmd_step /=; subst P; cbn beta.
-    1: move: (acmd_step adv2 _ _)=> [] [] *. 2: move: (acmd_step adv1 _ _)=> [] [] *.
-    1,2: move=> /=; clear.
-    1: revert_hyp_pat State2. 2: revert_hyp_pat State1. 
-    1,2: case; done.
+    1,2: done.
   Qed.
 End twoonestepsound.
 

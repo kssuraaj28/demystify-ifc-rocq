@@ -155,16 +155,14 @@ Section event_helper.
   Definition blank_event := mk_acmd_evnt None None.
 
   (* Can be split into a CmdEvent helper and an AdvEvent helper later. *)
-  Definition event_helper (past_acmd : AtkCmd) (new_store : Store) (old_ast : AtkStates) : Event :=
-    let: mk_atkcmd isatk ocmd := past_acmd in
-    let: atk_event := if isatk is false then None else pre_cmd_event adv old_ast in
-    let: cmd_event := if ocmd isn't Some (assign a) then None else
-                      let: adst := get_assign_dest a in
-                      let: oval := ⟨ new_store | is_trusted ⟩ adst in
-                      omap (pair adst) oval in
+  Definition event_gen (curr_cmd : AtkCmd) (store : Store) (ast : AtkStates) : Event :=
+    let: mk_atkcmd isatk ocmd := curr_cmd in
+    let: atk_event := if isatk is false then None else pre_cmd_event adv ast in
+    let: cmd_event := if ocmd isn't Some (output v) then None else
+                      let: oval := ⟨ store | is_trusted ⟩ v in
+                      omap (pair v) oval in
     mk_acmd_evnt cmd_event atk_event.
 End event_helper.
-
 
 Section cfg.
   Import Util.List.
@@ -184,10 +182,8 @@ Section cfg.
   Definition event (c : Cfg) : Event :=
     let: (aclst, s) := c in
     if aclst isn't ac :: rest then blank_event else
-    let: (_, old_ast) := s in
-    let: (_, s') := step c in
-    let: (new_store, _) := s' in
-    event_helper adv ac new_store old_ast.
+    let: (store, ast) := s in
+    event_gen adv ac store ast.
 End cfg.
 
 Section step_inj.

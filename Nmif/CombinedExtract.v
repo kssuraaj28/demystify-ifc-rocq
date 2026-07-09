@@ -423,34 +423,28 @@ Section extract_step_commute.
     CombinedInvariant c ->
     two_event (extract_2cfg c) = (comb_event c, comb_event c).
   Proof. 
-    move=> cinv.
-    rewrite/two_event extract_step_commute // /comb_event.
-    set cstp := comb_step c.
-    have csinv: CombinedInvariant cstp; [exact: cfg_step_inv|].
-    case: c cinv cstp csinv. (* TODO: we lose info*)
+    case: c.
     rewrite/CombinedInvariant/extract_2cfg.
     move=> ? [] // ? ? []. Forall_inv_toph.
-    rewrite cmd_map_cons=> cc1i _ cs1i []. 
-    move=> ? ? [] _ cs2i.
-    rewrite/event_helper.
+    rewrite cmd_map_cons /==> *. 
     do 2 cnstrct_eq_gl; cycle 1.
       { rewrite/pre_cmd_event/construct_simulator/sim_evnt cmd_map_sim_cons -/(pre_cmd_event _)/sim_active.
       case e: sim_active'=> //.
       move: e=> /sim_active'_false [] -> //. }
-    pattern_eq_2 [⟨_|_⟩] [⟨_|_⟩]; [move: cs2i=> [] //|].
-    move: (X in ⟨X|_⟩)=> ? <- {cs2i}.
-    move: cc1i cs1i. rewrite/CmbCmdInv/TypeInv/StateInv. 
+    pattern_eq_2 [⟨_|_⟩] [⟨_|_⟩]=> [|<-].
+      { revert_hyp_pat (StateInv _).
+      rewrite/StateInv=> - [] //. }
+    move: (X in ⟨X|_⟩)=> ?.
+    revert_hyp_pat [(CmbCmdInv _), (StateInv _)].
+    rewrite/CmbCmdInv/TypeInv/StateInv. 
     case=> + _. case. case: (pc_lbl _)=> - [] ? /= rwt=> [ |<- //].
     move=> iwt [] *.
     pattern_eq [LHS] with None=> [|->] ;[|pattern_eq [RHS] with None=> [|->]]=>//.
     1: case: (ideal_cmd _) iwt => // c //= wt.
     2: case: (real_cmd _) rwt => // c //= wt.
-    1,2: case e: c=> //. 
-    1,2: move: (wf_untr_cmd_dst_untr _ _ _ wt e).
-    1,2: rewrite -/(is_untrusted _).
-    1,2: move: (get_assign_dest _)=> > untr.
-    1,2: pattern_eq [ ⟨ _ | _ ⟩ _] with None=> [|->] //. (* TODO: Could be elsewhere *)
-    1,2: rewrite/⟨_|_⟩ /is_trusted untr //.
+    1,2: case: c wt=> // ? /wf_output_inv /flows_from_untr /=.
+    1,2: evar_spec_toph=>//.
+    1,2: rewrite /⟨_|_⟩/is_trusted/is_untrusted=> -> //.
   Qed.
 
   

@@ -49,8 +49,10 @@ Section sa.
   Unset Elimination Schemes.
   Inductive WellFormedCmd : PcLbl -> Cmd -> Prop := 
   | wf_output:
-     forall v lbl,
-       _ lbl (output v)
+     forall v pclbl, 
+       pclbl ⊑ var_lbl v ->
+       (* TODO: I think that it suffices to just have a trusted check. TODO! *)
+       _ pclbl (output v)
 
   | wf_endorse:
      forall from to,
@@ -96,8 +98,9 @@ Section sa.
     *)
 
     Hypothesis hyp_output :
-        forall lbl v,
-          P lbl (output v).
+        forall pclbl v,
+          pclbl ⊑ var_lbl v ->
+          P pclbl (output v).
 
     Hypothesis hyp_endorse :
         forall from to,
@@ -289,6 +292,19 @@ Section untrusted_dst.
     evar_spec_toph=> //.
   Qed.
 End untrusted_dst.
+
+Section output.
+  Import Lattice4pt.Notations.
+  Context `{!VarPrm, !ValPrm, !AdvLvlPrm}.
+
+  Lemma wf_output_inv l v: 
+    WellFormedCmd l (output v) ->
+    l ⊑ (var_lbl v).
+  Proof.
+    move e: (output v)=> ?; move: e=> /[swap]. 
+    case=> // > /[swap] - [->] //.
+  Qed.
+End output.
 
 Section step_soundness.
   Import VarValStore.Notations.

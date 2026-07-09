@@ -28,6 +28,7 @@ Section ts.
   Inductive FullWellFormedCmd : Label -> Cmd -> Prop :=
   | wff_output :
      forall pc out,
+       pc ⊑ fvar_lbl out ->
        FullWellFormedCmd pc (output out)
 
   | wff_endorse :
@@ -71,7 +72,8 @@ Section ts.
     Variable Pr : Label -> Cmd -> Prop.
 
     Hypothesis hyp_output :
-      forall pc v,
+      forall pc v, (* A little more restrictive then necessary  *)
+        pc ⊑ fvar_lbl v ->
         Pr pc (output v).
 
     Hypothesis hyp_endorse :
@@ -142,7 +144,8 @@ Section ts.
     FullWellFormedCmd pc c ->
     @WellFormedCmd _ _ (proj_adv A) (to4pt A pc) c.
   Proof.
-    elim; try (constructor; done).
+    elim.
+     1: move=> *;constructor; eauto using to4pt_mono.
      4,5: move=>*; constructor; apply: flows_to_subtype_prog; eauto using to4pt_join_le; fail.
      3: move=>*; constructor; rewrite /asgn_src_lbl /asgn_dst_lbl ?proj_adv_var ?join_flow; (apply/andP + idtac); eauto using to4pt_mono; fail.
      
