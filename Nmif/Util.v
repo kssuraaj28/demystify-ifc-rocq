@@ -742,7 +742,7 @@ Section test.
   Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["match_w_hyp_eq"])).
 
   Goal forall b, b = true -> if b then True else False.
-  Proof. move=> b ?. cook. Undo. Succeed now cook. Abort.
+  Proof. move=> b ?. Succeed now cook. Abort.
 
   Goal forall b, true = b -> if b then True else False.
   Proof. move=> b ?. cook. Abort.

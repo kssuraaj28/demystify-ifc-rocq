@@ -433,10 +433,9 @@ Section test.
     ⟨ clean_cmd_stp_store c (pre_cmd_action adv ast s1) | is_trusted ⟩ =
     ⟨ clean_cmd_stp_store c s2 | is_trusted ⟩.
   Proof.
-    move=> *.
-    unshelve (wf_finisher_guess [RHS] with ⟨ clean_cmd_stp_store _ _ | _ ⟩ => ->).
+    Succeed move=> *;
+    unshelve (wf_finisher_guess [RHS] with ⟨ clean_cmd_stp_store _ _ | _ ⟩ => ->);
     wf_finisher.
-    Restart.
     move=> ????? st *.
     wf_finisher_guess [LHS] with ⟨ clean_cmd_stp_store _ _ | _ ⟩ => ->.
     (* At c0e71ae, this was st, which breaks. TODO: Investigate later *)

@@ -308,8 +308,6 @@ Section invprf.
     Ltac2 Set curr_cookbook as old := join_cookbooks Syntax.this_cookbook old.
     Ltac2 Set curr_cookbook as old := join_cookbooks Lattice4pt.this_cookbook old.
 
-    Ltac2 Eval print_cookbook curr_cookbook.
-
     Hint Extern 10 => lazymatch goal with
            |- context [compute_new_pc (mk_lbl true ?p) ?c] =>
               move: ([elaborate compute_new_pc_untr p c])=> [] + ->
