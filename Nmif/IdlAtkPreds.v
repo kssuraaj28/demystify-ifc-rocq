@@ -107,7 +107,7 @@ Section fairness.
       let: (cmdlst, _, _) := final_cfg in
       let: pred := 
         fun '(mk_atkcmd ratk rcmd,mk_atkcmd iatk icmd) => 
-          (iatk -> icmd || rcmd || ratk) /\ (ratk -> iatk)  in (* I could do iatk => ..  \/ .. \/ .. too *)
+          (iatk -> icmd || rcmd || ratk)  in (* I could do iatk => ..  \/ .. \/ .. too *)
       Forall pred cmdlst.
 End fairness.
 
