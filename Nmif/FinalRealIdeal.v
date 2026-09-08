@@ -58,6 +58,7 @@ Section nmifc.
       exact: sim_fair ||
       exact: simulator_trace_eq.
   Qed.
+  Print Assumptions nmifc_real_ideal.
 End nmifc.
 
 Section nmif.
