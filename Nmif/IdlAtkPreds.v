@@ -82,7 +82,7 @@ Section semantic_preds.
   Definition Incurious : Prop :=
     forall st,
     let: learn_fn :=  post_cmd_action adv_step st in
-    Noninterfering id learn_fn id.  (* Maybe I should just define and write constant? *)
+    forall st1 st2, learn_fn st1 = learn_fn st2.
 
 
   Definition NMIFRestr :=  Nonmauling.
@@ -107,7 +107,7 @@ Section fairness.
       let: (cmdlst, _, _) := final_cfg in
       let: pred := 
         fun '(mk_atkcmd ratk rcmd,mk_atkcmd iatk icmd) => 
-          (iatk -> icmd || rcmd || ratk)  in (* I could do iatk => ..  \/ .. \/ .. too *)
+          (iatk -> icmd || rcmd || ratk) /\ (ratk -> iatk)  in (* I could do iatk => ..  \/ .. \/ .. too *)
       Forall pred cmdlst.
 End fairness.
 
