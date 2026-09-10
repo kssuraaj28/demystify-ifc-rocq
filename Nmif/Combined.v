@@ -130,7 +130,7 @@ Section cmb_step.
 
     Definition cmb_event (c: Cfg) : Event :=
       let: (st, cmdlst) := c in
-      if cmdlst isn't (mk_cmbcmd real_cmd real_atk_bit _ _ :: _) then blank_event else
+      if cmdlst isn't (mk_cmbcmd real_cmd real_atk_bit _ _ :: _) then mk_terminate_event else
       let: atk_st := atk_st st in
       let: store := real_store st in
       event_gen adv (mk_atkcmd real_atk_bit real_cmd) store atk_st.

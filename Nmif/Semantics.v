@@ -151,7 +151,7 @@ Section event_helper.
 
   Definition CmdEvent := option (Vars * Vals).
 
-  Record Event := mk_acmd_evnt { cevnt : CmdEvent ; aevnt : AdvEvent }.
+  Variant Event := mk_acmd_evnt ( cevnt : CmdEvent) ( aevnt : AdvEvent ) | mk_terminate_event.
   Definition blank_event := mk_acmd_evnt None None.
 
   (* Can be split into a CmdEvent helper and an AdvEvent helper later. *)
@@ -181,7 +181,7 @@ Section cfg.
 
   Definition event (c : Cfg) : Event :=
     let: (aclst, s) := c in
-    if aclst isn't ac :: rest then blank_event else
+    if aclst isn't ac :: rest then mk_terminate_event else
     let: (store, ast) := s in
     event_gen adv ac store ast.
 End cfg.

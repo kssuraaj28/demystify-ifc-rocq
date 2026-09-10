@@ -55,7 +55,7 @@ Section twostep.
 
   Definition twoevent (c: TwoCfg): Event * Event :=
     let: (c2lst, s1, s2) := c in
-    if c2lst isn't (ac1, ac2) :: rest then (blank_event, blank_event) else
+    if c2lst isn't (ac1, ac2) :: rest then (mk_terminate_event, mk_terminate_event) else
     let: (store1, ast1) := s1 in
     let: (store2, ast2) := s2 in
     let: e1 := event_gen adv1 ac1 store1 ast1 in

@@ -50,7 +50,7 @@ Section bisim.
     have [cl [cs1 [cs2 Ec]]] : exists cl cs1 cs2, extract_2cfg cc = (cl, cs1, cs2).
     { case: (extract_2cfg cc)=> [[l z1] z2]; exists l, z1, z2; reflexivity. }
     case: cl Ec => [Ec | [ac1 ac2] rest Ec].
-    - (* empty: both terminated, match with blank events *)
+    - (* empty: both terminated *)
       rewrite Ec in Hcom Het Hef. rewrite Ec.
       left; split=> //.
       exists cc; split; [exact: Hinv|].
