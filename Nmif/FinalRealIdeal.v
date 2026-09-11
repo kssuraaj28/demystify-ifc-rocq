@@ -3,8 +3,8 @@ Import List ListNotations ssreflect ssrfun ssrbool.
 
 From Ltac2 Require Import Ltac2.
 
-Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem IdlAtkPreds CoTrace SimulatorRealIdeal DowngradeSyntaxRestriction.
-Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem IdlAtkPreds CoTrace SimulatorRealIdeal DowngradeSyntaxRestriction.
+Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem IdlAtkPreds CoTrace SimulatorRealIdeal DowngradeSyntaxRestriction FullLattice FullTypeSystem.
+Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem IdlAtkPreds CoTrace SimulatorRealIdeal DowngradeSyntaxRestriction FullLattice FullTypeSystem.
 
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
@@ -144,4 +144,24 @@ Section ni.
   Print Assumptions ni_real_ideal.
 
 End ni.
+
+Section het_nmifc.
+  Context `{!VarPrm, !ValPrm, !PrincipalLatticePrm, !VarFullLblPrm, !AdvLeakPrm}.
+
+  Notation NMIFCRealIdeal A prog := (@NMIFCRealIdeal _ _ (proj_adv A) _ prog).
+
+  Definition HetNMIFCRealIdeal prog :=
+    forall A : AttackerLabel, NMIFCRealIdeal A prog.
+
+  Notation "⊢ p" := (FullWellFormedProg full_public_trusted p) (at level 10).
+
+  Theorem het_nmifc_real_ideal p :
+    ⊢ p ->
+    HetNMIFCRealIdeal p.
+  Proof.
+    move=> wt albl; apply: nmifc_real_ideal.
+    erewrite <- fullpt_is_pt; exact: full_to_4pt_prog.
+  Qed.
+  Print Assumptions het_nmifc_real_ideal. 
+End het_nmifc.
 

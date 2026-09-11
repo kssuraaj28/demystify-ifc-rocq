@@ -167,6 +167,10 @@ Section ts.
       constructor; done.
   Qed.
 
+  Lemma full_to_4pt_prog (A : AttackerLabel) pc p :
+    FullWellFormedProg pc p -> @WellFormedProg _ _ (proj_adv A) (to4pt A pc) p.
+  Proof. apply: Forall_impl. exact: full_to_4pt_cmd. Qed.
+
 
   Definition full_public_trusted := (topP , botP).
 
