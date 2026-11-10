@@ -73,13 +73,12 @@ Section thm.
     apply: (reachable_invariant _ _ dwnrd_rstrct_lift); [.. |exact: rch]=> {rch}. (* TODO: Why I have to do this dwnrd_rstrct_lift *)
       { move: wtp; clear.
       rewrite/prg_dwngrd_rstrct/dwnrd_rstrct_lift/init_cfg.
-      rewrite/is_true !forallb_forall -!Forall_forall Forall_map.
-      exact: Forall_impl. }
+      move=> /forallbP H; apply/forallbP; rewrite Forall_map.
+      move: H; exact: Forall_impl. }
     clear=> - [] [] // acmd ? [] > /= /andP [].
     rewrite/dwnrd_rstrct_lift.
     move acmdstp: (acmd_step _ _ _)=> [[? ?] ?].
-    rewrite/is_true !forallb_forall -!Forall_forall Forall_app.
-    move=> rst x; split=> // {x}.
+    move=> rst /forallbP x; apply/forallbP; rewrite Forall_app; split=> // {x}.
     rewrite Forall_map.
     apply: Forall_combine2_ind1; [case=> /= ? ?; apply| ..]=> //.
     rewrite Forall_map /=.
@@ -87,10 +86,11 @@ Section thm.
       { case: isatk=> _ [] <- _ //. } 
     move=> cmd rst [] <- _ _.
     move: cmd rst. rewrite/clean_cmd_stp_cnt. move: (eval_bool_exp _); clear=> ?.
-    case=> //=> > => [/andP []|]; rewrite !/is_true !forallb_forall -!Forall_forall.
-    1,2: case: (X in if X then _ else _)=> //.
-    rewrite Forall_app=> + /ltac:(split) //.
-    rewrite !Forall_forall -!forallb_forall /==> -> //.
+    case=> //=> > => [/andP [/forallbP Hb1 /forallbP Hb2]|/forallbP Hb].
+    - case: (X in if X then _ else _); done.
+    - case: (X in if X then _ else _); [|done].
+      rewrite Forall_app; split=> //.
+      apply: Forall_cons=> /=; [apply/forallbP|]; done.
   Qed.
 
 End thm.

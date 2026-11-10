@@ -57,6 +57,16 @@ Section full_lattice.
     move =>/leqP_antisym /[apply] ->; auto.
   Qed.
 
+  (* Decidable equality on principals, from antisymmetry of the order. *)
+  Definition eqP (x y : P) : bool := (x ≽ y) && (y ≽ x).
+
+  Lemma eqPP x y : reflect (x = y) (eqP x y).
+  Proof.
+    rewrite /eqP; apply: (iffP andP).
+    - case=> Hxy Hyx; exact: leqP_antisym.
+    - move=> ->; split; exact: leqP_refl.
+  Qed.
+
   (* Meet / join bounds, derived from the lub/glb characterisations. *)
   Lemma meet_le_l x y : leqP (meetP x y) x.
   Proof. move: (leqP_meet x y (meetP x y)); rewrite (leqP_refl (meetP x y))=> /esym /andP[Hl _]; exact: Hl. Qed.

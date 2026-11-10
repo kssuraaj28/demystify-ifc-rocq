@@ -661,6 +661,24 @@ Module List.
     Proof. move=> *. cook. Abort.
   End test.
 
+  Fact forallbP {A} (f : A -> bool) l : reflect (Forall (fun x => f x) l) (forallb f l).
+  Proof. apply: (iffP idP); rewrite /is_true forallb_forall -Forall_forall //. Qed.
+
+  (* Turn a [forallb] in the goal, or in the top hypothesis, into a [Forall]. *)
+  Ltac2 Set this_cookbook_ as old := add_cookstep ltac1:(
+    lazymatch goal with
+    | |- is_true (forallb _ _) => apply/forallbP
+    | |- is_true (forallb _ _) -> _ => move=> /forallbP
+    end) "forallbP" old.
+
+  Section test.
+    Ltac cook := ltac2:(cook (keep_only this_cookbook_ ["forallbP"])).
+    Goal forall (f g : nat -> bool) l, forallb f l -> forallb g l -> forallb g l.
+    Proof. move=> *. cook. Abort.
+    Goal forall (f : nat -> bool) l, forallb f l -> False.
+    Proof. move=> f l. cook. Abort.
+  End test.
+
   Ltac2 this_cookbook () := this_cookbook_ ().
   Ltac local_cook := ltac2:(cook this_cookbook).
   Hint Extern 10 => lazymatch goal with _ =>  apply/Forall_forall end : trickbag.
