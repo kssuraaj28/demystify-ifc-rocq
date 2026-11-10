@@ -213,17 +213,11 @@ End Notations.
    With a confidentiality principal more powerful than the integrity one
    (false ≤ true), this is exactly the semi-honest attacker. *)
 Section sanity.
-  Let bool_plat : PrincipalLatticePrm.
+  #[refine, local] Instance bool_plat : PrincipalLatticePrm :=
+    {| P := bool; leqP := implb; meetP := andb; joinP := orb;
+       topP := true; botP := false |}.
   Proof.
-    refine {| P := bool; leqP := implb; meetP := andb; joinP := orb;
-              topP := true; botP := false |}.
-    - case=> //.
-    - move=> x y z; case: x; case: y; case: z=> //.
-    - move=> x y; case: x; case: y=> //.
-    - move=> x y z; case: x; case: y; case: z=> //.
-    - move=> x y z; case: x; case: y; case: z=> //.
-    - case=> //.
-    - case=> //.
+    1-7: do ! (move=> // []).
   Defined.
 
   Let semihonest : @AttackerLabel bool_plat.

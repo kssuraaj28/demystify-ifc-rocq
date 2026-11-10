@@ -16,6 +16,7 @@ Proofs scripts live in the Nmif/ directory:
     DowngradeSyntaxRestriction.v : checking that a program does no downgrading
     FullLattice.v : the full lattice of heterogeneous principals
     FullTypeSystem.v : type system for IMPThreat with the full lattice
+    FullTypeChecker.v : verified type checker + running auction example
     IdlAtkPreds.v : predicates for constraining ideal attackers
     Lattice4pt.v : the 4-point lattice
     Noninterference.v : definition of noninterference
