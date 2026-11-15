@@ -190,3 +190,90 @@ Module AuctionExample.
     Proof. done. Qed.
   End insecure.
 End AuctionExample.
+
+Module PasswordExample.
+
+  (* The principals *)
+  Variant Prin := top | bot. 
+
+  Definition prin_leq (x y : Prin) : bool :=
+    match x, y with
+    | top, _ => true
+    | _, bot => true
+    | _, _ => false
+    end.
+
+  Definition prin_meet (x y : Prin) : Prin :=
+    match x, y with
+    | bot, bot => bot
+    | _, _ => top
+    end.
+
+  Definition prin_join (x y : Prin) : Prin :=
+    match x, y with
+    | top, top => top
+    | _, _ => bot
+    end.
+
+  #[refine, local] Instance auction_plat : PrincipalLatticePrm :=
+    {| P := Prin; leqP := prin_leq; meetP := prin_meet; joinP := prin_join;
+       topP := bot; botP := top |}.
+  Proof.
+    1-7: do ! (move=> // []).
+  Defined.
+
+  Variant Var := password | guess | endorsed_guess | result | result_pub.
+
+  #[refine, local] Instance auction_vars : VarPrm := {| Vars := Var |}.
+  Proof. constructor; rewrite /decidable; decide equality. Defined.
+
+  Import Stdlib.Strings.String.
+  #[local] Open Scope string_scope.
+
+  Variant Val := boolean (_ : bool) | str (_ : string).
+
+  #[local] Instance auction_vals : ValPrm := {| Vals := Val; val_ne := boolean true |}.
+
+  Definition check_password : Prog :=
+    [ assign (endorse guess endorsed_guess);
+
+      assign (exp_assign (endorsed_guess, password, 
+        fun a b => 
+        match a, b with
+        | str a , str b => boolean (a =? b)
+        | _ , _ => boolean false
+        end
+        ) result);
+
+      assign (declassify result result_pub)
+    ].
+
+  (* Labels as (confidentiality, integrity). *)
+  Section secure.
+    Instance secure_lbling : VarFullLblPrm := fun v =>
+      match v with
+      | password => (top , top)
+      | guess => (bot, bot)
+      | endorsed_guess => (bot, top)
+      | result => (top, top)
+      | result_pub => (bot, top)
+      end.
+    
+    Example secure_typechecks :
+      full_tc_prog full_public_trusted check_password = true.
+    Proof. done. Qed.
+  End secure.
+
+  Section insecure.
+    Instance insecure_lbling : VarFullLblPrm := fun v =>
+      match v with
+      | guess => (top, bot)
+      | endorsed_guess  => (top, top)
+      | _ => secure_lbling v
+      end.
+
+    Example insecure_fails :
+      full_tc_prog full_public_trusted check_password = false.
+    Proof. done. Qed.
+  End insecure.
+End PasswordExample.
