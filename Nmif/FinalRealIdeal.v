@@ -6,6 +6,7 @@ From Ltac2 Require Import Ltac2.
 Require Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem IdlAtkPreds CoTrace SimulatorRealIdeal DowngradeSyntaxRestriction FullLattice FullTypeSystem.
 Import Tacs Util VarValStore Attacker Syntax Lattice4pt Semantics TypeSystem IdlAtkPreds CoTrace SimulatorRealIdeal DowngradeSyntaxRestriction FullLattice FullTypeSystem.
 
+
 Set Default Proof Mode "Classic".
 Set Default Goal Selector "!".
 Set Bullet Behavior "Strict Subproofs".

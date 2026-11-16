@@ -82,7 +82,7 @@ Section semantic_preds.
   Definition Incurious : Prop :=
     forall st,
     let: learn_fn :=  post_cmd_action adv_step st in
-    forall st1 st2, learn_fn st1 = learn_fn st2.
+    Noninterfering (fun _ => tt) learn_fn id.
 
 
   Definition NMIFRestr :=  Nonmauling.
