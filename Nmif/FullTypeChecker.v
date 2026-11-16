@@ -277,3 +277,88 @@ Module PasswordExample.
     Proof. done. Qed.
   End insecure.
 End PasswordExample.
+
+Module LaunderingExample.
+
+  (* The principals *)
+  Variant Prin := top | bot. 
+
+  Definition prin_leq (x y : Prin) : bool :=
+    match x, y with
+    | top, _ => true
+    | _, bot => true
+    | _, _ => false
+    end.
+
+  Definition prin_meet (x y : Prin) : Prin :=
+    match x, y with
+    | bot, bot => bot
+    | _, _ => top
+    end.
+
+  Definition prin_join (x y : Prin) : Prin :=
+    match x, y with
+    | top, top => top
+    | _, _ => bot
+    end.
+
+  #[refine, local] Instance auction_plat : PrincipalLatticePrm :=
+    {| P := Prin; leqP := prin_leq; meetP := prin_meet; joinP := prin_join;
+       topP := bot; botP := top |}.
+  Proof.
+    1-7: do ! (move=> // []).
+  Defined.
+
+  (* Section 2.3 in the CCS'17 paper *)
+  Variant Var := x | y | y' | ret | ret_pub.
+
+  #[refine, local] Instance auction_vars : VarPrm := {| Vars := Var |}.
+  Proof. constructor; rewrite /decidable; decide equality. Defined.
+
+  Import Stdlib.Strings.String.
+  #[local] Open Scope string_scope.
+
+  #[local] Instance auction_vals : ValPrm := {| Vals := bool; val_ne := true |}.
+
+  Definition laundering : Prog :=
+    [ output x;
+      assign (endorse y y');
+      assign (exp_assign (x, y', 
+        fun a b => xorb a b)
+        ret);
+      assign (declassify ret ret_pub);
+      output ret_pub
+    ].
+
+  (* Labels as (confidentiality, integrity). *)
+  Section secure.
+    Instance secure_lbling : VarFullLblPrm := fun v =>
+      match v with
+      | y => (bot, bot)
+      | y' => (bot, top)
+
+      | x => (top, top)
+      | ret => (top, top)
+      | ret_pub => (bot, top)
+      end.
+    
+    Example secure_typechecks :
+      full_tc_prog full_public_trusted laundering = true.
+    Proof. done. Qed.
+  End secure.
+
+  Section insecure.
+
+    Instance insecure_lbling : VarFullLblPrm := fun v =>
+      match v with
+      | y => (top, bot)
+      | y' => (top, top)
+
+      | _ => secure_lbling v
+      end.
+
+    Example insecure_fails :
+      full_tc_prog full_public_trusted laundering = false.
+    Proof. done. Qed.
+  End insecure.
+End LaunderingExample.
