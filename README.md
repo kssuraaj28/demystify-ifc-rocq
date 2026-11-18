@@ -30,5 +30,6 @@ Proofs scripts live in the Nmif/ directory:
     Util.v : utility definitions, lemmas, tactics
     VarValStore.v : definition of the store
     WfFinisher.v : finisher tactic library
+    DisjunctiveTaste.v : A taste of disjunctive policies
 
 There are no admits and the only axiom used is functional extensionality.
